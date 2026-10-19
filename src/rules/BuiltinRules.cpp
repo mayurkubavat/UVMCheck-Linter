@@ -284,6 +284,16 @@ std::unique_ptr<Rule> createObjectionInNonRunPhase();
 std::unique_ptr<Rule> createObjectionControlFlowMismatch();
 std::unique_ptr<Rule> createConfigDbCrossComponentResolver();
 std::unique_ptr<Rule> createTlmTopologyChecker();
+std::unique_ptr<Rule> createVirtualSequencerWiringChecker();
+std::unique_ptr<Rule> createAnalysisTransactionMutation();
+std::unique_ptr<Rule> createBuildPhaseCrossComponentAccess();
+std::unique_ptr<Rule> createRalPredictorAdapterWiring();
+std::unique_ptr<Rule> createSequenceItemTypeCompatibility();
+std::unique_ptr<Rule> createRalMapAddressIntervalOverlap();
+std::unique_ptr<Rule> createAnalysisFifoDrainStarvation();
+std::unique_ptr<Rule> createCircularThreadWaitDeadlock();
+std::unique_ptr<Rule> createVirtualInterfaceModportDriveInversion();
+std::unique_ptr<Rule> createOrphanSubsequenceObjectionHang();
 
 void registerBuiltinRules() {
     static bool registered = false;
@@ -312,6 +322,16 @@ void registerBuiltinRules() {
     reg.registerRule(createObjectionControlFlowMismatch());
     reg.registerRule(createConfigDbCrossComponentResolver());
     reg.registerRule(createTlmTopologyChecker());
+    reg.registerRule(createVirtualSequencerWiringChecker());
+    reg.registerRule(createAnalysisTransactionMutation());
+    reg.registerRule(createBuildPhaseCrossComponentAccess());
+    reg.registerRule(createRalPredictorAdapterWiring());
+    reg.registerRule(createSequenceItemTypeCompatibility());
+    reg.registerRule(createRalMapAddressIntervalOverlap());
+    reg.registerRule(createAnalysisFifoDrainStarvation());
+    reg.registerRule(createCircularThreadWaitDeadlock());
+    reg.registerRule(createVirtualInterfaceModportDriveInversion());
+    reg.registerRule(createOrphanSubsequenceObjectionHang());
 
     // OOP
     reg.registerRule(createNonVirtualMethodOverride());

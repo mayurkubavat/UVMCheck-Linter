@@ -195,33 +195,45 @@ class uvm_tlm_fifo#(type T=int) extends uvm_component;
     function bit try_peek(output T t); return 1; endfunction
 endclass
 
-class uvm_analysis_port#(type T=int);
+class uvm_analysis_port#(type T=int) extends uvm_object;
     function new(string name = "", uvm_component parent = null);
+        super.new(name);
     endfunction
-    function void connect(uvm_analysis_port#(T) provider);
+    function void connect(uvm_object provider);
     endfunction
     function void write(T t);
     endfunction
 endclass
 
-class uvm_analysis_export#(type T=int);
+class uvm_analysis_export#(type T=int) extends uvm_object;
     function new(string name = "", uvm_component parent = null);
+        super.new(name);
     endfunction
-    function void connect(uvm_analysis_export#(T) provider);
+    function void connect(uvm_object provider);
     endfunction
     function void write(T t);
     endfunction
 endclass
 
-class uvm_seq_item_pull_export#(type REQ=int, type RSP=REQ);
+class uvm_tlm_analysis_fifo#(type T=int) extends uvm_tlm_fifo#(T);
+    uvm_analysis_export#(T) analysis_export;
     function new(string name = "", uvm_component parent = null);
+        super.new(name, parent);
+        analysis_export = new("analysis_export", this);
     endfunction
 endclass
 
-class uvm_seq_item_pull_port#(type REQ=int, type RSP=REQ);
+class uvm_seq_item_pull_export#(type REQ=int, type RSP=REQ) extends uvm_object;
     function new(string name = "", uvm_component parent = null);
+        super.new(name);
     endfunction
-    function void connect(uvm_seq_item_pull_export#(REQ, RSP) provider);
+endclass
+
+class uvm_seq_item_pull_port#(type REQ=int, type RSP=REQ) extends uvm_object;
+    function new(string name = "", uvm_component parent = null);
+        super.new(name);
+    endfunction
+    function void connect(uvm_object provider);
     endfunction
 endclass
 
@@ -236,6 +248,64 @@ class uvm_config_db #(type T = int);
         return 1;
     endfunction
     static function void set(uvm_component cntxt, string inst_name, string field_name, T value);
+    endfunction
+endclass
+
+virtual class uvm_subscriber#(type T=int) extends uvm_component;
+    function new(string name = "", uvm_component parent = null);
+        super.new(name, parent);
+    endfunction
+    pure virtual function void write(T t);
+endclass
+
+virtual class uvm_monitor extends uvm_component;
+    function new(string name = "", uvm_component parent = null);
+        super.new(name, parent);
+    endfunction
+endclass
+
+class uvm_reg extends uvm_object;
+    int size_in_bytes;
+    function new(string name = "", int size_bytes = 4);
+        super.new(name);
+        this.size_in_bytes = size_bytes;
+    endfunction
+    function int get_n_bytes();
+        return size_in_bytes;
+    endfunction
+endclass
+
+class uvm_reg_map extends uvm_object;
+    function new(string name = "");
+        super.new(name);
+    endfunction
+    function void set_sequencer(uvm_sequencer_base seqr, uvm_object adapter = null);
+    endfunction
+    function void add_reg(uvm_reg rg, int offset, string rights = "RW");
+    endfunction
+endclass
+
+class uvm_reg_block extends uvm_object;
+    uvm_reg_map default_map;
+    function new(string name = "");
+        super.new(name);
+        default_map = new("default_map");
+    endfunction
+endclass
+
+class uvm_reg_adapter extends uvm_object;
+    function new(string name = "");
+        super.new(name);
+    endfunction
+endclass
+
+class uvm_reg_predictor#(type BUSTYPE=int) extends uvm_component;
+    uvm_reg_map map;
+    uvm_reg_adapter adapter;
+    uvm_analysis_export#(BUSTYPE) bus_in;
+    function new(string name = "", uvm_component parent = null);
+        super.new(name, parent);
+        bus_in = new("bus_in", this);
     endfunction
 endclass
 
