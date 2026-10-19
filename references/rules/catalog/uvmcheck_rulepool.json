@@ -1,0 +1,2112 @@
+{
+  "version": "1.0",
+  "tool": "UVMCheck Master Rule Specification",
+  "rules": [
+    {
+      "id": "UVM-FAC-001",
+      "ref_id": "SVTB.UVM.FACTORY.NEW",
+      "name": "UvmComponentDirectNew",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "UVM components must be created using the UVM factory (type_name::type_id::create) instead of direct new() calls to support testbench overrides."
+    },
+    {
+      "id": "UVM-FAC-002",
+      "ref_id": "SVTB.UVM.FACTORY.MACRO_MISMATCH",
+      "name": "UvmFactoryMacroMismatch",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Classes derived from uvm_component must use `uvm_component_utils, and classes derived from uvm_object must use `uvm_object_utils."
+    },
+    {
+      "id": "UVM-FAC-003",
+      "ref_id": "SVTB.UVM.FACTORY.MISSING_UTILS",
+      "name": "UvmFactoryMissingUtils",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Concrete classes derived from uvm_object or uvm_component must declare factory registration macros."
+    },
+    {
+      "id": "UVM-PHS-001",
+      "ref_id": "SVTB.UVM.PHASE.MISSING_SUPER",
+      "name": "UvmMissingSuperPhase",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Overridden standard UVM phases in uvm_component must call super.<phase_name>(phase) to ensure proper base-class configuration."
+    },
+    {
+      "id": "UVM-PHS-002",
+      "ref_id": "SVTB.UVM.PHASE.TIME_IN_FUNC",
+      "name": "UvmTimeInFunctionPhase",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Function-based UVM phases (e.g., build_phase, connect_phase) must not consume simulation time using delays (#), event controls (@), or wait statements."
+    },
+    {
+      "id": "UVM-PHS-003",
+      "ref_id": "SVTB.UVM.PHASE.TASK_SIG_MISMATCH",
+      "name": "UvmPhaseSignatureMismatch",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Standard UVM phase methods must have the correct signature (e.g. build_phase must be function void with uvm_phase argument)."
+    },
+    {
+      "id": "UVM-OBJ-001",
+      "ref_id": "SVTB.UVM.OBJECTION.UNPAIRED_RAISE_DROP",
+      "name": "UvmUnpairedObjection",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Every phase.raise_objection() call must have a guaranteed corresponding phase.drop_objection() along all execution paths."
+    },
+    {
+      "id": "UVM-OBJ-002",
+      "ref_id": "SVTB.UVM.OBJECTION.RAISE_IN_LOOP",
+      "name": "UvmObjectionInLoop",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Avoid raising and dropping objections inside high-frequency transaction loops to prevent severe simulation performance degradation."
+    },
+    {
+      "id": "UVM-CFG-001",
+      "ref_id": "SVTB.UVM.CONFIG_DB.TYPE_MISMATCH",
+      "name": "UvmConfigDbTypeMismatch",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "The type parameter in uvm_config_db#(T)::get must match the type parameter used in the corresponding set call."
+    },
+    {
+      "id": "UVM-CFG-002",
+      "ref_id": "SVTB.UVM.CONFIG_DB.NULL_CONTEXT",
+      "name": "UvmConfigDbNullContext",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Avoid passing null as context inside uvm_component get/set calls; use 'this' for proper hierarchical scoping."
+    },
+    {
+      "id": "UVM-TLM-001",
+      "ref_id": "SVTB.UVM.TLM.UNBOUND_PORT",
+      "name": "UvmUnconnectedTlmPort",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Mandatory TLM ports and exports must be connected in the connect_phase to prevent runtime fatal errors."
+    },
+    {
+      "id": "UVM-SEQ-001",
+      "ref_id": "SVTB.UVM.SEQ.DIRECT_VIF_ACCESS",
+      "name": "UvmSequenceDirectVifAccess",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Sequences must not directly read or drive physical interface signals; driving is the sole responsibility of the driver."
+    },
+    {
+      "id": "SV-OOP-001",
+      "ref_id": "SVTB.OOP.NON_VIRTUAL_OVERRIDE",
+      "name": "NonVirtualMethodOverride",
+      "category": "OOP",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Overriding a non-virtual method in a derived class breaks polymorphism when accessed via a base class handle."
+    },
+    {
+      "id": "SV-OOP-002",
+      "ref_id": "SVTB.OOP.UNCHECKED_DYNAMIC_CAST",
+      "name": "UncheckedDynamicCast",
+      "category": "OOP",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Return value of $cast(dest, src) must be explicitly checked to prevent silent null-pointer exceptions."
+    },
+    {
+      "id": "SV-OOP-003",
+      "ref_id": "SVTB.OOP.MISSING_SUPER_NEW",
+      "name": "MissingSuperNew",
+      "category": "OOP",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Class constructors of derived classes should explicitly invoke super.new(...) with appropriate parameters."
+    },
+    {
+      "id": "SV-OOP-004",
+      "ref_id": "SVTB.OOP.VAR_SHADOWING",
+      "name": "VariableShadowing",
+      "category": "OOP",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Derived class property shadows a base class property, or a method parameter/local variable shadows a class member property."
+    },
+    {
+      "id": "SV-DUP-001",
+      "ref_id": "SVTB.CODE.DUPLICATE_METHOD",
+      "name": "DuplicateMethodBody",
+      "category": "Quality",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Detects identical copy-pasted subroutine method bodies across distinct classes to eliminate technical debt and encourage shared utilities."
+    },
+    {
+      "id": "SV-PRF-001",
+      "ref_id": "SVTB.PERF.PASS_ARRAY_BY_VALUE",
+      "name": "PassArrayByValue",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Passing dynamic arrays, queues, associative arrays, or large structs by value triggers expensive memory duplicates; use const ref instead."
+    },
+    {
+      "id": "SV-THR-001",
+      "ref_id": "SVTB.THREAD.FORK_LOOP_VAR",
+      "name": "ForkLoopVariableShared",
+      "category": "Concurrency",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Spawning background threads with fork..join_none inside a loop without an automatic variable copy causes all threads to see the final loop index."
+    },
+    {
+      "id": "SV-DED-001",
+      "ref_id": "SVTB.DEADCODE.UNUSED_VARIABLE",
+      "name": "UnusedVariable",
+      "category": "DeadCode",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Detects local variables or class properties that are declared but never referenced."
+    },
+    {
+      "id": "SV-STY-001",
+      "ref_id": "SVTB.STYLE.CLASS_MEMBER_PREFIX",
+      "name": "ClassMemberPrefix",
+      "category": "Style",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Enforces that member properties of classes begin with m_ prefix."
+    },
+    {
+      "id": "SV-STY-002",
+      "ref_id": "SVTB.STYLE.MACRO_SEMICOLON",
+      "name": "MacroTrailingSemicolon",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags semicolons following `uvm_* macro invocations that create empty statements in declarative scopes."
+    },
+    {
+      "id": "SV-RND-001",
+      "ref_id": "SVTB.RND.UNCHECKED_RANDOMIZE",
+      "name": "UncheckedRandomize",
+      "category": "Safety",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "The return value of randomize() must be checked. Silently ignoring failure leaves transactions un-randomized or corrupt."
+    },
+    {
+      "id": "SV-OOP-005",
+      "ref_id": "SVTB.OOP.VIRTUAL_CALL_IN_CTOR",
+      "name": "VirtualCallInConstructor",
+      "category": "OOP",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Calling virtual methods inside class constructors executes against uninitialized child properties."
+    },
+    {
+      "id": "SV-TYP-001",
+      "ref_id": "SVTB.TYPE.MIXED_SIGN_COMPARISON",
+      "name": "MixedSignComparison",
+      "category": "Arithmetic",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Comparing signed and unsigned integers causes implicit unsigned coercion, inverting negative magnitude comparisons."
+    },
+    {
+      "id": "SV-RND-002",
+      "ref_id": "SVTB.RND.GLOBAL_RNG_IN_CLASS",
+      "name": "GlobalRngInClass",
+      "category": "Reproducibility",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Calling global PRNG system functions ($urandom, $random) inside class scopes corrupts simulation seed repeatability."
+    },
+    {
+      "id": "SV-THR-002",
+      "ref_id": "SVTB.THREAD.STATIC_ROUTINE_VAR",
+      "name": "StaticRoutineVariableLifetime",
+      "category": "Concurrency",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Non-class tasks and functions default to static lifetime, causing local variables to be shared across concurrent invocations."
+    },
+    {
+      "id": "UVM-ALS-001",
+      "ref_id": "SVTB.UVM.ALIAS_TRANSACTION_LEAK",
+      "name": "UvmTransactionAliasing",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Writing a transaction to an analysis port and subsequently mutating it in-place leaks shared mutable state to listeners."
+    },
+    {
+      "id": "SV-RCE-001",
+      "ref_id": "SVTB.THREAD.ZERO_DELAY_EVENT",
+      "name": "ZeroDelayEventTrigger",
+      "category": "Concurrency",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Delta-cycle race condition when triggering a named event with -> before concurrent listeners reach @(event)."
+    },
+    {
+      "id": "SV-INT-001",
+      "ref_id": "SVTB.INTF.BLOCKING_SIGNAL_DRIVE",
+      "name": "BlockingAssignmentToInterface",
+      "category": "RTL_TB_Bridge",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Driving virtual interface signals using blocking assignment (=) introduces simulation race conditions with DUT sequential logic."
+    },
+    {
+      "id": "SV-PRF-002",
+      "ref_id": "SVTB.PERF.ARRAY_REDUCE_TRUNCATION",
+      "name": "ArrayReductionWidthTruncation",
+      "category": "Performance",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Array reduction methods (.sum, .product) accumulate at element bit-width before extension to LHS. Summing sub-32-bit elements into wider integers wraps modulo element width unless cast inside with()."
+    },
+    {
+      "id": "SV-OOP-006",
+      "ref_id": "SVTB.OOP.SHALLOW_COPY_ALIAS",
+      "name": "ClassShallowCopyAliasing",
+      "category": "OOP",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Using shallow copy (new other_obj) on classes containing nested object handles creates shared references across independent transactions."
+    },
+    {
+      "id": "SV-RND-003",
+      "ref_id": "SVTB.RND.MISSING_SUPER_CALLBACK",
+      "name": "RandomizeMissingSuper",
+      "category": "Safety",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Overridden pre_randomize() and post_randomize() callback methods must invoke super.pre_randomize() or super.post_randomize() to prevent bypassing base-class transaction setup and validation routines."
+    },
+    {
+      "id": "SV-EVT-001",
+      "ref_id": "SVTB.THREAD.PERSISTENT_TRIGGER_HANG",
+      "name": "ZeroDelayEventWaitLoop",
+      "category": "Concurrency",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Using wait(event.triggered) inside a loop without an intervening time-advancing delay (@ or #) causes a zero-delay infinite delta loop that hangs the simulator at 100% CPU."
+    },
+    {
+      "id": "SV-SVA-001",
+      "ref_id": "SVTB.SVA.GLITCH_IMMEDIATE_ASSERT",
+      "name": "ImmediateAssertInCombinatorialLogic",
+      "category": "SVA",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Simple immediate assertions in always_comb or combinatorial blocks evaluate transient delta glitches. Convert to deferred immediate assertions (assert #0 or assert final) to wait for settled circuit values."
+    },
+    {
+      "id": "SV-ASC-001",
+      "ref_id": "SVTB.ARRAY.ASSOC_MUTATING_READ",
+      "name": "AssociativeArrayMutatingRead",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Reading from an associative array without exists() allocates default uninitialized elements, silently mutating table size."
+    },
+    {
+      "id": "SV-LOC-001",
+      "ref_id": "SVTB.ARRAY.LOCATOR_EMPTY_DEREF",
+      "name": "ArrayLocatorEmptyQueueDeref",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Indexing [0] or popping from an array locator result (.find, .find_first) without checking .size() > 0 risks reading 'x or null."
+    },
+    {
+      "id": "SV-CB-001",
+      "ref_id": "SVTB.CB.OUTPUT_READ_SKEW",
+      "name": "ClockingBlockOutputReadSkew",
+      "category": "RTL_TB_Bridge",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Reading an output signal of a clocking block samples the Re-NBA scheduled drive rather than the physical bus wire."
+    },
+    {
+      "id": "SV-STR-001",
+      "ref_id": "SVTB.STREAM.UNBOUNDED_SIZE_MISMATCH",
+      "name": "StreamingConcatenationSizeMismatch",
+      "category": "Safety",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Unpacking bitstreams with {>>{}} silently truncates trailing bits or pads targets with zeros on length mismatch."
+    },
+    {
+      "id": "SV-COV-001",
+      "ref_id": "SVTB.COV.UNREFERENCED_CG",
+      "name": "UnreferencedCovergroup",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags covergroups that are declared inside classes or packages but never instantiated with new() or never explicitly sampled."
+    },
+    {
+      "id": "SV-OOP-007",
+      "ref_id": "SVTB.OOP.STATIC_COMP_MEMBER",
+      "name": "StaticMemberInUvmComponent",
+      "category": "Architecture",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Non-const static variable declared in a uvm_component subclass is shared across all instances simulation-wide, causing multi-channel race conditions."
+    },
+    {
+      "id": "UVM-SEQ-002",
+      "ref_id": "SVTB.UVM.SEQ_PRE_POST_BODY",
+      "name": "UvmSequencePrePostBodyMisuse",
+      "category": "Architecture",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "pre_body() and post_body() callbacks in uvm_sequence are explicitly bypassed when executed as a child sequence via `uvm_do or `uvm_do_with."
+    },
+    {
+      "id": "UVM-SEQ-003",
+      "ref_id": "SVTB.UVM.P_SEQUENCER_ABUSE",
+      "name": "UvmPSequencerAbuse",
+      "category": "Architecture",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Using `uvm_declare_p_sequencer or accessing p_sequencer violates the Law of Demeter by tightly coupling the sequence data tier to physical sequencer component internals."
+    },
+    {
+      "id": "UVM-OBS-001",
+      "ref_id": "SVTB.UVM.OBSERVER_WRITE_MUTATE",
+      "name": "ObserverStateMutationInWrite",
+      "category": "Architecture",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Mutating the observed transaction object inside a subscriber's write() method corrupts state for other concurrent subscribers in the Observer pattern."
+    },
+    {
+      "id": "UVM-RAL-001",
+      "ref_id": "SVTB.UVM.RAL_DIRECT_MIRROR_WRITE",
+      "name": "DirectRalMirrorTampering",
+      "category": "Architecture",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Direct assignment to internal RAL fields (m_value, m_mirrored, m_desired) bypasses register callbacks, access policy checks, and prediction pipelines."
+    },
+    {
+      "id": "SV-OCP-001",
+      "ref_id": "SVTB.OOP.CAST_TYPE_LADDER",
+      "name": "CastTypeInspectionLadder",
+      "category": "Architecture",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Chained $cast ladders against the same base transaction handle violate the Open/Closed Principle; refactor to polymorphic methods or visitor dispatch."
+    },
+    {
+      "id": "SV-LSP-001",
+      "ref_id": "SVTB.OOP.LSP_CONSTRAINT_CONTRADICTION",
+      "name": "LspConstraintContradiction",
+      "category": "Architecture",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Derived transaction constraint blocks contradicting or disabling inherited base-class constraints violate the Liskov Substitution Principle."
+    },
+    {
+      "id": "SV-ENC-001",
+      "ref_id": "SVTB.OOP.MUTABLE_OBJECT_GETTER_LEAK",
+      "name": "MutableObjectGetterLeak",
+      "category": "Architecture",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Public getter methods returning naked handles to private/local mutable objects break encapsulation and defensive copying contracts."
+    },
+    {
+      "id": "SV-PRF-003",
+      "ref_id": "SVTB.PERF.DYN_ARRAY_RESIZE_IN_LOOP",
+      "name": "DynArrayIncrementalResizeInLoop",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Growing dynamic arrays incrementally inside loops with new[arr.size()+1](arr) causes O(N^2) memory reallocation bottlenecks."
+    },
+    {
+      "id": "SV-PRF-004",
+      "ref_id": "SVTB.PERF.PROCEDURAL_ZERO_DELAY",
+      "name": "ProceduralZeroDelay",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Procedural delay #0 reschedules execution into the Inactive region. Repeated #0 rescheduling causes delta-cycle thrashing and degrades simulation throughput."
+    },
+    {
+      "id": "SV-DED-002",
+      "ref_id": "SVTB.DED.UNREACHABLE_POST_RETURN",
+      "name": "UnreachableStatementsPostReturn",
+      "category": "DeadCode",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Detects unreachable statements appearing after an unconditional control-flow termination (return, break, continue)."
+    },
+    {
+      "id": "SV-DED-003",
+      "ref_id": "SVTB.DED.ACCIDENTAL_EMPTY_CONDITIONAL",
+      "name": "AccidentalEmptyConditional",
+      "category": "DeadCode",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects accidental semicolons immediately following if() or while() headers, causing subsequent blocks to execute unconditionally."
+    },
+    {
+      "id": "SV-DED-004",
+      "ref_id": "SVTB.DED.CONSECUTIVE_DEAD_STORE",
+      "name": "ConsecutiveDeadStore",
+      "category": "DeadCode",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Detects consecutive assignments to the same variable where the initial value is immediately overwritten without being read."
+    },
+    {
+      "id": "SV-PRF-005",
+      "ref_id": "SVTB.PERF.VERBOSITY_FORMAT_EVAL",
+      "name": "UnshieldedVerbosityFormatEval",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Calling $sformatf inside uvm_info/warning without checking uvm_report_enabled formats strings even when messages are discarded."
+    },
+    {
+      "id": "SV-PRF-006",
+      "ref_id": "SVTB.PERF.STRING_KEY_ASSOC_ARRAY",
+      "name": "StringKeyAssociativeArray",
+      "category": "Performance",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Associative arrays indexed by strings in high-frequency scoreboards or monitors induce string hashing overhead; consider enum or integer keys."
+    },
+    {
+      "id": "SV-DED-005",
+      "ref_id": "SVTB.DED.UNREAD_CLASS_PROPERTY",
+      "name": "UnreadClassProperty",
+      "category": "DeadCode",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Class property is updated or written to, but its value is never read or checked across the testbench."
+    },
+    {
+      "id": "SV-DED-006",
+      "ref_id": "SVTB.DED.UNWRITTEN_CLASS_PROPERTY",
+      "name": "UnwrittenClassProperty",
+      "category": "DeadCode",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Non-rand class property with no default initializer is read by methods but never initialized or assigned."
+    },
+    {
+      "id": "SV-DED-007",
+      "ref_id": "SVTB.DED.UNUSED_PURE_ROUTINE_RESULT",
+      "name": "UnusedPureRoutineResult",
+      "category": "DeadCode",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Calling pure utility functions (e.g. $clog2, $countones, crc_calc) without capturing the return value."
+    },
+    {
+      "id": "SV-STY-003",
+      "ref_id": "SVTB.STY.TODO_COMMENT_TRACKER",
+      "name": "TodoCommentTracker",
+      "category": "Style",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Unresolved development markers (TODO, FIXME, ICEBOX, HACK, XXX) tracked in comments to prevent lingering technical debt."
+    },
+    {
+      "id": "UVM-STY-001",
+      "ref_id": "UVM.STY.CREATE_STRING_MATCH",
+      "name": "UvmCreateStringMismatch",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Instance name string in type_id::create() must match receiving variable identifier for proper uvm_config_db scoping."
+    },
+    {
+      "id": "UVM-STY-002",
+      "ref_id": "UVM.STY.CONSTRAINT_NAME_SUFFIX",
+      "name": "ConstraintNameSuffix",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Constraint block names must terminate with '_c' suffix by convention."
+    },
+    {
+      "id": "SV-STY-004",
+      "ref_id": "SVTB.STY.TYPEDEF_SUFFIX",
+      "name": "TypedefNameSuffix",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Enforce typedef suffixes: '_e' for enums and '_t' for structs/data types."
+    },
+    {
+      "id": "SV-STY-005",
+      "ref_id": "SVTB.STY.MANDATORY_END_LABEL",
+      "name": "MandatoryMatchingEndLabel",
+      "category": "Style",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Routines and classes must include explicit end labels ('endfunction : name', 'endclass : name')."
+    },
+    {
+      "id": "SV-STY-006",
+      "ref_id": "SVTB.STY.MATCHING_END_LABEL",
+      "name": "MismatchedEndLabel",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Routine or class end labels must match the declaration identifier."
+    },
+    {
+      "id": "SV-STY-007",
+      "ref_id": "SVTB.STY.METHOD_BANNER_STYLE",
+      "name": "MethodBannerStyle",
+      "category": "Documentation",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Standardized method header pre-banner separating non-extern methods."
+    },
+    {
+      "id": "SV-STY-008",
+      "ref_id": "SVTB.STY.SECTION_HEADER_BANNER",
+      "name": "SectionHeaderBanner",
+      "category": "Documentation",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Uniform major section divider banners across class and package scopes."
+    },
+    {
+      "id": "SV-STY-009",
+      "ref_id": "SVTB.STY.EXTERN_METHOD_THRESHOLD",
+      "name": "ExternMethodThreshold",
+      "category": "Architecture",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Enforce 'extern' declaration for class methods exceeding N lines of procedural implementation."
+    },
+    {
+      "id": "SV-STY-010",
+      "ref_id": "SVTB.STY.EXPLICIT_LITERAL_WIDTH",
+      "name": "ExplicitLiteralWidth",
+      "category": "Safety",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallow unsized integer and numeric literals without explicit bit-width declarations."
+    },
+    {
+      "id": "SV-STY-011",
+      "ref_id": "SVTB.STY.ONE_STMT_PER_LINE",
+      "name": "OneStatementPerLine",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Prohibit multiple procedural statements on the same line separated by semicolons."
+    },
+    {
+      "id": "SV-STY-012",
+      "ref_id": "SVTB.STY.SPACE_KEYWORD_PAREN",
+      "name": "SpaceKeywordParen",
+      "category": "Style",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Require a single space between control keywords (if, for, while, case) and opening parenthesis."
+    },
+    {
+      "id": "SV-STY-013",
+      "ref_id": "SVTB.STY.INCLUDE_GUARD",
+      "name": "IncludeGuard",
+      "category": "Preprocessor",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Enforce macro include guards (`ifndef / `define / `endif) in header files."
+    },
+    {
+      "id": "SV-DEP-001",
+      "ref_id": "SVTB.DEP.PROGRAM_BLOCK",
+      "name": "ProgramBlockDeprecation",
+      "category": "Deprecated",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "The 'program' block is obsolete and deprecated in modern SystemVerilog/UVM (IEEE 1800 Annex C / IEEE 1800-2017 \u00a7 24)."
+    },
+    {
+      "id": "SV-DEP-002",
+      "ref_id": "SVTB.DEP.DEFPARAM",
+      "name": "DefparamDeprecation",
+      "category": "Deprecated",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Hierarchical parameter override 'defparam' is formally deprecated in IEEE 1800 \u00a7 23.10.1."
+    },
+    {
+      "id": "SV-DEP-003",
+      "ref_id": "SVTB.DEP.LEGACY_ALWAYS",
+      "name": "LegacyAlwaysBlock",
+      "category": "Deprecated",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Untyped legacy 'always' block is superseded by IEEE 1800 always_comb, always_ff, and always_latch."
+    },
+    {
+      "id": "SV-DEP-004",
+      "ref_id": "SVTB.DEP.RANDOM_SYS_FUNC",
+      "name": "RandomSystemFunction",
+      "category": "Deprecated",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Legacy Verilog system function '$random' is superseded by IEEE 1800 '$urandom' and '$urandom_range'."
+    },
+    {
+      "id": "SV-DEP-005",
+      "ref_id": "SVTB.DEP.PROC_ASSIGN",
+      "name": "ProceduralContinuousAssign",
+      "category": "Deprecated",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Procedural continuous assignment ('assign' / 'deassign' inside procedural block) is non-synthesizable and deprecated in IEEE 1800 \u00a7 10.6."
+    },
+    {
+      "id": "SV-DEP-006",
+      "ref_id": "SVTB.DEP.NON_ANSI_PORTS",
+      "name": "NonAnsiPortList",
+      "category": "Deprecated",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Non-ANSI port list declarations are obsolete in IEEE 1800 \u00a7 13.3; use inline ANSI-style port declarations."
+    },
+    {
+      "id": "UVM-DEP-001",
+      "ref_id": "UVM.DEP.CONFIG_CALLS",
+      "name": "UvmDeprecatedConfigCalls",
+      "category": "Deprecated",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Legacy string-based configuration calls (set_config_*, get_config_*) are formally deprecated in IEEE 1800.2 Annex H."
+    },
+    {
+      "id": "UVM-DEP-002",
+      "ref_id": "UVM.DEP.REPORT_SERVER",
+      "name": "UvmDeprecatedReportServer",
+      "category": "Deprecated",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Direct singleton access 'uvm_report_server::get_server()' is deprecated in IEEE 1800.2 \u00a7 F.4.2 & Annex H; use uvm_coreservice_t."
+    },
+    {
+      "id": "UVM-DEP-003",
+      "ref_id": "UVM.DEP.PRINTER_KNOBS",
+      "name": "UvmDeprecatedPrinterKnobs",
+      "category": "Deprecated",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Direct access to internal 'printer.knobs' is deprecated in IEEE 1800.2 \u00a7 5.5.2; use accessor policy methods on uvm_printer."
+    },
+    {
+      "id": "UVM-DEP-004",
+      "ref_id": "UVM.DEP.TEST_DONE",
+      "name": "UvmDeprecatedTestDone",
+      "category": "Deprecated",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Legacy OVM objection handle 'uvm_test_done' is obsolete in IEEE 1800.2 Annex H; attach objections directly to phase handle."
+    },
+    {
+      "id": "UVM-BAN-001",
+      "ref_id": "UVM.BAN.FIELD_MACROS",
+      "name": "UvmBannedFieldMacros",
+      "category": "AntiPattern",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "The `uvm_field_* macro suite is banned in high-performance verification due to severe reflection overhead (3x-10x) and uncontrollable deep copying."
+    },
+    {
+      "id": "UVM-BAN-002",
+      "ref_id": "UVM.BAN.UVM_DO",
+      "name": "UvmBannedUvmDoMacros",
+      "category": "AntiPattern",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "The `uvm_do macro suite is discouraged in modern sequence development; use explicit start_item -> randomize -> finish_item handshake."
+    },
+    {
+      "id": "SV-BAN-001",
+      "ref_id": "SVTB.BAN.REG_WIRE",
+      "name": "LegacyRegWireInTestbench",
+      "category": "AntiPattern",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Legacy Verilog-95 keywords 'reg' and 'wire' are discouraged in SystemVerilog testbenches in favor of unified 4-state 'logic'."
+    },
+    {
+      "id": "SV-COR-001",
+      "ref_id": "SVTB.COR.TAUTOLOGICAL_CMP",
+      "name": "TautologicalCheckCompare",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects tautological comparison between identical expressions (e.g. act_pkt.data == act_pkt.data). Self-comparisons in scoreboards and checks always evaluate to true, masking hardware bugs."
+    },
+    {
+      "id": "SV-ARR-001",
+      "ref_id": "SVTB.ARR.OFF_BY_ONE_QUEUE",
+      "name": "OffByOneQueueIndex",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects out-of-bounds off-by-one queue and dynamic array indexing (e.g. q[q.size()]). SystemVerilog silently returns uninitialized x/0 instead of raising an exception."
+    },
+    {
+      "id": "UVM-SCB-001",
+      "ref_id": "SVTB.UVM.SCB.SILENT_DROP",
+      "name": "ScoreboardSilentDrop",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects silent returns in scoreboard write methods when expected queues are empty without logging an error. Spurious or unpredicted DUT packets are dropped, hiding hardware bugs."
+    },
+    {
+      "id": "UVM-SCB-002",
+      "ref_id": "SVTB.UVM.SCB.LEFTOVER_QUEUE",
+      "name": "ScoreboardLeftoverQueue",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Scoreboard expected transaction queues must be checked for drain completeness in check_phase or report_phase. Missing drain checks allow dropped DUT packets to pass silently."
+    },
+    {
+      "id": "SV-RND-004",
+      "ref_id": "SVTB.RND.INLINE_SHADOW_LOCAL",
+      "name": "InlineShadowNoLocal",
+      "category": "Randomization",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects inline constraint variable shadowing inside randomize() with missing local::. Unqualified identifiers resolve to target object properties, turning constraints into no-op tautologies."
+    },
+    {
+      "id": "SV-RND-005",
+      "ref_id": "SVTB.RND.NON_RAND_CONSTRAINED",
+      "name": "NonRandFieldConstrained",
+      "category": "Randomization",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects class member fields that are constrained in a constraint block but not declared rand or randc. The solver treats non-rand fields as fixed constants and will never randomize them."
+    },
+    {
+      "id": "SV-RND-006",
+      "ref_id": "SVTB.RND.RANDC_EXPLOSION",
+      "name": "RandcMemoryExplosion",
+      "category": "Randomization",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallow wide vector declarations with randc (> 16 bits). Cyclic permutation tracking across large state spaces causes simulator heap exhaustion and solver startup deadlocks."
+    },
+    {
+      "id": "SV-IPC-001",
+      "ref_id": "SVTB.IPC.TRY_PUT_IGNORED",
+      "name": "TryPutIgnoredReturn",
+      "category": "Concurrency",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Non-blocking IPC routines (try_put, try_get, try_peek) return a boolean status. Ignoring the return value silently drops transactions when queues are full or empty."
+    },
+    {
+      "id": "SV-DRV-001",
+      "ref_id": "SVTB.DRV.DRIVING_DURING_RESET",
+      "name": "DrivingDuringReset",
+      "category": "RTL_TB_Bridge",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallow driving virtual interface control signals without an active reset check or synchronization guard. Asserting handshake signals during reset violates physical bus protocols and corrupts hardware state."
+    },
+    {
+      "id": "UVM-PHS-004",
+      "ref_id": "SVTB.UVM.PHS.SEQ_IN_FUNC",
+      "name": "SequenceInFunctionPhase",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallow starting sequences (.start()) inside zero-time function phases (build_phase, connect_phase, etc.). Sequences require time-consuming simulation events and must be executed in task phases."
+    },
+    {
+      "id": "PORT-PTH-001",
+      "ref_id": "SVTB.PORT.HARDCODED_HOST_PATH",
+      "name": "HardcodedHostPaths",
+      "category": "Portability",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallow hardcoded absolute filesystem paths (/home/..., C:\\...) in file operations ($readmemh, $fopen). Absolute paths break regression execution in containerized CI/CD pipelines."
+    },
+    {
+      "id": "PORT-PRP-001",
+      "ref_id": "SVTB.PORT.PROPRIETARY_VENDOR_CALLS",
+      "name": "ProprietaryVendorCalls",
+      "category": "Portability",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallow unguarded simulator-proprietary system tasks ($vcdpluson, $fsdbDumpvars, $shm_open). Vendor-specific calls prevent Verification IP from running on other simulators."
+    },
+    {
+      "id": "SVA-CYC-001",
+      "ref_id": "SVTB.SVA.UNBOUNDED_CYCLE_DELAY",
+      "name": "SvaUnboundedDelay",
+      "category": "SVA",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallow unbounded cycle delays (##[1:$]) in SVA sequences. Unbounded delays cause simulator memory thread leaks and formal verification state-space explosions."
+    },
+    {
+      "id": "SVA-VAC-001",
+      "ref_id": "SVTB.SVA.VACUOUS_ANTECEDENT",
+      "name": "SvaVacuousAntecedent",
+      "category": "SVA",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects constant-false antecedents in assertion implications (0 |-> ...). False antecedents cause vacuous passes, giving a false 100% pass metric while never verifying DUT behavior."
+    },
+    {
+      "id": "SEC-LOG-001",
+      "ref_id": "SVTB.SEC.PLAINTEXT_KEY_LOG",
+      "name": "PlaintextKeyInLogs",
+      "category": "Security",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Detects plaintext logging of sensitive cryptographic assets (keys, seeds, secrets) via $sformatf/$display. Logging secrets compromises hardware security and violates ISO/SAE 21434 regression standards."
+    },
+    {
+      "id": "RAL-MAP-001",
+      "ref_id": "SVTB.RAL.ORPHAN_REGISTER",
+      "name": "RalOrphanRegister",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects instantiated uvm_reg instances inside uvm_reg_block that are never mapped via default_map.add_reg(). Orphan registers cause frontdoor access failures and verify phantom memory."
+    },
+    {
+      "id": "RAL-COL-001",
+      "ref_id": "SVTB.RAL.ADDRESS_COLLISION",
+      "name": "RalAddressCollision",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects duplicate/overlapping address offsets mapped in uvm_reg_block address maps. Address collisions cause silent register overwriting and hardware aliasing bugs."
+    },
+    {
+      "id": "DPI-TYP-001",
+      "ref_id": "SVTB.DPI.FOUR_STATE_TYPE",
+      "name": "DpiTypeWidthAlignment",
+      "category": "DPI",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallow 4-state types (integer, reg) in DPI-C declarations. 4-state types require complex svLogicVecVal structs in C; use 2-state portable types (int, longint, byte) for C99 ABI compatibility."
+    },
+    {
+      "id": "SV-MOD-001",
+      "ref_id": "SVTB.MOD.GLOBAL_UNIT_POLLUTION",
+      "name": "GlobalUnitPollution",
+      "category": "Portability",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallow variables, nets, typedefs, tasks, and functions declared directly in the $unit compilation unit scope. Declarations outside a package or module cause cross-file namespace pollution and compile-order dependencies in multi-unit compilation."
+    },
+    {
+      "id": "SV-MAC-001",
+      "ref_id": "SVTB.PRE.HEADER_MACRO_LEAK",
+      "name": "HeaderMacroLeak",
+      "category": "Portability",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Macros defined inside header files (.svh) must be undef'd with `undef before the end of the file unless registered as public API macros. Leaking macros causes silent parameter overrides and compilation collisions."
+    },
+    {
+      "id": "SV-FSM-001",
+      "ref_id": "SVTB.FSM.NON_EXHAUSTIVE_ENUM_CASE",
+      "name": "NonExhaustiveEnumCase",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Case statement switching over an enum type does not explicitly handle all declared enum variants while using a default: arm. Catch-all default arms silently swallow newly added specification states and mask FSM decoder bugs."
+    },
+    {
+      "id": "UVM-SEQ-004",
+      "ref_id": "SVTB.UVM.SEQUENCE_ABORT_SAFETY",
+      "name": "SequenceAbortSafety",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects calls to start_item() in UVM sequences that can bypass finish_item() via early return or break statements. An aborted sequence without finish_item() permanently deadlocks the sequencer's grant-wait queue."
+    },
+    {
+      "id": "UVM-DAG-001",
+      "ref_id": "SVTB.UVM.DANGLING_CONFIG_STRING",
+      "name": "UvmDanglingConfigString",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Static UVM component DAG path matching: detects glob strings in uvm_config_db::set() that match zero instantiated components in the verification hierarchy. Typographical errors in string paths cause configurations to be silently dropped."
+    },
+    {
+      "id": "SV-PRF-007",
+      "ref_id": "SVTB.PERF.QUEUE_CONCAT_APPEND",
+      "name": "QueueConcatAppend",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Queue concatenation 'q = {q, x}' or '{x, q}' causes full memory reallocation and O(N) buffer copy on every operation, degrading to an O(N^2) memory churn bottleneck in loops. Use in-place 'q.push_back()' or 'q.push_front()' instead."
+    },
+    {
+      "id": "SV-PRF-008",
+      "ref_id": "SVTB.PERF.QUEUE_SLICE_POP_FIRST",
+      "name": "QueueSlicePopFirst",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Queue slicing 'q = q[1:$]' duplicates the entire remaining queue into newly allocated memory. Use in-place 'void'(q.pop_front())' or 'item = q.pop_front()' for O(1) pointer adjustment."
+    },
+    {
+      "id": "SV-PRF-009",
+      "ref_id": "SVTB.PERF.NBA_ON_CLASS_PROPERTY",
+      "name": "NbaOnClassProperty",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Non-blocking assignment ('<=') targeting dynamic heap class properties. Forces simulation kernel to allocate dynamic event descriptors in the NBA event queue, thrashing the scheduler queue. Use blocking assignment ('=')."
+    },
+    {
+      "id": "SV-SML-001",
+      "ref_id": "SVTB.SML.SCRATCHPAD_CLASS_PROPERTY",
+      "name": "ScratchpadClassProperty",
+      "category": "Smell",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Loop induction variables or temporary scratchpads declared as class properties. Class-scoped loop counters waste heap memory and introduce severe multi-threaded race conditions when routines execute concurrently. Declare variables locally."
+    },
+    {
+      "id": "SV-SML-002",
+      "ref_id": "SVTB.SML.MAGIC_DELAY_IN_SEQUENCE",
+      "name": "MagicDelayInSequence",
+      "category": "Smell",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Hardcoded physical time delays ('#delay') inside uvm_sequence bodies. Sequences should be clock-frequency agnostic to ensure portability across emulation, FPGA prototyping, and ASIC frequencies. Synchronize using clocking blocks or protocol handshakes."
+    },
+    {
+      "id": "SV-SML-003",
+      "ref_id": "SVTB.SML.GENERIC_REPORT_ID",
+      "name": "GenericReportId",
+      "category": "Smell",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Generic or cryptic UVM report IDs ('ERR', 'INFO', 'DEBUG', ''). Prevents targeted log filtering and severity overrides via '+uvm_set_severity' and 'uvm_report_catcher'. Use descriptive, feature-scoped identifiers."
+    },
+    {
+      "id": "SV-SML-004",
+      "ref_id": "SVTB.SML.CYCLOMATIC_COMPLEXITY_GOD_METHOD",
+      "name": "CyclomaticComplexityGodMethod",
+      "category": "Maintainability",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Subroutines with McCabe Cyclomatic Complexity exceeding threshold (M > 15). Overly complex routines with deeply nested branching impede functional coverage, conceal unreachable edge cases, and lead to high defect density during maintenance."
+    },
+    {
+      "id": "SV-LANG-001",
+      "ref_id": "SVTB.LANG.EQUALITY_WITH_XZ",
+      "name": "EqualityWithXz",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects logical equality ('==', '!=') checks against 4-state unknown literals ('x, 'z). In SystemVerilog (IEEE 1800 \u00a7 11.4.5), logical equality against unknowns evaluates to 'x (false in branch conditions), silently masking verification failures. Use case equality ('===', '!==') instead."
+    },
+    {
+      "id": "SVA-RST-001",
+      "ref_id": "SVTB.SVA.DISABLE_IFF_RESET",
+      "name": "DisableIffReset",
+      "category": "SVA",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Concurrent assertions and property declarations must include a 'disable iff (!rst_n)' clause to gate checking during power-on reset and warm resets, avoiding false-failure storms."
+    },
+    {
+      "id": "SV-LANG-002",
+      "ref_id": "SVTB.LANG.BIT_SELECT_OOB",
+      "name": "BitSelectOutOfBounds",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects static out-of-bounds bit or element selects on vectors and arrays with fixed ranges. SystemVerilog silently returns 'x for out-of-bounds accesses without crashing, causing silent data corruption."
+    },
+    {
+      "id": "SV-RND-008",
+      "ref_id": "SVTB.RAND.NON_INVERTIBLE_OP",
+      "name": "NonInvertibleConstraintOp",
+      "category": "Randomization",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallow non-invertible operators (%, /, **) inside constraint blocks. Non-linear operators prevent SAT/SMT solvers from bi-directionally pruning solution spaces, causing catastrophic backtracking and long simulation stalls."
+    },
+    {
+      "id": "SV-COV-001",
+      "ref_id": "SVTB.COV.UNREFERENCED_CG",
+      "name": "UnreferencedCovergroup",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags covergroups that are declared inside classes or packages but never instantiated with new() or never explicitly sampled."
+    },
+    {
+      "id": "SVA-LBL-001",
+      "ref_id": "SVTB.SVA.UNLABELED_ASSERT",
+      "name": "UnlabeledAssertion",
+      "category": "Assertions",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags immediate and concurrent assertions lacking explicit label prefixes needed for regression triage and severity control."
+    },
+    {
+      "id": "SVA-CTX-001",
+      "ref_id": "SVTB.SVA.CONCURRENT_IN_FUNC",
+      "name": "ConcurrentAssertInFunction",
+      "category": "Assertions",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows concurrent assertions inside functions. Functions execute in zero simulation time and cannot participate in clock-domain sampled checking."
+    },
+    {
+      "id": "SVA-ACT-001",
+      "ref_id": "SVTB.SVA.ASSERT_WITHOUT_ELSE",
+      "name": "AssertWithoutElse",
+      "category": "Assertions",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags assertions lacking an else action block, which prevents custom error messages and UVM report catcher integration."
+    },
+    {
+      "id": "SV-LANG-004",
+      "ref_id": "SVTB.LANG.PART_SELECT_REVERSED",
+      "name": "PartSelectReversed",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects inverted part-select slicing (e.g. vec[0:7] on logic [7:0] vec). Bounds must match declared endianness."
+    },
+    {
+      "id": "SV-LANG-003",
+      "ref_id": "SVTB.LANG.UNSIZED_CONCAT",
+      "name": "UnsizedLiteralInConcat",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows unbased unsized integer literals inside concatenations ({1, 0, data}) expanding to 32 bits each."
+    },
+    {
+      "id": "SV-COV-003",
+      "ref_id": "SVTB.COV.CROSS_SAME_CP",
+      "name": "CrossSameCoverpoint",
+      "category": "Coverage",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects crossing a coverpoint with itself (cross cp_a, cp_a) which creates redundant diagonal bins."
+    },
+    {
+      "id": "SV-RND-009",
+      "ref_id": "SVTB.RAND.STATIC_CONSTRAINT",
+      "name": "StaticConstraint",
+      "category": "Random",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows static constraints which leak solver state globally across all class instances."
+    },
+    {
+      "id": "SV-RND-010",
+      "ref_id": "SVTB.RAND.CYCLIC_SOLVE_BEFORE",
+      "name": "CyclicSolveBefore",
+      "category": "Random",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects cyclic dependencies in solve...before constraint orderings forming an unsatisfiable solver graph."
+    },
+    {
+      "id": "SV-RND-011",
+      "ref_id": "SVTB.RAND.REDUNDANT_CONSTRAINT",
+      "name": "RedundantConstraint",
+      "category": "Random",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Detects duplicate constraint expressions within the same class scope that bloat solver networks."
+    },
+    {
+      "id": "UVM-LOG-002",
+      "ref_id": "SVTB.SYS.PROHIBITED_DISPLAY",
+      "name": "ProhibitedDisplayInUvm",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Prohibits direct $display/$write calls in UVM classes that bypass UVM report catchers and verbosity controls."
+    },
+    {
+      "id": "UVM-PHS-005",
+      "ref_id": "SVTB.UVM.PHASE.SUPER_PHASE_ORDER",
+      "name": "SuperBuildPhaseOrder",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Enforces that super.build_phase(phase) is the very first procedural statement in build_phase for top-down phasing."
+    },
+    {
+      "id": "UVM-STY-003",
+      "ref_id": "SVTB.UVM.COMPONENT.NAME_MISMATCH",
+      "name": "ComponentNameMismatch",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows passing hardcoded string literals to super.new in component constructors instead of forwarding name."
+    },
+    {
+      "id": "UVM-SEQ-005",
+      "ref_id": "SVTB.UVM.SEQ.EMPTY_BODY",
+      "name": "EmptySequenceBody",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags sequence classes whose body() task is empty, producing zero stimulus transactions."
+    },
+    {
+      "id": "SV-SYS-001",
+      "ref_id": "SVTB.SYS.UNCHECKED_FOPEN",
+      "name": "UncheckedFopen",
+      "category": "Security",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags unchecked $fopen return descriptors and discarded $fopen calls that risk simulator crashes on I/O error."
+    },
+    {
+      "id": "SV-LANG-005",
+      "ref_id": "SVTB.LANG.NON_BLOCKING_IN_FUNC",
+      "name": "NonBlockingInFunction",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Prohibits non-blocking assignments (<=) inside functions per IEEE 1800 \u00a7 13.4.4; functions execute in zero simulation time and must only use blocking assignments (=)."
+    },
+    {
+      "id": "SV-COV-002",
+      "ref_id": "SVTB.COV.WEIGHT_ZERO",
+      "name": "ZeroWeightCoverpoint",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags covergroups, coverpoints, or crosses configured with option.weight or type_option.weight set to 0, which contribute 0% to regression coverage calculations."
+    },
+    {
+      "id": "SVA-ACT-002",
+      "ref_id": "SVTB.SVA.TIME_IN_ACTION",
+      "name": "TimeInAssertionAction",
+      "category": "SVA",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Action blocks of immediate and concurrent assertions must not consume simulation time (# delays, @ event controls, or wait statements) per IEEE 1800 \u00a7 16."
+    },
+    {
+      "id": "SV-COV-005",
+      "ref_id": "SVTB.COV.TRANSITION_DEFAULT",
+      "name": "UnboundedTransitionBins",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Transition sequences in coverpoint bins must not specify unbounded repetitions (e.g., [*1:$], [->1:$]), which cause exponential memory growth in simulator coverage databases."
+    },
+    {
+      "id": "UVM-CFG-003",
+      "ref_id": "SVTB.UVM.CFG.GLOBAL_WILDCARD",
+      "name": "UvmConfigDbGlobalWildcard",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Calling uvm_config_db::set(null, \"*\", ...) with a null context and a bare wildcard or empty scope triggers global regex matching across every component in the testbench hierarchy."
+    },
+    {
+      "id": "SV-NAM-001",
+      "ref_id": "SVTB.NAME.UVM_SUFFIX",
+      "name": "UvmComponentNamingConvention",
+      "category": "Naming",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Enforces standard naming conventions for UVM components: drivers must end with _driver, monitors with _monitor, agents with _agent, environments with _env, and tests with _test."
+    },
+    {
+      "id": "SV-STY-015",
+      "ref_id": "SVTB.STYLE.TRAILING_WHITESPACE",
+      "name": "TrailingWhitespace",
+      "category": "Style",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Disallows trailing whitespace (spaces and tabs) at the end of lines in source files to maintain clean revision history."
+    },
+    {
+      "id": "SV-RND-012",
+      "ref_id": "SVTB.RAND.DIST_SUM_ZERO",
+      "name": "ZeroWeightDistribution",
+      "category": "Random",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects constraint distribution blocks where all weights evaluate to zero. At least one weight in a distribution must evaluate to non-zero per IEEE 1800 \u00a7 18.5.4."
+    },
+    {
+      "id": "SV-COV-004",
+      "ref_id": "SVTB.COV.ILLEGAL_BIN_OVERLAP",
+      "name": "IllegalBinOverlap",
+      "category": "Coverage",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects overlapping values between regular bins and illegal_bins or ignore_bins in the same coverpoint per IEEE 1800 \u00a7 19.5."
+    },
+    {
+      "id": "UVM-SEQ-006",
+      "ref_id": "SVTB.UVM.SEQ.UNCHECKED_RSP",
+      "name": "UncheckedGetResponse",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags calls to get_response() in UVM sequences that block waiting for driver response items that may never arrive."
+    },
+    {
+      "id": "SV-STY-016",
+      "ref_id": "SVTB.STYLE.MAX_LINE_LENGTH",
+      "name": "MaxLineLength",
+      "category": "Style",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Flags source lines exceeding 120 characters to preserve readability across split-view editors and terminal reviews."
+    },
+    {
+      "id": "SV-NAM-002",
+      "ref_id": "SVTB.NAME.PACKAGE_SUFFIX",
+      "name": "PackageNamingConvention",
+      "category": "Naming",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Enforces that package identifiers end with _pkg (e.g. axi_pkg) to standardize namespaces."
+    },
+    {
+      "id": "SV-NAM-003",
+      "ref_id": "SVTB.NAME.INTERFACE_SUFFIX",
+      "name": "InterfaceNamingConvention",
+      "category": "Naming",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Enforces that interface identifiers end with _if (e.g. axi_if) to standardize interface definitions."
+    },
+    {
+      "id": "SV-FOR-001",
+      "ref_id": "SVTB.CTRL.FORK_INSIDE_FUNCTION",
+      "name": "ForkInsideFunction",
+      "category": "Concurrency",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows spawning concurrent threads with fork ... join/join_any/join_none inside functions per IEEE 1800 \u00a7 13.4.4."
+    },
+    {
+      "id": "SV-DLY-002",
+      "ref_id": "SVTB.TIMING.NON_ZERO_INTRA_ASSIGN_DELAY",
+      "name": "IntraAssignmentDelay",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows intra-assignment timing controls (e.g., a = #5 b;) on procedural assignments due to simulation race conditions."
+    },
+    {
+      "id": "SV-COV-006",
+      "ref_id": "SVTB.COV.CROSS_BIN_EXPLOSION",
+      "name": "CovergroupCrossBinExplosion",
+      "category": "Coverage",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows crossing 3 or more coverpoints without ignore_bins or binsof exclusion filters to prevent combinatorial auto-bin explosion."
+    },
+    {
+      "id": "SV-RND-013",
+      "ref_id": "SVTB.RAND.UNRESTORED_RAND_MODE",
+      "name": "UnrestoredRandMode",
+      "category": "Random",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags .rand_mode(0) or .constraint_mode(0) calls that are never restored with 1 in the routine."
+    },
+    {
+      "id": "UVM-PHS-006",
+      "ref_id": "SVTB.UVM.PHASE_OBJECTION_MISMATCH",
+      "name": "PhaseObjectionMismatch",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Detects phase.raise_objection() calls without a matching phase.drop_objection() in the same task or method."
+    },
+    {
+      "id": "SV-DLY-003",
+      "ref_id": "SVTB.TIMING.REPEAT_LOOP_WITHOUT_TIMING",
+      "name": "RepeatLoopWithoutTiming",
+      "category": "Concurrency",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags repeat loops inside testbench tasks containing zero time-consuming statements (#, @, wait)."
+    },
+    {
+      "id": "UVM-CFG-004",
+      "ref_id": "SVTB.UVM.CONFIG_DB_GET_UNCHECKED",
+      "name": "ConfigDbGetUnchecked",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags calls to uvm_config_db#(...)::get() where the boolean return status is ignored without being checked in an if condition or assertion."
+    },
+    {
+      "id": "SV-COV-007",
+      "ref_id": "SVTB.COV.EMPTY_COVERGROUP",
+      "name": "EmptyCovergroup",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags covergroups declared with zero coverpoints and zero crosses."
+    },
+    {
+      "id": "SV-RND-014",
+      "ref_id": "SVTB.RAND.EMPTY_RANDOMIZE_WITH",
+      "name": "EmptyRandomizeWith",
+      "category": "Random",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags randomize() with {} containing an empty inline constraint block."
+    },
+    {
+      "id": "SV-CON-004",
+      "ref_id": "SVTB.CTRL.CONSTANT_WAIT_CONDITION",
+      "name": "ConstantWaitCondition",
+      "category": "Concurrency",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Flags wait() statements with compile-time constant conditions (e.g., wait(0);, wait(1);)."
+    },
+    {
+      "id": "SV-TIM-001",
+      "ref_id": "SVTB.TIMING.TIMESCALE_PRECISION_MISMATCH",
+      "name": "TimescalePrecisionMismatch",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Flags timescale directives where the time precision is coarser than the time unit per IEEE 1800 \u00a7 3.14.2."
+    },
+    {
+      "id": "SV-COR-005",
+      "ref_id": "SVTB.LANG.NON_SHORT_CIRCUIT_LOGICAL",
+      "name": "NonShortCircuitLogical",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows using bitwise AND (&) or bitwise OR (|) instead of logical short-circuiting operators (&&, ||) inside conditional statements."
+    },
+    {
+      "id": "UVM-PHS-007",
+      "ref_id": "SVTB.UVM.PHASE_JUMP_HAZARD",
+      "name": "UvmPhaseJumpHazard",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows manual phase jumping (phase.jump(...)) in UVM testbenches due to objection leaks and scoreboard desynchronization risks."
+    },
+    {
+      "id": "SV-SHD-002",
+      "ref_id": "SVTB.LANG.FOREACH_LOOP_VARIABLE_SHADOWING",
+      "name": "ForeachLoopVariableShadowing",
+      "category": "OOP",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags loop index variables in foreach (arr[i]) loops that shadow an existing class property or routine local variable."
+    },
+    {
+      "id": "SV-CON-005",
+      "ref_id": "SVTB.CON.SEMAPHORE_ZERO_KEY",
+      "name": "SemaphoreZeroKey",
+      "category": "Concurrency",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows calling semaphore.get(0), put(0), or try_get(0) with non-positive keys (<= 0), which causes simulation deadlocks and violates IEEE 1800 \u00a7 15.3."
+    },
+    {
+      "id": "UVM-SEQ-007",
+      "ref_id": "SVTB.UVM.SEQUENCE_PRIORITY_RANGE",
+      "name": "SequencePriorityRange",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags invalid sequence priority values (< -1) passed to seq.start(), which corrupts UVM sequencer arbitration priorities."
+    },
+    {
+      "id": "SV-RND-015",
+      "ref_id": "SVTB.RAND.UNCONSTRAINED_RAND_VAR",
+      "name": "UnconstrainedRandVariable",
+      "category": "Randomization",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags class properties marked rand or randc that are never referenced in any constraint block or randomize() with statement."
+    },
+    {
+      "id": "SV-COR-006",
+      "ref_id": "SVTB.COR.CASE_WITHOUT_DEFAULT",
+      "name": "CaseWithoutDefault",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows case/casex/casez statements lacking an explicit default branch, preventing unhandled states in decoders, monitors, and parsers."
+    },
+    {
+      "id": "SV-COV-008",
+      "ref_id": "SVTB.COV.CROSS_EMPTY_BINS",
+      "name": "CrossWithEmptyBins",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags cross coverage constructs that specify fewer than 2 coverpoints, which is mathematically degenerate and produces invalid coverage models."
+    },
+    {
+      "id": "SV-OOP-008",
+      "ref_id": "SVTB.OOP.NON_VIRTUAL_INTERFACE_IN_CLASS",
+      "name": "NonVirtualInterfaceInClass",
+      "category": "OOP",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows declaring physical interface types inside classes without the virtual keyword (IEEE 1800 \u00a7 25.9)."
+    },
+    {
+      "id": "SV-DED-008",
+      "ref_id": "SVTB.DEAD.UNUSED_GENERATE_BLOCK",
+      "name": "UnusedGenerateBlock",
+      "category": "DeadCode",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Flags conditional branches with constant false condition (0) and no else fallback, representing unreachable dead code."
+    },
+    {
+      "id": "UVM-TLM-002",
+      "ref_id": "SVTB.UVM.TLM_TRY_GET_UNCHECKED",
+      "name": "UvmTlmTryGetUnchecked",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags unchecked non-blocking TLM calls (try_get, try_peek, try_put) that cause silent transaction drops when channels are empty or full."
+    },
+    {
+      "id": "SV-DED-009",
+      "ref_id": "SVTB.DEAD.EMPTY_ALWAYS_OR_INITIAL",
+      "name": "EmptyAlwaysOrInitial",
+      "category": "DeadCode",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows initial, always, always_comb, always_ff, always_latch, or final procedural blocks with empty bodies."
+    },
+    {
+      "id": "UVM-PHS-008",
+      "ref_id": "SVTB.UVM.TIME_IN_NON_TIME_PHASE",
+      "name": "TimeInNonTimePhase",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows time-consuming statements (#, @, wait, ##) inside non-time-consuming UVM phases (e.g. build_phase, connect_phase, check_phase)."
+    },
+    {
+      "id": "SV-RND-016",
+      "ref_id": "SVTB.RAND.CONCURRENT_RANDOMIZE_CONFLICT",
+      "name": "ConcurrentRandomizeInFork",
+      "category": "Randomization",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows concurrent calls to .randomize() on the same object handle across parallel fork threads without synchronization."
+    },
+    {
+      "id": "SV-NAM-005",
+      "ref_id": "SVTB.NAME.CLASS_TYPE_SUFFIX",
+      "name": "UvmClassTypeSuffix",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Enforces standard verification naming suffix conventions for classes extending UVM base components (e.g. _seq, _item, _driver, _monitor, _scoreboard, _env)."
+    },
+    {
+      "id": "SV-CON-006",
+      "ref_id": "SVTB.CON.EVENT_TRIGGER_COMB",
+      "name": "EventTriggerInAlwaysComb",
+      "category": "Concurrency",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows event triggers (-> or ->>) inside always_comb blocks (IEEE 1800 \u00a7 9.2.2.2)."
+    },
+    {
+      "id": "SV-COV-009",
+      "ref_id": "SVTB.COV.DEFAULT_BIN_USAGE",
+      "name": "CoverpointDefaultBinHazard",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags non-ignoring default bins in coverpoints that mask uncovered stimulus and give a false sense of coverage closure."
+    },
+    {
+      "id": "SV-OOP-009",
+      "ref_id": "SVTB.OOP.EMPTY_VIRTUAL_METHOD",
+      "name": "EmptyVirtualMethodWithoutPure",
+      "category": "OOP",
+      "severity": "INFO",
+      "status": "Implemented",
+      "description": "Flags virtual methods defined with empty bodies instead of being declared pure virtual in abstract base classes."
+    },
+    {
+      "id": "SV-COR-007",
+      "ref_id": "SVTB.COR.ASSIGNMENT_IN_EXPRESSION",
+      "name": "AssignmentInExpression",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows assignment expressions (= or compound assignments) inside conditional predicates or loop conditions."
+    },
+    {
+      "id": "UVM-SEQ-008",
+      "ref_id": "SVTB.UVM.SEQUENCE_ITEM_DEFAULT_NEW",
+      "name": "SequenceItemDefaultNew",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Requires sequence item constructor new() to provide a default value for the string name argument to support UVM factory creation and cloning."
+    },
+    {
+      "id": "SV-CON-007",
+      "ref_id": "SVTB.CON.UNBOUNDED_MAILBOX",
+      "name": "UnboundedMailboxInstantiation",
+      "category": "Concurrency",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows instantiating unbounded mailboxes without a capacity limit to prevent memory bloat and missed producer-consumer synchronization."
+    },
+    {
+      "id": "SV-COV-010",
+      "ref_id": "SVTB.COV.CROSS_WITH_ALL_BINS_IGNORED",
+      "name": "CrossWithAllBinsIgnored",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags covergroup cross constructs where all defined bins are ignore_bins, producing vacuous 0-bin coverage metrics."
+    },
+    {
+      "id": "SV-DED-010",
+      "ref_id": "SVTB.DEAD.EMPTY_FORK_JOIN",
+      "name": "EmptyForkJoin",
+      "category": "DeadCode",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows empty fork...join, fork...join_any, or fork...join_none blocks that contain zero statements."
+    },
+    {
+      "id": "SV-COR-008",
+      "ref_id": "SVTB.COR.SELF_COMPARISON",
+      "name": "SelfComparison",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows self-comparisons where an operand is compared to itself (e.g. a == a), which tautologically evaluates to constant true or false."
+    },
+    {
+      "id": "SV-TIM-002",
+      "ref_id": "SVTB.TIM.MISSING_TIMESCALE_IN_TB",
+      "name": "MissingTimescaleInModule",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags files and modules containing procedural delays (#) that lack an explicit `timescale or timeunit declaration."
+    },
+    {
+      "id": "SV-PRF-010",
+      "ref_id": "SVTB.PERF.STRING_CONCAT_IN_LOOP",
+      "name": "StringConcatInLoop",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows iterative in-place string concatenation or $sformatf recursion inside loop bodies to prevent O(N^2) memory reallocation overhead."
+    },
+    {
+      "id": "SV-OOP-010",
+      "ref_id": "SVTB.OOP.CLASS_INSTANTIATION_IN_LOOP",
+      "name": "ClassInstantiationInLoop",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows direct class instantiation via new() inside simulation loops to prevent heap contention and memory allocation overhead."
+    },
+    {
+      "id": "SV-RND-017",
+      "ref_id": "SVTB.RAND.RANDC_INSUFFICIENT_STATE",
+      "name": "RandcStateExhaustion",
+      "category": "Randomization",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags 'randc' cyclic variables declared with bit-width <= 2 bits (1 or 2 bits). State permutation tables for <= 4 states reset almost immediately, incurring solver overhead with no benefit."
+    },
+    {
+      "id": "UVM-SEQ-009",
+      "ref_id": "SVTB.UVM.SEQUENCE_BODY_WITHOUT_START_ITEM",
+      "name": "SequenceBodyWithoutStartItem",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Flags calls to finish_item() inside uvm_sequence::body() that are not preceded by a corresponding start_item(). The UVM sequencer arbitration handshake strictly requires start_item() before finish_item()."
+    },
+    {
+      "id": "SV-CON-008",
+      "ref_id": "SVTB.CON.MUTEX_TRY_GET_UNCHECKED",
+      "name": "MutexTryGetWithoutCheck",
+      "category": "Concurrency",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags non-blocking semaphore or mutex try_get() calls whose return status is ignored, which risks threads executing critical sections without holding the lock."
+    },
+    {
+      "id": "SV-COV-011",
+      "ref_id": "SVTB.COV.AT_LEAST_ZERO_OR_NEGATIVE",
+      "name": "AtLeastZeroOrNegative",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags option.at_least or type_option.at_least set to 0 or negative values in covergroups/coverpoints. IEEE 1800 \u00a7 19.5 requires at_least to be a positive integer >= 1."
+    },
+    {
+      "id": "SV-OOP-011",
+      "ref_id": "SVTB.OOP.DOWNCAST_WITHOUT_CAST",
+      "name": "DowncastWithoutDynamicCast",
+      "category": "OOP",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Flags static casting syntax (e.g. DerivedClass'(base_handle)) applied to class objects. SystemVerilog requires dynamic casting via $cast() to verify runtime polymorphism."
+    },
+    {
+      "id": "SV-COR-009",
+      "ref_id": "SVTB.COR.PROHIBITED_CASEX",
+      "name": "CasexProhibited",
+      "category": "Correctness",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows use of 'casex' statements. 'casex' treats unknown simulation 'x' values as wildcards, masking uninitialized logic bugs and timing errors."
+    },
+    {
+      "id": "SV-DED-011",
+      "ref_id": "SVTB.DEAD.EMPTY_ROUTINE",
+      "name": "EmptyTaskOrFunction",
+      "category": "DeadCode",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags concrete, non-virtual, non-extern tasks and functions with empty bodies (zero statements). Empty routines cause useless call overhead and indicate incomplete or dead logic."
+    },
+    {
+      "id": "UVM-TLM-003",
+      "ref_id": "SVTB.UVM.TLM_PORT_SUFFIX",
+      "name": "UvmTlmPortSuffix",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Enforces standard UVM TLM port suffix naming conventions (_ap for analysis ports, _imp for imps, _export for exports, _port for ports, _fifo for TLM FIFOs)."
+    },
+    {
+      "id": "SV-CON-009",
+      "ref_id": "SVTB.CON.WAIT_FORK_WITHOUT_CHILDREN",
+      "name": "WaitForkWithoutFork",
+      "category": "Concurrency",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags 'wait fork;' statements in tasks or routines that contain no 'fork' blocks. In SystemVerilog (IEEE 1800 \u00a7 9.6.1), calling wait fork without spawning child threads either acts as a useless no-op or causes unintended hangs by waiting on unrelated threads spawned by caller processes."
+    },
+    {
+      "id": "SV-RND-018",
+      "ref_id": "SVTB.RAND.RANDOMIZE_IN_CONSTRUCTOR",
+      "name": "RandomizeInConstructor",
+      "category": "Randomization",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows calling randomize() inside class constructors (new()). In SystemVerilog OOP, calling randomize() during construction executes before derived class members, constraints, and factory overrides are fully constructed and initialized."
+    },
+    {
+      "id": "UVM-SEQ-010",
+      "ref_id": "SVTB.UVM.SEQ_ITEM_DIRECT_NEW",
+      "name": "SequenceItemCreateWithoutType",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags direct new() instantiation of sequence items inside uvm_sequence::body(). In UVM methodology (IEEE 1800.2 \u00a7 5.3), sequence items must be created through the factory (e.g. type_id::create()) to enable factory overrides."
+    },
+    {
+      "id": "SV-OOP-012",
+      "ref_id": "SVTB.OOP.CHAINED_ASSIGNMENT",
+      "name": "ChainedAssignmentAliasing",
+      "category": "OOP",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows chained assignment expressions (e.g. a = b = c;). In SystemVerilog verification environments, chained assignments on class handles create shared object aliases without clone safety, leading to unintentional state mutations across threads."
+    },
+    {
+      "id": "SV-COV-012",
+      "ref_id": "SVTB.COV.WIDE_COVERPOINT_AUTO_BINS",
+      "name": "WideCoverpointWithoutBins",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags wide coverpoint expressions (> 8 bits) that lack explicit bins or option.auto_bin_max. Coverpoints default to 64 auto-bins, resulting in misleading 100% coverage closure across millions of unvisited values."
+    },
+    {
+      "id": "SV-DED-012",
+      "ref_id": "SVTB.DEAD.UNREFERENCED_PARAMETER",
+      "name": "UnreferencedParameter",
+      "category": "DeadCode",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags parameters and localparams that are declared in class or module scope but never referenced anywhere in that scope. Unreferenced parameters complicate interfaces and indicate forgotten configuration logic or dead code."
+    },
+    {
+      "id": "SV-COR-011",
+      "ref_id": "SVTB.COR.MODIFYING_LOOP_INDEX_INSIDE_FOR",
+      "name": "ModifyingLoopIndexInsideFor",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags procedural modifications (assignments, increments, decrements) of a for-loop control index variable inside the loop body. Altering loop indices inside the loop conflicts with iteration step logic and causes infinite loops or skipped elements."
+    },
+    {
+      "id": "UVM-PHS-009",
+      "ref_id": "SVTB.UVM.OBJECTION_IN_NON_RUN_PHASE",
+      "name": "ObjectionInNonRunPhase",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows calling raise_objection() or drop_objection() inside non-run function phases (e.g. build_phase, connect_phase). Function phases execute synchronously in zero simulation time; objections are strictly reserved for runtime phases."
+    },
+    {
+      "id": "SV-NAM-100",
+      "ref_id": "SVTB.NAMING.CONFIGURABLE_NAMING_ENGINE",
+      "name": "ConfigurableNamingEngine",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Parameterizable naming convention engine validating regex, prefix, suffix, and casing conventions across packages, interfaces, UVM classes, covergroups, and constraints."
+    },
+    {
+      "id": "SV-STY-100",
+      "ref_id": "SVTB.STYLE.CONFIGURABLE_STYLE_ENGINE",
+      "name": "ConfigurableStyleEngine",
+      "category": "Style",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Parameterizable code style engine enforcing tab prohibitions, trailing whitespace limits, maximum line lengths, matching block end labels, and file naming."
+    },
+    {
+      "id": "SV-CON-010",
+      "ref_id": "SVTB.CONC.DISABLE_FORK",
+      "name": "DisableForkWithoutScope",
+      "category": "Concurrency",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows calling 'disable fork;' directly at task or routine scope without an enclosing isolating 'fork ... join' block."
+    },
+    {
+      "id": "SV-RND-019",
+      "ref_id": "SVTB.RAND.MULTIBIT_IMPLICATION",
+      "name": "ConstraintImplicationMultiBit",
+      "category": "Randomization",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags constraint implication expressions 'A -> B' where condition 'A' is a multi-bit vector without an explicit boolean comparison."
+    },
+    {
+      "id": "SV-CON-011",
+      "ref_id": "SVTB.CONC.WAIT_LOOP",
+      "name": "WaitModifiedInLoop",
+      "category": "Concurrency",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags wait(...) statements inside loops where condition variables are never modified or assigned inside the loop body."
+    },
+    {
+      "id": "SV-OOP-013",
+      "ref_id": "SVTB.OOP.VIRTUAL_CLASS_NEW",
+      "name": "AbstractClassInstantiation",
+      "category": "OOP",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows direct instantiation of abstract (virtual) classes via 'new()'. Only concrete derived classes can be instantiated."
+    },
+    {
+      "id": "SV-COV-013",
+      "ref_id": "SVTB.COV.IGNORE_ILLEGAL_OVERLAP",
+      "name": "IgnoreBinsOverlapsIllegalBins",
+      "category": "Coverage",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Flags coverage models where the same value or range is specified in both 'ignore_bins' and 'illegal_bins' within a coverpoint."
+    },
+    {
+      "id": "SV-TYP-008",
+      "ref_id": "SVTB.TYP.REDUNDANT_CAST",
+      "name": "RedundantCastToSameType",
+      "category": "Types",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags dynamic '$cast' calls or static type casts where the source and destination already have identical static types."
+    },
+    {
+      "id": "SV-TYP-009",
+      "ref_id": "SVTB.TYP.ARRAY_PATTERN_SIZE",
+      "name": "ArrayLiteralSizeMismatch",
+      "category": "Types",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags positional array assignment patterns '{...} where the number of elements does not match the target fixed array dimension."
+    },
+    {
+      "id": "UVM-REP-005",
+      "ref_id": "XVM.MESSAGING.DEBUG_LOW_VERBOSITY",
+      "name": "LowVerbosityDebugReport",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags UVM debug or trace messages configured with low verbosity (UVM_LOW or UVM_NONE)."
+    },
+    {
+      "id": "SV-CON-012",
+      "ref_id": "SVTB.CONC.FORK_LOOP_VAR_CAPTURE",
+      "name": "ForkLoopVariableCapture",
+      "category": "Concurrency",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Flags loop induction variables referenced directly inside 'fork ... join_none' or 'join_any' child threads without an isolating local variable copy."
+    },
+    {
+      "id": "SV-SVA-002",
+      "ref_id": "SVTB.SVA.DISABLE_IFF_COMPLEX",
+      "name": "DisableIffComplexExpression",
+      "category": "SVA",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags complex multi-operator expressions inside 'disable iff (...)' assertion clauses that introduce glitch sensitivity and formal state explosion."
+    },
+    {
+      "id": "SV-SVA-003",
+      "ref_id": "SVTB.SVA.MIXED_CLOCK_EDGES",
+      "name": "MixedClockEdgesInProperty",
+      "category": "SVA",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags assertions or properties mixing both 'posedge' and 'negedge' clock expressions, introducing half-cycle race conditions and formal verification explosion."
+    },
+    {
+      "id": "SV-RND-020",
+      "ref_id": "SVTB.RAND.RANDC_DYNAMIC_CONTAINER",
+      "name": "RandcInDynamicContainer",
+      "category": "Randomization",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows 'randc' cyclic random qualifiers on dynamic arrays, queues, and associative arrays per IEEE 1800 \u00a7 18.4.1."
+    },
+    {
+      "id": "UVM-FAC-004",
+      "ref_id": "SVTB.UVM.FACTORY.PARAM_UTILS",
+      "name": "ParameterizedClassFactoryRegistration",
+      "category": "UVM",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Flags parameterized UVM classes declaring non-parameterized `uvm_component_utils or `uvm_object_utils macros instead of `uvm_component_param_utils or `uvm_object_param_utils."
+    },
+    {
+      "id": "UVM-SEQ-011",
+      "ref_id": "SVTB.UVM.SEQ.P_SEQUENCER_UNCHECKED",
+      "name": "UncheckedPSequencerCast",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags unchecked $cast(p_sequencer, m_sequencer) calls in sequences that do not verify the return status, risking null-pointer dereference."
+    },
+    {
+      "id": "SV-COV-014",
+      "ref_id": "SVTB.COV.OPTION_WEIGHT_ZERO",
+      "name": "CoverpointWeightZero",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags covergroups or coverpoints where 'option.weight' or 'type_option.weight' is set to 0, silently excluding it from coverage scores."
+    },
+    {
+      "id": "SV-PRF-011",
+      "ref_id": "SVTB.PERF.DYNAMIC_ARRAY_NEW_IN_LOOP",
+      "name": "DynamicArrayNewInLoop",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags dynamic array allocations 'new[...]' inside simulation loops causing heap fragmentation and GC/allocation overhead."
+    },
+    {
+      "id": "SV-OOP-014",
+      "ref_id": "SVTB.OOP.SUPER_NEW_NOT_FIRST",
+      "name": "SuperNewNotFirstStatement",
+      "category": "OOP",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Requires derived class constructors calling 'super.new(...)' to execute it as the very first procedural statement."
+    },
+    {
+      "id": "SV-SVA-004",
+      "ref_id": "SVTB.SVA.NON_CONSEC_REP_ZERO",
+      "name": "NonConsecutiveRepetitionZeroBound",
+      "category": "SVA",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Flags non-consecutive or goto repetition operators '[= 0]' or '[-> 0]' with zero repetition bounds, violating IEEE 1800 \u00a7 16.9.2."
+    },
+    {
+      "id": "SV-RND-021",
+      "ref_id": "SVTB.RAND.INSIDE_INVERTED_RANGE",
+      "name": "ConstraintInsideInvertedRange",
+      "category": "Randomization",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows inverted value ranges [low : high] where low > high in set membership 'inside' expressions, causing solver contradictions."
+    },
+    {
+      "id": "SV-COV-015",
+      "ref_id": "SVTB.COV.MISSING_IFF_RESET_GUARD",
+      "name": "MissingIffOnCovergroupClock",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags covergroups sampled by a clocking event without an 'iff (!reset)' guard condition to prevent sampling during reset phases."
+    },
+    {
+      "id": "RAL-ACC-001",
+      "ref_id": "XVM.RAL.DIRECT_MIRROR_SET",
+      "name": "DirectMirrorSetWithoutWrite",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags direct reg.set(...) or field.set(...) calls that update only software mirrors without issuing physical DUT write transactions."
+    },
+    {
+      "id": "SV-CON-013",
+      "ref_id": "SVTB.CONC.BLOCKING_EVENT_TRIGGER",
+      "name": "BlockingEventTriggerInClockedBlock",
+      "category": "Concurrency",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows blocking event triggers '-> ev' inside sequential clocked blocks; non-blocking triggers '->> ev' must be used."
+    },
+    {
+      "id": "SV-PRF-012",
+      "ref_id": "SVTB.PERF.UNBOUNDED_ARRAY_SIZE_CONSTRAINT",
+      "name": "UnboundedDynamicArrayInConstraint",
+      "category": "Performance",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags dynamic array size constraints with an upper bound (< or <=) lacking an explicit lower bound, causing solver performance stalls."
+    },
+    {
+      "id": "UVM-SEQ-012",
+      "ref_id": "XVM.SEQ.START_ON_NULL_SEQUENCER",
+      "name": "SequenceStartOnNullSequencer",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags sequence start(null) calls that start sequences without an attached sequencer handle, risking runtime null-pointer crashes."
+    },
+    {
+      "id": "SV-SVA-005",
+      "ref_id": "SVTB.14.2.1",
+      "name": "MultiClockConcurrentAssertionDomain",
+      "category": "SVA",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows concurrent assertions mixing multiple asynchronous clock domains without formal clock domain crossing (CDC) qualification."
+    },
+    {
+      "id": "SV-RND-022",
+      "ref_id": "SVTB.15.5.3",
+      "name": "ConstraintCallingNonPureFunction",
+      "category": "Randomization",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Functions called in constraints must be pure and must not have side effects, task calls, or void return types."
+    },
+    {
+      "id": "SV-COV-016",
+      "ref_id": "SVTB.16.2.3",
+      "name": "OverlappingRangesInCoverpointBin",
+      "category": "Coverage",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags coverpoint bins containing overlapping numerical value ranges."
+    },
+    {
+      "id": "SV-TYP-010",
+      "ref_id": "SVTB.12.3.8",
+      "name": "TaskWithNonVoidReturnType",
+      "category": "Types",
+      "severity": "ERROR",
+      "status": "Implemented",
+      "description": "Disallows declaring tasks with explicit non-void return types per IEEE 1800 \u00a7 13.3."
+    },
+    {
+      "id": "SV-COR-020",
+      "ref_id": "SVTB.10.4.3",
+      "name": "ProceduralAssignmentAsSubExpression",
+      "category": "Correctness",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Disallows embedded assignment expressions used as sub-expressions within conditionals or arithmetic operations."
+    },
+    {
+      "id": "UVM-STR-005",
+      "ref_id": "XVM.2.1.16",
+      "name": "ComponentNullParentInCreate",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags UVM component factory create calls passing 'null' as the parent handle, creating orphaned hierarchy nodes."
+    },
+    {
+      "id": "RAL-ACC-002",
+      "ref_id": "XVM.RAL.5.1",
+      "name": "MissingBackdoorAccessPathDefinition",
+      "category": "UVM",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Flags RAL backdoor path configuration routines called with an empty string or null path."
+    },
+    {
+      "id": "SV-OOP-015",
+      "ref_id": "SVTB.7.5.3",
+      "name": "VirtualMethodSignatureMismatch",
+      "category": "OOP",
+      "severity": "WARNING",
+      "status": "Implemented",
+      "description": "Virtual method overrides in derived classes must match the parameter count and signature of the base virtual method."
+    }
+  ]
+}

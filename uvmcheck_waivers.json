@@ -1,0 +1,16 @@
+{
+  "version": "1.0",
+  "waivers": [
+    {
+      "rule": "SV-STY-002",
+      "path": "*legacy*",
+      "reason": "Style trailing semicolon permitted in legacy block"
+    },
+    {
+      "rule": "UVM-OBJ-002",
+      "file": "*loop_test.sv*",
+      "line": 42,
+      "reason": "Waive objection raise inside loop for stress test"
+    }
+  ]
+}

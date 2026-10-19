@@ -1,0 +1,62 @@
+# ==============================================================================
+# UVMCheck .gitignore
+# ==============================================================================
+
+# Build Output & CMake
+build/
+build*/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+CMakeScripts/
+Testing/
+Makefile
+cmake_install.cmake
+install_manifest.txt
+compile_commands.json
+
+# Binaries & Shared Libraries
+bin/
+lib/
+*.a
+*.so
+*.dylib
+*.dll
+*.exe
+*.o
+*.obj
+/uvmcheck
+
+# Third-Party Reference Repositories (External Git checkouts)
+references/code/
+
+# Generated Test Run Reports & Transient Logs
+uvmcheck_report.sarif
+uvmcheck_report.html
+uvmcheck_summary.json
+uvmcheck.log
+results.sarif
+report.html
+*.log
+*.tmp
+*.out
+.uvmcheck_cache/
+
+# IDEs & Code Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.bak
+.clangd/
+.cache/
+
+# OS-Specific Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
