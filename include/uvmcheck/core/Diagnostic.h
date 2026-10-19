@@ -74,6 +74,27 @@ public:
         violations.push_back(std::move(v));
     }
 
+    void addDirectViolation(std::string_view ruleId,
+                            std::string_view ruleName,
+                            std::string_view message,
+                            Severity severity,
+                            std::string_view filePath,
+                            size_t line,
+                            size_t column) {
+        if (filePath.find("uvm_mock.svh") != std::string_view::npos) {
+            return;
+        }
+        Violation v;
+        v.ruleId = ruleId;
+        v.ruleName = ruleName;
+        v.message = message;
+        v.severity = severity;
+        v.filePath = std::string(filePath);
+        v.line = line;
+        v.column = column;
+        violations.push_back(std::move(v));
+    }
+
     const std::vector<Violation>& getViolations() const { return violations; }
     std::vector<Violation>& getViolations() { return violations; }
 

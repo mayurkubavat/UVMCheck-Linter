@@ -32,6 +32,7 @@ private:
     std::optional<std::string> configFilePath;
     std::optional<std::string> dumpConfigPath;
     std::optional<std::string> ruleFilter;
+    std::optional<std::string> pythonRulesPath;
 };
 
 } // namespace uvmcheck::core

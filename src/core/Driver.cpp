@@ -5,6 +5,7 @@
 #include "uvmcheck/reporting/SarifReporter.h"
 #include "uvmcheck/reporting/HtmlReporter.h"
 #include "uvmcheck/core/ConfigManager.h"
+#include "uvmcheck/plugins/PythonPluginManager.h"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -31,6 +32,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--config", configFilePath, "Load parameterizable naming and style rules from JSON configuration file", "<file>");
     slangDriver.cmdLine.add("--dump-config", dumpConfigPath, "Dump default naming and style JSON configuration template and exit", "<file>");
     slangDriver.cmdLine.add("--rule", ruleFilter, "Execute only the specified rule ID or rule name", "<rule>");
+    slangDriver.cmdLine.add("--python-rules", pythonRulesPath, "Load and execute custom Python lint rules from specified file or directory", "<path>");
 }
 
 bool LinterDriver::parseCommandLine(int argc, char** argv) {
@@ -148,6 +150,12 @@ int LinterDriver::run() {
         if ((rule->getProfiles() & activeProfileMask) != 0) {
             rule->run(*compilation, uvmModel, diags);
         }
+    }
+
+    // Execute custom Python rules if specified
+    if (pythonRulesPath.has_value()) {
+        std::cout << "[uvmcheck] Executing custom Python rules from: " << *pythonRulesPath << "\n";
+        plugins::PythonPluginManager::runPythonRules(*pythonRulesPath, uvmModel, diags);
     }
 
     // Process Waivers and Baseline

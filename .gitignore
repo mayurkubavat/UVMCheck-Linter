@@ -52,6 +52,14 @@ report.html
 .clangd/
 .cache/
 
+# Python Cache & Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+.pytest_cache/
+
 # OS-Specific Files
 .DS_Store
 .DS_Store?

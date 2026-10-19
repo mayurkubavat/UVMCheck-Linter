@@ -61,6 +61,9 @@ public:
     /// Checks if a UVM glob string (e.g. "*.m_env.m_agent*") matches any discovered component path
     bool matchesAnyComponentPath(std::string_view globPattern) const;
 
+    /// Dumps the UVM semantic model (classes, methods, config_db, TLM) as JSON for Python SDK
+    void dumpSemanticJson(std::ostream& out) const;
+
 private:
     slang::ast::Compilation& compilation;
     std::vector<const slang::ast::ClassType*> discoveredClasses;

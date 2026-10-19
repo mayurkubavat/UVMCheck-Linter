@@ -125,6 +125,17 @@ Automatically refactor compliant syntax without manual editing:
 ./build/uvmcheck tb/*.sv --html report.html
 ```
 
+### Custom Python Rules Plugin SDK
+Verification teams can author custom corporate or project verification checks in pure Python without recompiling C++:
+```bash
+# Execute custom Python rules from a file or directory
+./build/uvmcheck tb/*.sv --python-rules examples/python_rules/custom_naming_rules.py
+
+# Python rule violations seamlessly participate in SARIF, HTML, and baselines
+./build/uvmcheck tb/*.sv --python-rules my_rules/ --sarif results.sarif
+```
+See [Python Rule SDK Documentation](docs/python_rule_sdk.md) for full API reference, context query helpers, and tutorials.
+
 ---
 
 ## Baseline & Waiver Management

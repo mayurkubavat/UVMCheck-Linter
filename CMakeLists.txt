@@ -51,6 +51,7 @@ file(GLOB_RECURSE UVMCHECK_SOURCES
     src/waivers/*.cpp
     src/reporting/*.cpp
     src/style/*.cpp
+    src/plugins/*.cpp
 )
 
 add_library(libuvmcheck STATIC ${UVMCHECK_SOURCES})

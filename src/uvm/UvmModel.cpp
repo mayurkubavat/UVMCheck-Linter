@@ -130,4 +130,87 @@ bool UvmModel::matchesAnyComponentPath(std::string_view globPattern) const {
     return false;
 }
 
+static std::string escapeJson(std::string_view str) {
+    std::string res;
+    for (char c : str) {
+        if (c == '"') res += "\\\"";
+        else if (c == '\\') res += "\\\\";
+        else if (c == '\n') res += "\\n";
+        else if (c == '\r') res += "\\r";
+        else if (c == '\t') res += "\\t";
+        else res += c;
+    }
+    return res;
+}
+
+void UvmModel::dumpSemanticJson(std::ostream& out) const {
+    const auto* sm = compilation.getSourceManager();
+
+    out << "{\n";
+    out << "  \"classes\": [\n";
+    bool firstCls = true;
+    for (const auto* cls : discoveredClasses) {
+        if (!cls) continue;
+        if (!firstCls) out << ",\n";
+        firstCls = false;
+
+        std::string baseClass;
+        if (cls->getBaseClass()) {
+            baseClass = std::string(cls->getBaseClass()->name);
+        }
+
+        std::string filename = sm ? std::string(sm->getFileName(cls->location)) : "";
+        size_t line = sm ? sm->getLineNumber(cls->location) : 1;
+        size_t col = sm ? sm->getColumnNumber(cls->location) : 1;
+
+        out << "    {\n";
+        out << "      \"name\": \"" << escapeJson(cls->name) << "\",\n";
+        out << "      \"base_class\": \"" << escapeJson(baseClass) << "\",\n";
+        out << "      \"is_component\": " << (isUvmComponent(*cls) ? "true" : "false") << ",\n";
+        out << "      \"is_object\": " << (isUvmObject(*cls) ? "true" : "false") << ",\n";
+        out << "      \"is_sequence\": " << (isUvmSequence(*cls) ? "true" : "false") << ",\n";
+        out << "      \"is_sequence_item\": " << (isUvmSequenceItem(*cls) ? "true" : "false") << ",\n";
+        out << "      \"filename\": \"" << escapeJson(filename) << "\",\n";
+        out << "      \"line\": " << line << ",\n";
+        out << "      \"column\": " << col << ",\n";
+
+        // Members (properties and methods)
+        out << "      \"members\": [\n";
+        bool firstMem = true;
+        for (const auto& member : cls->members()) {
+            if (member.kind == slang::ast::SymbolKind::ClassProperty ||
+                member.kind == slang::ast::SymbolKind::Subroutine) {
+                if (!firstMem) out << ",\n";
+                firstMem = false;
+
+                bool isMethod = (member.kind == slang::ast::SymbolKind::Subroutine);
+                std::string memType;
+                if (!isMethod) {
+                    const auto& prop = member.as<slang::ast::ClassPropertySymbol>();
+                    memType = std::string(prop.getType().toString());
+                }
+
+                out << "        {\n";
+                out << "          \"name\": \"" << escapeJson(member.name) << "\",\n";
+                out << "          \"is_method\": " << (isMethod ? "true" : "false") << ",\n";
+                out << "          \"type\": \"" << escapeJson(memType) << "\",\n";
+                out << "          \"line\": " << (sm ? sm->getLineNumber(member.location) : 1) << ",\n";
+                out << "          \"column\": " << (sm ? sm->getColumnNumber(member.location) : 1) << "\n";
+                out << "        }";
+            }
+        }
+        out << "\n      ]\n";
+        out << "    }";
+    }
+    out << "\n  ],\n";
+
+    // Component paths
+    out << "  \"component_paths\": [\n";
+    for (size_t i = 0; i < componentPaths.size(); ++i) {
+        out << "    \"" << escapeJson(componentPaths[i]) << "\"" << (i + 1 < componentPaths.size() ? "," : "") << "\n";
+    }
+    out << "  ]\n";
+    out << "}\n";
+}
+
 } // namespace uvmcheck::uvm
