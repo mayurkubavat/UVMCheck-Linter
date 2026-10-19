@@ -1,0 +1,76 @@
+{
+  "name": "uvmcheck-vscode",
+  "displayName": "UVMCheck SystemVerilog & UVM Linter",
+  "description": "High-performance semantic linter and static analyzer for SystemVerilog and UVM testbenches powered by Slang",
+  "version": "0.1.0",
+  "publisher": "mayurkubavat",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "systemverilog",
+    "uvm",
+    "verilog",
+    "linter",
+    "slang",
+    "verification"
+  ],
+  "activationEvents": [
+    "onLanguage:systemverilog",
+    "onLanguage:verilog"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "type": "object",
+      "title": "UVMCheck Configuration",
+      "properties": {
+        "uvmcheck.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable or disable UVMCheck real-time linting."
+        },
+        "uvmcheck.executablePath": {
+          "type": "string",
+          "default": "uvmcheck",
+          "description": "Path to the uvmcheck executable binary (or ensure uvmcheck is on PATH)."
+        },
+        "uvmcheck.preset": {
+          "type": "string",
+          "default": "all",
+          "enum": ["all", "soundness", "methodology", "performance", "style", "security", "smells"],
+          "description": "Active rule profile preset."
+        },
+        "uvmcheck.trace.server": {
+          "type": "string",
+          "default": "off",
+          "enum": ["off", "messages", "verbose"],
+          "description": "Traces the communication between VS Code / Cursor and the UVMCheck language server daemon."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "uvmcheck.restartServer",
+        "title": "UVMCheck: Restart Language Server"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^18.14.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.0.0"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^8.1.0"
+  }
+}

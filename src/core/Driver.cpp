@@ -6,6 +6,7 @@
 #include "uvmcheck/reporting/HtmlReporter.h"
 #include "uvmcheck/core/ConfigManager.h"
 #include "uvmcheck/plugins/PythonPluginManager.h"
+#include "uvmcheck/lsp/LspServer.h"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -33,6 +34,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--dump-config", dumpConfigPath, "Dump default naming and style JSON configuration template and exit", "<file>");
     slangDriver.cmdLine.add("--rule", ruleFilter, "Execute only the specified rule ID or rule name", "<rule>");
     slangDriver.cmdLine.add("--python-rules", pythonRulesPath, "Load and execute custom Python lint rules from specified file or directory", "<path>");
+    slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
 }
 
 bool LinterDriver::parseCommandLine(int argc, char** argv) {
@@ -40,6 +42,11 @@ bool LinterDriver::parseCommandLine(int argc, char** argv) {
 }
 
 int LinterDriver::run() {
+    if (runLsp.value_or(false)) {
+        lsp::LspServer server;
+        return server.run();
+    }
+
     if (showHelp.value_or(false)) {
         std::cout << slangDriver.cmdLine.getHelpText("uvmcheck - Advanced SystemVerilog & UVM Linter") << "\n";
         return 0;

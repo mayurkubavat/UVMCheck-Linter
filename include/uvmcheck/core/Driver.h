@@ -33,6 +33,7 @@ private:
     std::optional<std::string> dumpConfigPath;
     std::optional<std::string> ruleFilter;
     std::optional<std::string> pythonRulesPath;
+    std::optional<bool> runLsp;
 };
 
 } // namespace uvmcheck::core

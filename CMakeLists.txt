@@ -52,6 +52,7 @@ file(GLOB_RECURSE UVMCHECK_SOURCES
     src/reporting/*.cpp
     src/style/*.cpp
     src/plugins/*.cpp
+    src/lsp/*.cpp
 )
 
 add_library(libuvmcheck STATIC ${UVMCHECK_SOURCES})
@@ -103,6 +104,11 @@ add_test(
 add_test(
     NAME uvm_rules_suite
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression.py --binary $<TARGET_FILE:uvmcheck> --category uvm
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME lsp_integration_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lsp.py
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 

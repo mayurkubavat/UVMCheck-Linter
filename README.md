@@ -23,7 +23,7 @@
 - **Baseline Technical Debt Management (`--baseline`)**: Snapshot legacy violations into a JSON baseline to enforce zero-regression on new pull requests.
 - **Granular Waivers (`--waivers`)**: Waive rules by rule ID, file glob pattern, or line number with mandatory rationale tracking.
 - **CI/CD Integration**: Emits industry-standard SARIF 2.1.0 (for GitHub Code Scanning / GitLab Code Quality) and interactive, self-contained HTML dashboards.
-- **Modular Unit Testsuite**: 228 per-rule test directories with paired `bad.sv` and `good.sv` test cases running in ~3 seconds with 100% pass rate.
+- **Modular Unit Testsuite**: 238 per-rule test directories with 476 paired `bad.sv` and `good.sv` test cases running in ~3 seconds with 100% pass rate.
 
 ---
 
@@ -31,8 +31,8 @@
 
 | Category | Rules | Description |
 | :--- | :---: | :--- |
-| **UVM Methodology** | 44 | Factory registration, phasing, objection CFG balancing, cross-component config_db, TLM topology |
-| **Concurrency** | 12 | Delta-cycle oscillations, `always_comb` triggers, fork-join variable capture, race conditions |
+| **UVM Methodology** | 53 | Factory registration, phasing, objection CFG balancing, cross-component config_db, TLM topology |
+| **Concurrency** | 13 | Delta-cycle oscillations, `always_comb` triggers, fork-join variable capture, circular wait deadlocks |
 | **SVA (Assertions)** | 14 | Vacuous antecedents, combinatorial assert glitches, disable-iff resets, multi-clock domains |
 | **Randomization** | 18 | Unchecked `randomize()`, non-pure functions in constraints, cyclic `solve-before`, randc exhaustion |
 | **Coverage** | 16 | Cross-bin explosion, illegal bin overlaps, 0-weight coverpoints, unreferenced covergroups |
@@ -43,7 +43,7 @@
 | **Deprecated & Smells** | 18 | OVM legacy APIs, banned `uvm_field_*` macros, `uvm_do` hiding, god-methods, magic delays |
 | **Style & Formatting** | 21 | Mandatory end labels, line length limits, capitalization, naming conventions |
 
-> For comprehensive rule specifications, rationales, and bad/good examples across all 228 rules, explore the [Rule Catalog](references/rules/catalog/uvmcheck_rule_catalog.md).
+> For comprehensive rule specifications, rationales, and bad/good examples across all 238 rules, explore the [Rule Catalog](references/rules/catalog/uvmcheck_rule_catalog.md).
 
 ---
 
@@ -135,6 +135,14 @@ Verification teams can author custom corporate or project verification checks in
 ./build/uvmcheck tb/*.sv --python-rules my_rules/ --sarif results.sarif
 ```
 See [Python Rule SDK Documentation](docs/python_rule_sdk.md) for full API reference, context query helpers, and tutorials.
+
+### Language Server Protocol (LSP) & IDE Integration
+Run UVMCheck as an in-editor daemon for live, incremental linting in VS Code and Cursor:
+```bash
+# Launch LSP JSON-RPC daemon over stdin/stdout
+./build/uvmcheck --lsp
+```
+See [`editors/vscode/`](editors/vscode/) for the ready-to-use VS Code / Cursor extension providing real-time problem markers, diagnostics on save/edit, and quick-fixes.
 
 ---
 
