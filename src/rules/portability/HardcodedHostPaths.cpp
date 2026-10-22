@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::portability {
 
-class HardcodedPathsVisitor : public slang::ast::ASTVisitor<HardcodedPathsVisitor, slang::ast::VisitFlags::AllGood> {
+class HardcodedPathsVisitor : public engine::AstVisitor<HardcodedPathsVisitor> {
 public:
     explicit HardcodedPathsVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -63,11 +63,10 @@ public:
     std::string_view getCategory() const override { return "Portability"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         HardcodedPathsVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::style {
 
-class InterfaceNamingVisitor : public slang::syntax::SyntaxVisitor<InterfaceNamingVisitor> {
+class InterfaceNamingVisitor : public engine::SyntaxVisitor<InterfaceNamingVisitor> {
 public:
     explicit InterfaceNamingVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -42,15 +42,10 @@ public:
     std::string_view getCategory() const override { return "Naming"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         InterfaceNamingVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

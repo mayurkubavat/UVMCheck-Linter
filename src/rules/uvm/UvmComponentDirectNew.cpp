@@ -5,7 +5,7 @@
 
 namespace uvmcheck::rules::uvm {
 
-class UvmComponentDirectNewVisitor : public slang::ast::ASTVisitor<UvmComponentDirectNewVisitor, slang::ast::VisitFlags::AllGood> {
+class UvmComponentDirectNewVisitor : public engine::AstVisitor<UvmComponentDirectNewVisitor> {
 public:
     UvmComponentDirectNewVisitor(const uvmcheck::uvm::UvmModel& model, core::DiagnosticEngine& diags)
         : uvmModel(model), diags(diags) {}
@@ -40,11 +40,11 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& uvmModel,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        const auto& uvmModel = ctx.uvmModel();
+        auto& diags = ctx.diags();
         UvmComponentDirectNewVisitor visitor(uvmModel, diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::uvm {
 
-class TlmTryGetVisitor : public slang::syntax::SyntaxVisitor<TlmTryGetVisitor> {
+class TlmTryGetVisitor : public engine::SyntaxVisitor<TlmTryGetVisitor> {
 public:
     explicit TlmTryGetVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -60,15 +60,10 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         TlmTryGetVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

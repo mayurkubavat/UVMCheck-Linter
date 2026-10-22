@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::deadcode {
 
-class UnreachableVisitor : public slang::ast::ASTVisitor<UnreachableVisitor, slang::ast::VisitFlags::AllGood> {
+class UnreachableVisitor : public engine::AstVisitor<UnreachableVisitor> {
 public:
     explicit UnreachableVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -58,11 +58,10 @@ public:
     std::string_view getCategory() const override { return "DeadCode"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         UnreachableVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

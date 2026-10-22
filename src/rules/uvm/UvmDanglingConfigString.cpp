@@ -8,7 +8,7 @@
 
 namespace uvmcheck::rules::uvm {
 
-class DanglingConfigStringVisitor : public slang::ast::ASTVisitor<DanglingConfigStringVisitor, slang::ast::VisitFlags::AllGood> {
+class DanglingConfigStringVisitor : public engine::AstVisitor<DanglingConfigStringVisitor> {
 public:
     explicit DanglingConfigStringVisitor(const uvmcheck::uvm::UvmModel& uvmModel, core::DiagnosticEngine& diags)
         : uvmModel(uvmModel), diags(diags) {}
@@ -86,11 +86,11 @@ public:
         return static_cast<uint32_t>(RuleProfile::Soundness) | static_cast<uint32_t>(RuleProfile::Methodology);
     }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& uvmModel,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        const auto& uvmModel = ctx.uvmModel();
+        auto& diags = ctx.diags();
         DanglingConfigStringVisitor visitor(uvmModel, diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

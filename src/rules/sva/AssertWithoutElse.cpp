@@ -5,7 +5,7 @@
 
 namespace uvmcheck::rules::sva {
 
-class AssertWithoutElseVisitor : public slang::ast::ASTVisitor<AssertWithoutElseVisitor, slang::ast::VisitFlags::AllGood> {
+class AssertWithoutElseVisitor : public engine::AstVisitor<AssertWithoutElseVisitor> {
 public:
     explicit AssertWithoutElseVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -52,11 +52,10 @@ public:
     std::string_view getCategory() const override { return "SVA"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         AssertWithoutElseVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

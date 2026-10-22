@@ -8,7 +8,7 @@
 
 namespace uvmcheck::rules::oop {
 
-class AbstractClassVisitor : public slang::ast::ASTVisitor<AbstractClassVisitor, slang::ast::VisitFlags::AllGood> {
+class AbstractClassVisitor : public engine::AstVisitor<AbstractClassVisitor> {
 public:
     explicit AbstractClassVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -44,9 +44,9 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& compilation = ctx.compilation();
+        auto& diags = ctx.diags();
         // Slang compiler emits diag::NewVirtualClass during elaboration and suppresses AST node creation.
         // Intercept both Slang's diagnostic and any created NewClassExpression nodes.
         for (const auto& diag : compilation.getAllDiagnostics()) {
@@ -64,7 +64,7 @@ public:
         }
 
         AbstractClassVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

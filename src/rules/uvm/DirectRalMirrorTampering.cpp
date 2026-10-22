@@ -8,7 +8,7 @@
 
 namespace uvmcheck::rules::uvm {
 
-class RalAssignmentVisitor : public slang::ast::ASTVisitor<RalAssignmentVisitor, slang::ast::VisitFlags::AllGood> {
+class RalAssignmentVisitor : public engine::AstVisitor<RalAssignmentVisitor> {
 public:
     RalAssignmentVisitor(const uvmcheck::uvm::UvmModel& uvmModel, core::DiagnosticEngine& diags)
         : uvmModel(uvmModel), diags(diags) {}
@@ -68,11 +68,11 @@ public:
     std::string_view getCategory() const override { return "Architecture"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& uvmModel,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        const auto& uvmModel = ctx.uvmModel();
+        auto& diags = ctx.diags();
         RalAssignmentVisitor visitor(uvmModel, diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

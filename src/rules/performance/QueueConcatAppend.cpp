@@ -8,7 +8,7 @@
 
 namespace uvmcheck::rules::performance {
 
-class QueueConcatVisitor : public slang::ast::ASTVisitor<QueueConcatVisitor, slang::ast::VisitFlags::AllGood> {
+class QueueConcatVisitor : public engine::AstVisitor<QueueConcatVisitor> {
 public:
     explicit QueueConcatVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -75,11 +75,10 @@ public:
     std::string_view getCategory() const override { return "Performance"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         QueueConcatVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

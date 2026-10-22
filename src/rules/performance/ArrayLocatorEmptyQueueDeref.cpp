@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::performance {
 
-class ArrayLocatorDerefVisitor : public slang::syntax::SyntaxVisitor<ArrayLocatorDerefVisitor> {
+class ArrayLocatorDerefVisitor : public engine::SyntaxVisitor<ArrayLocatorDerefVisitor> {
 public:
     explicit ArrayLocatorDerefVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -70,15 +70,10 @@ public:
     std::string_view getCategory() const override { return "Performance"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ArrayLocatorDerefVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

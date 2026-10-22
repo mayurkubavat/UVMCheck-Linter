@@ -8,7 +8,7 @@
 
 namespace uvmcheck::rules::oop {
 
-class DowncastVisitor : public slang::syntax::SyntaxVisitor<DowncastVisitor> {
+class DowncastVisitor : public engine::SyntaxVisitor<DowncastVisitor> {
 public:
     explicit DowncastVisitor(core::DiagnosticEngine& diags, const uvmcheck::uvm::UvmModel& uvmModel)
         : diags(diags) {
@@ -81,15 +81,11 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& uvmModel,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        const auto& uvmModel = ctx.uvmModel();
+        auto& diags = ctx.diags();
         DowncastVisitor visitor(diags, uvmModel);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

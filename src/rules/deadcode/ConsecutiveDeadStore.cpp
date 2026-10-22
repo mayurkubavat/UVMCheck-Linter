@@ -33,7 +33,7 @@ static const slang::ast::Symbol* getTargetSymbol(const slang::ast::Statement* st
     return &assign.left().as<slang::ast::NamedValueExpression>().symbol;
 }
 
-class DeadStoreVisitor : public slang::ast::ASTVisitor<DeadStoreVisitor, slang::ast::VisitFlags::AllGood> {
+class DeadStoreVisitor : public engine::AstVisitor<DeadStoreVisitor> {
 public:
     explicit DeadStoreVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -82,11 +82,10 @@ public:
     std::string_view getCategory() const override { return "DeadCode"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         DeadStoreVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

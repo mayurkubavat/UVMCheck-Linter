@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::oop {
 
-class LspConstraintVisitor : public slang::syntax::SyntaxVisitor<LspConstraintVisitor> {
+class LspConstraintVisitor : public engine::SyntaxVisitor<LspConstraintVisitor> {
 public:
     explicit LspConstraintVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -50,15 +50,10 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         LspConstraintVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

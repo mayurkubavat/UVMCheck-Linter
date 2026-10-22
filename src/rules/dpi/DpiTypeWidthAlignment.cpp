@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::dpi {
 
-class DpiTypeVisitor : public slang::syntax::SyntaxVisitor<DpiTypeVisitor> {
+class DpiTypeVisitor : public engine::SyntaxVisitor<DpiTypeVisitor> {
 public:
     explicit DpiTypeVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -48,15 +48,10 @@ public:
     std::string_view getCategory() const override { return "DPI"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         DpiTypeVisitor visitor(diags);
-        for (const auto& syntaxTree : compilation.getSyntaxTrees()) {
-            if (syntaxTree) {
-                syntaxTree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

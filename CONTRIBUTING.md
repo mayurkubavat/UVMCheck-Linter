@@ -54,40 +54,68 @@ Locate the relevant category directory under `src/rules/`:
 Assign a unique rule ID conforming to the standard naming scheme (e.g. `UVM-XYZ-001`, `SV-PRF-013`).
 
 ### 2. Implement the Rule Class
-Create `src/rules/<category>/YourRule.cpp`:
+Create `src/rules/<category>/YourRule.cpp`. Rules hand their visitor to the
+engine's shared walk instead of walking the design themselves:
 
 ```cpp
-#include "uvmcheck/Rule.hpp"
-#include <slang/ast/ASTVisitor.h>
+#include "uvmcheck/rules/Rule.h"
+#include "uvmcheck/rules/RuleRegistry.h"
 
-namespace uvmcheck::rules {
+namespace uvmcheck::rules::uvm {
+
+// Derive from engine::AstVisitor (elaborated AST) or engine::SyntaxVisitor
+// (syntax trees). They are drop-in replacements for slang's visitors.
+class YourRuleVisitor : public engine::AstVisitor<YourRuleVisitor> {
+public:
+    explicit YourRuleVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
+
+    void handle(const slang::ast::NewClassExpression& expr) {
+        // ... report with diags.addViolation(...) ...
+        visitDefault(expr); // descend into children (omit to prune the subtree)
+    }
+
+private:
+    core::DiagnosticEngine& diags;
+};
 
 class YourRule : public Rule {
 public:
-    RuleInfo get_info() const override {
-        return {
-            .id = "UVM-XYZ-001",
-            .name = "YourRuleName",
-            .description = "Clear description of what this rule detects and why.",
-            .category = RuleCategory::UVM,
-            .default_severity = Severity::Warning,
-            .has_autofix = false
-        };
-    }
+    std::string_view getId() const override { return "UVM-XYZ-001"; }
+    std::string_view getName() const override { return "YourRuleName"; }
+    std::string_view getDescription() const override { return "What this rule detects and why."; }
+    std::string_view getCategory() const override { return "UVM"; }
+    core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void analyze(const AnalysisContext& ctx, RuleResults& results) override {
-        // Implement Slang AST or CST visitor logic here
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        YourRuleVisitor visitor(ctx.diags());
+        co_await ctx.visitAst(visitor); // or ctx.visitSyntax(visitor)
+        // Code here runs after the walk (e.g. reporting collected state).
     }
 };
 
-} // namespace uvmcheck::rules
+} // namespace uvmcheck::rules::uvm
 ```
 
+**How the engine runs it.** `co_await ctx.visitAst(v)` suspends the rule; the
+engine then does one walk per shard and routes each node only to visitors that
+have a `handle()` for its type, on a worker pool. Shared-walk handlers must
+follow two rules:
+
+- Call `visitDefault(node)` as the **last** statement of a handler (or not at
+  all, to prune). Code after it would run *before* the children are visited.
+  If a handler needs enter/exit logic around its children (depth counters,
+  scope stacks), visit the children yourself inside the handler, or override
+  `run()` instead of `check()` to get a private walk.
+- Only read the design and write to your own `diags`. Rules run in parallel
+  and each has its own `RuleContext`.
+
+Rules that need a custom traversal can still override
+`run(compilation, uvmModel, diags)`; they run as independent parallel jobs.
+`tests/engine_equivalence.py` checks that both styles give the same findings
+as the reference `--engine isolated` mode.
+
 ### 3. Register the Rule
-Add your rule factory to `src/rules/BuiltinRules.cpp`:
-```cpp
-registry.register_rule<YourRule>();
-```
+Add your rule factory to `src/rules/BuiltinRules.cpp`.
 
 ### 4. Create Paired Unit Tests
 Every rule in UVMCheck **must** have paired `bad.sv` and `good.sv` test cases:

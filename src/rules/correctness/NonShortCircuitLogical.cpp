@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::correctness {
 
-class NonShortCircuitVisitor : public slang::syntax::SyntaxVisitor<NonShortCircuitVisitor> {
+class NonShortCircuitVisitor : public engine::SyntaxVisitor<NonShortCircuitVisitor> {
 public:
     explicit NonShortCircuitVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -118,15 +118,10 @@ public:
     std::string_view getCategory() const override { return "Correctness"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         NonShortCircuitVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

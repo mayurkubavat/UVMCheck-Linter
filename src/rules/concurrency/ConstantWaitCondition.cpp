@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::concurrency {
 
-class ConstantWaitVisitor : public slang::syntax::SyntaxVisitor<ConstantWaitVisitor> {
+class ConstantWaitVisitor : public engine::SyntaxVisitor<ConstantWaitVisitor> {
 public:
     explicit ConstantWaitVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -63,15 +63,10 @@ public:
     std::string_view getCategory() const override { return "Concurrency"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ConstantWaitVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

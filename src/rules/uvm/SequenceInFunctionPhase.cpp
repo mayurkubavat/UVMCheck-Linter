@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::uvm {
 
-class SeqInFunctionPhaseVisitor : public slang::syntax::SyntaxVisitor<SeqInFunctionPhaseVisitor> {
+class SeqInFunctionPhaseVisitor : public engine::SyntaxVisitor<SeqInFunctionPhaseVisitor> {
 public:
     explicit SeqInFunctionPhaseVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -59,13 +59,10 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         SeqInFunctionPhaseVisitor visitor(diags);
-        for (const auto& syntaxTree : compilation.getSyntaxTrees()) {
-            syntaxTree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

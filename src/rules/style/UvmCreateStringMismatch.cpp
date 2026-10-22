@@ -8,7 +8,7 @@
 
 namespace uvmcheck::rules::style {
 
-class FactoryCreateVisitor : public slang::syntax::SyntaxVisitor<FactoryCreateVisitor> {
+class FactoryCreateVisitor : public engine::SyntaxVisitor<FactoryCreateVisitor> {
 public:
     explicit FactoryCreateVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -87,13 +87,10 @@ public:
     std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         FactoryCreateVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            tree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::sva {
 
-class VacuousAntecedentVisitor : public slang::syntax::SyntaxVisitor<VacuousAntecedentVisitor> {
+class VacuousAntecedentVisitor : public engine::SyntaxVisitor<VacuousAntecedentVisitor> {
 public:
     explicit VacuousAntecedentVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -60,15 +60,10 @@ public:
     std::string_view getCategory() const override { return "SVA"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         VacuousAntecedentVisitor visitor(diags);
-        for (const auto& syntaxTree : compilation.getSyntaxTrees()) {
-            if (syntaxTree) {
-                syntaxTree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

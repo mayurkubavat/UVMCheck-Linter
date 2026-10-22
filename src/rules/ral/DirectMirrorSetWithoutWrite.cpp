@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::ral {
 
-class DirectMirrorVisitor : public slang::ast::ASTVisitor<DirectMirrorVisitor, slang::ast::VisitFlags::AllGood> {
+class DirectMirrorVisitor : public engine::AstVisitor<DirectMirrorVisitor> {
 public:
     explicit DirectMirrorVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -64,11 +64,10 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         DirectMirrorVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::style {
 
-class OneStatementPerLineVisitor : public slang::syntax::SyntaxVisitor<OneStatementPerLineVisitor> {
+class OneStatementPerLineVisitor : public engine::SyntaxVisitor<OneStatementPerLineVisitor> {
 public:
     OneStatementPerLineVisitor(const slang::SourceManager& sm, core::DiagnosticEngine& diags)
         : sm(sm), diags(diags) {}
@@ -70,13 +70,11 @@ public:
     std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& compilation = ctx.compilation();
+        auto& diags = ctx.diags();
         OneStatementPerLineVisitor visitor(*compilation.getSourceManager(), diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            tree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 
