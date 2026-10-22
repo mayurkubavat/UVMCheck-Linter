@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::sva {
 
-class UnlabeledAssertionVisitor : public slang::syntax::SyntaxVisitor<UnlabeledAssertionVisitor> {
+class UnlabeledAssertionVisitor : public engine::SyntaxVisitor<UnlabeledAssertionVisitor> {
 public:
     explicit UnlabeledAssertionVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -57,15 +57,10 @@ public:
     std::string_view getCategory() const override { return "SVA"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         UnlabeledAssertionVisitor visitor(diags);
-        for (const auto& syntaxTree : compilation.getSyntaxTrees()) {
-            if (syntaxTree) {
-                syntaxTree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

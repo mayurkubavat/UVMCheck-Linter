@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::style {
 
-class PackageNamingVisitor : public slang::syntax::SyntaxVisitor<PackageNamingVisitor> {
+class PackageNamingVisitor : public engine::SyntaxVisitor<PackageNamingVisitor> {
 public:
     explicit PackageNamingVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -42,15 +42,10 @@ public:
     std::string_view getCategory() const override { return "Naming"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         PackageNamingVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

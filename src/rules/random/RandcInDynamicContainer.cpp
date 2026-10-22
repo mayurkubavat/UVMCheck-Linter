@@ -9,7 +9,7 @@
 
 namespace uvmcheck::rules::random {
 
-class RandcSyntaxVisitor : public slang::syntax::SyntaxVisitor<RandcSyntaxVisitor> {
+class RandcSyntaxVisitor : public engine::SyntaxVisitor<RandcSyntaxVisitor> {
 public:
     explicit RandcSyntaxVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -71,9 +71,9 @@ public:
     std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& uvmModel,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        const auto& uvmModel = ctx.uvmModel();
+        auto& diags = ctx.diags();
         // 1. Check AST symbols
         for (const auto* cls : uvmModel.getAllClasses()) {
             if (!cls) continue;
@@ -100,11 +100,7 @@ public:
 
         // 2. Syntax-based check for robust coverage
         RandcSyntaxVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

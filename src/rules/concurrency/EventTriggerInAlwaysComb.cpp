@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::concurrency {
 
-class EventTriggerVisitor : public slang::ast::ASTVisitor<EventTriggerVisitor, slang::ast::VisitFlags::AllGood> {
+class EventTriggerVisitor : public engine::AstVisitor<EventTriggerVisitor> {
 public:
     explicit EventTriggerVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -49,11 +49,10 @@ public:
     std::string_view getCategory() const override { return "Concurrency"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         EventTriggerVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

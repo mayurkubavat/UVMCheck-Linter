@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::style {
 
-class EndLabelVisitor : public slang::syntax::SyntaxVisitor<EndLabelVisitor> {
+class EndLabelVisitor : public engine::SyntaxVisitor<EndLabelVisitor> {
 public:
     explicit EndLabelVisitor(core::DiagnosticEngine& diags, bool checkMissing = true, bool checkMismatch = true)
         : diags(diags), checkMissing(checkMissing), checkMismatch(checkMismatch) {}
@@ -117,15 +117,10 @@ public:
     std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         EndLabelVisitor visitor(diags, true, false);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

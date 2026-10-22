@@ -7,11 +7,13 @@
 #include "uvmcheck/core/ConfigManager.h"
 #include "uvmcheck/plugins/PythonPluginManager.h"
 #include "uvmcheck/lsp/LspServer.h"
+#include "uvmcheck/engine/RuleEngine.h"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
 #include <algorithm>
 #include <unordered_map>
+#include <chrono>
 
 namespace uvmcheck::core {
 
@@ -34,6 +36,8 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--dump-config", dumpConfigPath, "Dump default naming and style JSON configuration template and exit", "<file>");
     slangDriver.cmdLine.add("--rule", ruleFilter, "Execute only the specified rule ID or rule name", "<rule>");
     slangDriver.cmdLine.add("--python-rules", pythonRulesPath, "Load and execute custom Python lint rules from specified file or directory", "<path>");
+    slangDriver.cmdLine.add("--profile-rules", profileRules, "Print per-phase and per-rule execution times to stderr");
+    slangDriver.cmdLine.add("--engine", engineMode, "Rule execution engine: single-pass (default, parallel shared walk) or isolated (one walk per rule, sequential)", "<mode>");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
 }
 
@@ -97,13 +101,21 @@ int LinterDriver::run() {
         return 3;
     }
 
+    using Clock = std::chrono::steady_clock;
+    auto elaborateStart = Clock::now();
     auto compilation = slangDriver.createCompilation();
     
     // Check if there are compilation syntax/elaboration errors
     (void)slangDriver.reportDiagnostics(false);
 
+    // Fully elaborate up front. Rules then only read the AST, which is what
+    // makes it safe to run them in parallel (same protocol as slang's own
+    // analysis passes), and every rule sees the same, complete design.
+    (void)compilation->getAllDiagnostics();
+
     // Construct UVM knowledge model
     uvm::UvmModel uvmModel(*compilation);
+    double elaborateSeconds = std::chrono::duration<double>(Clock::now() - elaborateStart).count();
 
     // Initialize diagnostic engine
     DiagnosticEngine diags(slangDriver.sourceManager);
@@ -146,8 +158,21 @@ int LinterDriver::run() {
         }
     }
 
-    // Execute all registered rules matching active profile and filter
+    engine::EngineOptions engineOptions;
+    engineOptions.profile = profileRules.value_or(false);
+    engineOptions.threads = slangDriver.options.numThreads.value_or(0);
+    if (engineMode.has_value()) {
+        if (*engineMode == "isolated") {
+            engineOptions.mode = engine::ExecutionMode::Isolated;
+        } else if (*engineMode != "single-pass") {
+            std::cerr << "Error: Unknown --engine '" << *engineMode << "' (expected single-pass or isolated)\n";
+            return 2;
+        }
+    }
+
+    // Select registered rules matching active profile and filter
     const auto& allRules = rules::RuleRegistry::instance().getRules();
+    std::vector<rules::Rule*> activeRules;
     for (const auto& rule : allRules) {
         if (ruleFilter.has_value()) {
             if (rule->getId() != *ruleFilter && rule->getName() != *ruleFilter) {
@@ -155,14 +180,26 @@ int LinterDriver::run() {
             }
         }
         if ((rule->getProfiles() & activeProfileMask) != 0) {
-            rule->run(*compilation, uvmModel, diags);
+            activeRules.push_back(rule.get());
         }
     }
 
-    // Execute custom Python rules if specified
+    engine::RuleEngine ruleEngine(*compilation, uvmModel, slangDriver.sourceManager, engineOptions);
+
+    // Custom Python rules only read the UVM model, so they run alongside the built-in rules
     if (pythonRulesPath.has_value()) {
         std::cout << "[uvmcheck] Executing custom Python rules from: " << *pythonRulesPath << "\n";
-        plugins::PythonPluginManager::runPythonRules(*pythonRulesPath, uvmModel, diags);
+        ruleEngine.addExternalJob("python rules", [&](DiagnosticEngine& pyDiags) {
+            plugins::PythonPluginManager::runPythonRules(*pythonRulesPath, uvmModel, pyDiags);
+        });
+    }
+
+    ruleEngine.run(activeRules, diags);
+
+    if (engineOptions.profile) {
+        std::cerr << "[profile] elaborate + UVM model: " << std::fixed << std::setprecision(3)
+                  << elaborateSeconds << " s\n";
+        ruleEngine.printProfile(std::cerr);
     }
 
     // Process Waivers and Baseline

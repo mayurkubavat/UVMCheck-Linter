@@ -8,7 +8,7 @@
 
 namespace uvmcheck::rules::performance {
 
-class ArrayReductionVisitor : public slang::ast::ASTVisitor<ArrayReductionVisitor, slang::ast::VisitFlags::AllGood> {
+class ArrayReductionVisitor : public engine::AstVisitor<ArrayReductionVisitor> {
 public:
     explicit ArrayReductionVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -68,11 +68,10 @@ public:
     std::string_view getCategory() const override { return "Performance"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ArrayReductionVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

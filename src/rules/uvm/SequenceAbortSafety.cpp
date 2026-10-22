@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::uvm {
 
-class SequenceAbortVisitor : public slang::syntax::SyntaxVisitor<SequenceAbortVisitor> {
+class SequenceAbortVisitor : public engine::SyntaxVisitor<SequenceAbortVisitor> {
 public:
     explicit SequenceAbortVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -99,15 +99,10 @@ public:
         return static_cast<uint32_t>(RuleProfile::Soundness) | static_cast<uint32_t>(RuleProfile::Methodology);
     }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         SequenceAbortVisitor visitor(diags);
-        for (const auto& syntaxTree : compilation.getSyntaxTrees()) {
-            if (syntaxTree) {
-                syntaxTree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

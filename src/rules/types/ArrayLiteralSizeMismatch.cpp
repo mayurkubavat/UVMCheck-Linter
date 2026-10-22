@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::types {
 
-class ArrayLiteralSizeVisitor : public slang::ast::ASTVisitor<ArrayLiteralSizeVisitor, slang::ast::VisitFlags::AllGood> {
+class ArrayLiteralSizeVisitor : public engine::AstVisitor<ArrayLiteralSizeVisitor> {
 public:
     explicit ArrayLiteralSizeVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -47,9 +47,9 @@ public:
     std::string_view getCategory() const override { return "Types"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& compilation = ctx.compilation();
+        auto& diags = ctx.diags();
         // Intercept both Slang's diagnostic for pattern count mismatch and ASTVisitor
         for (const auto& diag : compilation.getAllDiagnostics()) {
             if (diag.code == slang::diag::WrongNumberAssignmentPatterns) {
@@ -66,7 +66,7 @@ public:
         }
 
         ArrayLiteralSizeVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

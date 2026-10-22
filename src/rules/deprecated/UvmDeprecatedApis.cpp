@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::deprecated {
 
-class UvmDeprecatedApisVisitor : public slang::ast::ASTVisitor<UvmDeprecatedApisVisitor, slang::ast::VisitFlags::AllGood> {
+class UvmDeprecatedApisVisitor : public engine::AstVisitor<UvmDeprecatedApisVisitor> {
 public:
     explicit UvmDeprecatedApisVisitor(core::DiagnosticEngine& diags, std::string_view targetRule = "")
         : diags(diags), targetRule(targetRule) {}
@@ -106,11 +106,10 @@ public:
     std::string_view getCategory() const override { return "Deprecated"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         UvmDeprecatedApisVisitor visitor(diags, getId());
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

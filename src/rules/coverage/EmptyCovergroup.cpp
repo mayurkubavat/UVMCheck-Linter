@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::coverage {
 
-class EmptyCovergroupVisitor : public slang::syntax::SyntaxVisitor<EmptyCovergroupVisitor> {
+class EmptyCovergroupVisitor : public engine::SyntaxVisitor<EmptyCovergroupVisitor> {
 public:
     explicit EmptyCovergroupVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -50,15 +50,10 @@ public:
     std::string_view getCategory() const override { return "Coverage"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         EmptyCovergroupVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

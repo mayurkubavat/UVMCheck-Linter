@@ -9,7 +9,7 @@
 
 namespace uvmcheck::rules::types {
 
-class MixedSignVisitor : public slang::ast::ASTVisitor<MixedSignVisitor, slang::ast::VisitFlags::AllGood> {
+class MixedSignVisitor : public engine::AstVisitor<MixedSignVisitor> {
 public:
     explicit MixedSignVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -98,11 +98,10 @@ public:
     std::string_view getCategory() const override { return "Arithmetic"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         MixedSignVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

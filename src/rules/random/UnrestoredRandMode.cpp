@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::random {
 
-class RandModeVisitor : public slang::syntax::SyntaxVisitor<RandModeVisitor> {
+class RandModeVisitor : public engine::SyntaxVisitor<RandModeVisitor> {
 public:
     explicit RandModeVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -72,15 +72,10 @@ public:
     std::string_view getCategory() const override { return "Random"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         RandModeVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

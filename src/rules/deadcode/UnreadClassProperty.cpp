@@ -49,7 +49,7 @@ public:
     }
 };
 
-class UnreadPropertyVisitor : public slang::syntax::SyntaxVisitor<UnreadPropertyVisitor> {
+class UnreadPropertyVisitor : public engine::SyntaxVisitor<UnreadPropertyVisitor> {
 public:
     explicit UnreadPropertyVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -127,15 +127,10 @@ public:
     std::string_view getCategory() const override { return "DeadCode"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         UnreadPropertyVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

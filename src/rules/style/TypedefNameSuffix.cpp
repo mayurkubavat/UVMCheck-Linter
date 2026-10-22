@@ -5,7 +5,7 @@
 
 namespace uvmcheck::rules::style {
 
-class TypedefVisitor : public slang::ast::ASTVisitor<TypedefVisitor, slang::ast::VisitFlags::AllGood> {
+class TypedefVisitor : public engine::AstVisitor<TypedefVisitor> {
 public:
     explicit TypedefVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -54,11 +54,10 @@ public:
     std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         TypedefVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

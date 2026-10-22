@@ -46,6 +46,7 @@ endif()
 # Core library sources
 file(GLOB_RECURSE UVMCHECK_SOURCES
     src/core/*.cpp
+    src/engine/*.cpp
     src/uvm/*.cpp
     src/rules/*.cpp
     src/waivers/*.cpp
@@ -104,6 +105,11 @@ add_test(
 add_test(
     NAME uvm_rules_suite
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression.py --binary $<TARGET_FILE:uvmcheck> --category uvm
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME engine_equivalence
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/engine_equivalence.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(

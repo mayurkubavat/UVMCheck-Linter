@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::deprecated {
 
-class DefparamVisitor : public slang::syntax::SyntaxVisitor<DefparamVisitor> {
+class DefparamVisitor : public engine::SyntaxVisitor<DefparamVisitor> {
 public:
     explicit DefparamVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -37,13 +37,10 @@ public:
     std::string_view getCategory() const override { return "Deprecated"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         DefparamVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            tree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

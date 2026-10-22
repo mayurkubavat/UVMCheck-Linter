@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::deprecated {
 
-class ProceduralAssignVisitor : public slang::syntax::SyntaxVisitor<ProceduralAssignVisitor> {
+class ProceduralAssignVisitor : public engine::SyntaxVisitor<ProceduralAssignVisitor> {
 public:
     explicit ProceduralAssignVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -40,13 +40,10 @@ public:
     std::string_view getCategory() const override { return "Deprecated"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ProceduralAssignVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            tree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 
