@@ -1,0 +1,8 @@
+{
+  "bad.sv": [
+    {
+      "rule": "UVM-VIF-DIR",
+      "line": 14
+    }
+  ]
+}

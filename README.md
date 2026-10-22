@@ -116,8 +116,11 @@ Automatically refactor compliant syntax without manual editing:
 ./build/uvmcheck tb/legacy_code.sv --fix
 ```
 
-### Reporting (SARIF & HTML)
+### Reporting (SARIF, JSON & HTML)
 ```bash
+# Machine-readable findings for scripts and CI ('-' writes to stdout)
+./build/uvmcheck tb/*.sv --json results.json
+
 # Generate SARIF 2.1.0 for CI/CD code scanning
 ./build/uvmcheck tb/*.sv --sarif results.sarif
 
