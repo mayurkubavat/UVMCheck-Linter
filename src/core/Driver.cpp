@@ -24,7 +24,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("-h,--help", showHelp, "Display available options");
     slangDriver.cmdLine.add("--version", showVersion, "Display version information and exit");
     slangDriver.cmdLine.add("--list-rules", listRules, "List all available linter rules and exit");
-    slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: soundness, methodology, performance, style, security, all", "<name>");
+    slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: soundness, methodology, performance, style, security, smells, advisory, all", "<name>");
     slangDriver.cmdLine.add("--fix", autoFix, "Automatically apply fix-it rewrites to source files where supported");
     slangDriver.cmdLine.add("--sarif", sarifOutputPath, "Output results to specified SARIF 2.1.0 file", "<file>");
     slangDriver.cmdLine.add("--json", jsonOutputPath, "Output results as JSON to specified file ('-' for stdout)", "<file>");
@@ -74,15 +74,15 @@ int LinterDriver::run() {
         std::cout << "\n=== Registered UVMCheck Rules ===\n\n";
         std::cout << std::left << std::setw(15) << "Rule ID"
                   << std::setw(28) << "Name"
-                  << std::setw(14) << "Category"
+                  << std::setw(17) << "Category"
                   << std::setw(10) << "Severity"
                   << "Description\n";
-        std::cout << std::string(115, '-') << "\n";
+        std::cout << std::string(118, '-') << "\n";
 
         for (const auto& rule : rules::RuleRegistry::instance().getRules()) {
             std::cout << std::left << std::setw(15) << rule->getId()
                       << std::setw(28) << rule->getName()
-                      << std::setw(14) << rule->getCategory()
+                      << std::setw(17) << rule->getCategory()
                       << std::setw(10) << severityToString(rule->getDefaultSeverity())
                       << rule->getDescription() << "\n";
         }
@@ -132,7 +132,9 @@ int LinterDriver::run() {
     }
 
     // Resolve active rule preset profile
-    uint32_t activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::All);
+    // Advisory rules only run when asked for by preset or by --rule.
+    uint32_t activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::All) &
+                                 ~static_cast<uint32_t>(rules::RuleProfile::Advisory);
     if (presetName.has_value()) {
         std::string p = *presetName;
         for (char& c : p) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -148,6 +150,8 @@ int LinterDriver::run() {
             activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::Security);
         } else if (p == "smells" || p == "smell" || p == "maintainability") {
             activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::Smells);
+        } else if (p == "advisory") {
+            activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::Advisory);
         } else if (p == "all") {
             activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::All);
         } else {
@@ -163,7 +167,8 @@ int LinterDriver::run() {
                 continue;
             }
         }
-        if ((rule->getProfiles() & activeProfileMask) != 0) {
+        // A rule named with --rule runs whatever its profile.
+        if (ruleFilter.has_value() || (rule->getProfiles() & activeProfileMask) != 0) {
             rule->run(*compilation, uvmModel, diags);
         }
     }

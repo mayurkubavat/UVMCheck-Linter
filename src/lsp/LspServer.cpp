@@ -242,7 +242,10 @@ std::vector<core::Violation> LspServer::lintDocument(const std::string& uri, con
     core::DiagnosticEngine diags(sm);
 
     const auto& rules = rules::RuleRegistry::instance().getRules();
+    // Same default as the CLI: opt-in Advisory rules stay off in the editor.
+    const auto advisory = static_cast<uint32_t>(rules::RuleProfile::Advisory);
     for (const auto& rule : rules) {
+        if ((rule->getProfiles() & ~advisory) == 0) continue;
         rule->run(compilation, uvmModel, diags);
     }
 

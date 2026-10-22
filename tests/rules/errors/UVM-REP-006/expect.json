@@ -1,0 +1,16 @@
+{
+  "bad.sv": [
+    {
+      "rule": "UVM-REP-006",
+      "line": 11
+    },
+    {
+      "rule": "UVM-REP-006",
+      "line": 24
+    },
+    {
+      "rule": "UVM-REP-006",
+      "line": 25
+    }
+  ]
+}

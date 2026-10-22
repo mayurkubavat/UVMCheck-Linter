@@ -42,8 +42,9 @@
 | **Types & DPI** | 15 | Mixed-sign comparisons, redundant `$cast`, non-void task return types, DPI width mismatches |
 | **Deprecated & Smells** | 18 | OVM legacy APIs, banned `uvm_field_*` macros, `uvm_do` hiding, god-methods, magic delays |
 | **Style & Formatting** | 21 | Mandatory end labels, line length limits, capitalization, naming conventions |
+| **Software Engineering** | 47 | Copy-paste bugs, failures that are not reported, checkers that cannot fail, testbench layer rules, god classes, cohesion and coupling metrics, cognitive complexity, lock and file-handle leaks |
 
-> For comprehensive rule specifications, rationales, and bad/good examples across all 238 rules, explore the [Rule Catalog](references/rules/catalog/uvmcheck_rule_catalog.md).
+> For comprehensive rule specifications, rationales, and bad/good examples across all 293 rules, explore the [Rule Catalog](references/rules/catalog/uvmcheck_rule_catalog.md).
 
 ---
 
@@ -101,7 +102,18 @@ Filter rule execution using curated verification profiles:
 
 # Run only code style checks
 ./build/uvmcheck tb/top.sv --preset style
+
+# Run only maintainability checks (metrics, design smells)
+./build/uvmcheck tb/top.sv --preset maintainability
+
+# Run the opt-in advisory rules (magic numbers, commented-out code, ...)
+./build/uvmcheck tb/top.sv --preset advisory
+
+# Run everything, advisory rules included
+./build/uvmcheck tb/top.sv --preset all
 ```
+
+Without `--preset`, every rule except the Advisory ones runs. `--rule <ID>` always runs the named rule.
 
 ### Single-Rule Targeting
 Run or debug a specific rule against a source file in milliseconds:
@@ -191,7 +203,7 @@ Run with waivers applied:
 
 ## Regression & Unit Testsuite
 
-UVMCheck features a modular unit test suite with 456 test cases covering all 228 rules:
+UVMCheck features a modular unit test suite with 570 test cases covering 285 rules:
 
 ```bash
 # Run entire testsuite via Python runner (~2.8 seconds)

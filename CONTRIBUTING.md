@@ -50,6 +50,25 @@ Locate the relevant category directory under `src/rules/`:
 - `random/` - Unchecked `randomize()`, constraint solving issues
 - `sva/` - Vacuous assertions, combinatorial triggers
 - `uvm/` - Factory, phasing, objections, `uvm_config_db`, sequences
+- `errors/` - Failures that are not reported, checkers that cannot fail, use after a failed check
+- `design/` - Testbench layers, hierarchy reach-through, god class, cohesion, coupling, overrides
+- `metrics/` - Cognitive complexity, routine length, nesting, argument count, class size
+- `readability/` - Flag arguments, const ref, commented-out code, magic numbers
+
+Rules in `errors/`, `design/`, `metrics/` and `readability/` (and the SV-BUG, SV-RSC, SV-CNC-003/004 and
+SV-THR-003 rules) build on shared helpers instead of re-implementing them:
+
+- `uvmcheck/rules/SweSupport.h`: UVM role of a class (driver, monitor, scoreboard, env, test, config,
+  register model ...), user classes and methods with the UVM library filtered out, `uvm_*` report macro
+  handling for both the test stub and real uvm-core (`isReportGuard`, `reportLevel`, `alwaysExits`), written
+  and referenced symbols, and `UserCodeVisitor`, a visitor root that skips the UVM library.
+- `uvmcheck/rules/CodeMetrics.h`: per-routine metrics (cognitive and cyclomatic complexity, nesting,
+  statements) and per-class metrics (WMC, ATFD, TCC, LCOM4, CBO, DIT), computed once per compilation.
+- `uvmcheck/rules/PathWalker.h`: a small path-sensitive walker for rules that track state along paths.
+
+Thresholds go through `swe::ruleOption("<RULE-ID>", "<key>", default)` so the project config can override
+them per rule. Opinionated rules use the category `Advisory`: they are off unless `--preset advisory`,
+`--preset all` or `--rule` selects them, in the CLI and in the language server.
 
 Assign a unique rule ID conforming to the standard naming scheme (e.g. `UVM-XYZ-001`, `SV-PRF-013`).
 
