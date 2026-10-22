@@ -3,6 +3,10 @@
     {
       "rule": "UVM-OBJ-003",
       "line": 18
+    },
+    {
+      "rule": "UVM-OBJ-003",
+      "line": 34
     }
   ]
 }

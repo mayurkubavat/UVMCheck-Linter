@@ -23,3 +23,17 @@ class good_obj_test extends uvm_test;
     phase.drop_objection(this);
   endtask
 endclass
+
+class good_timed_test extends uvm_test;
+  `uvm_component_utils(good_timed_test)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  // The drop sits inside a timed statement; it still balances the raise.
+  task main_phase(uvm_phase phase);
+    phase.raise_objection(this);
+    #100 phase.drop_objection(this);
+  endtask
+endclass
