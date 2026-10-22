@@ -54,7 +54,7 @@ private:
     core::DiagnosticEngine& diags;
 };
 
-class InlineShadowVisitor : public slang::syntax::SyntaxVisitor<InlineShadowVisitor> {
+class InlineShadowVisitor : public engine::SyntaxVisitor<InlineShadowVisitor> {
 public:
     explicit InlineShadowVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -93,13 +93,10 @@ public:
     std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         InlineShadowVisitor visitor(diags);
-        for (const auto& syntaxTree : compilation.getSyntaxTrees()) {
-            syntaxTree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

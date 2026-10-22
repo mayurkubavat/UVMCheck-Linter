@@ -10,7 +10,7 @@
 
 namespace uvmcheck::rules::random {
 
-class CyclicSolveBeforeVisitor : public slang::syntax::SyntaxVisitor<CyclicSolveBeforeVisitor> {
+class CyclicSolveBeforeVisitor : public engine::SyntaxVisitor<CyclicSolveBeforeVisitor> {
 public:
     explicit CyclicSolveBeforeVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -108,13 +108,10 @@ public:
     std::string_view getCategory() const override { return "Random"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         CyclicSolveBeforeVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            tree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::style {
 
-class BannerFormattingVisitor : public slang::syntax::SyntaxVisitor<BannerFormattingVisitor> {
+class BannerFormattingVisitor : public engine::SyntaxVisitor<BannerFormattingVisitor> {
 public:
     explicit BannerFormattingVisitor(core::DiagnosticEngine& diags, bool checkMethods = true, bool checkSections = true)
         : diags(diags), checkMethods(checkMethods), checkSections(checkSections) {}
@@ -86,13 +86,10 @@ public:
     std::string_view getCategory() const override { return "Documentation"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         BannerFormattingVisitor visitor(diags, true, false);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            tree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

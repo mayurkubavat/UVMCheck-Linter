@@ -5,7 +5,7 @@
 
 namespace uvmcheck::rules::deprecated {
 
-class RandomSystemFunctionVisitor : public slang::ast::ASTVisitor<RandomSystemFunctionVisitor, slang::ast::VisitFlags::AllGood> {
+class RandomSystemFunctionVisitor : public engine::AstVisitor<RandomSystemFunctionVisitor> {
 public:
     explicit RandomSystemFunctionVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -39,11 +39,10 @@ public:
     std::string_view getCategory() const override { return "Deprecated"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         RandomSystemFunctionVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

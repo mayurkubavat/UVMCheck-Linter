@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::deadcode {
 
-class UnusedGenerateVisitor : public slang::syntax::SyntaxVisitor<UnusedGenerateVisitor> {
+class UnusedGenerateVisitor : public engine::SyntaxVisitor<UnusedGenerateVisitor> {
 public:
     explicit UnusedGenerateVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -53,15 +53,10 @@ public:
     std::string_view getCategory() const override { return "DeadCode"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         UnusedGenerateVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

@@ -12,7 +12,7 @@
 
 namespace uvmcheck::rules::coverage {
 
-class CovergroupUsageVisitor : public slang::ast::ASTVisitor<CovergroupUsageVisitor, slang::ast::VisitFlags::AllGood> {
+class CovergroupUsageVisitor : public engine::AstVisitor<CovergroupUsageVisitor> {
 public:
     void handle(const slang::ast::AssignmentExpression& assign) {
         if (assign.right().kind == slang::ast::ExpressionKind::NewCovergroup) {
@@ -77,9 +77,9 @@ public:
     std::string_view getCategory() const override { return "Coverage"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& uvmModel,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        const auto& uvmModel = ctx.uvmModel();
+        auto& diags = ctx.diags();
         // Collect all declared covergroups
         struct DeclaredCovergroup {
             std::string name;
@@ -112,11 +112,11 @@ public:
             }
         }
 
-        if (declaredCgs.empty()) return;
+        if (declaredCgs.empty()) co_return;
 
         // Traverse AST to find instantiation and sampling
         CovergroupUsageVisitor visitor;
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
 
         for (const auto& cg : declaredCgs) {
             bool isInstantiated = (visitor.instantiatedCovergroups.find(cg.name) != visitor.instantiatedCovergroups.end());

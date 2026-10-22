@@ -10,7 +10,7 @@
 
 namespace uvmcheck::rules::correctness {
 
-class BitSelectOutOfBoundsVisitor : public slang::ast::ASTVisitor<BitSelectOutOfBoundsVisitor, slang::ast::VisitFlags::AllGood> {
+class BitSelectOutOfBoundsVisitor : public engine::AstVisitor<BitSelectOutOfBoundsVisitor> {
 public:
     explicit BitSelectOutOfBoundsVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -79,11 +79,10 @@ public:
     std::string_view getCategory() const override { return "Correctness"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         BitSelectOutOfBoundsVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

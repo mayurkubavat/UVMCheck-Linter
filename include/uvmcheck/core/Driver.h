@@ -34,6 +34,8 @@ private:
     std::optional<std::string> ruleFilter;
     std::optional<std::string> pythonRulesPath;
     std::optional<bool> runLsp;
+    std::optional<bool> profileRules;
+    std::optional<std::string> engineMode;
 };
 
 } // namespace uvmcheck::core

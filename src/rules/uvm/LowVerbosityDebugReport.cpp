@@ -20,7 +20,7 @@ static std::string toUpper(std::string_view s) {
     return res;
 }
 
-class LowVerbosityDebugVisitor : public slang::ast::ASTVisitor<LowVerbosityDebugVisitor, slang::ast::VisitFlags::AllGood> {
+class LowVerbosityDebugVisitor : public engine::AstVisitor<LowVerbosityDebugVisitor> {
 public:
     explicit LowVerbosityDebugVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -122,11 +122,10 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         LowVerbosityDebugVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

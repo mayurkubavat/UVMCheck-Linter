@@ -26,7 +26,7 @@ private:
     core::DiagnosticEngine& diags;
 };
 
-class LoopInstantiationVisitor : public slang::syntax::SyntaxVisitor<LoopInstantiationVisitor> {
+class LoopInstantiationVisitor : public engine::SyntaxVisitor<LoopInstantiationVisitor> {
 public:
     explicit LoopInstantiationVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -68,15 +68,10 @@ public:
     std::string_view getCategory() const override { return "Performance"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         LoopInstantiationVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

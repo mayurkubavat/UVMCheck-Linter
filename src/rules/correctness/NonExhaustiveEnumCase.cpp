@@ -10,7 +10,7 @@
 
 namespace uvmcheck::rules::correctness {
 
-class NonExhaustiveEnumCaseVisitor : public slang::ast::ASTVisitor<NonExhaustiveEnumCaseVisitor, slang::ast::VisitFlags::AllGood> {
+class NonExhaustiveEnumCaseVisitor : public engine::AstVisitor<NonExhaustiveEnumCaseVisitor> {
 public:
     explicit NonExhaustiveEnumCaseVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -92,11 +92,10 @@ public:
         return static_cast<uint32_t>(RuleProfile::Soundness);
     }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         NonExhaustiveEnumCaseVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

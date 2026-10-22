@@ -11,7 +11,7 @@
 
 namespace uvmcheck::rules::coverage {
 
-class IllegalBinOverlapVisitor : public slang::syntax::SyntaxVisitor<IllegalBinOverlapVisitor> {
+class IllegalBinOverlapVisitor : public engine::SyntaxVisitor<IllegalBinOverlapVisitor> {
 public:
     explicit IllegalBinOverlapVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -98,15 +98,10 @@ public:
     std::string_view getCategory() const override { return "Coverage"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         IllegalBinOverlapVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 
