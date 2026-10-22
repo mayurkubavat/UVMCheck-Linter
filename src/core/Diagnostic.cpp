@@ -1,6 +1,109 @@
 #include "uvmcheck/core/Diagnostic.h"
+#include "uvmcheck/core/ProjectConfig.h"
 
 namespace uvmcheck::core {
+
+static bool isMockLibrary(std::string_view fileName) {
+    return fileName.find("uvm_mock.svh") != std::string_view::npos;
+}
+
+const DiagnosticEngine::PathInfo& DiagnosticEngine::classify(std::string_view filePath) {
+    auto it = pathCache.find(std::string(filePath));
+    if (it == pathCache.end()) {
+        PathInfo info;
+        info.normalized = normalizePathForMatching(filePath);
+        SuppressionReason r = projectConfig->classifyPath(info.normalized);
+        info.cls = r == SuppressionReason::LibraryPath    ? PathClass::Library
+                   : r == SuppressionReason::ExcludedPath ? PathClass::Excluded
+                                                          : PathClass::Normal;
+        it = pathCache.emplace(std::string(filePath), std::move(info)).first;
+    }
+    return it->second;
+}
+
+bool DiagnosticEngine::applyProjectPolicy(std::string_view ruleId, std::string_view filePath,
+                                          std::string_view originFile, Severity& severity) {
+    if (!projectConfig) return false;
+
+    // Covers Python plugin rules, which the driver cannot skip up front.
+    if (!projectConfig->isRuleEnabled(ruleId, {})) return true;
+
+    if (projectConfig->hasPathFilters() && !filePath.empty()) {
+        const PathInfo& info = classify(filePath);
+        if (info.cls == PathClass::Library) {
+            librarySuppressed++;
+            return true;
+        }
+        if (info.cls == PathClass::Excluded || projectConfig->isExcludedForRule(ruleId, info.normalized)) {
+            excludeSuppressed++;
+            return true;
+        }
+        if (!originFile.empty() && originFile != filePath &&
+            !projectConfig->reportLibraryMacroExpansions() &&
+            classify(originFile).cls == PathClass::Library) {
+            librarySuppressed++;
+            return true;
+        }
+    }
+
+    if (auto sev = projectConfig->severityOverride(ruleId)) severity = *sev;
+    return false;
+}
+
+void DiagnosticEngine::addViolation(std::string_view ruleId,
+                                    std::string_view ruleName,
+                                    std::string_view message,
+                                    Severity severity,
+                                    slang::SourceLocation loc,
+                                    std::vector<FixItHint> fixIts) {
+    std::string_view fileName;
+    std::string_view originFile;
+    if (loc.valid()) {
+        fileName = sourceManager.getFileName(loc);
+        if (isMockLibrary(fileName)) return;
+        if (projectConfig && sourceManager.isMacroLoc(loc)) {
+            originFile = sourceManager.getFileName(sourceManager.getFullyOriginalLoc(loc));
+        }
+    }
+    if (applyProjectPolicy(ruleId, fileName, originFile, severity)) return;
+
+    Violation v;
+    v.ruleId = ruleId;
+    v.ruleName = ruleName;
+    v.message = message;
+    v.severity = severity;
+    v.fixIts = std::move(fixIts);
+
+    if (loc.valid()) {
+        v.filePath = std::string(fileName);
+        v.line = sourceManager.getLineNumber(loc);
+        v.column = sourceManager.getColumnNumber(loc);
+        v.snippet = std::string(sourceManager.getSourceLine(loc));
+    }
+
+    violations.push_back(std::move(v));
+}
+
+void DiagnosticEngine::addDirectViolation(std::string_view ruleId,
+                                          std::string_view ruleName,
+                                          std::string_view message,
+                                          Severity severity,
+                                          std::string_view filePath,
+                                          size_t line,
+                                          size_t column) {
+    if (isMockLibrary(filePath)) return;
+    if (applyProjectPolicy(ruleId, filePath, {}, severity)) return;
+
+    Violation v;
+    v.ruleId = ruleId;
+    v.ruleName = ruleName;
+    v.message = message;
+    v.severity = severity;
+    v.filePath = std::string(filePath);
+    v.line = line;
+    v.column = column;
+    violations.push_back(std::move(v));
+}
 
 void DiagnosticEngine::printSummary(std::ostream& os) const {
     const char* reset   = "\033[0m";
@@ -32,6 +135,10 @@ void DiagnosticEngine::printSummary(std::ostream& os) const {
     os << "Total Violations: " << violations.size() << " ("
        << red << errorCount() << " errors" << reset << ", "
        << yellow << warningCount() << " warnings" << reset << ")\n";
+    if (librarySuppressed > 0 || excludeSuppressed > 0) {
+        os << dim << "Suppressed by project config: " << librarySuppressed
+           << " in library paths, " << excludeSuppressed << " in excluded paths" << reset << "\n";
+    }
 }
 
 } // namespace uvmcheck::core

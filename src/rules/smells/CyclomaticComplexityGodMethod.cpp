@@ -1,5 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
+#include "uvmcheck/core/ConfigManager.h"
 #include "slang/ast/ASTVisitor.h"
 #include "slang/ast/symbols/SubroutineSymbols.h"
 #include "slang/ast/statements/ConditionalStatements.h"
@@ -63,20 +64,24 @@ public:
 
 class CyclomaticVisitor : public slang::ast::ASTVisitor<CyclomaticVisitor, slang::ast::VisitFlags::AllGood> {
 public:
-    explicit CyclomaticVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
+    explicit CyclomaticVisitor(core::DiagnosticEngine& diags) : diags(diags) {
+        const auto& cfg = core::ConfigManager::instance().getProjectConfig();
+        maxComplexity = cfg.ruleOptionInt("SV-SML-004", "max_complexity", 15);
+        warningComplexity = cfg.ruleOptionInt("SV-SML-004", "warning_complexity", 25);
+    }
 
     void checkSubroutine(const slang::ast::SubroutineSymbol& sub) {
         ComplexityCounter counter;
         sub.getBody().visit(counter);
 
-        if (counter.complexity > 15) {
-            core::Severity sev = (counter.complexity > 25) ? core::Severity::Warning : core::Severity::Info;
+        if (counter.complexity > maxComplexity) {
+            core::Severity sev = (counter.complexity > warningComplexity) ? core::Severity::Warning : core::Severity::Info;
             diags.addViolation(
                 "SV-SML-004",
                 "CyclomaticComplexityGodMethod",
                 "Subroutine '" + std::string(sub.name) +
                 "' has high McCabe Cyclomatic Complexity (" + std::to_string(counter.complexity) +
-                " > 15). Overly complex routines with deeply nested branching impede functional coverage, "
+                " > " + std::to_string(maxComplexity) + "). Overly complex routines with deeply nested branching impede functional coverage, "
                 "conceal unreachable edge cases, and lead to high defect density during maintenance. "
                 "Decompose into smaller, modular sub-tasks.",
                 sev,
@@ -92,6 +97,8 @@ public:
 
 private:
     core::DiagnosticEngine& diags;
+    int64_t maxComplexity = 15;
+    int64_t warningComplexity = 25;
 };
 
 class CyclomaticComplexityGodMethod : public Rule {

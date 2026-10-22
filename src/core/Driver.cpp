@@ -30,8 +30,10 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--baseline", baselineInputPath, "Filter out known technical debt matching baseline JSON", "<file>");
     slangDriver.cmdLine.add("--update-baseline", baselineOutputPath, "Snapshot current violations into baseline JSON file", "<file>");
     slangDriver.cmdLine.add("--waivers", waiversFilePath, "Load external waiver rules from JSON file", "<file>");
-    slangDriver.cmdLine.add("--config", configFilePath, "Load parameterizable naming and style rules from JSON configuration file", "<file>");
-    slangDriver.cmdLine.add("--dump-config", dumpConfigPath, "Dump default naming and style JSON configuration template and exit", "<file>");
+    slangDriver.cmdLine.add("--config", configFilePath, "Load project configuration (Python uvmcheck_config.py or JSON); default: auto-discover", "<file>");
+    slangDriver.cmdLine.add("--dump-config", dumpConfigPath, "Write a starter Python project configuration and exit", "<file>");
+    slangDriver.cmdLine.add("--library", libraryPathArgs, "Treat files matching this glob as library code: compiled, never reported (repeatable)", "<glob>");
+    slangDriver.cmdLine.add("--exclude", excludePathArgs, "Do not report violations in files matching this glob (repeatable)", "<glob>");
     slangDriver.cmdLine.add("--rule", ruleFilter, "Execute only the specified rule ID or rule name", "<rule>");
     slangDriver.cmdLine.add("--python-rules", pythonRulesPath, "Load and execute custom Python lint rules from specified file or directory", "<path>");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
@@ -41,12 +43,42 @@ bool LinterDriver::parseCommandLine(int argc, char** argv) {
     return slangDriver.parseCommandLine(argc, argv);
 }
 
-int LinterDriver::run() {
-    if (runLsp.value_or(false)) {
-        lsp::LspServer server;
-        return server.run();
+bool LinterDriver::loadProjectConfig() {
+    auto& cfgMgr = ConfigManager::instance();
+    if (configFilePath.has_value()) {
+        if (!cfgMgr.loadFromFile(*configFilePath)) {
+            std::cerr << "Error: " << cfgMgr.getLastError() << "\n";
+            return false;
+        }
+        std::cout << "[uvmcheck] Loaded configuration from " << *configFilePath << "\n";
+    } else if (cfgMgr.autoDiscover(".")) {
+        std::cout << "[uvmcheck] Auto-discovered configuration: " << cfgMgr.getLoadedConfigPath() << "\n";
+    } else if (!cfgMgr.getLastError().empty()) {
+        std::cerr << "Error: " << cfgMgr.getLastError() << "\n";
+        return false;
     }
 
+    // Command-line globs are relative to the working directory.
+    auto& project = cfgMgr.getProjectConfig();
+    for (const auto& g : libraryPathArgs) project.libraryPaths().add(PathPattern(g, "."));
+    for (const auto& g : excludePathArgs) project.excludePaths().add(PathPattern(g, "."));
+
+    std::unordered_map<std::string, std::string> nameToId;
+    std::vector<std::string> ids;
+    for (const auto& rule : rules::RuleRegistry::instance().getRules()) {
+        nameToId.emplace(rule->getName(), rule->getId());
+        ids.emplace_back(rule->getId());
+    }
+    cfgMgr.validateRuleKeys(nameToId, ids);
+
+    for (const auto& w : cfgMgr.getWarnings()) {
+        std::cerr << "Warning: " << (cfgMgr.hasLoadedConfig() ? cfgMgr.getLoadedConfigPath() + ": " : "")
+                  << w << "\n";
+    }
+    return true;
+}
+
+int LinterDriver::run() {
     if (showHelp.value_or(false)) {
         std::cout << slangDriver.cmdLine.getHelpText("uvmcheck - Advanced SystemVerilog & UVM Linter") << "\n";
         return 0;
@@ -88,6 +120,15 @@ int LinterDriver::run() {
         return 0;
     }
 
+    if (!loadProjectConfig()) {
+        return 2;
+    }
+
+    if (runLsp.value_or(false)) {
+        lsp::LspServer server;
+        return server.run();
+    }
+
     if (!slangDriver.processOptions()) {
         return 2;
     }
@@ -108,19 +149,8 @@ int LinterDriver::run() {
     // Initialize diagnostic engine
     DiagnosticEngine diags(slangDriver.sourceManager);
 
-    // Load or auto-discover JSON configuration
-    if (configFilePath.has_value()) {
-        if (!ConfigManager::instance().loadFromFile(*configFilePath)) {
-            std::cerr << "Warning: Could not open or parse config file: " << *configFilePath << "\n";
-        } else {
-            std::cout << "[uvmcheck] Loaded configuration from " << *configFilePath << "\n";
-        }
-    } else {
-        if (ConfigManager::instance().autoDiscover(".")) {
-            std::cout << "[uvmcheck] Auto-discovered configuration: "
-                      << ConfigManager::instance().getLoadedConfigPath() << "\n";
-        }
-    }
+    const auto& projectConfig = ConfigManager::instance().getProjectConfig();
+    diags.setProjectConfig(&projectConfig);
 
     // Resolve active rule preset profile
     uint32_t activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::All);
@@ -154,6 +184,9 @@ int LinterDriver::run() {
                 continue;
             }
         }
+        if (!projectConfig.isRuleEnabled(rule->getId(), rule->getName())) {
+            continue;
+        }
         if ((rule->getProfiles() & activeProfileMask) != 0) {
             rule->run(*compilation, uvmModel, diags);
         }
@@ -167,6 +200,14 @@ int LinterDriver::run() {
 
     // Process Waivers and Baseline
     waivers::WaiverEngine waiverEngine(slangDriver.sourceManager);
+    for (const auto& cw : ConfigManager::instance().getWaivers()) {
+        waivers::ExternalWaiver w;
+        w.ruleId = cw.ruleId;
+        w.line = cw.line;
+        w.reason = cw.reason;
+        w.glob = cw.path;
+        waiverEngine.addWaiver(std::move(w));
+    }
 
     if (waiversFilePath.has_value()) {
         if (!waiverEngine.loadWaivers(*waiversFilePath)) {

@@ -1,4 +1,5 @@
 #include "uvmcheck/lsp/LspServer.h"
+#include "uvmcheck/core/ConfigManager.h"
 #include "uvmcheck/rules/RuleRegistry.h"
 #include "uvmcheck/rules/BuiltinRules.h"
 #include "uvmcheck/uvm/UvmModel.h"
@@ -240,9 +241,12 @@ std::vector<core::Violation> LspServer::lintDocument(const std::string& uri, con
 
     uvm::UvmModel uvmModel(compilation);
     core::DiagnosticEngine diags(sm);
+    const auto& projectConfig = core::ConfigManager::instance().getProjectConfig();
+    diags.setProjectConfig(&projectConfig);
 
     const auto& rules = rules::RuleRegistry::instance().getRules();
     for (const auto& rule : rules) {
+        if (!projectConfig.isRuleEnabled(rule->getId(), rule->getName())) continue;
         rule->run(compilation, uvmModel, diags);
     }
 
