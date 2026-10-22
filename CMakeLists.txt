@@ -106,10 +106,24 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(
-    NAME uvm_rules_suite
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression.py --binary $<TARGET_FILE:uvmcheck> --category uvm
+    NAME all_rules_stub_suite
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression.py --binary $<TARGET_FILE:uvmcheck>
+            --mode all-rules --baseline ${CMAKE_CURRENT_SOURCE_DIR}/tests/baselines/all_rules_stub.json
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
+
+# Runs against the real Accellera library when a uvm-core checkout is given,
+# e.g. cmake -DUVMCHECK_UVM_HOME=/path/to/uvm-core
+set(UVMCHECK_UVM_HOME "" CACHE PATH "uvm-core checkout used by the real-UVM rule tests")
+if(UVMCHECK_UVM_HOME)
+    add_test(
+        NAME all_rules_uvm_core_suite
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression.py --binary $<TARGET_FILE:uvmcheck>
+                --mode all-rules --uvm-home ${UVMCHECK_UVM_HOME}
+                --baseline ${CMAKE_CURRENT_SOURCE_DIR}/tests/baselines/all_rules_uvm_core.json
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+endif()
 add_test(
     NAME project_config_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_config.py --binary $<TARGET_FILE:uvmcheck>
