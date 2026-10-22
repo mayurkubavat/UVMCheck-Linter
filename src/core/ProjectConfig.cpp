@@ -110,6 +110,13 @@ bool matchSegments(const std::vector<std::string_view>& g, size_t gi,
     return true;
 }
 
+/// Lexically normalizes and resolves symlinks in the existing part of the path.
+fs::path resolveSymlinks(const fs::path& p) {
+    std::error_code ec;
+    fs::path r = fs::weakly_canonical(p, ec);
+    return ec ? p.lexically_normal() : r;
+}
+
 } // namespace
 
 bool globMatch(std::string_view glob, std::string_view path) {
@@ -122,7 +129,7 @@ std::string normalizePathForMatching(std::string_view path) {
     fs::path p(path);
     fs::path abs = fs::absolute(p, ec);
     if (ec) abs = p;
-    std::string s = abs.lexically_normal().generic_string();
+    std::string s = resolveSymlinks(abs).generic_string();
     while (s.size() > 1 && s.back() == '/') s.pop_back();
     return s;
 }
@@ -150,7 +157,15 @@ PathPattern::PathPattern(std::string_view pattern, const fs::path& baseDir) : or
         fs::path base = fs::absolute(baseDir.empty() ? fs::path(".") : baseDir, ec);
         p = base / p;
     }
-    glob = p.lexically_normal().generic_string();
+    // Resolve symlinks in the wildcard-free prefix so patterns compare equal to
+    // normalized file paths (e.g. macOS /tmp -> /private/tmp).
+    fs::path prefix, rest;
+    bool inWildcards = false;
+    for (const auto& seg : p.lexically_normal()) {
+        if (!inWildcards && seg.string().find_first_of("*?[") != std::string::npos) inWildcards = true;
+        (inWildcards ? rest : prefix) /= seg;
+    }
+    glob = (resolveSymlinks(prefix) / rest).generic_string();
     while (glob.size() > 1 && glob.back() == '/') glob.pop_back();
 }
 
