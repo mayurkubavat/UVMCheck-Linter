@@ -24,6 +24,7 @@ private:
     std::optional<bool> listRules;
     std::optional<std::string> sarifOutputPath;
     std::optional<std::string> htmlOutputPath;
+    std::optional<std::string> jsonOutputPath;
     std::optional<std::string> baselineInputPath;
     std::optional<std::string> baselineOutputPath;
     std::optional<std::string> waiversFilePath;

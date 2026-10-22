@@ -4,6 +4,7 @@
 #include "uvmcheck/waivers/WaiverEngine.h"
 #include "uvmcheck/reporting/SarifReporter.h"
 #include "uvmcheck/reporting/HtmlReporter.h"
+#include "uvmcheck/reporting/JsonReporter.h"
 #include "uvmcheck/core/ConfigManager.h"
 #include "uvmcheck/plugins/PythonPluginManager.h"
 #include "uvmcheck/lsp/LspServer.h"
@@ -28,6 +29,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: soundness, methodology, performance, style, security, all", "<name>");
     slangDriver.cmdLine.add("--fix", autoFix, "Automatically apply fix-it rewrites to source files where supported");
     slangDriver.cmdLine.add("--sarif", sarifOutputPath, "Output results to specified SARIF 2.1.0 file", "<file>");
+    slangDriver.cmdLine.add("--json", jsonOutputPath, "Output results as JSON to specified file ('-' for stdout)", "<file>");
     slangDriver.cmdLine.add("--html", htmlOutputPath, "Generate standalone interactive HTML quality dashboard", "<file>");
     slangDriver.cmdLine.add("--baseline", baselineInputPath, "Filter out known technical debt matching baseline JSON", "<file>");
     slangDriver.cmdLine.add("--update-baseline", baselineOutputPath, "Snapshot current violations into baseline JSON file", "<file>");
@@ -49,14 +51,16 @@ bool LinterDriver::parseCommandLine(int argc, char** argv) {
 
 bool LinterDriver::loadProjectConfig() {
     auto& cfgMgr = ConfigManager::instance();
+    // Keep stdout parseable when the JSON report goes there.
+    std::ostream& info = jsonOutputPath.has_value() && *jsonOutputPath == "-" ? std::cerr : std::cout;
     if (configFilePath.has_value()) {
         if (!cfgMgr.loadFromFile(*configFilePath)) {
             std::cerr << "Error: " << cfgMgr.getLastError() << "\n";
             return false;
         }
-        std::cout << "[uvmcheck] Loaded configuration from " << *configFilePath << "\n";
+        info << "[uvmcheck] Loaded configuration from " << *configFilePath << "\n";
     } else if (cfgMgr.autoDiscover(".")) {
-        std::cout << "[uvmcheck] Auto-discovered configuration: " << cfgMgr.getLoadedConfigPath() << "\n";
+        info << "[uvmcheck] Auto-discovered configuration: " << cfgMgr.getLoadedConfigPath() << "\n";
     } else if (!cfgMgr.getLastError().empty()) {
         std::cerr << "Error: " << cfgMgr.getLastError() << "\n";
         return false;
@@ -146,8 +150,15 @@ int LinterDriver::run() {
     auto elaborateStart = Clock::now();
     auto compilation = slangDriver.createCompilation();
     
-    // Check if there are compilation syntax/elaboration errors
-    (void)slangDriver.reportDiagnostics(false);
+    // With JSON on stdout, keep stdout parseable by moving status lines to stderr
+    const bool jsonToStdout = jsonOutputPath.has_value() && *jsonOutputPath == "-";
+    std::ostream& info = jsonToStdout ? std::cerr : std::cout;
+
+    // Check if there are compilation syntax/elaboration errors. Elaboration
+    // diagnostics only reach the engine through reportCompilation.
+    slangDriver.reportCompilation(*compilation, /* quiet */ true);
+    (void)slangDriver.reportDiagnostics(/* quiet */ jsonToStdout);
+    const size_t compileErrors = static_cast<size_t>(slangDriver.diagEngine.getNumErrors());
 
     // Fully elaborate up front. Rules then only read the AST, which is what
     // makes it safe to run them in parallel (same protocol as slang's own
@@ -221,7 +232,7 @@ int LinterDriver::run() {
 
     // Custom Python rules only read the UVM model, so they run alongside the built-in rules
     if (pythonRulesPath.has_value()) {
-        std::cout << "[uvmcheck] Executing custom Python rules from: " << *pythonRulesPath << "\n";
+        info << "[uvmcheck] Executing custom Python rules from: " << *pythonRulesPath << "\n";
         ruleEngine.addExternalJob("python rules", [&](DiagnosticEngine& pyDiags) {
             plugins::PythonPluginManager::runPythonRules(*pythonRulesPath, uvmModel, pyDiags);
         });
@@ -250,7 +261,7 @@ int LinterDriver::run() {
         if (!waiverEngine.loadWaivers(*waiversFilePath)) {
             std::cerr << "Warning: Could not open waiver file: " << *waiversFilePath << "\n";
         } else {
-            std::cout << "[uvmcheck] Loaded external waivers from " << *waiversFilePath << "\n";
+            info << "[uvmcheck] Loaded external waivers from " << *waiversFilePath << "\n";
         }
     }
 
@@ -258,13 +269,13 @@ int LinterDriver::run() {
         if (!waiverEngine.loadBaseline(*baselineInputPath)) {
             std::cerr << "Warning: Could not open baseline file: " << *baselineInputPath << "\n";
         } else {
-            std::cout << "[uvmcheck] Loaded baseline from " << *baselineInputPath << "\n";
+            info << "[uvmcheck] Loaded baseline from " << *baselineInputPath << "\n";
         }
     }
 
     if (baselineOutputPath.has_value()) {
         if (waiverEngine.saveBaseline(*baselineOutputPath, diags.getViolations())) {
-            std::cout << "[uvmcheck] Successfully saved " << diags.getViolations().size()
+            info << "[uvmcheck] Successfully saved " << diags.getViolations().size()
                       << " violations to baseline: " << *baselineOutputPath << "\n";
         } else {
             std::cerr << "Error: Failed to write baseline to: " << *baselineOutputPath << "\n";
@@ -322,7 +333,7 @@ int LinterDriver::run() {
         }
 
         if (totalFixed > 0) {
-            std::cout << "[uvmcheck] Automatically applied " << totalFixed << " fix-it(s) across "
+            info << "[uvmcheck] Automatically applied " << totalFixed << " fix-it(s) across "
                       << fileFixes.size() << " file(s).\n";
         }
     }
@@ -330,26 +341,37 @@ int LinterDriver::run() {
     // Write SARIF report if requested
     if (sarifOutputPath.has_value()) {
         if (reporting::SarifReporter::writeSarif(*sarifOutputPath, diags.getViolations(), allRules)) {
-            std::cout << "[uvmcheck] SARIF 2.1.0 report written to: " << *sarifOutputPath << "\n";
+            info << "[uvmcheck] SARIF 2.1.0 report written to: " << *sarifOutputPath << "\n";
         } else {
             std::cerr << "Error: Failed to write SARIF report to: " << *sarifOutputPath << "\n";
+        }
+    }
+
+    // Write JSON report if requested
+    if (jsonOutputPath.has_value()) {
+        if (!reporting::JsonReporter::writeJson(*jsonOutputPath, diags.getViolations(), compileErrors, waivedCount)) {
+            std::cerr << "Error: Failed to write JSON report to: " << *jsonOutputPath << "\n";
+        } else if (!jsonToStdout) {
+            info << "[uvmcheck] JSON report written to: " << *jsonOutputPath << "\n";
         }
     }
 
     // Write HTML quality dashboard if requested
     if (htmlOutputPath.has_value()) {
         if (reporting::HtmlReporter::writeHtml(*htmlOutputPath, diags.getViolations(), allRules)) {
-            std::cout << "[uvmcheck] Interactive HTML dashboard generated: " << *htmlOutputPath << "\n";
+            info << "[uvmcheck] Interactive HTML dashboard generated: " << *htmlOutputPath << "\n";
         } else {
             std::cerr << "Error: Failed to write HTML report to: " << *htmlOutputPath << "\n";
         }
     }
 
     // Print summary
-    diags.printSummary(std::cout);
+    if (!jsonToStdout) {
+        diags.printSummary(std::cout);
+    }
 
     if (waivedCount > 0) {
-        std::cout << "\033[2m[uvmcheck] " << waivedCount
+        info << "\033[2m[uvmcheck] " << waivedCount
                   << " violation(s) suppressed by inline waivers or baseline.\033[0m\n";
     }
 

@@ -118,23 +118,43 @@ as the reference `--engine isolated` mode.
 Add your rule factory to `src/rules/BuiltinRules.cpp`.
 
 ### 4. Create Paired Unit Tests
-Every rule in UVMCheck **must** have paired `bad.sv` and `good.sv` test cases:
+Every rule in UVMCheck **must** have paired `bad.sv` and `good.sv` test cases plus an `expect.json`:
 1. Create directory `tests/rules/<category>/<RULE_ID>/`.
 2. Add `bad.sv` containing an isolated violation that should trigger the rule.
 3. Add `good.sv` containing the compliant implementation that should pass cleanly without warnings.
+4. Add `expect.json` listing every finding `bad.sv` must produce, by rule and line:
+   ```json
+   { "bad.sv": [ { "rule": "UVM-XYZ-001", "line": 17 } ] }
+   ```
+   `python3 tests/regression.py --rule <RULE_ID> --update-expectations` writes it from the
+   current output. Check every line it records before committing: it captures what the
+   rule does, not what it should do.
 
 ### 5. Verify via Regression Suite
-Run the test runner to ensure 100% pass rate:
+The runner reads findings from the linter's `--json` report and compile errors from
+slang's `--diag-json`. It has three suites, all of which run in CI:
+
 ```bash
-# Run only your new rule
+# 1. Isolated: only the rule under test, against the UVM stub (tests/common/uvm_mock.svh)
 python3 tests/regression.py --rule <RULE_ID>
 
-# Run full regression suite across all 225 rules
-python3 tests/regression.py
+# 2. All rules enabled, against the UVM stub
+python3 tests/regression.py --mode all-rules --baseline tests/baselines/all_rules_stub.json
 
-# Verify via CTest
+# 3. All rules enabled, against the real Accellera library
+git clone --depth 1 --branch 2020.3.1 https://github.com/accellera-official/uvm-core.git ../uvm-core
+python3 tests/regression.py --mode all-rules --uvm-home ../uvm-core \
+    --baseline tests/baselines/all_rules_uvm_core.json
+
+# Everything via CTest (suite 3 only when UVMCHECK_UVM_HOME is set at configure time)
+cmake --preset default -DUVMCHECK_UVM_HOME=$PWD/../uvm-core
 ctest --test-dir build --output-on-failure
 ```
+
+In the all-rules suites, findings from *other* rules in `bad.sv`/`good.sv`, and compile
+errors (as `COMPILE:<code>@<line>`), must be listed in the suite's baseline file. A new one fails the run, and so does a baseline entry that no
+longer fires, so the baseline only shrinks. After fixing a false positive, refresh it with
+`--update-baseline` and commit the smaller file.
 
 ---
 
