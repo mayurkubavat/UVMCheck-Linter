@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SV-SML-001",
+      "line": 10
+    },
+    {
+      "rule": "SV-SML-001",
+      "line": 15
+    }
+  ]
+}
