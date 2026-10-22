@@ -61,6 +61,9 @@ target_include_directories(libuvmcheck PUBLIC
     $<INSTALL_INTERFACE:include>
 )
 target_link_libraries(libuvmcheck PUBLIC slang::slang)
+# Fallback location of the Python SDK (config loader, plugin runner) for in-tree builds
+target_compile_definitions(libuvmcheck PRIVATE
+    UVMCHECK_PYTHON_SDK_DIR="${CMAKE_CURRENT_SOURCE_DIR}/python")
 
 # Precompile heavy C++20 and Slang AST headers to avoid re-parsing them 237 times
 target_precompile_headers(libuvmcheck PRIVATE
@@ -104,6 +107,11 @@ add_test(
 add_test(
     NAME uvm_rules_suite
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression.py --binary $<TARGET_FILE:uvmcheck> --category uvm
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME project_config_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_config.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(

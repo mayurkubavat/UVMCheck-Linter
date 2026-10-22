@@ -59,7 +59,9 @@ bool WaiverEngine::matchesExternalWaiver(const core::Violation& v) const {
             continue;
         }
 
-        if (!w.pathPattern.empty()) {
+        if (w.glob) {
+            if (!w.glob->matches(core::normalizePathForMatching(v.filePath))) continue;
+        } else if (!w.pathPattern.empty()) {
             std::string pat = w.pathPattern;
             // Trim leading/trailing asterisks for flexible matching
             while (!pat.empty() && pat.front() == '*') pat.erase(0, 1);
@@ -156,6 +158,7 @@ bool WaiverEngine::loadWaivers(const std::string& waiverFilePath) {
         ExternalWaiver w;
         w.ruleId = rule;
         w.pathPattern = extractStr("path");
+        if (w.pathPattern.empty()) w.pathPattern = extractStr("file");
         w.line = static_cast<size_t>(std::max(0, extractInt("line")));
         w.reason = extractStr("reason");
 

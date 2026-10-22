@@ -34,6 +34,12 @@ private:
     std::optional<std::string> ruleFilter;
     std::optional<std::string> pythonRulesPath;
     std::optional<bool> runLsp;
+    std::vector<std::string> libraryPathArgs;
+    std::vector<std::string> excludePathArgs;
+
+    /// Loads the explicit or auto-discovered project config and CLI path
+    /// filters. Returns false (after printing why) if the config is broken.
+    bool loadProjectConfig();
 };
 
 } // namespace uvmcheck::core

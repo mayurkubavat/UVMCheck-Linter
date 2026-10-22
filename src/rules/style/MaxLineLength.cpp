@@ -2,6 +2,7 @@
 #include "uvmcheck/rules/RuleRegistry.h"
 #include "slang/syntax/SyntaxTree.h"
 #include "slang/text/SourceManager.h"
+#include "uvmcheck/core/ConfigManager.h"
 
 namespace uvmcheck::rules::style {
 
@@ -10,7 +11,7 @@ public:
     std::string_view getId() const override { return "SV-STY-016"; }
     std::string_view getName() const override { return "MaxLineLength"; }
     std::string_view getDescription() const override {
-        return "Flags source lines exceeding 120 characters to preserve readability across split-view editors and terminal reviews.";
+        return "Flags source lines exceeding 120 characters (option: max_columns) to preserve readability across split-view editors and terminal reviews.";
     }
     std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
@@ -18,7 +19,9 @@ public:
     void run(slang::ast::Compilation& compilation,
              const uvmcheck::uvm::UvmModel& /*uvmModel*/,
              core::DiagnosticEngine& diags) override {
-        constexpr size_t kMaxColumns = 120;
+        const auto& cfg = core::ConfigManager::instance().getProjectConfig();
+        const size_t kMaxColumns = static_cast<size_t>(
+            std::max<int64_t>(1, cfg.ruleOptionInt(getId(), "max_columns", 120)));
 
         for (const auto& tree : compilation.getSyntaxTrees()) {
             if (!tree) continue;
@@ -45,7 +48,7 @@ public:
                                 "SV-STY-016",
                                 "MaxLineLength",
                                 "Line " + std::to_string(lineNum) + " length (" + std::to_string(lineLen) +
-                                " characters) exceeds maximum recommended threshold of 120 characters. Wrap long expressions or break statements across lines.",
+                                " characters) exceeds maximum recommended threshold of " + std::to_string(kMaxColumns) + " characters. Wrap long expressions or break statements across lines.",
                                 core::Severity::Info,
                                 loc
                             );

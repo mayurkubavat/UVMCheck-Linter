@@ -6,6 +6,7 @@
 #include <vector>
 #include <optional>
 #include "uvmcheck/core/Diagnostic.h"
+#include "uvmcheck/core/ProjectConfig.h"
 #include "slang/text/SourceManager.h"
 
 namespace uvmcheck::waivers {
@@ -15,6 +16,7 @@ struct ExternalWaiver {
     std::string pathPattern; // e.g. "*sample_tb.sv" or substring
     size_t line = 0;         // 0 means any line
     std::string reason;
+    std::optional<core::PathPattern> glob; // project-config waivers match by glob instead
 };
 
 class WaiverEngine {
@@ -23,6 +25,9 @@ public:
 
     /// Load external waiver rules from a JSON file
     bool loadWaivers(const std::string& waiverFilePath);
+
+    /// Add a waiver declared in the project config
+    void addWaiver(ExternalWaiver waiver) { externalWaivers.push_back(std::move(waiver)); }
 
     /// Load baseline fingerprints from a JSON file
     bool loadBaseline(const std::string& baselinePath);
