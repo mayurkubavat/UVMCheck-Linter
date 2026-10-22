@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::deadcode {
 
-class EmptyConditionalVisitor : public slang::ast::ASTVisitor<EmptyConditionalVisitor, slang::ast::VisitFlags::AllGood> {
+class EmptyConditionalVisitor : public engine::AstVisitor<EmptyConditionalVisitor> {
 public:
     explicit EmptyConditionalVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -54,11 +54,10 @@ public:
     std::string_view getCategory() const override { return "DeadCode"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         EmptyConditionalVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

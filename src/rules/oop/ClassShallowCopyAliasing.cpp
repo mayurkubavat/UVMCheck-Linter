@@ -25,7 +25,7 @@ static bool hasNestedClassHandle(const slang::ast::ClassType& classType) {
     return false;
 }
 
-class ShallowCopyVisitor : public slang::ast::ASTVisitor<ShallowCopyVisitor, slang::ast::VisitFlags::AllGood> {
+class ShallowCopyVisitor : public engine::AstVisitor<ShallowCopyVisitor> {
 public:
     explicit ShallowCopyVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -63,11 +63,10 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ShallowCopyVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

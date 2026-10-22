@@ -5,6 +5,8 @@
 #include "slang/ast/Compilation.h"
 #include "uvmcheck/core/Diagnostic.h"
 #include "uvmcheck/uvm/UvmModel.h"
+#include "uvmcheck/engine/RuleContext.h"
+#include "uvmcheck/engine/RuleTask.h"
 
 namespace uvmcheck::rules {
 
@@ -73,10 +75,28 @@ public:
         return static_cast<uint32_t>(RuleProfile::Soundness);
     }
 
-    /// Execute check against compilation AST and UVM domain model
-    virtual void run(slang::ast::Compilation& compilation,
-                     const uvm::UvmModel& uvmModel,
-                     core::DiagnosticEngine& diags) = 0;
+    /// Entry point used by the rule engine.
+    ///
+    /// Rules that walk the whole design should override this and hand their
+    /// visitors to the shared walk instead of walking themselves:
+    ///
+    ///     engine::RuleTask check(engine::RuleContext& ctx) override {
+    ///         MyVisitor visitor(ctx.diags());
+    ///         co_await ctx.visitAst(visitor);   // or ctx.visitSyntax(visitor)
+    ///         // ... optional post-walk reporting ...
+    ///     }
+    ///
+    /// The default runs the rule's own run() as an independent parallel job.
+    virtual engine::RuleTask check(engine::RuleContext& ctx) {
+        co_await ctx.standaloneJob();
+        run(ctx.compilation(), ctx.uvmModel(), ctx.diags());
+    }
+
+    /// Standalone check against compilation AST and UVM domain model, for rules
+    /// that do not use the shared walk (or need a custom traversal).
+    virtual void run(slang::ast::Compilation& /*compilation*/,
+                     const uvm::UvmModel& /*uvmModel*/,
+                     core::DiagnosticEngine& /*diags*/) {}
 };
 
 } // namespace uvmcheck::rules

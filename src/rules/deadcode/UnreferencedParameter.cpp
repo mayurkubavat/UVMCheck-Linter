@@ -10,7 +10,7 @@
 
 namespace uvmcheck::rules::deadcode {
 
-class ParamDeclVisitor : public slang::ast::ASTVisitor<ParamDeclVisitor, slang::ast::VisitFlags::AllGood> {
+class ParamDeclVisitor : public engine::AstVisitor<ParamDeclVisitor> {
 public:
     struct ParamInfo {
         slang::SourceLocation loc;
@@ -47,11 +47,10 @@ public:
     std::string_view getCategory() const override { return "DeadCode"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ParamDeclVisitor visitor;
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
 
         for (const auto& [name, info] : visitor.declaredParams) {
             if (visitor.referencedParams.find(name) == visitor.referencedParams.end()) {

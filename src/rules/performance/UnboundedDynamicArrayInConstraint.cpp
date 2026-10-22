@@ -8,7 +8,7 @@
 
 namespace uvmcheck::rules::performance {
 
-class ArraySizeConstraintVisitor : public slang::syntax::SyntaxVisitor<ArraySizeConstraintVisitor> {
+class ArraySizeConstraintVisitor : public engine::SyntaxVisitor<ArraySizeConstraintVisitor> {
 public:
     explicit ArraySizeConstraintVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -64,15 +64,10 @@ public:
     std::string_view getCategory() const override { return "Performance"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ArraySizeConstraintVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

@@ -15,7 +15,7 @@ struct ConfigCallInfo {
     slang::SourceLocation location;
 };
 
-class ConfigDbVisitor : public slang::ast::ASTVisitor<ConfigDbVisitor, slang::ast::VisitFlags::AllGood> {
+class ConfigDbVisitor : public engine::AstVisitor<ConfigDbVisitor> {
 public:
     void handle(const slang::ast::CallExpression& expr) {
         std::string_view subName = expr.getSubroutineName();
@@ -88,11 +88,10 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ConfigDbVisitor visitor;
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
 
         for (const auto& [fieldName, getInfo] : visitor.getCalls) {
             auto it = visitor.setCalls.find(fieldName);

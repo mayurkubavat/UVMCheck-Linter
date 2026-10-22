@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::concurrency {
 
-class ZeroDelayEventTriggerVisitor : public slang::syntax::SyntaxVisitor<ZeroDelayEventTriggerVisitor> {
+class ZeroDelayEventTriggerVisitor : public engine::SyntaxVisitor<ZeroDelayEventTriggerVisitor> {
 public:
     explicit ZeroDelayEventTriggerVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -52,15 +52,10 @@ public:
     std::string_view getCategory() const override { return "Concurrency"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ZeroDelayEventTriggerVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

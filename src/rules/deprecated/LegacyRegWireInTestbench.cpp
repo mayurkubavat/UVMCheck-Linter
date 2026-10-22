@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::deprecated {
 
-class LegacyRegWireVisitor : public slang::syntax::SyntaxVisitor<LegacyRegWireVisitor> {
+class LegacyRegWireVisitor : public engine::SyntaxVisitor<LegacyRegWireVisitor> {
 public:
     explicit LegacyRegWireVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -54,13 +54,10 @@ public:
     std::string_view getCategory() const override { return "AntiPattern"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         LegacyRegWireVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            tree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

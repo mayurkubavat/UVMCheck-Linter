@@ -17,7 +17,7 @@ public:
     }
 };
 
-class MutableGetterVisitor : public slang::syntax::SyntaxVisitor<MutableGetterVisitor> {
+class MutableGetterVisitor : public engine::SyntaxVisitor<MutableGetterVisitor> {
 public:
     explicit MutableGetterVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -117,15 +117,10 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         MutableGetterVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

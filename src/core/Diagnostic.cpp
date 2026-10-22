@@ -105,6 +105,15 @@ void DiagnosticEngine::addDirectViolation(std::string_view ruleId,
     violations.push_back(std::move(v));
 }
 
+void DiagnosticEngine::absorb(DiagnosticEngine& other) {
+    violations.insert(violations.end(), std::make_move_iterator(other.violations.begin()),
+                      std::make_move_iterator(other.violations.end()));
+    other.violations.clear();
+    librarySuppressed += other.librarySuppressed;
+    excludeSuppressed += other.excludeSuppressed;
+    other.librarySuppressed = other.excludeSuppressed = 0;
+}
+
 void DiagnosticEngine::printSummary(std::ostream& os) const {
     const char* reset   = "\033[0m";
     const char* red     = "\033[1;31m";

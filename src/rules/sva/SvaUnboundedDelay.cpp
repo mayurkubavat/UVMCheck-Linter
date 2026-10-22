@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::sva {
 
-class UnboundedDelayVisitor : public slang::syntax::SyntaxVisitor<UnboundedDelayVisitor> {
+class UnboundedDelayVisitor : public engine::SyntaxVisitor<UnboundedDelayVisitor> {
 public:
     explicit UnboundedDelayVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -63,15 +63,10 @@ public:
     std::string_view getCategory() const override { return "SVA"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         UnboundedDelayVisitor visitor(diags);
-        for (const auto& syntaxTree : compilation.getSyntaxTrees()) {
-            if (syntaxTree) {
-                syntaxTree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

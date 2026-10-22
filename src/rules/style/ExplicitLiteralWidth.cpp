@@ -8,7 +8,7 @@
 
 namespace uvmcheck::rules::style {
 
-class ExplicitLiteralWidthVisitor : public slang::ast::ASTVisitor<ExplicitLiteralWidthVisitor, slang::ast::VisitFlags::AllGood> {
+class ExplicitLiteralWidthVisitor : public engine::AstVisitor<ExplicitLiteralWidthVisitor> {
 public:
     explicit ExplicitLiteralWidthVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -63,11 +63,10 @@ public:
     std::string_view getCategory() const override { return "Safety"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ExplicitLiteralWidthVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

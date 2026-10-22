@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::deadcode {
 
-class EmptyForkJoinVisitor : public slang::syntax::SyntaxVisitor<EmptyForkJoinVisitor> {
+class EmptyForkJoinVisitor : public engine::SyntaxVisitor<EmptyForkJoinVisitor> {
 public:
     explicit EmptyForkJoinVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -52,15 +52,10 @@ public:
     std::string_view getCategory() const override { return "DeadCode"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         EmptyForkJoinVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

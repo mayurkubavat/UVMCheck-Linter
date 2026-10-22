@@ -110,6 +110,24 @@ Run or debug a specific rule against a source file in milliseconds:
 ./build/uvmcheck tb/my_scb.sv --rule ScoreboardLeftoverQueue
 ```
 
+### Performance & Threading
+Rules run on a single-pass, parallel engine: most rules hand their visitors to one
+shared walk per shard, which routes each syntax/AST node only to the rules that
+handle it, and shards run on a worker pool alongside the remaining standalone rules.
+Findings are printed in file/line order and are identical for any thread count.
+```bash
+# Use 8 worker threads (default: all cores)
+./build/uvmcheck tb/top.sv -j 8
+
+# Show where time goes (elaboration, walk shards, slowest standalone rules)
+./build/uvmcheck tb/top.sv --profile-rules
+
+# Reference mode: one walk per rule, sequential (for debugging rule behavior)
+./build/uvmcheck tb/top.sv --engine isolated
+```
+On the 86k-line Accellera `uvm-core` library, a full all-rules run takes about
+0.5 s on 4 cores (previously about 2.9 s on the same machine).
+
 ### Automated Fix-It Rewrites
 Automatically refactor compliant syntax without manual editing:
 ```bash
@@ -225,6 +243,9 @@ python3 tests/regression.py --category uvm
 
 # Run single-rule test (~7 ms)
 python3 tests/regression.py --rule UVM-CFG-002
+
+# Check the parallel engine gives identical findings to the reference engine
+python3 tests/engine_equivalence.py
 
 # Run via CTest
 ctest --test-dir build --output-on-failure

@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::concurrency {
 
-class DrivingDuringResetVisitor : public slang::syntax::SyntaxVisitor<DrivingDuringResetVisitor> {
+class DrivingDuringResetVisitor : public engine::SyntaxVisitor<DrivingDuringResetVisitor> {
 public:
     explicit DrivingDuringResetVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -71,15 +71,10 @@ public:
     std::string_view getCategory() const override { return "RTL_TB_Bridge"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         DrivingDuringResetVisitor visitor(diags);
-        for (const auto& syntaxTree : compilation.getSyntaxTrees()) {
-            if (syntaxTree) {
-                syntaxTree->root().visit(visitor);
-            }
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

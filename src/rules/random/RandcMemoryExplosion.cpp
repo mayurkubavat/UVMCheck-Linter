@@ -6,7 +6,7 @@
 
 namespace uvmcheck::rules::random {
 
-class RandcMemoryVisitor : public slang::ast::ASTVisitor<RandcMemoryVisitor, slang::ast::VisitFlags::AllGood> {
+class RandcMemoryVisitor : public engine::AstVisitor<RandcMemoryVisitor> {
 public:
     explicit RandcMemoryVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -45,11 +45,10 @@ public:
     std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         RandcMemoryVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

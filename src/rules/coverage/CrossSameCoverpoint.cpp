@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::coverage {
 
-class CrossSameCoverpointVisitor : public slang::syntax::SyntaxVisitor<CrossSameCoverpointVisitor> {
+class CrossSameCoverpointVisitor : public engine::SyntaxVisitor<CrossSameCoverpointVisitor> {
 public:
     explicit CrossSameCoverpointVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -56,13 +56,10 @@ public:
     std::string_view getCategory() const override { return "Coverage"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         CrossSameCoverpointVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            tree->root().visit(visitor);
-        }
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

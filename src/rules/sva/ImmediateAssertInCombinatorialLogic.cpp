@@ -29,7 +29,7 @@ private:
     core::DiagnosticEngine& diags;
 };
 
-class ProceduralAssertVisitor : public slang::ast::ASTVisitor<ProceduralAssertVisitor, slang::ast::VisitFlags::AllGood> {
+class ProceduralAssertVisitor : public engine::AstVisitor<ProceduralAssertVisitor> {
 public:
     explicit ProceduralAssertVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -57,11 +57,10 @@ public:
     std::string_view getCategory() const override { return "SVA"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ProceduralAssertVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

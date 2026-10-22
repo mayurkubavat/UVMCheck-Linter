@@ -27,7 +27,7 @@ private:
     slang::SourceLocation firstLoc;
 };
 
-class TimeInAssertionActionVisitor : public slang::ast::ASTVisitor<TimeInAssertionActionVisitor, slang::ast::VisitFlags::AllGood> {
+class TimeInAssertionActionVisitor : public engine::AstVisitor<TimeInAssertionActionVisitor> {
 public:
     explicit TimeInAssertionActionVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -74,11 +74,10 @@ public:
     std::string_view getCategory() const override { return "SVA"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         TimeInAssertionActionVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::correctness {
 
-class EqualityWithXzVisitor : public slang::ast::ASTVisitor<EqualityWithXzVisitor, slang::ast::VisitFlags::AllGood> {
+class EqualityWithXzVisitor : public engine::AstVisitor<EqualityWithXzVisitor> {
 public:
     explicit EqualityWithXzVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -78,11 +78,10 @@ public:
     std::string_view getCategory() const override { return "Correctness"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         EqualityWithXzVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

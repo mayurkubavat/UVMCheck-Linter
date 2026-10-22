@@ -56,7 +56,7 @@ private:
     core::DiagnosticEngine& diags;
 };
 
-class ForLoopVisitor : public slang::ast::ASTVisitor<ForLoopVisitor, slang::ast::VisitFlags::AllGood> {
+class ForLoopVisitor : public engine::AstVisitor<ForLoopVisitor> {
 public:
     explicit ForLoopVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -99,11 +99,10 @@ public:
     std::string_view getCategory() const override { return "Concurrency"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel&,
-             core::DiagnosticEngine& diags) override {
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        auto& diags = ctx.diags();
         ForLoopVisitor visitor(diags);
-        compilation.getRoot().visit(visitor);
+        co_await ctx.visitAst(visitor);
     }
 };
 

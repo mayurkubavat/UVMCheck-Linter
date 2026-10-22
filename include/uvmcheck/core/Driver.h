@@ -36,6 +36,8 @@ private:
     std::optional<bool> runLsp;
     std::vector<std::string> libraryPathArgs;
     std::vector<std::string> excludePathArgs;
+    std::optional<bool> profileRules;
+    std::optional<std::string> engineMode;
 
     /// Loads the explicit or auto-discovered project config and CLI path
     /// filters. Returns false (after printing why) if the config is broken.

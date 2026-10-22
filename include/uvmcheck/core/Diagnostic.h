@@ -53,6 +53,11 @@ public:
     /// Attach a project config: violations in library/excluded paths are
     /// dropped as they are reported and per-rule severity overrides applied.
     void setProjectConfig(const ProjectConfig* config) { projectConfig = config; }
+    const ProjectConfig* getProjectConfig() const { return projectConfig; }
+
+    /// Moves `other`'s violations to the end of this engine and adds its
+    /// suppression counts to ours. Used to merge per-rule engines.
+    void absorb(DiagnosticEngine& other);
 
     void addViolation(std::string_view ruleId,
                       std::string_view ruleName,
