@@ -70,6 +70,7 @@ def main():
         bad_sv_content = (
             "module bad_timescale;\n"
             "  logic clk;\n"
+            "  initial #10 clk = 1;\n"
             "endmodule\n"
         )
         did_open = {
@@ -94,7 +95,8 @@ def main():
         assert params.get("uri") == "file:///workspace/test.sv"
         diagnostics = params.get("diagnostics", [])
         print(f"  [PASS] Received {len(diagnostics)} live diagnostics on didOpen.")
-        assert len(diagnostics) > 0, "Expected at least 1 diagnostic for missing timescale"
+        assert any(d.get("code") == "SV-TIM-002" for d in diagnostics), \
+            "Expected an SV-TIM-002 diagnostic for missing timescale"
         print(f"         Code: {diagnostics[0].get('code')}, Message: {diagnostics[0].get('message')[:60]}...")
 
         # Step 3: Send 'textDocument/didClose' -> should clear diagnostics
