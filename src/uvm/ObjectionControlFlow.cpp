@@ -112,6 +112,12 @@ bool ObjectionControlFlowAnalyzer::evaluateStatement(
             return false;
         }
 
+        case slang::ast::StatementKind::Timed: {
+            // '#100 phase.drop_objection(this);' and '@(ev) ...': the delay does not change the state.
+            const auto& timed = stmt.as<slang::ast::TimedStatement>();
+            return evaluateStatement(timed.stmt, inState, outState, violations, sub, className);
+        }
+
         case slang::ast::StatementKind::Return: {
             if (inState == ObjectionState::Held) {
                 violations.push_back({
