@@ -23,8 +23,11 @@ UVM library:
   instead: uvm_pkg.sv is added as a source and tests/common/real_uvm/uvm_mock.svh
   replaces the stub with `include "uvm_macros.svh" + import uvm_pkg::*.
 
-Any test file that does not compile cleanly fails, since rules on a broken AST
-prove nothing.
+Compile errors (from slang's --diag-json) are tracked as pseudo-findings named
+COMPILE:<code> in the all-rules baselines, so a test file that newly stops
+compiling fails the run. Some bad.sv files are illegal SystemVerilog on purpose
+(the rule detects the illegal construct); others are broken because the stub or
+the file is incomplete. The baseline records both until the broken ones are fixed.
 """
 
 import sys
@@ -78,6 +81,8 @@ class Linter:
         sv_file = Path(sv_file).resolve()
         fd, json_path = tempfile.mkstemp(suffix=".json", dir=self.workdir)
         os.close(fd)
+        fd, diag_path = tempfile.mkstemp(suffix=".diag.json", dir=self.workdir)
+        os.close(fd)
 
         cmd = [self.binary]
         if self.uvm_home:
@@ -88,20 +93,24 @@ class Linter:
             cmd += [str(sv_file), "-I", str(self.common_dir)]
         if rule_id:
             cmd += ["--rule", rule_id]
-        cmd += ["--json", json_path]
+        cmd += ["--json", json_path, "--diag-json", diag_path]
 
         start_time = time.time()
         res = subprocess.run(cmd, capture_output=True, text=True, cwd=self.workdir)
         elapsed = time.time() - start_time
 
         report = None
+        diags = []
         try:
             with open(json_path) as f:
                 report = json.load(f)
+            with open(diag_path) as f:
+                diags = json.load(f)
         except (OSError, json.JSONDecodeError):
             pass
         finally:
             os.unlink(json_path)
+            os.unlink(diag_path)
 
         if report is None:
             return {"error": f"no JSON report (exit code {res.returncode})",
@@ -111,9 +120,22 @@ class Linter:
         # Reported paths are relative to the linter's working directory.
         findings = [(v["ruleId"], v["line"]) for v in report["violations"]
                     if v["file"] and (Path(self.workdir) / v["file"]).resolve() == sv_file]
+
+        compile_errors = []
+        for d in diags:
+            if d.get("severity") not in ("error", "fatal"):
+                continue
+            path, line = "", 0
+            if d.get("location"):
+                path, line = d["location"].rsplit(":", 2)[:2]
+            name = f"COMPILE:{d.get('code', 'Unknown')}"
+            if not path or (Path(self.workdir) / path).resolve() != sv_file:
+                name += f":{Path(path).name or '?'}"
+            compile_errors.append((name, int(line)))
+
         return {
             "error": None,
-            "compile_errors": report["compileErrors"],
+            "compile_errors": compile_errors,
             "findings": findings,
             "stdout": res.stdout,
             "stderr": res.stderr,
@@ -151,13 +173,9 @@ def check_file(linter, rule_path, file_name, mode, expected, baseline):
         return [f"{key}: {result['error']}\n{result['stderr'].strip()}"], [], result
 
     failures = []
-    if result["compile_errors"]:
-        failures.append(f"{key}: {result['compile_errors']} compile error(s)\n"
-                        f"{result['stderr'].strip()}")
-
     findings = result["findings"]
     own = [f for f in findings if f[0] == rule_id]
-    cross = [f for f in findings if f[0] != rule_id]
+    cross = [f for f in findings if f[0] != rule_id] + result["compile_errors"]
 
     if file_name == "bad.sv":
         if not expected:

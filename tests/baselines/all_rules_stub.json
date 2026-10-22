@@ -21,6 +21,7 @@
     "UVM-FAC-003@5"
   ],
   "antipattern/UVM-BAN-002/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@14",
     "SV-DED-001@14",
     "SV-STY-005@11",
     "SV-STY-005@17",
@@ -235,6 +236,7 @@
     "UVM-FAC-003@5"
   ],
   "concurrency/SV-THR-001/bad.sv": [
+    "COMPILE:UnexpectedEndDelim@23",
     "SV-CON-012@10",
     "SV-MOD-001@7",
     "SV-STY-005@22",
@@ -309,6 +311,7 @@
     "UVM-FAC-003@5"
   ],
   "correctness/SV-COR-005/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@8",
     "SV-STY-005@14",
     "SV-STY-005@15",
     "SV-STY-009@8",
@@ -337,6 +340,7 @@
     "UVM-FAC-003@5"
   ],
   "correctness/SV-COR-007/bad.sv": [
+    "COMPILE:AssignmentRequiresParens@10",
     "SV-COR-020@10",
     "SV-STY-005@13",
     "SV-STY-005@14",
@@ -451,6 +455,7 @@
     "UVM-FAC-003@5"
   ],
   "correctness/SV-LANG-002/bad.sv": [
+    "COMPILE:IndexOOB@12",
     "SV-STY-005@13",
     "SV-STY-005@14",
     "SV-STY-010@12",
@@ -478,6 +483,7 @@
     "UVM-FAC-003@5"
   ],
   "correctness/SV-LANG-004/bad.sv": [
+    "COMPILE:RangeSelectReversed@12",
     "SV-DED-001@10",
     "SV-STY-005@13",
     "SV-STY-005@14",
@@ -521,6 +527,9 @@
     "SVTB.1.5@9",
     "UVM-FAC-003@5"
   ],
+  "correctness/SV-TIM-001/bad.sv": [
+    "COMPILE:InvalidTimeScalePrecision@8"
+  ],
   "correctness/SV-TIM-001/good.sv": [
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -559,6 +568,7 @@
     "UVM-FAC-003@5"
   ],
   "coverage/SV-COV-003/bad.sv": [
+    "COMPILE:Redefinition:?@0",
     "SV-COV-001@9",
     "SV-COV-012@10",
     "SV-STY-004@12",
@@ -594,6 +604,7 @@
     "UVM-FAC-003@5"
   ],
   "coverage/SV-COV-005/bad.sv": [
+    "COMPILE:UnboundedNotAllowed@12",
     "SV-COV-001@9",
     "SV-STY-005@17",
     "SV-STY-005@18",
@@ -643,6 +654,7 @@
     "UVM-FAC-003@5"
   ],
   "coverage/SV-COV-008/bad.sv": [
+    "COMPILE:CoverCrossItems@12",
     "SV-COV-001@9",
     "SV-COV-012@10",
     "SV-STY-004@12",
@@ -1229,6 +1241,7 @@
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-002/bad.sv": [
+    "COMPILE:TimingInFuncNotAllowed@15",
     "SV-DED-005@21",
     "SV-DED-006@22",
     "SV-STY-001@20",
@@ -1265,6 +1278,7 @@
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-003/bad.sv": [
+    "COMPILE:BaseConstructorNotCalled@7",
     "SV-STY-005@11",
     "SV-STY-005@12",
     "SVTB.1.5@11",
@@ -1346,6 +1360,7 @@
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-008/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@9",
     "SV-STY-005@10",
     "SVTB.1.5@10"
   ],
@@ -1370,6 +1385,7 @@
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-011/bad.sv": [
+    "COMPILE:BadConversion@18",
     "SV-DED-001@15",
     "SV-DED-001@16",
     "SV-STY-005@9",
@@ -1390,6 +1406,8 @@
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-012/bad.sv": [
+    "COMPILE:AssignmentRequiresParens@12",
+    "COMPILE:UndeclaredIdentifier@8",
     "SV-COR-020@12",
     "SV-DED-005@8",
     "SV-STY-005@13",
@@ -1405,6 +1423,7 @@
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-013/bad.sv": [
+    "COMPILE:NewVirtualClass@15",
     "SV-DED-005@12"
   ],
   "oop/SV-OOP-013/good.sv": [
@@ -1415,6 +1434,7 @@
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-014/bad.sv": [
+    "COMPILE:InvalidSuperNew@19",
     "SV-DED-005@8",
     "SV-DED-005@15",
     "SV-STY-010@18",
@@ -1428,6 +1448,7 @@
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-015/bad.sv": [
+    "COMPILE:VirtualArgCountMismatch@14",
     "SV-DED-011@14",
     "SV-OOP-009@8"
   ],
@@ -1551,6 +1572,7 @@
     "UVM-FAC-003@5"
   ],
   "performance/SV-OOP-010/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@9",
     "SV-DED-001@9",
     "SV-STY-005@14",
     "SV-STY-005@15",
@@ -1566,6 +1588,9 @@
     "UVM-FAC-003@5"
   ],
   "performance/SV-PRF-001/bad.sv": [
+    "COMPILE:ExpectedToken@32",
+    "COMPILE:Redefinition@7",
+    "COMPILE:Redefinition@17",
     "SV-DED-011@13",
     "SV-DED-011@23",
     "SV-DED-011@27",
@@ -1751,6 +1776,9 @@
     "SVTB.1.5@9",
     "UVM-FAC-003@5"
   ],
+  "portability/PORT-PRP-001/bad.sv": [
+    "COMPILE:UnknownSystemName@10"
+  ],
   "portability/PORT-PRP-001/good.sv": [
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -1909,6 +1937,7 @@
     "UVM-FAC-003@5"
   ],
   "random/SV-RND-013/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@9",
     "SV-DED-001@9",
     "SV-STY-005@12",
     "SV-STY-005@13",
@@ -1923,6 +1952,7 @@
     "UVM-FAC-003@5"
   ],
   "random/SV-RND-014/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@9",
     "SV-DED-001@9",
     "SV-STY-005@14",
     "SV-STY-005@15",
@@ -1952,6 +1982,7 @@
     "UVM-FAC-003@5"
   ],
   "random/SV-RND-016/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@8",
     "SV-STY-005@16",
     "SV-STY-005@17",
     "SV-STY-009@9",
@@ -2036,6 +2067,7 @@
     "UVM-FAC-003@5"
   ],
   "rtl_tb_bridge/SV-CB-001/bad.sv": [
+    "COMPILE:ClockVarOutputRead@19",
     "SV-DED-006@16",
     "SV-STY-005@23",
     "SV-STY-005@24",
@@ -2074,6 +2106,7 @@
     "UVM-FAC-003@5"
   ],
   "rtl_tb_bridge/SV-INT-001/bad.sv": [
+    "COMPILE:ClockVarSyncDrive@19",
     "SV-CB-001@19",
     "SV-STY-005@20",
     "SV-STY-005@21",
@@ -2328,6 +2361,7 @@
     "UVM-FAC-003@5"
   ],
   "style/SV-STY-006/bad.sv": [
+    "COMPILE:EndNameMismatch@16",
     "SV-STY-005@11",
     "SVTB.1.5@11",
     "UVM-LOG-002@15"
@@ -2380,6 +2414,7 @@
     "UVM-FAC-003@5"
   ],
   "style/UVM-STY-001/bad.sv": [
+    "COMPILE:UnknownClassMember@18",
     "SV-DED-005@9",
     "SV-STY-005@13",
     "SV-STY-005@19",
@@ -2412,6 +2447,7 @@
     "UVM-FAC-003@5"
   ],
   "style/UVM-TLM-003/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@10",
     "SV-STY-001@10",
     "SV-STY-005@13",
     "SV-STY-005@14",
@@ -2503,6 +2539,7 @@
     "UVM-FAC-003@5"
   ],
   "sva/SVA-CTX-001/bad.sv": [
+    "COMPILE:ConcurrentAssertNotInProc@10",
     "SV-STY-005@11",
     "SV-STY-005@12",
     "SVA-LBL-001@10",
@@ -2600,6 +2637,7 @@
     "UVM-FAC-003@5"
   ],
   "types/SV-TYP-009/bad.sv": [
+    "COMPILE:WrongNumberAssignmentPatterns@11",
     "SV-DED-005@8"
   ],
   "types/SV-TYP-009/good.sv": [
@@ -2610,6 +2648,8 @@
     "UVM-FAC-003@5"
   ],
   "types/SV-TYP-010/bad.sv": [
+    "COMPILE:BadAssignment@11",
+    "COMPILE:TaskReturnType@9",
     "SV-STY-010@10",
     "SV-TIM-002@10"
   ],
@@ -2644,6 +2684,10 @@
     "UVM-FAC-003@5"
   ],
   "uvm/RAL-COL-001/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@8",
+    "COMPILE:UndeclaredIdentifier@9",
+    "COMPILE:UnknownClassOrPackage@16",
+    "COMPILE:UnknownClassOrPackage@17",
     "SV-STY-005@13",
     "SV-STY-005@21",
     "SV-STY-005@22",
@@ -2661,6 +2705,11 @@
     "UVM-FAC-003@5"
   ],
   "uvm/RAL-MAP-001/bad.sv": [
+    "COMPILE:BadAssignment@46",
+    "COMPILE:Redefinition@21",
+    "COMPILE:Redefinition@26",
+    "COMPILE:UsedBeforeDeclared@8",
+    "COMPILE:UsedBeforeDeclared@9",
     "SV-DED-001@9",
     "SV-DED-005@27",
     "SV-DED-005@36",
@@ -2699,6 +2748,8 @@
     "UVM-FAC-003@5"
   ],
   "uvm/RAL-MAP-002/bad.sv": [
+    "COMPILE:TooManyArguments@27",
+    "COMPILE:TooManyArguments@28",
     "SV-STY-005@7",
     "SV-STY-005@8",
     "SV-STY-005@13",
@@ -2722,6 +2773,8 @@
     "UVM-FAC-003@10"
   ],
   "uvm/RAL-MAP-002/good.sv": [
+    "COMPILE:TooManyArguments@27",
+    "COMPILE:TooManyArguments@28",
     "SV-STY-005@7",
     "SV-STY-005@8",
     "SV-STY-005@13",
@@ -2812,6 +2865,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-CFG-002/bad.sv": [
+    "COMPILE:TimingInFuncNotAllowed@15",
     "SV-DED-005@21",
     "SV-DED-006@22",
     "SV-OOP-002@38",
@@ -2884,6 +2938,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-CFG-005/bad.sv": [
+    "COMPILE:UnknownClassMember@32",
     "SV-DED-005@22",
     "SV-DED-006@7",
     "SV-STY-001@7",
@@ -2905,6 +2960,7 @@
     "UVM-CFG-001@16"
   ],
   "uvm/UVM-CFG-005/good.sv": [
+    "COMPILE:UnknownClassMember@31",
     "SV-DED-005@21",
     "SV-DED-006@7",
     "SV-STY-001@7",
@@ -2956,6 +3012,7 @@
     "UVM-FAC-003@10"
   ],
   "uvm/UVM-FAC-001/good.sv": [
+    "COMPILE:UnknownClassMember@23",
     "SV-DED-005@14",
     "SV-STY-001@14",
     "SV-STY-005@9",
@@ -2997,6 +3054,9 @@
     "SV-STY-005@10",
     "SVTB.1.5@9",
     "SVTB.1.5@10"
+  ],
+  "uvm/UVM-FAC-004/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@7"
   ],
   "uvm/UVM-FAC-004/good.sv": [
     "SV-STY-005@8",
@@ -3065,6 +3125,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-OBJ-003/bad.sv": [
+    "COMPILE:UnknownDirective@17",
     "SV-STY-005@10",
     "SV-STY-005@23",
     "SV-STY-005@24",
@@ -3077,6 +3138,7 @@
     "UVM-PHS-001@12"
   ],
   "uvm/UVM-OBJ-003/good.sv": [
+    "COMPILE:UnknownDirective@17",
     "SV-STY-005@10",
     "SV-STY-005@24",
     "SV-STY-005@25",
@@ -3118,6 +3180,7 @@
     "SVTB.1.5@23"
   ],
   "uvm/UVM-PHS-001/bad.sv": [
+    "COMPILE:TimingInFuncNotAllowed@15",
     "SV-DED-005@21",
     "SV-DED-006@22",
     "SV-OOP-002@38",
@@ -3154,6 +3217,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-PHS-002/bad.sv": [
+    "COMPILE:TimingInFuncNotAllowed@15",
     "SV-DED-005@21",
     "SV-DED-006@22",
     "SV-OOP-002@38",
@@ -3190,6 +3254,8 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-PHS-003/bad.sv": [
+    "COMPILE:VirtualKindMismatch@14",
+    "COMPILE:VirtualKindMismatch@18",
     "SV-DED-011@14",
     "SV-DED-011@18",
     "SV-STY-005@11",
@@ -3251,6 +3317,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-PHS-007/bad.sv": [
+    "COMPILE:UnknownMember@14",
     "SV-STY-005@11",
     "SV-STY-005@15",
     "SV-STY-005@16",
@@ -3267,6 +3334,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-PHS-008/bad.sv": [
+    "COMPILE:TimingInFuncNotAllowed@15",
     "SV-STY-005@11",
     "SV-STY-005@16",
     "SV-STY-005@17",
@@ -3429,6 +3497,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-SEQ-006/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@15",
     "SV-DED-001@13",
     "SV-STY-005@11",
     "SV-STY-005@16",
@@ -3476,6 +3545,8 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-SEQ-009/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@10",
+    "COMPILE:UndeclaredIdentifier@12",
     "SV-DED-001@10",
     "SV-STY-005@13",
     "SV-STY-005@14",
@@ -3492,6 +3563,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-SEQ-010/bad.sv": [
+    "COMPILE:UndeclaredIdentifier@10",
     "SV-DED-001@10",
     "SV-STY-005@13",
     "SV-STY-005@14",
@@ -3521,6 +3593,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-SEQ-012/bad.sv": [
+    "COMPILE:NewVirtualClass@13",
     "SV-OOP-013@13",
     "UVM-PHS-001@12"
   ],
@@ -3606,6 +3679,7 @@
     "UVM-TLM-001@18"
   ],
   "uvm/UVM-STR-005/bad.sv": [
+    "COMPILE:UnknownClassMember@23",
     "SV-DED-005@16",
     "SV-STY-001@16"
   ],
@@ -3665,6 +3739,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-TLM-004/bad.sv": [
+    "COMPILE:UnknownClassMember@32",
     "SV-DED-005@14",
     "SV-DED-005@24",
     "SV-NAM-005@5",
@@ -3690,6 +3765,8 @@
     "UVM-TLM-001@14"
   ],
   "uvm/UVM-TLM-004/good.sv": [
+    "COMPILE:UnknownClassMember@43",
+    "COMPILE:UnknownClassMember@44",
     "SV-DED-005@14",
     "SV-DED-005@24",
     "SV-NAM-005@5",
