@@ -472,7 +472,8 @@ void NamingEngine::run(slang::ast::Compilation& compilation,
                        core::DiagnosticEngine& diags) const {
     // 0. Package-level Inspections
     for (const auto* pkg : compilation.getPackages()) {
-        if (!pkg || pkg->name.empty() || pkg->name == "$unit") continue;
+        // "std" is the built-in IEEE 1800 package, not user code.
+        if (!pkg || pkg->name.empty() || pkg->name == "$unit" || pkg->name == "std") continue;
         std::string reason, suggested;
         if (!validate("Package", pkg->name, reason, suggested)) {
             const auto* spec = getRule("Package");
