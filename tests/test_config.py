@@ -129,6 +129,21 @@ def main():
         """, env={"VIP_HOME": "lib"})
     check("$VIP_HOME relative value resolves", files_with(found, "SV-COR-008") == ["user_tb.sv"], out + err)
 
+    # Library path spelled through a symlink (e.g. macOS /tmp -> /private/tmp).
+    with tempfile.TemporaryDirectory() as alias_dir:
+        alias = Path(alias_dir) / "alias"
+        os.symlink(t.name, alias)
+        (Path(t.name) / "uvmcheck_config.py").write_text(textwrap.dedent("""\
+            from uvmcheck.config import ProjectConfig
+            class Project(ProjectConfig):
+                library_paths = ["$VIP_HOME"]
+            """))
+        rc, found, out, err = run(binary, t.name, ["lib/vendor_vip.sv", "src/user_tb.sv"],
+                                  env={"VIP_HOME": str(alias / "lib")})
+        print("\nLibrary path through a symlink")
+        check("symlinked library path suppresses vendor file",
+              files_with(found, "SV-COR-008") == ["user_tb.sv"], out + err)
+
     t, rc, found, out, err = case(binary, "Unset env var", "uvmcheck_config.py", """\
         from uvmcheck.config import ProjectConfig
         class Project(ProjectConfig):
