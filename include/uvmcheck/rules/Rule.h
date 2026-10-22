@@ -18,6 +18,7 @@ enum class RuleProfile : uint32_t {
     Style       = 1 << 3, // Naming, banner, formatting, readability
     Security    = 1 << 4, // Secrets in logs, host path leaks, portability
     Smells      = 1 << 5, // Code smells, maintainability, architectural debt
+    Advisory    = 1 << 6, // Opinionated checks, off unless selected by --preset or --rule
     All         = 0xFFFFFFFF
 };
 
@@ -68,6 +69,9 @@ public:
         }
         if (cat == "Security" || cat == "Portability" || cat == "DPI") {
             return static_cast<uint32_t>(RuleProfile::Security) | static_cast<uint32_t>(RuleProfile::Soundness);
+        }
+        if (cat == "Advisory") {
+            return static_cast<uint32_t>(RuleProfile::Advisory);
         }
         if (cat == "Smell" || cat == "Maintainability") {
             return static_cast<uint32_t>(RuleProfile::Smells);

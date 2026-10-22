@@ -11,6 +11,42 @@
 `define uvm_object_utils_end
 `define uvm_do(ITEM)
 
+// Reporting macros, expanded the way the real UVM library expands them
+`define uvm_info(ID, MSG, VERBOSITY) \
+    begin \
+        if (uvm_report_enabled(VERBOSITY, UVM_INFO, ID)) \
+            uvm_report_info(ID, MSG, VERBOSITY, `__FILE__, `__LINE__); \
+    end
+`define uvm_warning(ID, MSG) \
+    begin \
+        if (uvm_report_enabled(UVM_NONE, UVM_WARNING, ID)) \
+            uvm_report_warning(ID, MSG, UVM_NONE, `__FILE__, `__LINE__); \
+    end
+`define uvm_error(ID, MSG) \
+    begin \
+        if (uvm_report_enabled(UVM_NONE, UVM_ERROR, ID)) \
+            uvm_report_error(ID, MSG, UVM_NONE, `__FILE__, `__LINE__); \
+    end
+`define uvm_fatal(ID, MSG) \
+    begin \
+        if (uvm_report_enabled(UVM_NONE, UVM_FATAL, ID)) \
+            uvm_report_fatal(ID, MSG, UVM_NONE, `__FILE__, `__LINE__); \
+    end
+
+typedef enum int {UVM_NONE = 0, UVM_LOW = 100, UVM_MEDIUM = 200, UVM_HIGH = 300,
+                  UVM_FULL = 400, UVM_DEBUG = 500} uvm_verbosity;
+typedef enum bit [1:0] {UVM_INFO, UVM_WARNING, UVM_ERROR, UVM_FATAL} uvm_severity;
+typedef int uvm_action;
+parameter uvm_action UVM_NO_ACTION = 0;
+parameter uvm_action UVM_DISPLAY = 1;
+parameter uvm_action UVM_LOG = 2;
+parameter uvm_action UVM_COUNT = 4;
+parameter uvm_action UVM_EXIT = 8;
+
+typedef class uvm_comparer;
+typedef class uvm_printer;
+typedef class uvm_component;
+
 // Core UVM base classes
 virtual class uvm_void;
 endclass
@@ -26,13 +62,69 @@ virtual class uvm_object extends uvm_void;
     virtual function string get_full_name();
         return name;
     endfunction
-    virtual function void print();
+    virtual function void print(uvm_printer printer = null);
+    endfunction
+    virtual function string get_type_name();
+        return "";
+    endfunction
+    virtual function string convert2string();
+        return "";
+    endfunction
+    virtual function string sprint(uvm_printer printer = null);
+        return "";
+    endfunction
+    function void copy(uvm_object rhs);
+        do_copy(rhs);
+    endfunction
+    virtual function void do_copy(uvm_object rhs);
+    endfunction
+    function bit compare(uvm_object rhs, uvm_comparer comparer = null);
+        return do_compare(rhs, comparer);
+    endfunction
+    virtual function bit do_compare(uvm_object rhs, uvm_comparer comparer);
+        return 1;
+    endfunction
+    virtual function void do_print(uvm_printer printer);
+    endfunction
+    virtual function uvm_object clone();
+        return null;
+    endfunction
+
+    function bit uvm_report_enabled(int verbosity, uvm_severity severity = UVM_INFO, string id = "");
+        return 1;
+    endfunction
+
+    function void uvm_report_info(string id, string message, int verbosity = 300, string filename = "", int line = 0);
+    endfunction
+
+    function void uvm_report_warning(string id, string message, int verbosity = 200, string filename = "", int line = 0);
+    endfunction
+
+    function void uvm_report_error(string id, string message, int verbosity = 100, string filename = "", int line = 0);
+    endfunction
+
+    function void uvm_report_fatal(string id, string message, int verbosity = 0, string filename = "", int line = 0);
+    endfunction
+endclass
+
+class uvm_comparer;
+endclass
+
+class uvm_objection extends uvm_object;
+    function new(string name = "");
+        super.new(name);
+    endfunction
+    function void set_drain_time(uvm_object obj = null, time drain = 0);
     endfunction
 endclass
 
 class uvm_phase extends uvm_object;
+    uvm_objection phase_done;
     function new(string name = "");
         super.new(name);
+    endfunction
+    function uvm_objection get_objection();
+        return phase_done;
     endfunction
     function void raise_objection(uvm_object obj = null, string desc = "", int count = 1);
     endfunction
@@ -80,16 +172,23 @@ virtual class uvm_component extends uvm_object;
     function void get_config_int(string field_name, ref int val);
     endfunction
 
-    function void uvm_report_info(string id, string message, int verbosity = 300, string filename = "", int line = 0);
+    function void set_report_severity_override(uvm_severity cur_severity, uvm_severity new_severity);
     endfunction
 
-    function void uvm_report_warning(string id, string message, int verbosity = 200, string filename = "", int line = 0);
+    function void set_report_severity_id_override(uvm_severity cur_severity, string id, uvm_severity new_severity);
     endfunction
 
-    function void uvm_report_error(string id, string message, int verbosity = 100, string filename = "", int line = 0);
+    function void set_report_severity_action(uvm_severity severity, uvm_action action);
     endfunction
 
-    function void uvm_report_fatal(string id, string message, int verbosity = 0, string filename = "", int line = 0);
+    function void set_report_id_action(string id, uvm_action action);
+    endfunction
+
+    function void set_report_severity_action_hier(uvm_severity severity, uvm_action action);
+    endfunction
+
+    function uvm_component lookup(string name);
+        return null;
     endfunction
 endclass
 
@@ -123,9 +222,19 @@ virtual class uvm_sequence_item extends uvm_object;
     endfunction
 endclass
 
+typedef class uvm_sequence_base;
+
 class uvm_sequencer_base extends uvm_component;
     function new(string name = "", uvm_component parent = null);
         super.new(name, parent);
+    endfunction
+    task lock(uvm_sequence_base sequence_ptr);
+    endtask
+    function void unlock(uvm_sequence_base sequence_ptr);
+    endfunction
+    task grab(uvm_sequence_base sequence_ptr);
+    endtask
+    function void ungrab(uvm_sequence_base sequence_ptr);
     endfunction
 endclass
 
@@ -148,6 +257,14 @@ virtual class uvm_sequence_base extends uvm_sequence_item;
     endtask
     virtual task post_body();
     endtask
+    task lock(uvm_sequencer_base sequencer = null);
+    endtask
+    function void unlock(uvm_sequencer_base sequencer = null);
+    endfunction
+    task grab(uvm_sequencer_base sequencer = null);
+    endtask
+    function void ungrab(uvm_sequencer_base sequencer = null);
+    endfunction
 endclass
 
 virtual class uvm_sequence#(type REQ = uvm_sequence_item, type RSP = REQ) extends uvm_sequence_base;
@@ -307,6 +424,38 @@ class uvm_reg_predictor#(type BUSTYPE=int) extends uvm_component;
         super.new(name, parent);
         bus_in = new("bus_in", this);
     endfunction
+endclass
+
+class uvm_root extends uvm_component;
+    function new(string name = "__top__", uvm_component parent = null);
+        super.new(name, parent);
+    endfunction
+    static function uvm_root get();
+        return null;
+    endfunction
+    function uvm_component find(string comp_match);
+        return null;
+    endfunction
+    function void find_all(string comp_match, ref uvm_component comps[$], input uvm_component comp = null);
+    endfunction
+endclass
+
+uvm_root uvm_top;
+
+typedef enum {UNKNOWN_ACTION, THROW, CAUGHT} uvm_report_catcher_action_e;
+
+virtual class uvm_report_catcher extends uvm_object;
+    typedef uvm_report_catcher_action_e action_e;
+    function new(string name = "uvm_report_catcher");
+        super.new(name);
+    endfunction
+    pure virtual function action_e catch();
+    function uvm_severity get_severity(); return UVM_INFO; endfunction
+    function string get_id(); return ""; endfunction
+    function string get_message(); return ""; endfunction
+    function void set_severity(uvm_severity severity); endfunction
+    function void set_action(uvm_action action); endfunction
+    function void set_message(string message); endfunction
 endclass
 
 `ifndef MOCK_BASE_DRIVER_DEFINED

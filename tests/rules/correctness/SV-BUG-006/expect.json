@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SV-BUG-006",
+      "line": 6
+    },
+    {
+      "rule": "SV-BUG-006",
+      "line": 9
+    }
+  ]
+}

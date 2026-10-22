@@ -93,6 +93,8 @@ class Linter:
             cmd += [str(sv_file), "-I", str(self.common_dir)]
         if rule_id:
             cmd += ["--rule", rule_id]
+        else:
+            cmd += ["--preset", "all"]  # all-rules mode includes the opt-in Advisory rules
         cmd += ["--json", json_path, "--diag-json", diag_path]
 
         start_time = time.time()
