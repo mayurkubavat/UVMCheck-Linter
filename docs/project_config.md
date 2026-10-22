@@ -42,8 +42,20 @@ class Project(ProjectConfig):
     waivers = [
         Waiver("UVM-OBJ-002", path="tb/stress_seq.sv", line=142,
                reason="Objection in loop verified for stress bench"),
+        LegacyMacros,
     ]
+
+
+# A reusable waiver is a class; subclass it to widen or narrow it.
+class LegacyMacros(Waiver):
+    rules = ["SV-STY-002", "OneStatementPerLine"]
+    paths = ["**/legacy/**"]
+    reason = "Vendor macros we cannot edit"
+    owner = "dv-infra"
+    expires = "2027-06-30"     # stops applying after this date, with a warning
 ```
+
+(Define `LegacyMacros` above `Project` in a real file; it is shown after for reading order.)
 
 ## Sharing and overriding
 
@@ -84,7 +96,7 @@ with `config = DmaBlock`. For anything dynamic, override `rule_configs()` or
 | `library_paths` | Globs for third-party code (UVM, VIP). Files are still compiled; violations in them are dropped. |
 | `exclude_paths` | Globs for your own files whose violations should be dropped. |
 | `report_library_macro_expansions` | Default `False`: code produced by a library macro (`` `uvm_object_utils `` etc.) inside your file counts as library code. |
-| `waivers` | `Waiver(rule, reason=..., path=None, line=None)`; `reason` is mandatory, `rule="*"` waives every rule. |
+| `waivers` | `Waiver(...)` objects or `Waiver` subclasses with `rules`, `paths`, `line`, `reason` (mandatory), `owner`, `expires` (YYYY-MM-DD). Empty `rules` / `paths` mean every rule / file. |
 | `style`, `naming` | Same dicts as the legacy JSON `style` / `naming` blocks. |
 | `RuleConfig.rule` | Rule ID (`"SV-STY-016"`) or name (`"MaxLineLength"`); defaults to the class name. |
 | `RuleConfig.enabled` | `False` skips the rule entirely (also for Python plugin rules). |
