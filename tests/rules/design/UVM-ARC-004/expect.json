@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "UVM-ARC-004",
+      "line": 19
+    },
+    {
+      "rule": "UVM-ARC-004",
+      "line": 20
+    }
+  ]
+}
