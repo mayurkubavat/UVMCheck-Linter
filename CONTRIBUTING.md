@@ -103,8 +103,8 @@ Every rule in UVMCheck **must** have paired `bad.sv` and `good.sv` test cases pl
    rule does, not what it should do.
 
 ### 5. Verify via Regression Suite
-The runner reads findings from the linter's `--json` report and fails on any test file
-that does not compile cleanly. It has three suites, all of which run in CI:
+The runner reads findings from the linter's `--json` report and compile errors from
+slang's `--diag-json`. It has three suites, all of which run in CI:
 
 ```bash
 # 1. Isolated: only the rule under test, against the UVM stub (tests/common/uvm_mock.svh)
@@ -123,8 +123,8 @@ cmake --preset default -DUVMCHECK_UVM_HOME=$PWD/../uvm-core
 ctest --test-dir build --output-on-failure
 ```
 
-In the all-rules suites, findings from *other* rules in `bad.sv`/`good.sv` must be listed in
-the suite's baseline file. A new one fails the run, and so does a baseline entry that no
+In the all-rules suites, findings from *other* rules in `bad.sv`/`good.sv`, and compile
+errors (as `COMPILE:<code>@<line>`), must be listed in the suite's baseline file. A new one fails the run, and so does a baseline entry that no
 longer fires, so the baseline only shrinks. After fixing a false positive, refresh it with
 `--update-baseline` and commit the smaller file.
 

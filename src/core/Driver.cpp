@@ -105,7 +105,9 @@ int LinterDriver::run() {
     const bool jsonToStdout = jsonOutputPath.has_value() && *jsonOutputPath == "-";
     std::ostream& info = jsonToStdout ? std::cerr : std::cout;
 
-    // Check if there are compilation syntax/elaboration errors
+    // Check if there are compilation syntax/elaboration errors. Elaboration
+    // diagnostics only reach the engine through reportCompilation.
+    slangDriver.reportCompilation(*compilation, /* quiet */ true);
     (void)slangDriver.reportDiagnostics(/* quiet */ jsonToStdout);
     const size_t compileErrors = static_cast<size_t>(slangDriver.diagEngine.getNumErrors());
 
