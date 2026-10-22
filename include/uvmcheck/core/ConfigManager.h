@@ -79,6 +79,7 @@ private:
     bool runPythonConfig(const std::string& filePath, std::string& jsonOut);
     void applyStyle(const json::Value& style);
     void applyNaming(const json::Value& naming);
+    bool applyWaivers(const json::Value& list, const std::filesystem::path& baseDir);
     bool applyRules(const json::Value& rules, const std::filesystem::path& baseDir);
     bool readPathList(const json::Value& v, std::string_view key, const std::filesystem::path& baseDir,
                       PathSet& out);

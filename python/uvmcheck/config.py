@@ -25,10 +25,17 @@ just the parts they need:
                    reason="Objection in loop verified for stress bench"),
         ]
 
+    class LegacyMacros(Waiver):        # reusable, subclassable waiver
+        rules = ["SV-STY-002"]
+        paths = ["**/legacy/**"]
+        reason = "Vendor macros we cannot edit"
+        expires = "2027-06-30"
+
 The C++ engine runs this file through ``python3 -m uvmcheck.config_runner``,
 which serializes the selected config to JSON with ``to_dict()``.
 """
 
+import datetime
 import inspect
 from typing import Any, Dict, List, Optional, Union
 
@@ -116,33 +123,90 @@ class RuleConfig:
 class Waiver:
     """An approved exception. ``reason`` is mandatory so every waiver is reviewable.
 
-    ``path`` is a glob (same syntax as ``library_paths``) or ``None`` for any
-    file; ``line`` is ``None`` for any line.
+    Write one inline:
+
+        Waiver("UVM-OBJ-002", path="tb/stress_seq.sv", line=142, reason="...")
+
+    or as a class, which can be shared and subclassed:
+
+        class LegacyMacros(Waiver):
+            rules = ["SV-STY-002", "SV-STY-011"]
+            paths = ["**/legacy/**"]
+            reason = "Vendor macros we cannot edit"
+            owner = "dv-infra"
+            expires = "2027-06-30"
+
+    ``rules`` / ``paths`` default to every rule / every file; ``line`` to any
+    line. ``paths`` use the same glob syntax as ``library_paths``. A waiver
+    past its ``expires`` date (YYYY-MM-DD) stops applying and is reported.
     """
 
-    def __init__(self, rule: str, *, reason: str, path: Optional[str] = None,
-                 line: Optional[int] = None):
-        if not rule:
-            raise ConfigError("Waiver needs a rule ID (or '*' for every rule)")
-        if not reason or not reason.strip():
-            raise ConfigError(f"Waiver for {rule} needs a non-empty reason")
-        if line is not None and (not isinstance(line, int) or line < 1):
-            raise ConfigError(f"Waiver for {rule}: line must be a positive integer")
-        self.rule = rule
-        self.reason = reason
-        self.path = path
-        self.line = line
+    rules: List[str] = []
+    paths: List[str] = []
+    line: Optional[int] = None
+    reason: str = ""
+    owner: Optional[str] = None
+    expires: Optional[str] = None
+
+    def __init__(self, rule: Optional[str] = None, *, reason: Optional[str] = None,
+                 path: Optional[str] = None, line: Optional[int] = None,
+                 rules: Optional[List[str]] = None, paths: Optional[List[str]] = None,
+                 owner: Optional[str] = None, expires: Optional[str] = None):
+        if rule is not None:
+            self.rules = [rule]
+        if rules is not None:
+            self.rules = list(rules)
+        if path is not None:
+            self.paths = [path]
+        if paths is not None:
+            self.paths = list(paths)
+        if line is not None:
+            self.line = line
+        if reason is not None:
+            self.reason = reason
+        if owner is not None:
+            self.owner = owner
+        if expires is not None:
+            self.expires = expires
+        self.validate()
+
+    @property
+    def label(self) -> str:
+        return type(self).__qualname__ if type(self) is not Waiver else f"Waiver({', '.join(self.rules) or '*'})"
+
+    def validate(self) -> None:
+        if isinstance(self.rules, str) or not all(isinstance(r, str) and r for r in self.rules):
+            raise ConfigError(f"{self.label}: rules must be a list of rule IDs or names")
+        _path_list(self.label, "paths", self.paths)
+        if not self.reason or not str(self.reason).strip():
+            raise ConfigError(f"{self.label} needs a non-empty reason")
+        if self.line is not None and (not isinstance(self.line, int) or self.line < 1):
+            raise ConfigError(f"{self.label}: line must be a positive integer")
+        if self.expires is not None:
+            try:
+                datetime.date.fromisoformat(str(self.expires))
+            except ValueError:
+                raise ConfigError(f"{self.label}: expires must be a YYYY-MM-DD date, got {self.expires!r}")
+
+    def is_expired(self, today: Optional[datetime.date] = None) -> bool:
+        if self.expires is None:
+            return False
+        return datetime.date.fromisoformat(str(self.expires)) < (today or datetime.date.today())
 
     def to_dict(self) -> Dict[str, Any]:
-        out: Dict[str, Any] = {"rule": self.rule, "reason": self.reason}
-        if self.path:
-            out["path"] = self.path
+        out: Dict[str, Any] = {"rules": list(self.rules) or ["*"], "reason": self.reason}
+        if self.paths:
+            out["paths"] = list(self.paths)
         if self.line:
             out["line"] = self.line
+        if self.owner:
+            out["owner"] = self.owner
+        if self.expires:
+            out["expires"] = str(self.expires)
         return out
 
     def __repr__(self) -> str:
-        return f"Waiver({self.rule!r}, path={self.path!r}, line={self.line!r})"
+        return f"{self.label}(paths={self.paths!r}, line={self.line!r})"
 
 
 class ProjectConfig:
@@ -154,7 +218,7 @@ class ProjectConfig:
     report_library_macro_expansions
                    False (default): code expanded from a library macro, such as
                    `uvm_object_utils in your class, counts as library code.
-    waivers        List of Waiver objects.
+    waivers        List of Waiver objects or Waiver subclasses.
     style, naming  Optional dicts with the same keys as the JSON config.
 
     Rule settings are RuleConfig subclasses defined in (or assigned to) the
@@ -187,12 +251,20 @@ class ProjectConfig:
             "report_library_macro_expansions": bool(self.report_library_macro_expansions),
             "rules": {rc.rule_key(): rc.to_dict() for rc in self.rule_configs()},
         }
-        waivers = list(self.waivers)
-        for w in waivers:
+        out["waivers"] = []
+        warnings: List[str] = []
+        for w in self.waivers:
+            if inspect.isclass(w) and issubclass(w, Waiver):
+                w = w()
             if not isinstance(w, Waiver):
-                raise ConfigError(f"{name}.waivers must contain Waiver objects, got {w!r}")
-        if waivers:
-            out["waivers"] = [w.to_dict() for w in waivers]
+                raise ConfigError(f"{name}.waivers must contain Waiver objects or classes, got {w!r}")
+            if w.is_expired():
+                owner = f" (owner: {w.owner})" if w.owner else ""
+                warnings.append(f"waiver {w.label} expired on {w.expires}{owner}; it no longer applies")
+                continue
+            out["waivers"].append(w.to_dict())
+        if warnings:
+            out["warnings"] = warnings
         if self.style:
             out["style"] = dict(self.style)
         if self.naming:

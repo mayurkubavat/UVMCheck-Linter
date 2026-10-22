@@ -198,6 +198,25 @@ def main():
         """)
     check("waiver by path+line", files_with(found, "SV-COR-008") == ["vendor_vip.sv"], out + err)
 
+    t, rc, found, out, err = case(binary, "Class-style waivers", "uvmcheck_config.py", """\
+        from uvmcheck.config import ProjectConfig, Waiver
+        class VendorNoise(Waiver):
+            rules = ["SelfComparison", "SV-STY-016"]
+            paths = ["lib/**"]
+            reason = "vendor code"
+            owner = "dv-infra"
+        class Stale(Waiver):
+            rules = ["SV-COR-001"]
+            reason = "temporary"
+            expires = "2001-01-01"
+        class Project(ProjectConfig):
+            waivers = [VendorNoise, Stale]
+        """)
+    check("class waiver by rule name and glob", files_with(found, "SV-COR-008") == ["user_tb.sv"] and
+          files_with(found, "SV-STY-016") == ["user_tb.sv"], out + err)
+    check("expired waiver no longer applies", files_with(found, "SV-COR-001") == ["user_tb.sv", "vendor_vip.sv"], out)
+    check("expired waiver is reported", "expired on 2001-01-01 (owner" not in err and "Stale expired on 2001-01-01" in err, err)
+
     t, rc, found, out, err = case(binary, "Waiver without reason", "uvmcheck_config.py", """\
         from uvmcheck.config import ProjectConfig, Waiver
         class Project(ProjectConfig):

@@ -6,6 +6,7 @@
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <unordered_set>
 #include <unistd.h>
 
@@ -236,12 +237,90 @@ bool ConfigManager::applyRules(const json::Value& rulesBlock, const fs::path& ba
     return true;
 }
 
+bool ConfigManager::applyWaivers(const json::Value& list, const fs::path& baseDir) {
+    if (!list.isArray()) return error("'waivers' must be a list");
+
+    // Accepts a string or list of strings under the plural or singular key.
+    auto stringList = [](const json::Value& w, const char* plural, const char* singular,
+                         std::vector<std::string>& out) {
+        for (const char* key : {plural, singular}) {
+            const auto* v = w.find(key);
+            if (!v) continue;
+            if (v->isString()) {
+                if (!v->asString().empty()) out.push_back(v->asString());
+            } else if (v->isArray()) {
+                for (const auto& item : v->asArray()) {
+                    if (!item.isString()) return false;
+                    out.push_back(item.asString());
+                }
+            } else {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    char today[11] = {};
+    std::time_t now = std::time(nullptr);
+    std::strftime(today, sizeof(today), "%Y-%m-%d", std::localtime(&now));
+
+    for (const auto& w : list.asArray()) {
+        if (!w.isObject()) return error("every waiver must be an object");
+        std::vector<std::string> ruleIds, paths;
+        if (!stringList(w, "rules", "rule", ruleIds) || ruleIds.empty()) {
+            return error("every waiver needs \"rules\" (a rule ID, name, or \"*\")");
+        }
+        const auto* reason = w.find("reason");
+        if (!reason || !reason->isString() || reason->asString().empty()) {
+            return error("waiver for " + ruleIds.front() + " needs a \"reason\"");
+        }
+        if (!stringList(w, "paths", "path", paths)) return error("waiver paths must be strings");
+        if (paths.empty()) {
+            // Legacy waiver files used "file" for the path.
+            if (const auto* f = w.find("file"); f && f->isString()) paths.push_back(f->asString());
+        }
+        if (const auto* e = w.find("expires"); e && e->isString() && e->asString() < today) {
+            warn("waiver for " + ruleIds.front() + " expired on " + e->asString() + "; it no longer applies");
+            continue;
+        }
+        size_t line = 0;
+        if (const auto* l = w.find("line"); l && l->isNumber() && l->asNumber() >= 1) {
+            line = static_cast<size_t>(l->asNumber());
+        }
+
+        std::vector<std::optional<PathPattern>> globs;
+        for (const auto& p : paths) {
+            PathPattern pat(p, baseDir);
+            if (!pat.isResolved()) {
+                warn("waiver for " + ruleIds.front() + ": path '" + p +
+                     "' uses an unset environment variable; path ignored");
+                continue;
+            }
+            globs.emplace_back(std::move(pat));
+        }
+        if (!paths.empty() && globs.empty()) continue; // every path unresolvable: waive nothing
+        if (globs.empty()) globs.emplace_back(std::nullopt);
+
+        for (const auto& rule : ruleIds) {
+            for (const auto& g : globs) {
+                ConfigWaiver cw;
+                cw.ruleId = rule;
+                cw.path = g;
+                cw.line = line;
+                cw.reason = reason->asString();
+                waivers.push_back(std::move(cw));
+            }
+        }
+    }
+    return true;
+}
+
 bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir) {
     if (!root.isObject()) return error("top level must be an object");
 
     static const std::unordered_set<std::string_view> knownKeys = {
-        "version", "source", "library_paths", "exclude_paths", "report_library_macro_expansions",
-        "rules", "waivers", "style", "naming"};
+        "version", "source", "warnings", "library_paths", "exclude_paths",
+        "report_library_macro_expansions", "rules", "waivers", "style", "naming"};
     for (const auto& [key, _] : root.asObject()) {
         if (!knownKeys.count(key)) warn("unknown top-level key '" + key + "' ignored");
     }
@@ -260,31 +339,12 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
         if (!applyRules(*v, baseDir)) return false;
     }
     if (const auto* v = root.find("waivers")) {
-        if (!v->isArray()) return error("'waivers' must be a list");
+        if (!applyWaivers(*v, baseDir)) return false;
+    }
+    if (const auto* v = root.find("warnings"); v && v->isArray()) {
+        // Emitted by the Python config loader (e.g. expired waivers).
         for (const auto& w : v->asArray()) {
-            const auto* rule = w.find("rule");
-            const auto* reason = w.find("reason");
-            if (!rule || !rule->isString() || rule->asString().empty()) {
-                return error("every waiver needs a \"rule\"");
-            }
-            if (!reason || !reason->isString() || reason->asString().empty()) {
-                return error("waiver for " + rule->asString() + " needs a \"reason\"");
-            }
-            ConfigWaiver cw;
-            cw.ruleId = rule->asString();
-            cw.reason = reason->asString();
-            if (const auto* p = w.find("path"); p && p->isString() && !p->asString().empty()) {
-                cw.path.emplace(p->asString(), baseDir);
-                if (!cw.path->isResolved()) {
-                    warn("waiver for " + cw.ruleId + ": path '" + p->asString() +
-                         "' uses an unset environment variable; waiver ignored");
-                    continue;
-                }
-            }
-            if (const auto* l = w.find("line"); l && l->isNumber() && l->asNumber() >= 1) {
-                cw.line = static_cast<size_t>(l->asNumber());
-            }
-            waivers.push_back(std::move(cw));
+            if (w.isString()) warn(w.asString());
         }
     }
     if (const auto* v = root.find("style"); v && v->isObject()) applyStyle(*v);
@@ -348,6 +408,9 @@ void ConfigManager::validateRuleKeys(const std::unordered_map<std::string, std::
         }
     }
     projectConfig.resolveRuleNames(nameToId);
+    for (auto& w : waivers) {
+        if (auto it = nameToId.find(w.ruleId); it != nameToId.end()) w.ruleId = it->second;
+    }
 }
 
 void ConfigManager::dumpDefaultConfig(std::ostream& os) const {
@@ -393,6 +456,14 @@ class Project(ProjectConfig):
         # Waiver("UVM-OBJ-002", path="tb/stress_seq.sv", line=142,
         #        reason="Objection in loop verified for stress bench"),
     ]
+
+    # Reusable waivers can also be classes (and listed in `waivers`):
+    # class LegacyMacros(Waiver):
+    #     rules = ["SV-STY-002"]
+    #     paths = ["**/legacy/**"]
+    #     reason = "Vendor macros we cannot edit"
+    #     owner = "dv-infra"
+    #     expires = "2027-06-30"
 
     style = {
         "max_line_length": 120,
