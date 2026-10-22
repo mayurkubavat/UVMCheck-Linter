@@ -22,3 +22,15 @@ class bad_obj_test extends uvm_test;
     phase.drop_objection(this);
   endtask
 endclass
+
+class bad_timed_test extends uvm_test;
+  `uvm_component_utils(bad_timed_test)
+
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  task main_phase(uvm_phase phase);
+    #5 phase.drop_objection(this); // VIOLATION: dropped after a delay, but never raised
+  endtask
+endclass

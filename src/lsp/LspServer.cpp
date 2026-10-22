@@ -245,8 +245,11 @@ std::vector<core::Violation> LspServer::lintDocument(const std::string& uri, con
     const auto& projectConfig = core::ConfigManager::instance().getProjectConfig();
     diags.setProjectConfig(&projectConfig);
 
+    // Same default as the CLI: opt-in Advisory rules stay off in the editor.
+    const auto advisory = static_cast<uint32_t>(rules::RuleProfile::Advisory);
     std::vector<rules::Rule*> rules;
     for (const auto& rule : rules::RuleRegistry::instance().getRules()) {
+        if ((rule->getProfiles() & ~advisory) == 0) continue;
         if (!projectConfig.isRuleEnabled(rule->getId(), rule->getName())) continue;
         rules.push_back(rule.get());
     }

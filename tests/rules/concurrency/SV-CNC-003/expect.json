@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SV-CNC-003",
+      "line": 10
+    },
+    {
+      "rule": "SV-CNC-003",
+      "line": 13
+    }
+  ]
+}
