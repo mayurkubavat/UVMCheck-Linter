@@ -196,11 +196,17 @@ class uvm_printer_knobs;
     int depth;
 endclass
 
-class uvm_printer extends uvm_object;
+virtual class uvm_printer extends uvm_object;
     uvm_printer_knobs knobs;
     function new(string name = "uvm_printer");
         super.new(name);
         knobs = new();
+    endfunction
+endclass
+
+class uvm_table_printer extends uvm_printer;
+    function new(string name = "uvm_table_printer");
+        super.new(name);
     endfunction
 endclass
 
@@ -354,12 +360,6 @@ class uvm_seq_item_pull_port#(type REQ=int, type RSP=REQ) extends uvm_object;
     endfunction
 endclass
 
-interface bus_if;
-    logic clk;
-    logic req;
-    logic ack;
-endinterface
-
 class uvm_config_db #(type T = int);
     static function bit get(uvm_component cntxt, string inst_name, string field_name, ref T value);
         return 1;
@@ -458,22 +458,6 @@ virtual class uvm_report_catcher extends uvm_object;
     function void set_message(string message); endfunction
 endclass
 
-`ifndef MOCK_BASE_DRIVER_DEFINED
-`define MOCK_BASE_DRIVER_DEFINED
-// Standard test mock drivers
-class BaseDriver extends uvm_component;
-    `uvm_component_utils(BaseDriver)
-    function new(string name = "BaseDriver", uvm_component parent = null);
-        super.new(name, parent);
-    endfunction
-endclass
-
-class MyDriver extends BaseDriver;
-    `uvm_component_utils(MyDriver)
-    function new(string name = "MyDriver", uvm_component parent = null);
-        super.new(name, parent);
-    endfunction
-endclass
-`endif
+`include "test_fixtures.svh"
 
 `endif // UVM_MOCK_SVH

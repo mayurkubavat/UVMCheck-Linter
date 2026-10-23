@@ -21,7 +21,8 @@ UVM library:
   By default tests compile against the stub in tests/common/uvm_mock.svh. With
   --uvm-home <uvm-core checkout> they compile against the real Accellera library
   instead: uvm_pkg.sv is added as a source and tests/common/real_uvm/uvm_mock.svh
-  replaces the stub with `include "uvm_macros.svh" + import uvm_pkg::*.
+  replaces the stub with `include "uvm_macros.svh" + import uvm_pkg::*. Both
+  include tests/common/test_fixtures.svh for the non-UVM helpers tests share.
 
 Compile errors (from slang's --diag-json) are tracked as pseudo-findings named
 COMPILE:<code> in the all-rules baselines, so a test file that newly stops
@@ -88,7 +89,8 @@ class Linter:
         if self.uvm_home:
             uvm_src = self.uvm_home / "src"
             cmd += [str(uvm_src / "uvm_pkg.sv"), str(sv_file),
-                    "-I", str(TESTS_DIR / "common" / "real_uvm"), "-I", str(uvm_src)]
+                    "-I", str(TESTS_DIR / "common" / "real_uvm"), "-I", str(uvm_src),
+                    "-I", str(self.common_dir)]
         else:
             cmd += [str(sv_file), "-I", str(self.common_dir)]
         if rule_id:
