@@ -27,8 +27,8 @@ lib/
 *.obj
 /uvmcheck
 
-# Third-Party Reference Repositories (External Git checkouts)
-references/code/
+# Local reference material (external checkouts, notes); never committed
+references/
 
 # Generated Test Run Reports & Transient Logs
 uvmcheck_report.sarif

@@ -181,5 +181,5 @@ longer fires, so the baseline only shrinks. After fixing a false positive, refre
 
 1. **Commit Hygiene**: Ensure code compiles warning-free on Clang and GCC.
 2. **Zero Regressions**: All 450+ unit tests must pass before opening a PR.
-3. **Documentation**: Update the [Rule Catalog](references/rules/catalog/uvmcheck_rule_catalog.md) when introducing new rules or modifying rule semantics.
+3. **Documentation**: Update the [Rule Catalog](docs/rules/uvmcheck_rule_catalog.md) when introducing new rules or modifying rule semantics.
 4. **Automated Fixes**: If your rule supports `--fix`, include test cases verifying the exact textual rewrite output.
