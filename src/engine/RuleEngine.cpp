@@ -9,6 +9,7 @@
 #include <ostream>
 #include <thread>
 #include <tuple>
+#include <unordered_set>
 
 #include "uvmcheck/rules/Rule.h"
 
@@ -139,6 +140,45 @@ private:
     MuteSet mutes;
 };
 
+/// Creates and fully elaborates the default specialization of every generic
+/// class. getAllDiagnostics() only builds an invalid placeholder for generic
+/// classes nobody instantiates, and slang creates default specializations on
+/// demand, so a rule asking for one (swe::userClasses) would otherwise mutate
+/// the compilation while other rules read it. Elaborating a specialization
+/// can create specializations of other generic classes, so finish() repeats
+/// until no new ones appear, as slang's own diagnostic pass does.
+class DefaultSpecializer
+    : public slang::ast::ASTVisitor<DefaultSpecializer, slang::ast::VisitFlags::AllGood> {
+public:
+    void handle(const slang::ast::GenericClassDefSymbol& gen) {
+        if (knownGenerics.insert(&gen).second) generics.push_back(&gen);
+        (void)gen.getDefaultSpecialization(*gen.getParentScope());
+        visitSpecializations(gen);
+    }
+
+    void finish() {
+        size_t before;
+        do {
+            before = seen.size();
+            // Visiting can discover more generic classes; index, don't iterate.
+            for (size_t i = 0; i < generics.size(); i++) visitSpecializations(*generics[i]);
+        } while (seen.size() != before);
+    }
+
+private:
+    void visitSpecializations(const slang::ast::GenericClassDefSymbol& gen) {
+        std::vector<const slang::ast::Type*> toVisit;
+        for (const auto& spec : gen.specializations()) {
+            if (seen.insert(&spec).second) toVisit.push_back(&spec);
+        }
+        for (const auto* spec : toVisit) spec->visit(*this);
+    }
+
+    std::vector<const slang::ast::GenericClassDefSymbol*> generics;
+    std::unordered_set<const slang::ast::GenericClassDefSymbol*> knownGenerics;
+    std::unordered_set<const slang::ast::Type*> seen;
+};
+
 /// One shared walk over the elaborated AST (VisitFlags::AllGood order) for a
 /// group of subscribers.
 class AstWalker : public slang::ast::ASTVisitor<AstWalker, slang::ast::VisitFlags::AllGood> {
@@ -223,7 +263,11 @@ void RuleEngine::run(std::span<rules::Rule* const> rules, core::DiagnosticEngine
     // Rules only read the design. Finish all lazy elaboration first and freeze
     // the compilation while rules run in parallel, the same protocol slang's
     // own multithreaded analysis uses.
+    // Both modes specialize up front so they see the same AST.
     (void)compilation.getAllDiagnostics();
+    DefaultSpecializer specializer;
+    compilation.getRoot().visit(specializer);
+    specializer.finish();
     if (parallel) compilation.freeze();
     struct Unfreeze {
         slang::ast::Compilation& c;
