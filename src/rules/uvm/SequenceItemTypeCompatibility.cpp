@@ -10,19 +10,40 @@
 
 namespace uvmcheck::rules::uvm {
 
-class ConnectCallVisitor : public slang::ast::ASTVisitor<ConnectCallVisitor, slang::ast::VisitFlags::AllGood> {
+// Visits bad nodes too: against the real UVM library a mismatched connect() does not
+// type-check, so slang wraps the call and its statement in Invalid nodes.
+class ConnectCallVisitor : public slang::ast::ASTVisitor<ConnectCallVisitor,
+                                                         slang::ast::VisitFlags::AllGood | slang::ast::VisitFlags::Bad> {
 public:
     core::DiagnosticEngine& diags;
     explicit ConnectCallVisitor(core::DiagnosticEngine& d) : diags(d) {}
+
+    void handle(const slang::ast::InvalidStatement& stmt) {
+        if (stmt.child) stmt.child->visit(*this);
+    }
+
+    void handle(const slang::ast::InvalidExpression& expr) {
+        if (expr.child) expr.child->visit(*this);
+    }
 
     void handle(const slang::ast::CallExpression& call) {
         if (call.getSubroutineName() == "connect" && call.thisClass() && !call.arguments().empty()) {
             const auto* arg0 = call.arguments()[0];
             if (arg0) {
-                // Unwrap any implicit conversions (e.g. upcasting export to uvm_object)
+                // Unwrap any implicit conversions (e.g. upcasting export to uvm_object) and the
+                // InvalidExpression slang puts around an argument that fails to type-check.
                 const auto* actualArg = arg0;
-                while (actualArg->kind == slang::ast::ExpressionKind::Conversion) {
-                    actualArg = &actualArg->as<slang::ast::ConversionExpression>().operand();
+                while (actualArg) {
+                    if (actualArg->kind == slang::ast::ExpressionKind::Conversion)
+                        actualArg = &actualArg->as<slang::ast::ConversionExpression>().operand();
+                    else if (actualArg->kind == slang::ast::ExpressionKind::Invalid)
+                        actualArg = actualArg->as<slang::ast::InvalidExpression>().child;
+                    else
+                        break;
+                }
+                if (!actualArg) {
+                    visitDefault(call);
+                    return;
                 }
 
                 std::string thisType(call.thisClass()->type->toString());
