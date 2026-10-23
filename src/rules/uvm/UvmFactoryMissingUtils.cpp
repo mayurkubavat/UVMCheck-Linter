@@ -42,8 +42,9 @@ public:
             auto classRange = syntax->sourceRange();
             bool hasRegistration = false;
 
-            // Check if type_id or get_type method exists in class
-            if (cls->find("type_id") != nullptr || cls->find("get_type") != nullptr) {
+            // Check if the class itself declares type_id or get_type. find() also returns
+            // inherited members, and the real uvm_object/uvm_component declare get_type().
+            if (declaresOwn(*cls, "type_id") || declaresOwn(*cls, "get_type")) {
                 hasRegistration = true;
             }
 
@@ -84,6 +85,12 @@ public:
                 );
             }
         }
+    }
+
+private:
+    static bool declaresOwn(const slang::ast::ClassType& cls, std::string_view name) {
+        const auto* sym = cls.find(name);
+        return sym && sym->getParentScope() == &cls;
     }
 };
 
