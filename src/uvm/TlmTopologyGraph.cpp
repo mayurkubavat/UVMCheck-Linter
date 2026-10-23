@@ -5,6 +5,7 @@
 #include "slang/ast/symbols/VariableSymbols.h"
 #include "slang/ast/expressions/CallExpression.h"
 #include "slang/syntax/AllSyntax.h"
+#include "uvmcheck/rules/SweSupport.h"
 
 namespace uvmcheck::uvm {
 
@@ -13,6 +14,9 @@ public:
     explicit TlmConnectionCollector(std::vector<TlmConnectionRecord>& outConns) : connections(outConns) {}
 
     void handle(const slang::ast::ClassType& cls) {
+        // connect() calls inside the UVM library never bind testbench ports,
+        // and matching them by name would hide unconnected ones.
+        if (rules::swe::isLibrarySymbol(cls)) return;
         std::string prev = currentClass;
         currentClass = std::string(cls.name);
         visitDefault(cls);
