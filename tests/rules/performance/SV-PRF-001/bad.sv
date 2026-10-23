@@ -1,6 +1,6 @@
 // Test Case: SV-PRF-001 (PassArrayByValue)
 // Extracted from sample_tb.sv (Test Case 1)
-
+`define MOCK_BASE_DRIVER_DEFINED
 `include "uvm_mock.svh"
 
 // --- TEST CASE 1: SV-OOP-001 (Non-virtual method override) & SV-PRF-001 (Array by value) ---

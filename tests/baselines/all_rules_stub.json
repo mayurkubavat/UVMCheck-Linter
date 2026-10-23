@@ -3243,12 +3243,11 @@
   ],
   "performance/SV-PRF-001/bad.sv": [
     "COMPILE:ExpectedToken@32",
-    "COMPILE:Redefinition@7",
-    "COMPILE:Redefinition@17",
     "SV-DED-011@13",
     "SV-DED-011@23",
     "SV-DED-011@27",
     "SV-DED-011@31",
+    "SV-OOP-001@23",
     "SV-STY-005@10",
     "SV-STY-005@14",
     "SV-STY-005@15",
