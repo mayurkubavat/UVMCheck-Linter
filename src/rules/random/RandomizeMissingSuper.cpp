@@ -51,7 +51,7 @@ public:
                 if (member.kind == slang::ast::SymbolKind::Subroutine) {
                     const auto& sub = member.as<slang::ast::SubroutineSymbol>();
                     if (sub.name == "pre_randomize" || sub.name == "post_randomize") {
-                        if (!sub.flags.has(slang::ast::MethodFlags::BuiltIn)) {
+                        if (!sub.flags.has(slang::ast::MethodFlags::BuiltIn) && hasUserCallbackAbove(*cls, sub.name)) {
                             SuperRandomizeVisitor visitor(sub.name);
                             sub.getBody().visit(visitor);
 
@@ -72,6 +72,25 @@ public:
                 }
             }
         }
+    }
+
+private:
+    // True when an ancestor declares its own callback of this name. The built-in
+    // pre/post_randomize every class gets has nothing to chain to, so a class whose
+    // ancestors only have the built-in is defining the callback, not overriding it.
+    static bool hasUserCallbackAbove(const slang::ast::ClassType& cls, std::string_view name) {
+        const slang::ast::Type* base = cls.getBaseClass();
+        int guard = 0;
+        while (base && base->isClass() && guard++ < 64) {
+            const auto& baseClass = base->getCanonicalType().as<slang::ast::ClassType>();
+            const auto* found = baseClass.find(name);
+            if (found && found->kind == slang::ast::SymbolKind::Subroutine &&
+                !found->as<slang::ast::SubroutineSymbol>().flags.has(slang::ast::MethodFlags::BuiltIn)) {
+                return true;
+            }
+            base = baseClass.getBaseClass();
+        }
+        return false;
     }
 };
 
