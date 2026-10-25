@@ -351,6 +351,12 @@ std::unique_ptr<Rule> createUnstablePackageDependedOn();
 std::unique_ptr<Rule> createConfigDbAsRuntimeChannel();
 std::unique_ptr<Rule> createScatteredConfigKeyLiteral();
 std::unique_ptr<Rule> createSharedConfigMutatedAtRuntime();
+std::unique_ptr<Rule> createCloneFragments();
+std::unique_ptr<Rule> createDuplicatedConstraint();
+std::unique_ptr<Rule> createRepeatedStringLiteral();
+std::unique_ptr<Rule> createCopiedAgentPackage();
+std::unique_ptr<Rule> createHotspot();
+std::unique_ptr<Rule> createChangeCoupling();
 std::unique_ptr<Rule> createHierarchyReachThrough();
 std::unique_ptr<Rule> createLayerDependency();
 std::unique_ptr<Rule> createUseAfterFailedNullCheck();
@@ -748,6 +754,12 @@ void registerBuiltinRules() {
     reg.registerRule(createConfigDbAsRuntimeChannel());
     reg.registerRule(createScatteredConfigKeyLiteral());
     reg.registerRule(createSharedConfigMutatedAtRuntime());
+    reg.registerRule(createCloneFragments());
+    reg.registerRule(createDuplicatedConstraint());
+    reg.registerRule(createRepeatedStringLiteral());
+    reg.registerRule(createCopiedAgentPackage());
+    reg.registerRule(createHotspot());
+    reg.registerRule(createChangeCoupling());
 }
 
 } // namespace uvmcheck::rules

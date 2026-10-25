@@ -552,7 +552,7 @@ Thresholds are read through `swe::ruleOption(rule, key, default)`, so the Python
 
 ---
 
-## Category 9: Methodology Guide Rules (`UVM-RUS`, `UVM-ROL`, `UVM-CPL`, `UVM-PAT`, `RAL-ADP`, `UVM-REP-007/008`, `SV-PKG`, `SV-CNS`, `SV-CPL`, `UVM-CFG-007` to `009`)
+## Category 9: Methodology Guide Rules (`UVM-RUS`, `UVM-ROL`, `UVM-CPL`, `UVM-PAT`, `RAL-ADP`, `UVM-REP-007/008`, `SV-PKG`, `SV-CNS`, `SV-CPL`, `UVM-CFG-007` to `009`, `SV-DUP-002` to `005`, `SV-EVO`)
 
 Rules written for the [UVM Methodology Guide](../methodology/README.md). Each enforces one guideline; `--guideline <id>` runs a chapter or guideline, and `--list-guidelines` prints the full mapping, including the existing rules tagged with guidelines.
 
@@ -743,4 +743,40 @@ Rules written for the [UVM Methodology Guide](../methodology/README.md). Each en
 * **`SV-CNS-008`** (FunctionOutputArguments)
   * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-6.3](../methodology/README.md)
   * **Description:** Flags void class functions that hand their results back through output arguments. A return value, or a struct for several values, keeps the call an expression and makes the data flow visible (command-query separation, MG-6.3). Overrides are left alone, since their signature is fixed. Advisory: off by default.
+  * **uvmcheck Status:** **Implemented**
+
+### 9.8 Duplication (MG-7)
+
+* **`SV-DUP-002`** (CloneFragments)
+  * **Severity:** WARNING · **Category:** Maintainability · **Guideline:** [MG-7.1](../methodology/README.md)
+  * **Description:** Finds runs of three or more statements (at least 50 tokens) that appear in more than one place, also when variables and literals were renamed consistently. Macro calls count as written, not as their expansion, and called names must match. Each pair of routines is reported once; whole identical method bodies are SV-DUP-001's, and files whose header says they are generated are left out (DRY, Type-1/2 clones, MG-7.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-DUP-003`** (DuplicatedConstraint)
+  * **Severity:** WARNING · **Category:** Maintainability · **Guideline:** [MG-7.1](../methodology/README.md)
+  * **Description:** Flags a constraint body repeated in two classes that do not inherit from each other. The rule then lives in two places and drifts; declare it once in a shared base class or a policy object (Fowler 'pull up', MG-7.1). SV-RND-011 covers repeats inside one class.
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-DUP-004`** (RepeatedStringLiteral)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-7.1](../methodology/README.md)
+  * **Description:** Flags a string literal, such as a report ID or a file name, written four or more times in the code. Config keys (UVM-CFG-008), instance names and class names are left out. One named constant keeps the copies in step (DRY, MG-7.1). Advisory: off by default.
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-DUP-005`** (CopiedAgentPackage)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-7.2](../methodology/README.md)
+  * **Description:** Flags two packages whose classes have the same roles, fields and method bodies apart from renamed identifiers, for at least three classes and 80% of the classes in the larger package (classes with almost no code are not counted). They are one agent copied and renamed; a parameterized agent, or a shared base with small subclasses, keeps one copy to fix (DRY, MG-7.2). Advisory: off by default.
+  * **uvmcheck Status:** **Implemented**
+
+### 9.9 Change history (MG-9)
+
+These read git and run only with `--history`.
+
+* **`SV-EVO-001`** (Hotspot)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-9.2](../methodology/README.md)
+  * **Description:** With --history: reports the files that are both complex (summed cyclomatic complexity of their routines) and often changed in git, the top five by complexity times commits. Such hotspots are where defects collect and where refactoring pays first (Tornhill, MG-9.2). Advisory: off by default.
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-EVO-002`** (ChangeCoupling)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-9.2](../methodology/README.md)
+  * **Description:** With --history: reports two files in different packages that change together in at least three commits and in at least half of the commits touching either. The packages have a hidden dependency that their imports do not show; move the shared knowledge to one place (temporal coupling, MG-9.2). Advisory: off by default.
   * **uvmcheck Status:** **Implemented**

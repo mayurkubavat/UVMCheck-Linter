@@ -128,10 +128,10 @@ const std::vector<Entry>& entries() {
         {{"MG-7.1", "MG-7", kDuplication, L::Should,
           "Copy-paste is refactored into a shared base, helper or parameterized class by the third "
           "copy."},
-         {"SV-DUP-001", "SV-RND-011"}},
+         {"SV-DUP-001", "SV-DUP-002", "SV-DUP-003", "SV-DUP-004", "SV-RND-011"}},
         {{"MG-7.2", "MG-7", kDuplication, L::May,
           "Near-identical agents become one parameterized agent."},
-         {}},
+         {"SV-DUP-005"}},
 
         // MG-8 Contracts and failure handling
         {{"MG-8.1", "MG-8", kContracts, L::Shall,
@@ -153,7 +153,7 @@ const std::vector<Entry>& entries() {
           "SV-DED-005", "SV-DED-006", "SV-DED-011", "SV-DED-012", "SV-DED-013"}},
         {{"MG-9.2", "MG-9", kEvolvability, L::May,
           "Complex code that changes often is refactored first."},
-         {}},
+         {"SV-EVO-001", "SV-EVO-002"}},
     };
     return table;
 }

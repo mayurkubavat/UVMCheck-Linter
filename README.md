@@ -44,7 +44,7 @@
 | **Style & Formatting** | 21 | Mandatory end labels, line length limits, capitalization, naming conventions |
 | **Software Engineering** | 47 | Copy-paste bugs, failures that are not reported, checkers that cannot fail, testbench layer rules, god classes, cohesion and coupling metrics, cognitive complexity, lock and file-handle leaks |
 
-> For comprehensive rule specifications, rationales, and bad/good examples across all 328 rules, explore the [Rule Catalog](docs/rules/uvmcheck_rule_catalog.md).
+> For comprehensive rule specifications, rationales, and bad/good examples across all 334 rules, explore the [Rule Catalog](docs/rules/uvmcheck_rule_catalog.md).
 
 ---
 
@@ -126,6 +126,7 @@ usage, duplication, failure handling, evolvability), each backed by lint rules:
 ./build/uvmcheck tb/top.sv --guideline MG-4         # one chapter (or MG-4.1 for one guideline)
 ./build/uvmcheck tb/top.sv --preset reuse           # chapters MG-1 to MG-5
 ./build/uvmcheck tb/top.sv --conformance            # pass/fail per guideline after any run
+./build/uvmcheck tb/top.sv --guideline MG-9.2 --history  # hotspots and change coupling from git
 ```
 
 ### Single-Rule Targeting
@@ -260,7 +261,7 @@ Run with waivers applied:
 
 ## Regression & Unit Testsuite
 
-UVMCheck features a modular unit test suite with 640 test cases covering 320 rules:
+UVMCheck features a modular unit test suite with 648 test cases covering 324 rules:
 
 ```bash
 # Run entire testsuite via Python runner (~2.8 seconds)
@@ -274,6 +275,9 @@ python3 tests/regression.py --rule UVM-CFG-002
 
 # Check the parallel engine gives identical findings to the reference engine
 python3 tests/engine_equivalence.py
+
+# Git-history rules (SV-EVO-001/002) against throwaway repositories
+python3 tests/test_history.py
 
 # Run via CTest
 ctest --test-dir build --output-on-failure

@@ -7,6 +7,7 @@
 #include "uvmcheck/reporting/JsonReporter.h"
 #include "uvmcheck/reporting/Conformance.h"
 #include "uvmcheck/rules/Guidelines.h"
+#include "uvmcheck/rules/History.h"
 #include "uvmcheck/core/ConfigManager.h"
 #include "uvmcheck/plugins/PythonPluginManager.h"
 #include "uvmcheck/lsp/LspServer.h"
@@ -45,6 +46,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--exclude", excludePathArgs, "Do not report violations in files matching this glob (repeatable)", "<glob>");
     slangDriver.cmdLine.add("--rule", ruleFilter, "Execute only the specified rule ID or rule name", "<rule>");
     slangDriver.cmdLine.add("--python-rules", pythonRulesPath, "Load and execute custom Python lint rules from specified file or directory", "<path>");
+    slangDriver.cmdLine.add("--history", useHistory, "Read git history for the change-based rules (SV-EVO-001 hotspots, SV-EVO-002 change coupling); off by default");
     slangDriver.cmdLine.add("--profile-rules", profileRules, "Print per-phase and per-rule execution times to stderr");
     slangDriver.cmdLine.add("--engine", engineMode, "Rule execution engine: single-pass (default, parallel shared walk) or isolated (one walk per rule, sequential)", "<mode>");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
@@ -263,6 +265,7 @@ int LinterDriver::run() {
 
     engine::EngineOptions engineOptions;
     engineOptions.profile = profileRules.value_or(false);
+    rules::history::setEnabled(useHistory.value_or(false));
     engineOptions.threads = slangDriver.options.numThreads.value_or(0);
     if (engineMode.has_value()) {
         if (*engineMode == "isolated") {

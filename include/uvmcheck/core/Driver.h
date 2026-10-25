@@ -38,6 +38,7 @@ private:
     std::vector<std::string> libraryPathArgs;
     std::vector<std::string> excludePathArgs;
     std::optional<bool> profileRules;
+    std::optional<bool> useHistory;
     std::optional<std::string> engineMode;
     std::optional<std::string> guidelineSelector;
     std::optional<bool> listGuidelines;

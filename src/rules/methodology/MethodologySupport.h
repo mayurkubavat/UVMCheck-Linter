@@ -39,6 +39,25 @@ bool isLibraryTree(const slang::SourceManager& sm, const slang::syntax::SyntaxTr
 /// also check each node's own buffer).
 std::vector<const slang::syntax::SyntaxTree*> userSyntaxTrees(slang::ast::Compilation& comp);
 
+/// The tokens of a syntax node as the user wrote them, for clone detection: a macro expansion
+/// becomes one `name token followed by its arguments, so `uvm_info(...) counts as the call
+/// and not as the code it expands to. Identifiers are marked so that callers can rename them.
+struct NormToken {
+    std::string text;
+    bool identifier = false;
+};
+void writtenTokens(const slang::SourceManager& sm, const slang::syntax::SyntaxNode& node,
+                   std::vector<NormToken>& out);
+
+/// One string for a token sequence. With `rename`, identifiers become $1, $2 ... in order of
+/// first use and literals become #, so a copy with renamed variables still matches. A name
+/// followed by "(" is a call and keeps its text.
+std::string tokenKey(const std::vector<NormToken>& tokens, size_t begin, size_t end, bool rename);
+
+/// The file says in its header comment that a tool generated it ("auto-generated", "do not
+/// edit"). Its copies come from a template, so the duplication rules leave it out.
+bool isGeneratedBuffer(const slang::SourceManager& sm, slang::BufferID buffer);
+
 /// A location in user code, after resolving macro expansions to where they were written.
 bool isUserLocation(const slang::SourceManager& sm, slang::SourceLocation loc);
 
