@@ -2,11 +2,13 @@
 
 #include <string_view>
 #include <memory>
+#include <vector>
 #include "slang/ast/Compilation.h"
 #include "uvmcheck/core/Diagnostic.h"
 #include "uvmcheck/uvm/UvmModel.h"
 #include "uvmcheck/engine/RuleContext.h"
 #include "uvmcheck/engine/RuleTask.h"
+#include "uvmcheck/rules/Guidelines.h"
 
 namespace uvmcheck::rules {
 
@@ -50,6 +52,11 @@ public:
 
     /// Default severity (Error, Warning, Info)
     virtual core::Severity getDefaultSeverity() const = 0;
+
+    /// Methodology guidelines this rule enforces ("MG-4.1" ...); see docs/methodology/.
+    virtual std::vector<std::string_view> getGuidelines() const {
+        return guidelinesForRule(getId());
+    }
 
     /// Preset profile bitmask (defaults based on category or overridden by rule)
     virtual uint32_t getProfiles() const {

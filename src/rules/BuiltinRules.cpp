@@ -315,6 +315,25 @@ std::unique_ptr<Rule> createTooManyArguments();
 std::unique_ptr<Rule> createLockNotReleased();
 std::unique_ptr<Rule> createFileIncludedInMultiplePackages();
 std::unique_ptr<Rule> createGodClass();
+// Methodology guide rules (docs/methodology/)
+std::unique_ptr<Rule> createAgentIgnoresIsActive();
+std::unique_ptr<Rule> createAgentWithoutConfigObject();
+std::unique_ptr<Rule> createHardcodedTopology();
+std::unique_ptr<Rule> createAbsoluteConfigDbPath();
+std::unique_ptr<Rule> createOverrideByNameString();
+std::unique_ptr<Rule> createIncompleteItemContract();
+std::unique_ptr<Rule> createDriverGeneratesStimulus();
+std::unique_ptr<Rule> createCoverageOutsideObservers();
+std::unique_ptr<Rule> createDutCheckingInAgent();
+std::unique_ptr<Rule> createTestBuildsLeafComponents();
+std::unique_ptr<Rule> createMonitorDependsOnActivePath();
+std::unique_ptr<Rule> createHandleToEnvOrTest();
+std::unique_ptr<Rule> createForeignComponentStateWrite();
+std::unique_ptr<Rule> createHierarchicalReferenceInClass();
+std::unique_ptr<Rule> createCallbackNotRegistered();
+std::unique_ptr<Rule> createIncompleteRegAdapter();
+std::unique_ptr<Rule> createCheckFailureAsWarning();
+std::unique_ptr<Rule> createFatalInCheckerPath();
 std::unique_ptr<Rule> createHierarchyReachThrough();
 std::unique_ptr<Rule> createLayerDependency();
 std::unique_ptr<Rule> createUseAfterFailedNullCheck();
@@ -677,6 +696,24 @@ void registerBuiltinRules() {
     reg.registerRule(createDeepNesting());
     reg.registerRule(createLongRoutine());
     reg.registerRule(createTooManyArguments());
+    reg.registerRule(createAgentIgnoresIsActive());
+    reg.registerRule(createAgentWithoutConfigObject());
+    reg.registerRule(createHardcodedTopology());
+    reg.registerRule(createAbsoluteConfigDbPath());
+    reg.registerRule(createOverrideByNameString());
+    reg.registerRule(createIncompleteItemContract());
+    reg.registerRule(createDriverGeneratesStimulus());
+    reg.registerRule(createCoverageOutsideObservers());
+    reg.registerRule(createDutCheckingInAgent());
+    reg.registerRule(createTestBuildsLeafComponents());
+    reg.registerRule(createMonitorDependsOnActivePath());
+    reg.registerRule(createHandleToEnvOrTest());
+    reg.registerRule(createForeignComponentStateWrite());
+    reg.registerRule(createHierarchicalReferenceInClass());
+    reg.registerRule(createCallbackNotRegistered());
+    reg.registerRule(createIncompleteRegAdapter());
+    reg.registerRule(createCheckFailureAsWarning());
+    reg.registerRule(createFatalInCheckerPath());
 }
 
 } // namespace uvmcheck::rules

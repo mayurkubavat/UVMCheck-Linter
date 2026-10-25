@@ -4,12 +4,26 @@
 `ifndef UVM_MOCK_SVH
 `define UVM_MOCK_SVH
 
-`define uvm_component_utils(T) typedef T this_type;
-`define uvm_object_utils(T) typedef T this_type;
+`define uvm_component_utils(T) typedef T this_type; typedef uvm_component_registry#(T) type_id;
+`define uvm_object_utils(T) typedef T this_type; typedef uvm_object_registry#(T) type_id;
 `define uvm_field_int(ARG, FLAG)
 `define uvm_object_utils_begin(T) `uvm_object_utils(T)
 `define uvm_object_utils_end
 `define uvm_do(ITEM)
+
+// Callback macros, expanded the way the real UVM library expands them
+`define uvm_register_cb(T,CB) \
+    static local bit m_register_cb_``CB = uvm_callbacks#(T,CB)::m_register_pair(`"T`",`"CB`");
+`define uvm_do_obj_callbacks(T,CB,OBJ,METHOD) \
+    begin \
+        uvm_callback_iter#(T,CB) iter = new(OBJ); \
+        CB cb = iter.first(); \
+        while (cb != null) begin \
+            cb.METHOD; \
+            cb = iter.next(); \
+        end \
+    end
+`define uvm_do_callbacks(T,CB,METHOD) `uvm_do_obj_callbacks(T,CB,this,METHOD)
 
 // Reporting macros, expanded the way the real UVM library expands them
 `define uvm_info(ID, MSG, VERBOSITY) \
@@ -37,6 +51,17 @@ typedef enum int {UVM_NONE = 0, UVM_LOW = 100, UVM_MEDIUM = 200, UVM_HIGH = 300,
                   UVM_FULL = 400, UVM_DEBUG = 500} uvm_verbosity;
 typedef enum bit [1:0] {UVM_INFO, UVM_WARNING, UVM_ERROR, UVM_FATAL} uvm_severity;
 typedef int uvm_action;
+typedef enum bit {UVM_PASSIVE = 0, UVM_ACTIVE = 1} uvm_active_passive_enum;
+typedef enum {UVM_IS_OK, UVM_NOT_OK, UVM_HAS_X} uvm_status_e;
+typedef enum {UVM_READ, UVM_WRITE, UVM_BURST_READ, UVM_BURST_WRITE} uvm_access_e;
+typedef struct {
+    uvm_access_e kind;
+    logic [63:0] addr;
+    logic [63:0] data;
+    int n_bits;
+    logic [7:0] byte_en;
+    uvm_status_e status;
+} uvm_reg_bus_op;
 parameter uvm_action UVM_NO_ACTION = 0;
 parameter uvm_action UVM_DISPLAY = 1;
 parameter uvm_action UVM_LOG = 2;
@@ -190,6 +215,91 @@ virtual class uvm_component extends uvm_object;
     function uvm_component lookup(string name);
         return null;
     endfunction
+
+    // Factory convenience methods that take type names as strings
+    static function void set_type_override(string original_type_name, string override_type_name,
+                                           bit replace = 1);
+    endfunction
+    function void set_inst_override(string relative_inst_path, string original_type_name,
+                                    string override_type_name);
+    endfunction
+    function uvm_object create_object(string requested_type_name, string name = "");
+        return null;
+    endfunction
+    function uvm_component create_component(string requested_type_name, string name);
+        return null;
+    endfunction
+endclass
+
+class uvm_factory;
+    static function uvm_factory get();
+        uvm_factory f;
+        return f;
+    endfunction
+    function void set_type_override_by_name(string original_type_name, string override_type_name,
+                                            bit replace = 1);
+    endfunction
+    function void set_inst_override_by_name(string original_type_name, string override_type_name,
+                                            string full_inst_path);
+    endfunction
+    function uvm_object create_object_by_name(string requested_type_name, string parent_inst_path = "",
+                                              string name = "");
+        return null;
+    endfunction
+    function uvm_component create_component_by_name(string requested_type_name, string parent_inst_path,
+                                                    string name, uvm_component parent);
+        return null;
+    endfunction
+endclass
+
+// Factory registries behind `uvm_component_utils / `uvm_object_utils (type_id)
+class uvm_component_registry#(type T = uvm_component);
+    static function uvm_object get();
+        return null;
+    endfunction
+    static function T create(string name, uvm_component parent, string contxt = "");
+        T obj;
+        return obj;
+    endfunction
+    static function void set_type_override(uvm_object override_type, bit replace = 1);
+    endfunction
+endclass
+
+class uvm_object_registry#(type T = uvm_object);
+    static function uvm_object get();
+        return null;
+    endfunction
+    static function T create(string name = "", uvm_component parent = null, string contxt = "");
+        T obj;
+        return obj;
+    endfunction
+    static function void set_type_override(uvm_object override_type, bit replace = 1);
+    endfunction
+endclass
+
+class uvm_callback extends uvm_object;
+    function new(string name = "uvm_callback");
+        super.new(name);
+    endfunction
+endclass
+
+class uvm_callbacks#(type T = uvm_object, type CB = uvm_callback);
+    static function bit m_register_pair(string tname = "", string cbname = "");
+        return 1;
+    endfunction
+    static function void add(T obj, uvm_callback cb);
+    endfunction
+endclass
+
+class uvm_callback_iter#(type T = uvm_object, type CB = uvm_callback);
+    function new(T obj);
+    endfunction
+    function CB first();
+        return null;
+    endfunction
+    function CB next();
+        return null;
+    endfunction
 endclass
 
 class uvm_printer_knobs;
@@ -245,6 +355,7 @@ class uvm_sequencer_base extends uvm_component;
 endclass
 
 class uvm_sequencer#(type REQ=uvm_sequence_item, type RSP=REQ) extends uvm_sequencer_base;
+    typedef uvm_component_registry#(uvm_sequencer#(REQ, RSP)) type_id;
     function new(string name = "", uvm_component parent = null);
         super.new(name, parent);
     endfunction
@@ -286,8 +397,12 @@ virtual class uvm_driver#(type REQ = uvm_sequence_item, type RSP = REQ) extends 
 endclass
 
 virtual class uvm_agent extends uvm_component;
+    uvm_active_passive_enum is_active = UVM_ACTIVE;
     function new(string name = "", uvm_component parent = null);
         super.new(name, parent);
+    endfunction
+    virtual function uvm_active_passive_enum get_is_active();
+        return is_active;
     endfunction
 endclass
 
@@ -411,8 +526,15 @@ class uvm_reg_block extends uvm_object;
 endclass
 
 class uvm_reg_adapter extends uvm_object;
+    bit supports_byte_enable;
+    bit provides_responses;
     function new(string name = "");
         super.new(name);
+    endfunction
+    virtual function uvm_sequence_item reg2bus(const ref uvm_reg_bus_op rw);
+        return null;
+    endfunction
+    virtual function void bus2reg(uvm_sequence_item bus_item, ref uvm_reg_bus_op rw);
     endfunction
 endclass
 

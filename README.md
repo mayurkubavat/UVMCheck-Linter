@@ -44,7 +44,7 @@
 | **Style & Formatting** | 21 | Mandatory end labels, line length limits, capitalization, naming conventions |
 | **Software Engineering** | 47 | Copy-paste bugs, failures that are not reported, checkers that cannot fail, testbench layer rules, god classes, cohesion and coupling metrics, cognitive complexity, lock and file-handle leaks |
 
-> For comprehensive rule specifications, rationales, and bad/good examples across all 293 rules, explore the [Rule Catalog](docs/rules/uvmcheck_rule_catalog.md).
+> For comprehensive rule specifications, rationales, and bad/good examples across all 311 rules, explore the [Rule Catalog](docs/rules/uvmcheck_rule_catalog.md).
 
 ---
 
@@ -114,6 +114,19 @@ Filter rule execution using curated verification profiles:
 ```
 
 Without `--preset`, every rule except the Advisory ones runs. `--rule <ID>` always runs the named rule.
+
+### Methodology Guide
+
+The [UVM Methodology Guide](docs/methodology/README.md) groups guidelines for reusable, maintainable
+testbenches into nine chapters (layering, coupling, component roles, reuse, design patterns, construct
+usage, duplication, failure handling, evolvability), each backed by lint rules:
+
+```bash
+./build/uvmcheck --list-guidelines                 # the guide and the rules behind each guideline
+./build/uvmcheck tb/top.sv --guideline MG-4         # one chapter (or MG-4.1 for one guideline)
+./build/uvmcheck tb/top.sv --preset reuse           # chapters MG-1 to MG-5
+./build/uvmcheck tb/top.sv --conformance            # pass/fail per guideline after any run
+```
 
 ### Single-Rule Targeting
 Run or debug a specific rule against a source file in milliseconds:

@@ -54,6 +54,7 @@ Locate the relevant category directory under `src/rules/`:
 - `design/` - Testbench layers, hierarchy reach-through, god class, cohesion, coupling, overrides
 - `metrics/` - Cognitive complexity, routine length, nesting, argument count, class size
 - `readability/` - Flag arguments, const ref, commented-out code, magic numbers
+- `methodology/` - Rules written for the [UVM Methodology Guide](docs/methodology/README.md): reuse, component roles, coupling, pattern conformance
 
 Rules in `errors/`, `design/`, `metrics/` and `readability/` (and the SV-BUG, SV-RSC, SV-CNC-003/004 and
 SV-THR-003 rules) build on shared helpers instead of re-implementing them:
@@ -134,7 +135,11 @@ Rules that need a custom traversal can still override
 as the reference `--engine isolated` mode.
 
 ### 3. Register the Rule
-Add your rule factory to `src/rules/BuiltinRules.cpp`.
+Add your rule factory to `src/rules/BuiltinRules.cpp`. If the rule enforces a guideline of the
+[UVM Methodology Guide](docs/methodology/README.md), add its ID to that guideline in
+`src/rules/Guidelines.cpp` and to the guideline's "Enforced by" line in the chapter page;
+`tests/test_guidelines.py` fails if the two disagree. The guide also describes how to turn a
+software-engineering principle into a rule and how to score a candidate before it runs by default.
 
 ### 4. Create Paired Unit Tests
 Every rule in UVMCheck **must** have paired `bad.sv` and `good.sv` test cases plus an `expect.json`:

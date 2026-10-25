@@ -5,6 +5,8 @@
 #include "uvmcheck/reporting/SarifReporter.h"
 #include "uvmcheck/reporting/HtmlReporter.h"
 #include "uvmcheck/reporting/JsonReporter.h"
+#include "uvmcheck/reporting/Conformance.h"
+#include "uvmcheck/rules/Guidelines.h"
 #include "uvmcheck/core/ConfigManager.h"
 #include "uvmcheck/plugins/PythonPluginManager.h"
 #include "uvmcheck/lsp/LspServer.h"
@@ -26,7 +28,10 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("-h,--help", showHelp, "Display available options");
     slangDriver.cmdLine.add("--version", showVersion, "Display version information and exit");
     slangDriver.cmdLine.add("--list-rules", listRules, "List all available linter rules and exit");
-    slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: soundness, methodology, performance, style, security, smells, advisory, all", "<name>");
+    slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: soundness, methodology, performance, style, security, smells, advisory, reuse, guide, all", "<name>");
+    slangDriver.cmdLine.add("--guideline", guidelineSelector, "Run only the rules that enforce these methodology guidelines or chapters (comma-separated, e.g. MG-4,MG-3.1)", "<ids>");
+    slangDriver.cmdLine.add("--list-guidelines", listGuidelines, "List the methodology guide (guidelines and the rules that enforce them) and exit; with --json, write it as JSON");
+    slangDriver.cmdLine.add("--conformance", showConformance, "Report pass/fail per methodology guideline (implied by --guideline and the reuse and guide presets)");
     slangDriver.cmdLine.add("--fix", autoFix, "Automatically apply fix-it rewrites to source files where supported");
     slangDriver.cmdLine.add("--sarif", sarifOutputPath, "Output results to specified SARIF 2.1.0 file", "<file>");
     slangDriver.cmdLine.add("--json", jsonOutputPath, "Output results as JSON to specified file ('-' for stdout)", "<file>");
@@ -128,6 +133,32 @@ int LinterDriver::run() {
         return 0;
     }
 
+    if (listGuidelines.value_or(false)) {
+        if (jsonOutputPath.has_value()) {
+            if (!reporting::JsonReporter::writeGuidelines(*jsonOutputPath)) {
+                std::cerr << "Error: Failed to write guidelines to: " << *jsonOutputPath << "\n";
+                return 1;
+            }
+            return 0;
+        }
+        std::string_view chapter;
+        for (const auto& g : rules::methodologyGuidelines()) {
+            if (g.chapter != chapter) {
+                chapter = g.chapter;
+                std::cout << "\n" << g.chapter << " " << g.chapterTitle << "\n";
+            }
+            std::cout << "  " << std::left << std::setw(8) << g.id << std::setw(8)
+                      << rules::levelName(g.level) << g.statement << "\n";
+            const auto& ids = rules::rulesForGuideline(g.id);
+            std::cout << "  " << std::string(16, ' ') << "Rules: ";
+            if (ids.empty()) std::cout << "(review only)";
+            for (size_t i = 0; i < ids.size(); ++i) std::cout << (i ? ", " : "") << ids[i];
+            std::cout << "\n";
+        }
+        std::cout << "\n";
+        return 0;
+    }
+
     if (!loadProjectConfig()) {
         return 2;
     }
@@ -179,10 +210,37 @@ int LinterDriver::run() {
     // Advisory rules only run when asked for by preset or by --rule.
     uint32_t activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::All) &
                                  ~static_cast<uint32_t>(rules::RuleProfile::Advisory);
+    // Guideline selection (--guideline, or the reuse and guide presets) picks rules by the
+    // guidelines they enforce, whatever their profile.
+    std::vector<std::string> guidelineSelectors;
+    if (guidelineSelector.has_value()) {
+        std::string_view rest = *guidelineSelector;
+        while (!rest.empty()) {
+            size_t comma = rest.find(',');
+            std::string_view item = rest.substr(0, comma);
+            while (!item.empty() && item.front() == ' ') item.remove_prefix(1);
+            while (!item.empty() && item.back() == ' ') item.remove_suffix(1);
+            if (!item.empty()) guidelineSelectors.emplace_back(item);
+            if (comma == std::string_view::npos) break;
+            rest.remove_prefix(comma + 1);
+        }
+        for (const auto& sel : guidelineSelectors) {
+            bool known = false;
+            for (const auto& g : rules::methodologyGuidelines()) known |= rules::guidelineMatches(sel, g.id);
+            if (!known) {
+                std::cerr << "Error: Unknown guideline '" << sel << "' (see --list-guidelines)\n";
+                return 2;
+            }
+        }
+    }
     if (presetName.has_value()) {
         std::string p = *presetName;
         for (char& c : p) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        if (p == "soundness") {
+        if (p == "reuse") {
+            guidelineSelectors.insert(guidelineSelectors.end(), {"MG-1", "MG-2", "MG-3", "MG-4", "MG-5"});
+        } else if (p == "guide") {
+            for (const auto& g : rules::methodologyGuidelines()) guidelineSelectors.emplace_back(g.id);
+        } else if (p == "soundness") {
             activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::Soundness);
         } else if (p == "methodology") {
             activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::Methodology);
@@ -228,9 +286,15 @@ int LinterDriver::run() {
             continue;
         }
         // A rule named with --rule runs whatever its profile.
-        if (ruleFilter.has_value() || (rule->getProfiles() & activeProfileMask) != 0) {
-            activeRules.push_back(rule.get());
+        bool selected = ruleFilter.has_value();
+        if (!selected && !guidelineSelectors.empty()) {
+            for (auto g : rule->getGuidelines()) {
+                for (const auto& sel : guidelineSelectors) selected |= rules::guidelineMatches(sel, g);
+            }
+        } else if (!selected) {
+            selected = (rule->getProfiles() & activeProfileMask) != 0;
         }
+        if (selected) activeRules.push_back(rule.get());
     }
 
     engine::RuleEngine ruleEngine(*compilation, uvmModel, slangDriver.sourceManager, engineOptions);
@@ -343,6 +407,11 @@ int LinterDriver::run() {
         }
     }
 
+    std::vector<reporting::GuidelineResult> conformance;
+    if (showConformance.value_or(false) || !guidelineSelectors.empty()) {
+        conformance = reporting::computeConformance(activeRules, diags.getViolations());
+    }
+
     // Write SARIF report if requested
     if (sarifOutputPath.has_value()) {
         if (reporting::SarifReporter::writeSarif(*sarifOutputPath, diags.getViolations(), allRules)) {
@@ -354,7 +423,8 @@ int LinterDriver::run() {
 
     // Write JSON report if requested
     if (jsonOutputPath.has_value()) {
-        if (!reporting::JsonReporter::writeJson(*jsonOutputPath, diags.getViolations(), compileErrors, waivedCount)) {
+        if (!reporting::JsonReporter::writeJson(*jsonOutputPath, diags.getViolations(), compileErrors, waivedCount,
+                                                   conformance)) {
             std::cerr << "Error: Failed to write JSON report to: " << *jsonOutputPath << "\n";
         } else if (!jsonToStdout) {
             info << "[uvmcheck] JSON report written to: " << *jsonOutputPath << "\n";
@@ -373,6 +443,7 @@ int LinterDriver::run() {
     // Print summary
     if (!jsonToStdout) {
         diags.printSummary(std::cout);
+        reporting::printConformance(std::cout, conformance);
     }
 
     if (waivedCount > 0) {

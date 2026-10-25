@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "UVM-RUS-005",
+      "line": 25
+    },
+    {
+      "rule": "UVM-RUS-005",
+      "line": 26
+    }
+  ]
+}

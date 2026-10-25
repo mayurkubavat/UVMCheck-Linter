@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "UVM-CPL-003",
+      "line": 27
+    },
+    {
+      "rule": "UVM-CPL-003",
+      "line": 30
+    }
+  ]
+}

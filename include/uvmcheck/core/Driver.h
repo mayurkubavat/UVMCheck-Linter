@@ -39,6 +39,9 @@ private:
     std::vector<std::string> excludePathArgs;
     std::optional<bool> profileRules;
     std::optional<std::string> engineMode;
+    std::optional<std::string> guidelineSelector;
+    std::optional<bool> listGuidelines;
+    std::optional<bool> showConformance;
 
     /// Loads the explicit or auto-discovered project config and CLI path
     /// filters. Returns false (after printing why) if the config is broken.

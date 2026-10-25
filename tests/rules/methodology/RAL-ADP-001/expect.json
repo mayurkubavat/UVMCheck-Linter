@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "RAL-ADP-001",
+      "line": 19
+    },
+    {
+      "rule": "RAL-ADP-001",
+      "line": 25
+    }
+  ]
+}

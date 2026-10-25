@@ -549,3 +549,107 @@ Thresholds are read through `swe::ruleOption(rule, key, default)`, so the Python
   * **Severity:** INFO · **Category:** Advisory
   * **Description:** Flags srandom() or set_randstate() with a constant in components, sequences and other non-test classes; every seed of the regression then runs the same stimulus. Advisory: off by default.
   * **uvmcheck Status:** **Implemented**
+
+---
+
+## Category 9: Methodology Guide Rules (`UVM-RUS`, `UVM-ROL`, `UVM-CPL`, `UVM-PAT`, `RAL-ADP`, `UVM-REP-007/008`)
+
+Rules written for the [UVM Methodology Guide](../methodology/README.md). Each enforces one guideline; `--guideline <id>` runs a chapter or guideline, and `--list-guidelines` prints the full mapping, including the existing rules tagged with guidelines.
+
+### 9.1 Reusable verification components (MG-4)
+
+* **`UVM-RUS-001`** (AgentIgnoresIsActive)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-4.1](../methodology/README.md)
+  * **Description:** Flags agents that create their driver or sequencer without checking is_active or get_is_active(). Such an agent cannot be reused as a passive monitor in a larger env (MG-4.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-RUS-002`** (AgentWithoutConfigObject)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-4.2](../methodology/README.md)
+  * **Description:** Flags agents and envs that read three or more separate scalar settings from uvm_config_db instead of one config object (Fowler 'data clumps', MG-4.2).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-RUS-003`** (HardcodedTopology)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-4.2](../methodology/README.md)
+  * **Description:** Flags envs that create components in a loop with a literal count instead of a count from their config object (open/closed principle, MG-4.2).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-RUS-004`** (AbsoluteConfigDbPath)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-4.3](../methodology/README.md)
+  * **Description:** Flags uvm_config_db calls in classes whose path starts at uvm_test_top. Below the test the path should be relative to 'this'; with a non-null context an absolute path is appended to the context and never matches (MG-4.3).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-RUS-005`** (OverrideByNameString)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-4.3](../methodology/README.md)
+  * **Description:** Flags factory overrides and creates that name types with string literals (set_type_override_by_name, set_inst_override, create_object ...). A typo or rename is only found at run time; T::type_id::set_type_override() is checked by the compiler (connascence of name, MG-4.3).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-RUS-006`** (IncompleteItemContract)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-4.4](../methodology/README.md)
+  * **Description:** Flags concrete sequence items with fields that implement neither field macros nor do_copy(), do_compare() and convert2string()/do_print(). Scoreboards, clone() and debug prints then silently see default behaviour (MG-4.4).
+  * **uvmcheck Status:** **Implemented**
+
+### 9.2 Component roles (MG-3)
+
+* **`UVM-ROL-001`** (DriverGeneratesStimulus)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-3.1](../methodology/README.md)
+  * **Description:** Flags drivers that randomize sequence items or start sequences. Stimulus belongs in sequences, where tests can layer constraints and the sequencer can arbitrate; a driver only converts items to pin activity (single responsibility, MG-3.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-ROL-002`** (CoverageOutsideObservers)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-3.1](../methodology/README.md)
+  * **Description:** Flags covergroups declared in drivers and sequences. They sample what was intended, not what reached the DUT, and disappear when the agent is passive; collect coverage in a monitor or subscriber (MG-3.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-ROL-003`** (DutCheckingInAgent)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-3.2](../methodology/README.md)
+  * **Description:** Flags agents that hold a scoreboard, predictor or reference model. Agents carry protocol knowledge only; DUT-specific checking belongs in the env so the agent can be reused with other DUTs (MG-3.2).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-ROL-004`** (TestBuildsLeafComponents)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-3.3](../methodology/README.md)
+  * **Description:** Flags tests that create drivers, monitors, sequencers, agents, scoreboards or subscribers directly. Tests configure and select; the env builds, so every test shares one structure (facade, MG-3.3).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-ROL-005`** (MonitorDependsOnActivePath)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-3.1](../methodology/README.md)
+  * **Description:** Flags monitors that hold a handle to a driver, sequencer or sequence item port. A monitor must work on its own, observing only the interface, or it breaks in passive agents (MG-3.1).
+  * **uvmcheck Status:** **Implemented**
+
+### 9.3 Coupling (MG-2)
+
+* **`UVM-CPL-002`** (HandleToEnvOrTest)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-2.1](../methodology/README.md)
+  * **Description:** Flags sequences, items, agents, config objects and helpers that store a handle to a user env or test class. They then depend on everything the env contains and cannot be used under another env (stamp coupling, dependency inversion, MG-2.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-CPL-003`** (ForeignComponentStateWrite)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-2.1](../methodology/README.md)
+  * **Description:** Flags assignments to properties of another component through a handle, except a parent setting up its own subtree in new() and the build, connect and end_of_elaboration phases (content coupling, MG-2.1). UVM-ARC-002 covers long read chains.
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-CPL-004`** (HierarchicalReferenceInClassUVM)
+  * **Severity:** Flags · **Category:** WARNING · **Guideline:** [MG-2.2](../methodology/README.md)
+  * **Description:** class code that names a module hierarchy (tb_top.dut.sig, $root.tb.x). Classes must reach the DUT only through virtual interfaces so they stay reusable (information hiding, MG-2.2).
+  * **uvmcheck Status:** **Implemented**
+
+### 9.4 Pattern conformance and failure handling (MG-5, MG-8)
+
+* **`UVM-PAT-001`** (CallbackNotRegistered)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-5.1](../methodology/README.md)
+  * **Description:** Flags `uvm_do_callbacks(T, CB, ...) in classes where no `uvm_register_cb(T, CB) registers that pair for T or a base of T. UVM then refuses to add callbacks of that type at run time, so the hook never fires (MG-5.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`RAL-ADP-001`** (IncompleteRegAdapter)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-5.1](../methodology/README.md)
+  * **Description:** Flags uvm_reg_adapter subclasses whose bus2reg() never sets rw.status or whose reg2bus() never reads rw.kind. The register layer then reports every access as passed, or turns reads into writes (adapter pattern, MG-5.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-REP-007`** (CheckFailureAsWarning)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-8.1](../methodology/README.md)
+  * **Description:** Flags a failed compare() or an expected-versus-actual mismatch reported only with `uvm_warning or `uvm_info. The test still passes; check failures must be errors so they are counted (MG-8.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-REP-008`** (FatalInCheckerPath)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-8.1](../methodology/README.md)
+  * **Description:** Flags `uvm_fatal on a data mismatch in scoreboards and subscribers. The run stops at the first mismatch and hides how many others there are; use `uvm_error and let max_quit_count stop the run (MG-8.1).
+  * **uvmcheck Status:** **Implemented**
