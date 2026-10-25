@@ -26,7 +26,9 @@ class bus_seq extends uvm_sequence #(bus_item);
 endclass
 ```
 
-Enforced by: `UVM-ARC-001`
+Packages follow the same order: an agent package that imports an env or test package (SV-PKG-004) cannot be compiled or reused without it.
+
+Enforced by: `UVM-ARC-001`, `SV-PKG-004`
 
 ## MG-1.2 (Should)
 
@@ -34,7 +36,9 @@ Enforced by: `UVM-ARC-001`
 
 A reader finds class bus_driver in bus_driver.svh without searching. One class per file also keeps diffs and merge conflicts small.
 
-Enforced by: review only (no rule yet).
+SV-PKG-001 checks the class files that are `include'd into a package or $unit. Classes written directly in a package file, and files compiled on their own, are left alone.
+
+Enforced by: `SV-PKG-001`
 
 ## MG-1.3 (Shall)
 
@@ -58,7 +62,9 @@ endpackage
 // soc_pkg imports bus_pkg::bus_item instead
 ```
 
-Enforced by: `UVM-ARC-003`, `SV-MOD-001`, `SV-MAC-001`, `SV-STY-013`
+Imports follow the same rule. `import pkg::*` at file scope puts the whole package into $unit, and an import inside a class file that is included into a package applies to every file included after it (SV-PKG-002). An import that supplies nothing is a dependency the code does not have (SV-PKG-003).
+
+Enforced by: `UVM-ARC-003`, `SV-MOD-001`, `SV-MAC-001`, `SV-STY-013`, `SV-PKG-002`, `SV-PKG-003`
 
 ## MG-1.4 (May)
 
@@ -66,4 +72,6 @@ Enforced by: `UVM-ARC-003`, `SV-MOD-001`, `SV-MAC-001`, `SV-STY-013`
 
 A package many others import should change rarely, because every change ripples into its dependents. Put volatile, project-specific code in packages that nothing else depends on.
 
-Enforced by: review only (no rule yet).
+SV-PKG-005 computes Martin's instability I = Ce / (Ca + Ce) for each package from its imports, where Ca counts the packages that import it and Ce the packages it imports. It flags a package that imports one with a higher instability than its own.
+
+Enforced by: `SV-PKG-005`

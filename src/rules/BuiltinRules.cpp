@@ -334,6 +334,23 @@ std::unique_ptr<Rule> createCallbackNotRegistered();
 std::unique_ptr<Rule> createIncompleteRegAdapter();
 std::unique_ptr<Rule> createCheckFailureAsWarning();
 std::unique_ptr<Rule> createFatalInCheckerPath();
+std::unique_ptr<Rule> createDefineForConstant();
+std::unique_ptr<Rule> createMacroAsRoutine();
+std::unique_ptr<Rule> createIfdefInReusableClass();
+std::unique_ptr<Rule> createStringAsEnum();
+std::unique_ptr<Rule> createManualBitFieldSlicing();
+std::unique_ptr<Rule> createImplicitEnumBaseType();
+std::unique_ptr<Rule> createLegacyIntegerType();
+std::unique_ptr<Rule> createFunctionOutputArguments();
+std::unique_ptr<Rule> createStringModeParameter();
+std::unique_ptr<Rule> createFileClassNameMismatch();
+std::unique_ptr<Rule> createWildcardImportOutsidePackage();
+std::unique_ptr<Rule> createUnusedPackageImport();
+std::unique_ptr<Rule> createPackageLayerInversion();
+std::unique_ptr<Rule> createUnstablePackageDependedOn();
+std::unique_ptr<Rule> createConfigDbAsRuntimeChannel();
+std::unique_ptr<Rule> createScatteredConfigKeyLiteral();
+std::unique_ptr<Rule> createSharedConfigMutatedAtRuntime();
 std::unique_ptr<Rule> createHierarchyReachThrough();
 std::unique_ptr<Rule> createLayerDependency();
 std::unique_ptr<Rule> createUseAfterFailedNullCheck();
@@ -714,6 +731,23 @@ void registerBuiltinRules() {
     reg.registerRule(createIncompleteRegAdapter());
     reg.registerRule(createCheckFailureAsWarning());
     reg.registerRule(createFatalInCheckerPath());
+    reg.registerRule(createDefineForConstant());
+    reg.registerRule(createMacroAsRoutine());
+    reg.registerRule(createIfdefInReusableClass());
+    reg.registerRule(createStringAsEnum());
+    reg.registerRule(createManualBitFieldSlicing());
+    reg.registerRule(createImplicitEnumBaseType());
+    reg.registerRule(createLegacyIntegerType());
+    reg.registerRule(createFunctionOutputArguments());
+    reg.registerRule(createStringModeParameter());
+    reg.registerRule(createFileClassNameMismatch());
+    reg.registerRule(createWildcardImportOutsidePackage());
+    reg.registerRule(createUnusedPackageImport());
+    reg.registerRule(createPackageLayerInversion());
+    reg.registerRule(createUnstablePackageDependedOn());
+    reg.registerRule(createConfigDbAsRuntimeChannel());
+    reg.registerRule(createScatteredConfigKeyLiteral());
+    reg.registerRule(createSharedConfigMutatedAtRuntime());
 }
 
 } // namespace uvmcheck::rules

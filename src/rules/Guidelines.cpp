@@ -31,17 +31,17 @@ const std::vector<Entry>& entries() {
         {{"MG-1.1", "MG-1", kLayering, L::Shall,
           "Dependencies point down the testbench stack: item, sequence, agent, env, test. Nothing "
           "lower knows about anything higher."},
-         {"UVM-ARC-001"}},
+         {"UVM-ARC-001", "SV-PKG-004"}},
         {{"MG-1.2", "MG-1", kLayering, L::Should,
           "One class per file, and the file is named after the class."},
-         {}},
+         {"SV-PKG-001"}},
         {{"MG-1.3", "MG-1", kLayering, L::Shall,
           "Each file belongs to one package; declarations, imports and macros stay inside it and do "
           "not leak into $unit or other files."},
-         {"UVM-ARC-003", "SV-MOD-001", "SV-MAC-001", "SV-STY-013"}},
+         {"UVM-ARC-003", "SV-MOD-001", "SV-MAC-001", "SV-STY-013", "SV-PKG-002", "SV-PKG-003"}},
         {{"MG-1.4", "MG-1", kLayering, L::May,
           "Packages that many others depend on stay small and stable."},
-         {}},
+         {"SV-PKG-005"}},
 
         // MG-2 Coupling
         {{"MG-2.1", "MG-2", kCoupling, L::Shall,
@@ -56,11 +56,12 @@ const std::vector<Entry>& entries() {
         {{"MG-2.3", "MG-2", kCoupling, L::Should,
           "Shared state is passed down at build time, not kept in globals, statics, the command "
           "line or run-time hierarchy lookups."},
-         {"SV-DSN-008", "SV-OOP-007", "UVM-CFG-003", "UVM-CFG-005", "UVM-CFG-006", "UVM-ARC-004"}},
+         {"SV-DSN-008", "SV-OOP-007", "UVM-CFG-003", "UVM-CFG-005", "UVM-CFG-006", "UVM-ARC-004",
+          "UVM-CFG-007", "UVM-CFG-009"}},
         {{"MG-2.4", "MG-2", kCoupling, L::Should,
           "Names and positions that tie code together (config keys, value types, argument order) "
           "match on both sides and are checked, not left to convention."},
-         {"UVM-CFG-001", "UVM-DAG-001", "SV-RDB-001", "SV-BUG-007"}},
+         {"UVM-CFG-001", "UVM-DAG-001", "SV-RDB-001", "SV-BUG-007", "UVM-CFG-008", "SV-CPL-001"}},
 
         // MG-3 Cohesion and component roles
         {{"MG-3.1", "MG-3", kRoles, L::Shall,
@@ -111,15 +112,17 @@ const std::vector<Entry>& entries() {
         // MG-6 Construct usage
         {{"MG-6.1", "MG-6", kConstructs, L::Shall,
           "Prefer typed language constructs to the preprocessor and to code-generating macros."},
-         {"UVM-BAN-001", "UVM-BAN-002"}},
+         {"UVM-BAN-001", "UVM-BAN-002", "SV-CNS-001", "SV-CNS-002", "SV-CNS-003"}},
         {{"MG-6.2", "MG-6", kConstructs, L::Should,
           "Model domain values with types: enums instead of strings, packed structs instead of "
           "hand slicing."},
-         {}},
+         {"SV-CNS-004", "SV-CNS-005"}},
         {{"MG-6.3", "MG-6", kConstructs, L::Shall,
-          "Use current language and UVM constructs; deprecated and legacy forms are not used."},
+          "Use current, explicit language and UVM constructs; deprecated and legacy forms are not "
+          "used."},
          {"SV-DEP-001", "SV-DEP-002", "SV-DEP-003", "SV-DEP-004", "SV-DEP-005", "SV-DEP-006",
-          "UVM-DEP-001", "UVM-DEP-002", "UVM-DEP-003", "UVM-DEP-004", "SV-BAN-001", "SV-COR-009"}},
+          "UVM-DEP-001", "UVM-DEP-002", "UVM-DEP-003", "UVM-DEP-004", "SV-BAN-001", "SV-COR-009",
+          "SV-CNS-006", "SV-CNS-007", "SV-CNS-008"}},
 
         // MG-7 Duplication
         {{"MG-7.1", "MG-7", kDuplication, L::Should,

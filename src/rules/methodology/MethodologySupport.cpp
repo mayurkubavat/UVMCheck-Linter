@@ -6,11 +6,66 @@
 #include "slang/ast/expressions/MiscExpressions.h"
 #include "slang/ast/expressions/OperatorExpressions.h"
 #include "slang/ast/statements/ConditionalStatements.h"
+#include "slang/ast/expressions/LiteralExpressions.h"
 #include "slang/ast/statements/MiscStatements.h"
 
 namespace uvmcheck::rules::meth {
 
 using namespace slang::ast;
+
+bool isStringLiteral(const Expression& e) {
+    return swe::stripConversions(e).kind == ExpressionKind::StringLiteral;
+}
+
+std::string literalValue(const Expression& e) {
+    const Expression& x = swe::stripConversions(e);
+    if (x.kind != ExpressionKind::StringLiteral) return {};
+    return std::string(x.as<StringLiteral>().getValue());
+}
+
+bool isNullLiteral(const Expression& e) {
+    return swe::stripConversions(e).kind == ExpressionKind::NullLiteral;
+}
+
+bool isLibraryBuffer(const slang::SourceManager& sm, slang::BufferID buffer) {
+    for (int guard = 0; buffer && guard < 64; guard++) {
+        std::string_view path = sm.getRawFileName(buffer);
+        size_t slash = path.find_last_of("/\\");
+        std::string_view base = slash == std::string_view::npos ? path : path.substr(slash + 1);
+        if (base.starts_with("uvm_")) return true;
+        slang::SourceLocation from = sm.getIncludedFrom(buffer);
+        if (!from) break;
+        buffer = from.buffer();
+    }
+    return false;
+}
+
+bool isLibraryTree(const slang::SourceManager& sm, const slang::syntax::SyntaxTree& tree) {
+    auto ids = tree.getSourceBufferIds();
+    if (ids.empty()) return false;
+    for (auto id : ids) {
+        if (!isLibraryBuffer(sm, id)) return false;
+    }
+    return true;
+}
+
+std::vector<const slang::syntax::SyntaxTree*> userSyntaxTrees(Compilation& comp) {
+    std::vector<const slang::syntax::SyntaxTree*> out;
+    const auto* sm = comp.getSourceManager();
+    if (!sm) return out;
+    for (const auto& tree : comp.getSyntaxTrees()) {
+        if (tree && !isLibraryTree(*sm, *tree)) out.push_back(tree.get());
+    }
+    return out;
+}
+
+bool isUserLocation(const slang::SourceManager& sm, slang::SourceLocation loc) {
+    if (!loc.valid()) return false;
+    loc = sm.getFullyOriginalLoc(loc);
+    return loc.valid() && !isLibraryBuffer(sm, loc.buffer());
+}
+
+bool overridesBaseMethod(const SubroutineSymbol& sub) { return sub.getOverride() != nullptr; }
 
 std::string_view declaringClassName(const CallExpression& call) {
     if (call.isSystemCall()) return {};

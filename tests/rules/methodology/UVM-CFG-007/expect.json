@@ -1,0 +1,20 @@
+{
+  "bad.sv": [
+    {
+      "rule": "UVM-CFG-007",
+      "line": 10
+    },
+    {
+      "rule": "UVM-CFG-007",
+      "line": 12
+    },
+    {
+      "rule": "UVM-CFG-007",
+      "line": 16
+    },
+    {
+      "rule": "UVM-CFG-007",
+      "line": 28
+    }
+  ]
+}

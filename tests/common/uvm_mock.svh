@@ -481,6 +481,11 @@ class uvm_config_db #(type T = int);
     endfunction
     static function void set(uvm_component cntxt, string inst_name, string field_name, T value);
     endfunction
+    static function bit exists(uvm_component cntxt, string inst_name, string field_name, bit spell_chk = 0);
+        return 1;
+    endfunction
+    static task wait_modified(uvm_component cntxt, string inst_name, string field_name);
+    endtask
 endclass
 
 virtual class uvm_subscriber#(type T=int) extends uvm_component;

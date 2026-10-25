@@ -53,7 +53,29 @@ Enforced by: `UVM-CPL-004`, `SV-OOP-008`
 
 Statics, package variables, plusargs read deep inside components and find() lookups are all hidden inputs. Passing state down at build time keeps every dependency visible in the constructor or config object.
 
-Enforced by: `SV-DSN-008`, `SV-OOP-007`, `UVM-CFG-003`, `UVM-CFG-005`, `UVM-CFG-006`, `UVM-ARC-004`
+config_db is the build-time mechanism for this. Called from run-time phases or inside a task's loop it becomes a slow global mailbox (UVM-CFG-007), and a config object fetched from it is shared by everyone who read it, so only its owner should change it after the build (UVM-CFG-009).
+
+Instead of:
+
+```systemverilog
+task bus_driver::run_phase(uvm_phase phase);
+  forever begin
+    void'(uvm_config_db#(int)::get(this, "", "delay", delay));
+    cfg.enable_checks = 0;     // cfg came from config_db
+  end
+endtask
+```
+
+Write:
+
+```systemverilog
+function void bus_driver::build_phase(uvm_phase phase);
+  void'(uvm_config_db#(bus_cfg)::get(this, "", "cfg", cfg));
+endfunction
+// run-time changes come through a TLM port, an event or a method on cfg
+```
+
+Enforced by: `SV-DSN-008`, `SV-OOP-007`, `UVM-CFG-003`, `UVM-CFG-005`, `UVM-CFG-006`, `UVM-ARC-004`, `UVM-CFG-007`, `UVM-CFG-009`
 
 ## MG-2.4 (Should)
 
@@ -61,4 +83,21 @@ Enforced by: `SV-DSN-008`, `SV-OOP-007`, `UVM-CFG-003`, `UVM-CFG-005`, `UVM-CFG-
 
 When two pieces of code must agree on a name, type or argument order, the agreement should be checked by the compiler or a rule, not by convention.
 
-Enforced by: `UVM-CFG-001`, `UVM-DAG-001`, `SV-RDB-001`, `SV-BUG-007`
+A config_db field name typed as a literal in several files (UVM-CFG-008) and a routine that picks its behaviour from a string argument (SV-CPL-001) both depend on matching spellings that nothing checks.
+
+Instead of:
+
+```systemverilog
+uvm_config_db#(bus_cfg)::set(this, "agt", "bus_cfg", cfg);       // in the env
+void'(uvm_config_db#(bus_cfg)::get(this, "", "bus_cfg", cfg));   // in the agent
+seq.do_op("write");
+```
+
+Write:
+
+```systemverilog
+localparam string BUS_CFG_KEY = "bus_cfg";   // in bus_pkg, used on both sides
+seq.do_op(OP_WRITE);                          // enum argument
+```
+
+Enforced by: `UVM-CFG-001`, `UVM-DAG-001`, `SV-RDB-001`, `SV-BUG-007`, `UVM-CFG-008`, `SV-CPL-001`

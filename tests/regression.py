@@ -7,6 +7,10 @@ Each rule has a folder tests/rules/<category>/<RULE-ID>/ holding:
   good.sv      must not trigger the rule
   expect.json  the exact (rule, line) findings bad.sv must produce
 
+A test may also hold helper files that bad.sv or good.sv `include, for rules about
+included files. The rule's own findings in a helper are expected with a "file" key in
+expect.json; other rules' findings in helpers are not checked.
+
 Findings are read from the linter's --json report, never scraped from the console.
 
 Modes:
@@ -124,6 +128,14 @@ class Linter:
         # Reported paths are relative to the linter's working directory.
         findings = [(v["ruleId"], v["line"]) for v in report["violations"]
                     if v["file"] and (Path(self.workdir) / v["file"]).resolve() == sv_file]
+        # The rule's findings in helper files next to the test, as (rule, "file:line").
+        helper_findings = []
+        for v in report["violations"]:
+            if not v["file"]:
+                continue
+            path = (Path(self.workdir) / v["file"]).resolve()
+            if path.parent == sv_file.parent and path.name not in ("bad.sv", "good.sv"):
+                helper_findings.append((v["ruleId"], f"{path.name}:{v['line']}"))
 
         compile_errors = []
         for d in diags:
@@ -141,6 +153,7 @@ class Linter:
             "error": None,
             "compile_errors": compile_errors,
             "findings": findings,
+            "helper_findings": helper_findings,
             "stdout": res.stdout,
             "stderr": res.stderr,
             "elapsed": elapsed,
@@ -148,7 +161,7 @@ class Linter:
 
 
 def fmt(findings):
-    return ", ".join(f"{r}@{l}" for r, l in sorted(findings)) or "none"
+    return ", ".join(f"{r}@{l}" for r, l in sorted(findings, key=lambda f: (f[0], str(f[1])))) or "none"
 
 
 def load_expect(rule_path):
@@ -157,11 +170,19 @@ def load_expect(rule_path):
         return None
     with open(p) as f:
         data = json.load(f)
-    return [(e["rule"], e["line"]) for e in data.get("bad.sv", [])]
+    return [(e["rule"], f"{e['file']}:{e['line']}" if "file" in e else e["line"])
+            for e in data.get("bad.sv", [])]
 
 
 def write_expect(rule_path, findings):
-    data = {"bad.sv": [{"rule": r, "line": l} for r, l in sorted(findings)]}
+    entries = []
+    for r, l in sorted(findings, key=lambda f: (isinstance(f[1], str), f[0], str(f[1]))):
+        if isinstance(l, str):
+            file, line = l.rsplit(":", 1)
+            entries.append({"rule": r, "file": file, "line": int(line)})
+        else:
+            entries.append({"rule": r, "line": l})
+    data = {"bad.sv": entries}
     with open(rule_path / EXPECT_FILE, "w") as f:
         json.dump(data, f, indent=2)
         f.write("\n")
@@ -178,7 +199,7 @@ def check_file(linter, rule_path, file_name, mode, expected, baseline):
 
     failures = []
     findings = result["findings"]
-    own = [f for f in findings if f[0] == rule_id]
+    own = [f for f in findings + result["helper_findings"] if f[0] == rule_id]
     cross = [f for f in findings if f[0] != rule_id] + result["compile_errors"]
 
     if file_name == "bad.sv":
@@ -311,7 +332,8 @@ def main():
         if cross:
             new_baseline[key] = [f"{r}@{l}" for r, l in sorted(cross)]
         if args.update_expectations and name == "bad.sv" and not result.get("error"):
-            write_expect(rule_path, [f for f in result["findings"] if f[0] == rule_path.name])
+            write_expect(rule_path, [f for f in result["findings"] + result["helper_findings"]
+                                      if f[0] == rule_path.name])
 
         if failures:
             failed_tests += 1

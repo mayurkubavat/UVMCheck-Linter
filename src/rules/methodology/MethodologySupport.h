@@ -10,14 +10,40 @@
 #include <vector>
 
 #include "slang/ast/Expression.h"
+#include "slang/ast/Compilation.h"
 #include "slang/ast/Statement.h"
 #include "slang/ast/expressions/CallExpression.h"
 #include "slang/ast/symbols/ClassSymbols.h"
 #include "slang/ast/symbols/SubroutineSymbols.h"
 #include "slang/ast/symbols/VariableSymbols.h"
+#include "slang/syntax/SyntaxTree.h"
+#include "slang/text/SourceManager.h"
 #include "uvmcheck/rules/SweSupport.h"
 
 namespace uvmcheck::rules::meth {
+
+/// String literal arguments ("vif"), looking through conversions.
+bool isStringLiteral(const slang::ast::Expression& e);
+std::string literalValue(const slang::ast::Expression& e);
+bool isNullLiteral(const slang::ast::Expression& e);
+
+/// A buffer of the UVM library or the test stub: it, or a file that includes it, is named
+/// uvm_*. Rules that read source text or syntax use this where symbol-based rules use
+/// swe::isLibrarySymbol.
+bool isLibraryBuffer(const slang::SourceManager& sm, slang::BufferID buffer);
+
+/// A syntax tree all of whose source files are library buffers (uvm_pkg.sv and its includes).
+bool isLibraryTree(const slang::SourceManager& sm, const slang::syntax::SyntaxTree& tree);
+
+/// Syntax trees that hold user code (a test file still includes the UVM stub, so callers
+/// also check each node's own buffer).
+std::vector<const slang::syntax::SyntaxTree*> userSyntaxTrees(slang::ast::Compilation& comp);
+
+/// A location in user code, after resolving macro expansions to where they were written.
+bool isUserLocation(const slang::SourceManager& sm, slang::SourceLocation loc);
+
+/// The method overrides a virtual method of a base class (user or library).
+bool overridesBaseMethod(const slang::ast::SubroutineSymbol& sub);
 
 /// Name of the class that declares a call's subroutine, without parameters
 /// ("uvm_config_db" for uvm_config_db#(int)::get), or "" for free and system calls.

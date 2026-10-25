@@ -1,0 +1,14 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SV-PKG-001",
+      "file": "bus_drv.svh",
+      "line": 2
+    },
+    {
+      "rule": "SV-PKG-001",
+      "file": "bus_seqs.svh",
+      "line": 6
+    }
+  ]
+}

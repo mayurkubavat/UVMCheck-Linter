@@ -1,0 +1,13 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SV-PKG-002",
+      "line": 12
+    },
+    {
+      "rule": "SV-PKG-002",
+      "file": "bus_item_hdr.svh",
+      "line": 2
+    }
+  ]
+}

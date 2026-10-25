@@ -19,19 +19,9 @@ using namespace slang::ast;
 
 namespace {
 
-bool isStringLiteral(const Expression& e) {
-    return swe::stripConversions(e).kind == ExpressionKind::StringLiteral;
-}
-
-std::string literalValue(const Expression& e) {
-    const Expression& x = swe::stripConversions(e);
-    if (x.kind != ExpressionKind::StringLiteral) return {};
-    return std::string(x.as<StringLiteral>().getValue());
-}
-
-bool isNullLiteral(const Expression& e) {
-    return swe::stripConversions(e).kind == ExpressionKind::NullLiteral;
-}
+using meth::isNullLiteral;
+using meth::isStringLiteral;
+using meth::literalValue;
 
 std::string_view className(const ClassType& cls) { return meth::plainName(cls); }
 

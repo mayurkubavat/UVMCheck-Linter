@@ -552,7 +552,7 @@ Thresholds are read through `swe::ruleOption(rule, key, default)`, so the Python
 
 ---
 
-## Category 9: Methodology Guide Rules (`UVM-RUS`, `UVM-ROL`, `UVM-CPL`, `UVM-PAT`, `RAL-ADP`, `UVM-REP-007/008`)
+## Category 9: Methodology Guide Rules (`UVM-RUS`, `UVM-ROL`, `UVM-CPL`, `UVM-PAT`, `RAL-ADP`, `UVM-REP-007/008`, `SV-PKG`, `SV-CNS`, `SV-CPL`, `UVM-CFG-007` to `009`)
 
 Rules written for the [UVM Methodology Guide](../methodology/README.md). Each enforces one guideline; `--guideline <id>` runs a chapter or guideline, and `--list-guidelines` prints the full mapping, including the existing rules tagged with guidelines.
 
@@ -627,9 +627,9 @@ Rules written for the [UVM Methodology Guide](../methodology/README.md). Each en
   * **Description:** Flags assignments to properties of another component through a handle, except a parent setting up its own subtree in new() and the build, connect and end_of_elaboration phases (content coupling, MG-2.1). UVM-ARC-002 covers long read chains.
   * **uvmcheck Status:** **Implemented**
 
-* **`UVM-CPL-004`** (HierarchicalReferenceInClassUVM)
-  * **Severity:** Flags · **Category:** WARNING · **Guideline:** [MG-2.2](../methodology/README.md)
-  * **Description:** class code that names a module hierarchy (tb_top.dut.sig, $root.tb.x). Classes must reach the DUT only through virtual interfaces so they stay reusable (information hiding, MG-2.2).
+* **`UVM-CPL-004`** (HierarchicalReferenceInClass)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-2.2](../methodology/README.md)
+  * **Description:** Flags class code that names a module hierarchy (tb_top.dut.sig, $root.tb.x). Classes must reach the DUT only through virtual interfaces so they stay reusable (information hiding, MG-2.2).
   * **uvmcheck Status:** **Implemented**
 
 ### 9.4 Pattern conformance and failure handling (MG-5, MG-8)
@@ -652,4 +652,95 @@ Rules written for the [UVM Methodology Guide](../methodology/README.md). Each en
 * **`UVM-REP-008`** (FatalInCheckerPath)
   * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-8.1](../methodology/README.md)
   * **Description:** Flags `uvm_fatal on a data mismatch in scoreboards and subscribers. The run stops at the first mismatch and hides how many others there are; use `uvm_error and let max_quit_count stop the run (MG-8.1).
+  * **uvmcheck Status:** **Implemented**
+
+### 9.5 Layering and packages (MG-1)
+
+* **`SV-PKG-001`** (FileClassNameMismatch)
+  * **Severity:** WARNING · **Category:** Architecture · **Guideline:** [MG-1.2](../methodology/README.md)
+  * **Description:** Flags `include'd class files that define more than one top-level class, or whose one class is not named after the file (my_drv.svh holding my_driver). With one class per file, named after it, a class can be found from its name and reused on its own (MG-1.2).
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-PKG-002`** (WildcardImportOutsidePackage)
+  * **Severity:** WARNING · **Category:** Architecture · **Guideline:** [MG-1.3](../methodology/README.md)
+  * **Description:** Flags 'import pkg::*' at file ($unit) scope, and inside files that are `include'd into a package. Both leak names into code that never asked for them and hide where a dependency comes from (information hiding, MG-1.3).
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-PKG-003`** (UnusedPackageImport)
+  * **Severity:** WARNING · **Category:** Architecture · **Guideline:** [MG-1.3](../methodology/README.md)
+  * **Description:** Flags package imports that supply no name used in their scope. An unused import is a false dependency: the package is compiled first, changes to it look relevant, and names it exports can collide with local ones (common reuse principle, MG-1.3).
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-PKG-004`** (PackageLayerInversion)
+  * **Severity:** WARNING · **Category:** Architecture · **Guideline:** [MG-1.1](../methodology/README.md)
+  * **Description:** Flags a package that imports a package from a higher testbench layer, such as an agent package importing an env or test package. The lower package can then not be compiled or reused without the higher one (acyclic and stable dependencies, MG-1.1). UVM-ARC-001 checks the same order between classes.
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-PKG-005`** (UnstablePackageDependedOn)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-1.4](../methodology/README.md)
+  * **Description:** Computes instability I = Ce / (Ca + Ce) for each user package from its imports and flags a package that depends on a less stable one. Many packages rely on a stable package, so its own dependencies should be at least as stable (Martin's stable dependencies principle, MG-1.4). Advisory: off by default.
+  * **uvmcheck Status:** **Implemented**
+
+### 9.6 config_db coupling (MG-2)
+
+* **`UVM-CFG-007`** (ConfigDbAsRuntimeChannel)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-2.3](../methodology/README.md)
+  * **Description:** Flags uvm_config_db get, set, exists and wait_modified calls in the run-time phases of components and inside loops of any task. config_db is build-time wiring; used at run time it becomes a slow global mailbox (common coupling, MG-2.3).
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-CFG-008`** (ScatteredConfigKeyLiteral)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-2.4](../methodology/README.md)
+  * **Description:** Flags a uvm_config_db field name typed as a string literal in two or more files. The setter and getter only meet if both spell it the same; a shared constant makes the compiler check that (connascence of name, MG-2.4). Reported once per name.
+  * **uvmcheck Status:** **Implemented**
+
+* **`UVM-CFG-009`** (SharedConfigMutatedAtRuntime)
+  * **Severity:** WARNING · **Category:** UVM · **Guideline:** [MG-2.3](../methodology/README.md)
+  * **Description:** Flags writes to fields of a config object that the class got from uvm_config_db and did not create, made outside new() and the build phases. The object is shared by everyone who read it, so the write is hidden global state (common coupling, MG-2.3).
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-CPL-001`** (StringModeParameter)
+  * **Severity:** WARNING · **Category:** Maintainability · **Guideline:** [MG-2.4](../methodology/README.md)
+  * **Description:** Flags routines whose string argument is compared against two or more literals to choose what to do, as in do_op("read"). Caller and callee must agree on spellings the compiler never checks (control coupling, connascence of meaning, MG-2.4). Use an enum argument or separate routines. Overrides are left alone.
+  * **uvmcheck Status:** **Implemented**
+
+### 9.7 Construct usage (MG-6)
+
+* **`SV-CNS-001`** (DefineForConstant)
+  * **Severity:** WARNING · **Category:** Maintainability · **Guideline:** [MG-6.1](../methodology/README.md)
+  * **Description:** Flags `define macros whose body is only a number or a string, used as constants. A package parameter or localparam has a type and a scope; a macro is global to the rest of the compilation and can be redefined silently (MG-6.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-CNS-002`** (MacroAsRoutine)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-6.1](../methodology/README.md)
+  * **Description:** Flags multi-statement code macros that use nothing only a macro can do: no token pasting, stringification, nested macros, `__FILE__, type arguments, declarations or return/break. A function or task would be type-checked and debuggable (MG-6.1). Advisory: off by default.
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-CNS-003`** (IfdefInReusableClass)
+  * **Severity:** WARNING · **Category:** Maintainability · **Guideline:** [MG-6.1](../methodology/README.md)
+  * **Description:** Flags `ifdef, `ifndef and `elsif inside class bodies, apart from simulator and UVM version shims. Compile-time switches multiply the variants of a class and cannot be chosen per instance; configuration can (MG-6.1).
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-CNS-004`** (StringAsEnum)
+  * **Severity:** WARNING · **Category:** Maintainability · **Guideline:** [MG-6.2](../methodology/README.md)
+  * **Description:** Flags a string variable compared against three or more literals in one case statement or if/else-if chain. The values form an enumeration the compiler cannot check; a typo in any of them fails silently (Fowler 'primitive obsession', MG-6.2). String arguments are SV-CPL-001's.
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-CNS-005`** (ManualBitFieldSlicing)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-6.2](../methodology/README.md)
+  * **Description:** Flags a vector that is cut into three or more different fixed part-selects (hdr[7:0], hdr[15:8], hdr[31:16]). The field layout lives in scattered numbers; a packed struct names it once (MG-6.2). Advisory: off by default.
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-CNS-006`** (ImplicitEnumBaseType)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-6.3](../methodology/README.md)
+  * **Description:** Flags enums in packages, classes and interfaces declared without a base type. They silently become 32-bit int, which wastes bits in packed items and no longer matches the width of the bus field they model (MG-6.3). Advisory: off by default.
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-CNS-007`** (LegacyIntegerType)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-6.3](../methodology/README.md)
+  * **Description:** Flags the Verilog-1995 type 'integer' in class code. It is a 4-state 32-bit signed value; int (2-state) or an explicitly sized logic vector says what is meant (MG-6.3). Advisory: off by default.
+  * **uvmcheck Status:** **Implemented**
+
+* **`SV-CNS-008`** (FunctionOutputArguments)
+  * **Severity:** INFO · **Category:** Advisory · **Guideline:** [MG-6.3](../methodology/README.md)
+  * **Description:** Flags void class functions that hand their results back through output arguments. A return value, or a struct for several values, keeps the call an expression and makes the data flow visible (command-query separation, MG-6.3). Overrides are left alone, since their signature is fixed. Advisory: off by default.
   * **uvmcheck Status:** **Implemented**

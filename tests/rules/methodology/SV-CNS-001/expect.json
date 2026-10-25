@@ -1,0 +1,28 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SV-CNS-001",
+      "line": 3
+    },
+    {
+      "rule": "SV-CNS-001",
+      "line": 4
+    },
+    {
+      "rule": "SV-CNS-001",
+      "line": 5
+    },
+    {
+      "rule": "SV-CNS-001",
+      "line": 6
+    },
+    {
+      "rule": "SV-CNS-001",
+      "line": 7
+    },
+    {
+      "rule": "SV-CNS-001",
+      "line": 8
+    }
+  ]
+}
