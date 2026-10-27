@@ -21,7 +21,7 @@ enum class CasingStyle {
 };
 
 struct NamingTargetSpec {
-    std::string ruleId;         // e.g. "SVTB.27.1" / "SV-NAM-001"
+    std::string ruleId;         // e.g. "SV-NAM-101"
     std::string targetKind;     // "Package", "Interface", "Covergroup", "UvmDriver", etc.
     std::string regexPattern;   // compiled regex string
     std::string prefix;         // required prefix

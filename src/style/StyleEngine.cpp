@@ -47,7 +47,7 @@ void StyleEngine::inspectTextualStyle(const slang::syntax::SyntaxTree& tree,
             line.pop_back();
         }
 
-        // Check 1: Tabs Prohibited (SVTB.1.1.1)
+        // Check 1: Tabs Prohibited (SV-STY-101)
         if (!config.allowTabs) {
             size_t tabPos = line.find('\t');
             if (tabPos != std::string::npos) {
@@ -60,7 +60,7 @@ void StyleEngine::inspectTextualStyle(const slang::syntax::SyntaxTree& tree,
                 });
 
                 diags.addViolation(
-                    "SVTB.1.1.1",
+                    "SV-STY-101",
                     "TabCharactersProhibited",
                     "Literal tab character found at column " + std::to_string(tabPos + 1) + ". "
                     "In SystemVerilog style guidelines, tab characters must be replaced with spaces "
@@ -72,7 +72,7 @@ void StyleEngine::inspectTextualStyle(const slang::syntax::SyntaxTree& tree,
             }
         }
 
-        // Check 2: Trailing Whitespace (SVTB.1.1.2)
+        // Check 2: Trailing Whitespace (SV-STY-102)
         if (!config.allowTrailingWhitespace && !line.empty()) {
             char lastChar = line.back();
             if (lastChar == ' ' || lastChar == '\t') {
@@ -87,7 +87,7 @@ void StyleEngine::inspectTextualStyle(const slang::syntax::SyntaxTree& tree,
                 });
 
                 diags.addViolation(
-                    "SVTB.1.1.2",
+                    "SV-STY-102",
                     "TrailingWhitespace",
                     "Line contains trailing whitespace characters at line end. "
                     "Remove trailing spaces/tabs to prevent noisy version control diffs.",
@@ -98,11 +98,11 @@ void StyleEngine::inspectTextualStyle(const slang::syntax::SyntaxTree& tree,
             }
         }
 
-        // Check 3: Maximum Line Length (SVTB.1.1.3)
+        // Check 3: Maximum Line Length (SV-STY-103)
         if (config.maxLineLength > 0 && line.length() > config.maxLineLength) {
             slang::SourceLocation loc(tree.root().sourceRange().start().buffer(), fileOffset + config.maxLineLength);
             diags.addViolation(
-                "SVTB.1.1.3",
+                "SV-STY-103",
                 "MaxLineLengthExceeded",
                 "Line exceeds maximum length limit of " + std::to_string(config.maxLineLength) +
                 " characters (current: " + std::to_string(line.length()) + "). Wrap long lines for readable side-by-side reviews.",
@@ -125,7 +125,7 @@ void StyleEngine::inspectTextualStyle(const slang::syntax::SyntaxTree& tree,
     if (config.requireFileHeader && headerRegex.has_value() && !foundHeader) {
         slang::SourceLocation startLoc = tree.root().sourceRange().start();
         diags.addViolation(
-            "SVTB.25.1.1",
+            "SV-STY-106",
             "MissingFileHeader",
             "File '" + filePath + "' lacks required standard corporate copyright/license header pattern ('" +
             config.fileHeaderPattern + "').",
@@ -146,7 +146,7 @@ public:
         if (config.mandatoryMatchingEndLabel) {
             if (!cls.endBlockName) {
                 diags.addViolation(
-                    "SVTB.1.5",
+                    "SV-STY-104",
                     "MandatoryMatchingEndLabel",
                     "Class '" + std::string(cls.name.valueText()) + "' definition lacks matching end label (expected 'endclass : " +
                     std::string(cls.name.valueText()) + "').",
@@ -166,7 +166,7 @@ public:
                     std::string className = std::string(cls.name.valueText());
                     if (stem != className) {
                         diags.addViolation(
-                            "SVTB.2.1.1",
+                            "SV-STY-105",
                             "FileMatchesClassName",
                             "File name '" + p.filename().string() + "' does not match class name '" + className +
                             "'. SystemVerilog style guidelines recommend naming files after the primary class declared within them.",
@@ -189,7 +189,7 @@ public:
                 std::string kw = isTask ? "endtask" : "endfunction";
                 std::string kindStr = isTask ? "Task" : "Function";
                 diags.addViolation(
-                    "SVTB.1.5",
+                    "SV-STY-104",
                     "MandatoryMatchingEndLabel",
                     kindStr + " '" + routineName + "' lacks matching end label (expected '" + kw + " : " + routineName + "').",
                     core::Severity::Warning,
@@ -205,7 +205,7 @@ public:
             std::string ifName = std::string(mod.header->name.valueText());
             if (!ifName.empty() && !mod.blockName) {
                 diags.addViolation(
-                    "SVTB.1.5",
+                    "SV-STY-104",
                     "MandatoryMatchingEndLabel",
                     "Interface '" + ifName + "' lacks matching end label (expected 'endinterface : " + ifName + "').",
                     core::Severity::Warning,

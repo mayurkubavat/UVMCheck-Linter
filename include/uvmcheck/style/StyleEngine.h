@@ -12,14 +12,14 @@
 namespace uvmcheck::style {
 
 struct StyleConfiguration {
-    size_t maxLineLength = 120;             // SVTB.1.1.3: Maximum characters per line (0 = disabled)
-    bool allowTabs = false;                 // SVTB.1.1.1: Literal tab characters prohibited
-    bool allowTrailingWhitespace = false;   // SVTB.1.1.2: Trailing whitespace prohibited
-    bool oneStatementPerLine = true;        // SVTB.1.4.1: Exactly one statement per line
-    bool mandatoryMatchingEndLabel = true;  // SVTB.1.5: End labels required on blocks/routines
-    bool requireFileHeader = false;         // SVTB.25.1.1: Standard copyright/SPDX header
+    size_t maxLineLength = 120;             // SV-STY-103: Maximum characters per line (0 = disabled)
+    bool allowTabs = false;                 // SV-STY-101: Literal tab characters prohibited
+    bool allowTrailingWhitespace = false;   // SV-STY-102: Trailing whitespace prohibited
+    bool oneStatementPerLine = true;        // SV-STY-011: Exactly one statement per line
+    bool mandatoryMatchingEndLabel = true;  // SV-STY-104: End labels required on blocks/routines
+    bool requireFileHeader = false;         // SV-STY-106: Standard copyright/SPDX header
     std::string fileHeaderPattern = "";     // Regex pattern for required header content
-    bool fileMatchesClassName = false;      // SVTB.2.1.1: File basename must match top-level class
+    bool fileMatchesClassName = false;      // SV-STY-105: File basename must match top-level class
 };
 
 class StyleEngine {

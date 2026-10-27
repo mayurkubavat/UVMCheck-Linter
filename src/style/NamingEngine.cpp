@@ -224,107 +224,107 @@ void NamingEngine::loadDefaultRules() {
     compiledRegexCache.clear();
 
     rules["Package"] = {
-        "SVTB.27.1", "Package", "^[a-z0-9_]+_pkg$", "", "_pkg", CasingStyle::SnakeCase,
+        "SV-NAM-101", "Package", "^[a-z0-9_]+_pkg$", "", "_pkg", CasingStyle::SnakeCase,
         core::Severity::Warning, "Packages should end with '_pkg' for clean namespace identification.", true
     };
 
     rules["Interface"] = {
-        "SVTB.27.2", "Interface", "^[a-z0-9_]+_if$", "", "_if", CasingStyle::SnakeCase,
+        "SV-NAM-102", "Interface", "^[a-z0-9_]+_if$", "", "_if", CasingStyle::SnakeCase,
         core::Severity::Warning, "Interfaces should end with '_if' suffix.", true
     };
 
     rules["VirtualInterface"] = {
-        "SVTB.27.3", "VirtualInterface", "^[a-z0-9_]+_vif$", "", "_vif", CasingStyle::SnakeCase,
+        "SV-NAM-103", "VirtualInterface", "^[a-z0-9_]+_vif$", "", "_vif", CasingStyle::SnakeCase,
         core::Severity::Warning, "Virtual interface handles and typedefs should end with '_vif'.", true
     };
 
     rules["Class"] = {
-        "SVTB.27.4", "Class", "", "", "", CasingStyle::PascalCase,
+        "SV-NAM-104", "Class", "", "", "", CasingStyle::PascalCase,
         core::Severity::Warning, "General classes should follow PascalCase naming conventions.", false // optional by default
     };
 
     rules["UvmDriver"] = {
-        "SVTB.27.4.2", "UvmDriver", "^[a-zA-Z0-9_]+_(driver|drv)$", "", "", CasingStyle::None,
+        "UVM-NAM-101", "UvmDriver", "^[a-zA-Z0-9_]+_(driver|drv)$", "", "", CasingStyle::None,
         core::Severity::Warning, "UVM driver components must end with '_driver' or '_drv'.", true
     };
 
     rules["UvmMonitor"] = {
-        "SVTB.27.4.3", "UvmMonitor", "^[a-zA-Z0-9_]+_(monitor|mon)$", "", "", CasingStyle::None,
+        "UVM-NAM-102", "UvmMonitor", "^[a-zA-Z0-9_]+_(monitor|mon)$", "", "", CasingStyle::None,
         core::Severity::Warning, "UVM monitor components must end with '_monitor' or '_mon'.", true
     };
 
     rules["UvmSequencer"] = {
-        "SVTB.27.4.4", "UvmSequencer", "^[a-zA-Z0-9_]+_(sequencer|sqr)$", "", "", CasingStyle::None,
+        "UVM-NAM-103", "UvmSequencer", "^[a-zA-Z0-9_]+_(sequencer|sqr)$", "", "", CasingStyle::None,
         core::Severity::Warning, "UVM sequencers must end with '_sequencer' or '_sqr'.", true
     };
 
     rules["UvmSequence"] = {
-        "SVTB.27.4.5", "UvmSequence", "^[a-zA-Z0-9_]+_(seq|sequence)$", "", "", CasingStyle::None,
+        "UVM-NAM-104", "UvmSequence", "^[a-zA-Z0-9_]+_(seq|sequence)$", "", "", CasingStyle::None,
         core::Severity::Warning, "UVM sequence classes must end with '_seq' or '_sequence'.", true
     };
 
     rules["UvmSequenceItem"] = {
-        "SVTB.27.4.6", "UvmSequenceItem", "^[a-zA-Z0-9_]+_(item|seq_item|trans|transaction)$", "", "", CasingStyle::None,
+        "UVM-NAM-105", "UvmSequenceItem", "^[a-zA-Z0-9_]+_(item|seq_item|trans|transaction)$", "", "", CasingStyle::None,
         core::Severity::Warning, "UVM transaction/sequence items must end with '_item' or '_seq_item'.", true
     };
 
     rules["UvmAgent"] = {
-        "SVTB.27.4.7", "UvmAgent", "^[a-zA-Z0-9_]+_agent$", "", "_agent", CasingStyle::None,
+        "UVM-NAM-106", "UvmAgent", "^[a-zA-Z0-9_]+_agent$", "", "_agent", CasingStyle::None,
         core::Severity::Warning, "UVM agents must end with '_agent' suffix.", true
     };
 
     rules["UvmEnv"] = {
-        "SVTB.27.4.8", "UvmEnv", "^[a-zA-Z0-9_]+_env$", "", "_env", CasingStyle::None,
+        "UVM-NAM-107", "UvmEnv", "^[a-zA-Z0-9_]+_env$", "", "_env", CasingStyle::None,
         core::Severity::Warning, "UVM environments must end with '_env' suffix.", true
     };
 
     rules["UvmTest"] = {
-        "SVTB.27.4.9", "UvmTest", "^[a-zA-Z0-9_]+_test$", "", "_test", CasingStyle::None,
+        "UVM-NAM-108", "UvmTest", "^[a-zA-Z0-9_]+_test$", "", "_test", CasingStyle::None,
         core::Severity::Warning, "UVM test classes must end with '_test' suffix.", true
     };
 
     rules["UvmScoreboard"] = {
-        "SVTB.27.4.10", "UvmScoreboard", "^[a-zA-Z0-9_]+_(scoreboard|scb)$", "", "", CasingStyle::None,
+        "UVM-NAM-109", "UvmScoreboard", "^[a-zA-Z0-9_]+_(scoreboard|scb)$", "", "", CasingStyle::None,
         core::Severity::Warning, "UVM scoreboards must end with '_scoreboard' or '_scb'.", true
     };
 
     rules["Covergroup"] = {
-        "SVTB.27.5.1", "Covergroup", "^[a-zA-Z0-9_]+_cg$", "", "_cg", CasingStyle::None,
+        "SV-NAM-105", "Covergroup", "^[a-zA-Z0-9_]+_cg$", "", "_cg", CasingStyle::None,
         core::Severity::Warning, "Covergroup declarations must end with '_cg' suffix.", true
     };
 
     rules["Coverpoint"] = {
-        "SVTB.27.5.2", "Coverpoint", "^cp_[a-zA-Z0-9_]+$", "cp_", "", CasingStyle::None,
+        "SV-NAM-106", "Coverpoint", "^cp_[a-zA-Z0-9_]+$", "cp_", "", CasingStyle::None,
         core::Severity::Warning, "Coverpoints should start with 'cp_' prefix.", true
     };
 
     rules["Cross"] = {
-        "SVTB.27.5.3", "Cross", "^(cross|cx)_[a-zA-Z0-9_]+$", "", "", CasingStyle::None,
+        "SV-NAM-107", "Cross", "^(cross|cx)_[a-zA-Z0-9_]+$", "", "", CasingStyle::None,
         core::Severity::Warning, "Cross coverages should start with 'cross_' or 'cx_' prefix.", true
     };
 
     rules["Assertion"] = {
-        "SVTB.27.6.1", "Assertion", "^[a-zA-Z0-9_]+_(a|assert)$", "", "", CasingStyle::None,
+        "SV-NAM-108", "Assertion", "^[a-zA-Z0-9_]+_(a|assert)$", "", "", CasingStyle::None,
         core::Severity::Warning, "Concurrent assertions should have labels ending with '_a' or '_assert'.", true
     };
 
     rules["Parameter"] = {
-        "SVTB.27.7.1", "Parameter", "", "", "", CasingStyle::AllCaps,
+        "SV-NAM-109", "Parameter", "", "", "", CasingStyle::AllCaps,
         core::Severity::Warning, "Parameters and constants should follow ALL_CAPS conventions.", true
     };
 
     rules["TypedefEnum"] = {
-        "SVTB.27.8.1", "TypedefEnum", "^[a-zA-Z0-9_]+_e$", "", "_e", CasingStyle::None,
+        "SV-NAM-110", "TypedefEnum", "^[a-zA-Z0-9_]+_e$", "", "_e", CasingStyle::None,
         core::Severity::Warning, "Enum typedefs should end with '_e' suffix.", true
     };
 
     rules["Typedef"] = {
-        "SVTB.27.8.2", "Typedef", "^[a-zA-Z0-9_]+_t$", "", "_t", CasingStyle::None,
+        "SV-NAM-111", "Typedef", "^[a-zA-Z0-9_]+_t$", "", "_t", CasingStyle::None,
         core::Severity::Warning, "User-defined typedefs should end with '_t' suffix.", true
     };
 
     rules["Constraint"] = {
-        "SVTB.15.3", "Constraint", "^[a-zA-Z0-9_]+_c$", "", "_c", CasingStyle::None,
+        "SV-NAM-112", "Constraint", "^[a-zA-Z0-9_]+_c$", "", "_c", CasingStyle::None,
         core::Severity::Warning, "Class constraint blocks should end with '_c' suffix.", true
     };
 }
@@ -344,7 +344,7 @@ public:
         if (!engine.validate("Covergroup", cgName, reason, suggested)) {
             const auto* spec = engine.getRule("Covergroup");
             diags.addViolation(
-                spec ? spec->ruleId : "SVTB.27.5.1",
+                spec ? spec->ruleId : "SV-NAM-105",
                 "CovergroupNamingConvention",
                 reason,
                 spec ? spec->severity : core::Severity::Warning,
@@ -365,7 +365,7 @@ public:
             if (!engine.validate("Coverpoint", cpName, reason, suggested)) {
                 const auto* spec = engine.getRule("Coverpoint");
                 diags.addViolation(
-                    spec ? spec->ruleId : "SVTB.27.5.2",
+                    spec ? spec->ruleId : "SV-NAM-106",
                     "CoverpointNamingConvention",
                     reason,
                     spec ? spec->severity : core::Severity::Warning,
@@ -387,7 +387,7 @@ public:
             if (!engine.validate("Cross", crossName, reason, suggested)) {
                 const auto* spec = engine.getRule("Cross");
                 diags.addViolation(
-                    spec ? spec->ruleId : "SVTB.27.5.3",
+                    spec ? spec->ruleId : "SV-NAM-107",
                     "CrossNamingConvention",
                     reason,
                     spec ? spec->severity : core::Severity::Warning,
@@ -408,7 +408,7 @@ public:
         if (!engine.validate("Constraint", cName, reason, suggested)) {
             const auto* spec = engine.getRule("Constraint");
             diags.addViolation(
-                spec ? spec->ruleId : "SVTB.15.3",
+                spec ? spec->ruleId : "SV-NAM-112",
                 "ConstraintNamingConvention",
                 reason,
                 spec ? spec->severity : core::Severity::Warning,
@@ -429,7 +429,7 @@ public:
         if (!engine.validate(targetKind, tdName, reason, suggested)) {
             const auto* spec = engine.getRule(targetKind);
             diags.addViolation(
-                spec ? spec->ruleId : (targetKind == "TypedefEnum" ? "SVTB.27.8.1" : "SVTB.27.8.2"),
+                spec ? spec->ruleId : (targetKind == "TypedefEnum" ? "SV-NAM-110" : "SV-NAM-111"),
                 targetKind + "NamingConvention",
                 reason,
                 spec ? spec->severity : core::Severity::Warning,
@@ -450,7 +450,7 @@ public:
             if (!engine.validate("Interface", ifName, reason, suggested)) {
                 const auto* spec = engine.getRule("Interface");
                 diags.addViolation(
-                    spec ? spec->ruleId : "SVTB.27.2",
+                    spec ? spec->ruleId : "SV-NAM-102",
                     "InterfaceNamingConvention",
                     reason,
                     spec ? spec->severity : core::Severity::Warning,
@@ -478,7 +478,7 @@ void NamingEngine::run(slang::ast::Compilation& compilation,
         if (!validate("Package", pkg->name, reason, suggested)) {
             const auto* spec = getRule("Package");
             diags.addViolation(
-                spec ? spec->ruleId : "SVTB.27.1",
+                spec ? spec->ruleId : "SV-NAM-101",
                 "PackageNamingConvention",
                 reason,
                 spec ? spec->severity : core::Severity::Warning,
@@ -520,7 +520,7 @@ void NamingEngine::run(slang::ast::Compilation& compilation,
         if (!validate(targetKind, className, reason, suggested)) {
             const auto* spec = getRule(targetKind);
             diags.addViolation(
-                spec ? spec->ruleId : "SVTB.27.4",
+                spec ? spec->ruleId : "SV-NAM-104",
                 "UvmClassNamingConvention",
                 reason,
                 spec ? spec->severity : core::Severity::Warning,
@@ -538,7 +538,7 @@ void NamingEngine::run(slang::ast::Compilation& compilation,
                     if (!validate("Parameter", param.name, pReason, pSuggested)) {
                         const auto* spec = getRule("Parameter");
                         diags.addViolation(
-                            spec ? spec->ruleId : "SVTB.27.7.1",
+                            spec ? spec->ruleId : "SV-NAM-109",
                             "ConstantNamingConvention",
                             pReason,
                             spec ? spec->severity : core::Severity::Warning,
