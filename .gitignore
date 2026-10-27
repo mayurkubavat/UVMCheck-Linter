@@ -41,6 +41,7 @@ report.html
 *.tmp
 *.out
 .uvmcheck_cache/
+.uvmcheck/cache/
 
 # IDEs & Code Editors
 .vscode/

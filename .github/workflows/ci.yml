@@ -47,9 +47,9 @@ jobs:
           - suite: isolated rules, UVM stub
             args: --mode isolated
           - suite: all rules, UVM stub
-            args: --mode all-rules --baseline tests/baselines/all_rules_stub.json
+            args: --mode all-rules --baseline tests/baselines/baseline_stub.json
           - suite: all rules, real uvm-core
-            args: --mode all-rules --uvm-home uvm-core --baseline tests/baselines/all_rules_uvm_core.json
+            args: --mode all-rules --uvm-home uvm-core --baseline tests/baselines/baseline_uvm_core.json
             needs_uvm: true
           - suite: LSP integration
             lsp: true

@@ -163,12 +163,12 @@ slang's `--diag-json`. It has three suites, all of which run in CI:
 python3 tests/regression.py --rule <RULE_ID>
 
 # 2. All rules enabled, against the UVM stub
-python3 tests/regression.py --mode all-rules --baseline tests/baselines/all_rules_stub.json
+python3 tests/regression.py --mode all-rules --baseline tests/baselines/baseline_stub.json
 
 # 3. All rules enabled, against the real Accellera library
 git clone --depth 1 --branch 2020.3.1 https://github.com/accellera-official/uvm-core.git ../uvm-core
 python3 tests/regression.py --mode all-rules --uvm-home ../uvm-core \
-    --baseline tests/baselines/all_rules_uvm_core.json
+    --baseline tests/baselines/baseline_uvm_core.json
 
 # Everything via CTest (suite 3 only when UVMCHECK_UVM_HOME is set at configure time)
 cmake --preset default -DUVMCHECK_UVM_HOME=$PWD/../uvm-core

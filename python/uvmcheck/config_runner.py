@@ -1,7 +1,7 @@
 """
 Loads a Python project config and writes it as JSON for the C++ engine.
 
-    python3 -m uvmcheck.config_runner --config uvmcheck_config.py --out cfg.json
+    python3 -m uvmcheck.config_runner --config .uvmcheck/config.py --out cfg.json
 
 The config file may define ``config = SomeProject()`` explicitly. Otherwise the
 runner picks the single most-derived ProjectConfig subclass defined in the
@@ -25,6 +25,12 @@ def load_config(path: str) -> ProjectConfig:
     # Let configs import shared team bases sitting next to them.
     if config_dir not in sys.path:
         sys.path.insert(0, config_dir)
+    # If config is in a directory-scoped environment (.uvmcheck/), also add the project
+    # root (parent directory) so config.py can import repo packages and modules.
+    if os.path.basename(config_dir) == ".uvmcheck":
+        parent_dir = os.path.dirname(config_dir)
+        if parent_dir and parent_dir not in sys.path:
+            sys.path.insert(1, parent_dir)
 
     module_name = "_uvmcheck_project_config"
     spec = importlib.util.spec_from_file_location(module_name, path)

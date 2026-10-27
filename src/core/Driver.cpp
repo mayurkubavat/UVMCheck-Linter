@@ -18,6 +18,9 @@
 #include <algorithm>
 #include <unordered_map>
 #include <chrono>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace uvmcheck::core {
 
@@ -40,8 +43,8 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--baseline", baselineInputPath, "Filter out known technical debt matching baseline JSON", "<file>");
     slangDriver.cmdLine.add("--update-baseline", baselineOutputPath, "Snapshot current violations into baseline JSON file", "<file>");
     slangDriver.cmdLine.add("--waivers", waiversFilePath, "Load external waiver rules from JSON file", "<file>");
-    slangDriver.cmdLine.add("--config", configFilePath, "Load project configuration (Python uvmcheck_config.py or JSON); default: auto-discover", "<file>");
-    slangDriver.cmdLine.add("--dump-config", dumpConfigPath, "Write a starter Python project configuration and exit", "<file>");
+    slangDriver.cmdLine.add("--config", configFilePath, "Load project configuration (Python .uvmcheck/config.py, uvmcheck_config.py, or JSON); default: auto-discover", "<file>");
+    slangDriver.cmdLine.add("--dump-config", dumpConfigPath, "Write a starter Python project configuration and exit (e.g. .uvmcheck/config.py)", "<file>");
     slangDriver.cmdLine.add("--library", libraryPathArgs, "Treat files matching this glob as library code: compiled, never reported (repeatable)", "<glob>");
     slangDriver.cmdLine.add("--exclude", excludePathArgs, "Do not report violations in files matching this glob (repeatable)", "<glob>");
     slangDriver.cmdLine.add("--rule", ruleFilter, "Execute only the specified rule ID or rule name", "<rule>");
@@ -105,6 +108,11 @@ int LinterDriver::run() {
     }
 
     if (dumpConfigPath.has_value()) {
+        std::error_code ec;
+        fs::path p(*dumpConfigPath);
+        if (p.has_parent_path()) {
+            fs::create_directories(p.parent_path(), ec);
+        }
         std::ofstream out(*dumpConfigPath);
         if (!out.is_open()) {
             std::cerr << "Error: Could not open file for writing config template: " << *dumpConfigPath << "\n";
@@ -329,23 +337,48 @@ int LinterDriver::run() {
         waiverEngine.addWaiver(std::move(w));
     }
 
+    std::string waiversPathToLoad;
     if (waiversFilePath.has_value()) {
-        if (!waiverEngine.loadWaivers(*waiversFilePath)) {
-            std::cerr << "Warning: Could not open waiver file: " << *waiversFilePath << "\n";
-        } else {
-            info << "[uvmcheck] Loaded external waivers from " << *waiversFilePath << "\n";
+        waiversPathToLoad = *waiversFilePath;
+    } else {
+        std::error_code ec;
+        if (fs::exists(".uvmcheck/waivers.json", ec)) {
+            waiversPathToLoad = ".uvmcheck/waivers.json";
         }
     }
 
-    if (baselineInputPath.has_value()) {
-        if (!waiverEngine.loadBaseline(*baselineInputPath)) {
-            std::cerr << "Warning: Could not open baseline file: " << *baselineInputPath << "\n";
+    if (!waiversPathToLoad.empty()) {
+        if (!waiverEngine.loadWaivers(waiversPathToLoad)) {
+            std::cerr << "Warning: Could not open waiver file: " << waiversPathToLoad << "\n";
         } else {
-            info << "[uvmcheck] Loaded baseline from " << *baselineInputPath << "\n";
+            info << "[uvmcheck] Loaded external waivers from " << waiversPathToLoad << "\n";
+        }
+    }
+
+    std::string baselinePathToLoad;
+    if (baselineInputPath.has_value()) {
+        baselinePathToLoad = *baselineInputPath;
+    } else {
+        std::error_code ec;
+        if (fs::exists(".uvmcheck/baseline.json", ec)) {
+            baselinePathToLoad = ".uvmcheck/baseline.json";
+        }
+    }
+
+    if (!baselinePathToLoad.empty()) {
+        if (!waiverEngine.loadBaseline(baselinePathToLoad)) {
+            std::cerr << "Warning: Could not open baseline file: " << baselinePathToLoad << "\n";
+        } else {
+            info << "[uvmcheck] Loaded baseline from " << baselinePathToLoad << "\n";
         }
     }
 
     if (baselineOutputPath.has_value()) {
+        std::error_code ec;
+        fs::path p(*baselineOutputPath);
+        if (p.has_parent_path()) {
+            fs::create_directories(p.parent_path(), ec);
+        }
         if (waiverEngine.saveBaseline(*baselineOutputPath, diags.getViolations())) {
             info << "[uvmcheck] Successfully saved " << diags.getViolations().size()
                       << " violations to baseline: " << *baselineOutputPath << "\n";

@@ -383,7 +383,14 @@ bool ConfigManager::loadFromFile(const std::string& filePath) {
 }
 
 bool ConfigManager::autoDiscover(const std::string& startDir) {
-    static const char* const names[] = {"uvmcheck_config.py", ".uvmcheck.py", ".uvmcheck.json", "uvmcheck.json"};
+    static const char* const names[] = {
+        ".uvmcheck/config.py",
+        ".uvmcheck/config.json",
+        "uvmcheck_config.py",
+        ".uvmcheck.py",
+        ".uvmcheck.json",
+        "uvmcheck.json"
+    };
     lastError.clear();
     std::error_code ec;
     fs::path curr = fs::absolute(startDir, ec).lexically_normal();
@@ -416,9 +423,9 @@ void ConfigManager::validateRuleKeys(const std::unordered_map<std::string, std::
 void ConfigManager::dumpDefaultConfig(std::ostream& os) const {
     os << R"PY("""UVMCheck project configuration.
 
-Save as uvmcheck_config.py at the root of your verification project; uvmcheck
-finds it automatically (or pass --config path/to/file.py). Paths are relative
-to this file and may use $ENV_VARS, * / ? within a name, and ** across folders.
+Save as .uvmcheck/config.py (or uvmcheck_config.py) at the root of your
+verification project; uvmcheck finds it automatically (or pass --config path/to/file.py).
+Paths are relative to this file and may use $ENV_VARS, * / ? within a name, and ** across folders.
 """
 from uvmcheck.config import ProjectConfig, RuleConfig, Waiver, Severity
 

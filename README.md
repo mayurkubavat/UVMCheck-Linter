@@ -195,7 +195,7 @@ See [`editors/vscode/`](editors/vscode/) for the ready-to-use VS Code / Cursor e
 
 ## Project Configuration
 
-Describe your project once in `uvmcheck_config.py` (auto-discovered from the working directory upward):
+Describe your project once in `.uvmcheck/config.py` or `uvmcheck_config.py` (auto-discovered from the working directory upward):
 
 ```python
 from uvmcheck.config import ProjectConfig, RuleConfig, Waiver, Severity
@@ -226,14 +226,15 @@ Establish a zero-new-defects baseline without fixing thousands of pre-existing l
 
 ```bash
 # 1. Snapshot all current legacy violations into baseline JSON
-./build/uvmcheck tb/*.sv --update-baseline uvmcheck_baseline.json
+./build/uvmcheck tb/*.sv --update-baseline .uvmcheck/baseline.json
 
 # 2. Enforce zero regressions on new PRs (only new violations fail CI)
-./build/uvmcheck tb/*.sv --baseline uvmcheck_baseline.json
+# Note: .uvmcheck/baseline.json is auto-discovered if present!
+./build/uvmcheck tb/*.sv
 ```
 
 ### Waivers Configuration
-Create a `uvmcheck_waivers.json` file to document approved exceptions:
+Document approved exceptions in `.uvmcheck/waivers.json` (auto-discovered) or in your `config.py`:
 ```json
 {
   "version": "1.0",
@@ -252,10 +253,11 @@ Create a `uvmcheck_waivers.json` file to document approved exceptions:
   ]
 }
 ```
-Run with waivers applied:
+Run with waivers automatically discovered:
 ```bash
-./build/uvmcheck tb/*.sv --waivers uvmcheck_waivers.json
+./build/uvmcheck tb/*.sv
 ```
+(Or pass `--waivers path/to/waivers.json` explicitly).
 
 ---
 

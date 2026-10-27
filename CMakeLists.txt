@@ -108,7 +108,7 @@ add_test(
 add_test(
     NAME all_rules_stub_suite
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression.py --binary $<TARGET_FILE:uvmcheck>
-            --mode all-rules --baseline ${CMAKE_CURRENT_SOURCE_DIR}/tests/baselines/all_rules_stub.json
+            --mode all-rules --baseline ${CMAKE_CURRENT_SOURCE_DIR}/tests/baselines/baseline_stub.json
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
@@ -120,7 +120,7 @@ if(UVMCHECK_UVM_HOME)
         NAME all_rules_uvm_core_suite
         COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/regression.py --binary $<TARGET_FILE:uvmcheck>
                 --mode all-rules --uvm-home ${UVMCHECK_UVM_HOME}
-                --baseline ${CMAKE_CURRENT_SOURCE_DIR}/tests/baselines/all_rules_uvm_core.json
+                --baseline ${CMAKE_CURRENT_SOURCE_DIR}/tests/baselines/baseline_uvm_core.json
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
 endif()

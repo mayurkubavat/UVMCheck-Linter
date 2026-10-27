@@ -6,13 +6,21 @@ shared base config and each block can override just what it needs.
 
 ```bash
 # Write a starter config, then edit it
-./build/uvmcheck --dump-config uvmcheck_config.py
+./build/uvmcheck --dump-config .uvmcheck/config.py
 ```
 
-UVMCheck looks for `uvmcheck_config.py`, `.uvmcheck.py`, `.uvmcheck.json` or
-`uvmcheck.json` in the working directory and its parents (first hit wins), or
-uses `--config <file>`. A config that fails to load stops the run with exit
+UVMCheck looks for configuration files in the working directory and its parents (first hit wins):
+1. `.uvmcheck/config.py`
+2. `.uvmcheck/config.json`
+3. `uvmcheck_config.py`
+4. `.uvmcheck.py`
+5. `.uvmcheck.json`
+6. `uvmcheck.json`
+
+You can also specify `--config <file>` explicitly. A config that fails to load stops the run with exit
 code 2 instead of silently linting with defaults.
+
+In addition, `.uvmcheck/waivers.json` and `.uvmcheck/baseline.json` are automatically discovered if present.
 
 ## Example
 

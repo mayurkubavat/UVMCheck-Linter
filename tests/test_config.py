@@ -8,6 +8,7 @@ Each case builds a small project in a temp directory with a "library" file and a
 """
 
 import argparse
+import json
 import os
 import re
 import subprocess
@@ -93,9 +94,13 @@ def case(binary, title, config_name, config_text, args=None, env=None, extra=Non
     make_project(root)
     if extra:
         for rel, text in extra.items():
-            (root / rel).write_text(text)
+            dest = root / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            dest.write_text(text)
     if config_name:
-        (root / config_name).write_text(textwrap.dedent(config_text))
+        dest = root / config_name
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(textwrap.dedent(config_text))
     sources = args if args is not None else ["lib/vendor_vip.sv", "src/user_tb.sv"]
     rc, found, out, err = run(binary, root, sources, env)
     print(f"\n{title}")
@@ -292,6 +297,28 @@ def main():
         config = A
         """)
     check("config = A picks A", files_with(found, "SV-COR-008") == ["user_tb.sv"], out + err)
+
+    # 17. Directory-scoped .uvmcheck/config.py auto-discovery
+    t, rc, found, out, err = case(binary, "Directory-scoped .uvmcheck/config.py auto-discovery", ".uvmcheck/config.py", """\
+        from uvmcheck.config import ProjectConfig
+        class Project(ProjectConfig):
+            library_paths = ["lib"]
+        """)
+    check("user file reported under .uvmcheck/config.py", files_with(found, "SV-COR-008") == ["user_tb.sv"], out + err)
+    check(".uvmcheck/config.py auto-discovered", ".uvmcheck/config.py" in out, out)
+
+    # 18. Auto-discovery of .uvmcheck/waivers.json
+    waiver_json = json.dumps({
+        "version": "1.0",
+        "waivers": [
+            {"rule": "SV-COR-008", "path": "src/user_tb.sv", "reason": "waived"}
+        ]
+    })
+    t, rc, found, out, err = case(binary, ".uvmcheck/waivers.json auto-discovery", None, "", extra={
+        ".uvmcheck/waivers.json": waiver_json
+    })
+    check("violation waived by auto-discovered .uvmcheck/waivers.json", files_with(found, "SV-COR-008") == ["vendor_vip.sv"], out + err)
+    check("waiver file auto-loaded banner present", "Loaded external waivers from .uvmcheck/waivers.json" in out, out)
 
     print(f"\n{'FAILED' if failures else 'PASSED'}: {len(failures)} failure(s)")
     return 1 if failures else 0
