@@ -26,7 +26,7 @@ class bus_driver extends uvm_driver #(bus_item);
 endclass
 ```
 
-Enforced by: `UVM-PAT-001`, `RAL-ADP-001`, `RAL-WIRE-001`, `UVM-VSEQ-001`, `UVM-TLM-001`, `UVM-TLM-004`
+Enforced by: `UVM-PAT-001`, `RAL-ADP-001`, `RAL-WIRE-001`, `UVM-VSEQ-001`, `UVM-TLM-001`, `UVM-TLM-004`, `UVM-OBS-002`
 
 ## MG-5.2 (Should)
 

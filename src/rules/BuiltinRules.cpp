@@ -19,6 +19,8 @@ std::unique_ptr<Rule> createUvmUnconnectedTlmPort();
 std::unique_ptr<Rule> createUvmSequencePrePostBodyMisuse();
 std::unique_ptr<Rule> createUvmPSequencerAbuse();
 std::unique_ptr<Rule> createObserverStateMutationInWrite();
+std::unique_ptr<Rule> createBlockingInObserver();
+std::unique_ptr<Rule> createGlobalFactoryOverridePollution();
 std::unique_ptr<Rule> createDirectRalMirrorTampering();
 
 // OOP rules
@@ -409,6 +411,8 @@ void registerBuiltinRules() {
     reg.registerRule(createUvmSequencePrePostBodyMisuse());
     reg.registerRule(createUvmPSequencerAbuse());
     reg.registerRule(createObserverStateMutationInWrite());
+    reg.registerRule(createBlockingInObserver());
+    reg.registerRule(createGlobalFactoryOverridePollution());
     reg.registerRule(createDirectRalMirrorTampering());
     reg.registerRule(createObjectionControlFlowMismatch());
     reg.registerRule(createConfigDbCrossComponentResolver());

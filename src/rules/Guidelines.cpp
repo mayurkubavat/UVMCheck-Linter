@@ -93,13 +93,15 @@ const std::vector<Entry>& entries() {
          {"UVM-RUS-006", "SV-BUG-004", "UVM-SEQ-008"}},
         {{"MG-4.5", "MG-4", kReuse, L::Shall,
           "Every reusable class is registered with the factory and created through it."},
-         {"UVM-FAC-001", "UVM-FAC-002", "UVM-FAC-003", "UVM-FAC-004", "UVM-STR-005", "UVM-SEQ-010"}},
+         {"UVM-FAC-001", "UVM-FAC-002", "UVM-FAC-003", "UVM-FAC-004", "UVM-STR-005", "UVM-SEQ-010",
+          "UVM-FAC-005"}},
 
         // MG-5 Design-pattern conformance
         {{"MG-5.1", "MG-5", kPatterns, L::Shall,
           "When a pattern's mechanism is used, all of its parts are present: callbacks are "
           "registered, adapters are complete, ports and sequencers are wired."},
-         {"UVM-PAT-001", "RAL-ADP-001", "RAL-WIRE-001", "UVM-VSEQ-001", "UVM-TLM-001", "UVM-TLM-004"}},
+         {"UVM-PAT-001", "RAL-ADP-001", "RAL-WIRE-001", "UVM-VSEQ-001", "UVM-TLM-001", "UVM-TLM-004",
+          "UVM-OBS-002"}},
         {{"MG-5.2", "MG-5", kPatterns, L::Should,
           "Behaviour varies through overrides, hooks and callbacks, not type switches or edits to "
           "the base class; overrides keep the base contract."},

@@ -83,4 +83,4 @@ Enforced by: `UVM-RUS-006`, `SV-BUG-004`, `UVM-SEQ-008`
 
 Only factory-created classes can be replaced by tests. Direct new() and missing registration remove that extension point.
 
-Enforced by: `UVM-FAC-001`, `UVM-FAC-002`, `UVM-FAC-003`, `UVM-FAC-004`, `UVM-STR-005`, `UVM-SEQ-010`
+Enforced by: `UVM-FAC-001`, `UVM-FAC-002`, `UVM-FAC-003`, `UVM-FAC-004`, `UVM-STR-005`, `UVM-SEQ-010`, `UVM-FAC-005`

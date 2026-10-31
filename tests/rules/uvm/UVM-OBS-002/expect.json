@@ -1,0 +1,6 @@
+{
+  "bad.sv": [
+    {"rule": "UVM-OBS-002", "line": 16},
+    {"rule": "UVM-OBS-002", "line": 36}
+  ]
+}

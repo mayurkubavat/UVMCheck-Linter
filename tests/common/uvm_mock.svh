@@ -453,6 +453,24 @@ class uvm_analysis_export#(type T=int) extends uvm_object;
     endfunction
 endclass
 
+// Analysis imp: forwards write() to its implementing component (body left empty in the stub).
+class uvm_analysis_imp#(type T=int, type IMP=int) extends uvm_object;
+    function new(string name, IMP imp);
+        super.new(name);
+    endfunction
+    function void write(T t);
+    endfunction
+endclass
+
+`define uvm_analysis_imp_decl(SFX) \
+class uvm_analysis_imp``SFX #(type T=int, type IMP=int) extends uvm_object; \
+    function new(string name, IMP imp); \
+        super.new(name); \
+    endfunction \
+    function void write(T t); \
+    endfunction \
+endclass
+
 class uvm_tlm_analysis_fifo#(type T=int) extends uvm_tlm_fifo#(T);
     uvm_analysis_export#(T) analysis_export;
     function new(string name = "", uvm_component parent = null);
