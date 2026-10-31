@@ -59,7 +59,23 @@ file(GLOB_RECURSE UVMCHECK_SOURCES
     src/lsp/*.cpp
 )
 
-add_library(libuvmcheck STATIC ${UVMCHECK_SOURCES})
+find_package(Python3 COMPONENTS Interpreter REQUIRED)
+# --explain data: each rule's tested bad/good example and its options, generated from
+# tests/rules/ and the rule sources so the examples shown are the ones the tests run.
+file(GLOB_RECURSE UVMCHECK_RULE_EXAMPLES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/tests/rules/*.sv)
+file(GLOB_RECURSE UVMCHECK_RULE_SOURCES CONFIGURE_DEPENDS
+    ${CMAKE_CURRENT_SOURCE_DIR}/src/rules/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/style/*.cpp)
+set(UVMCHECK_RULE_EXTRAS ${CMAKE_CURRENT_BINARY_DIR}/generated/RuleExtras.cpp)
+add_custom_command(
+    OUTPUT ${UVMCHECK_RULE_EXTRAS}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen_rule_extras.py
+            --repo ${CMAKE_CURRENT_SOURCE_DIR} --out ${UVMCHECK_RULE_EXTRAS}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/gen_rule_extras.py ${UVMCHECK_RULE_EXAMPLES} ${UVMCHECK_RULE_SOURCES}
+    COMMENT "Generating rule examples for --explain"
+    VERBATIM)
+
+add_library(libuvmcheck STATIC ${UVMCHECK_SOURCES} ${UVMCHECK_RULE_EXTRAS})
 target_include_directories(libuvmcheck PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
@@ -157,6 +173,11 @@ add_test(
 add_test(
     NAME testbench_map_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_map.py --binary $<TARGET_FILE:uvmcheck>
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME explain_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_explain.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(

@@ -15,11 +15,14 @@
 #include "uvmcheck/core/ProjectInit.h"
 #include "uvmcheck/core/ChangedLines.h"
 #include "uvmcheck/reporting/TestbenchMap.h"
+#include "uvmcheck/rules/RuleExtras.h"
 #include "uvmcheck/style/NamingEngine.h"
 #include "uvmcheck/engine/RuleEngine.h"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <cstdio>
+#include <unistd.h>
 #include <set>
 #include <unordered_set>
 #include <algorithm>
@@ -61,6 +64,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--engine", engineMode, "Rule execution engine: single-pass (default, parallel shared walk) or isolated (one walk per rule, sequential)", "<mode>");
     slangDriver.cmdLine.add("--waiver-report", waiverReport, "Report waiver and baseline hygiene: unused, ownerless and expired waivers, stale waiver comments, waived findings per rule and owner");
     slangDriver.cmdLine.add("--strict-waivers", strictWaivers, "Exit with status 4 when a waiver, waiver comment or baseline entry matched nothing, or a waiver has expired (implies --waiver-report)");
+    slangDriver.cmdLine.add("--explain", explainRule, "Explain a rule (ID or name): what it checks, the guidelines it enforces, its options, and a flagged and a fixed example", "<rule>");
     slangDriver.cmdLine.add("--map", mapOutputPath, "Write the testbench map: component tree, TLM connections and config_db flows with findings attached (HTML, or JSON for a .json path)", "<file>");
     slangDriver.cmdLine.add("--changed-since", changedSince, "Report only findings on lines added or changed since this git revision (and in untracked files): a new-code-is-clean gate without a baseline", "<git-ref>");
     slangDriver.cmdLine.add("--no-config", noConfig, "Do not look for a project configuration (tests, one-off checks)");
@@ -70,6 +74,82 @@ LinterDriver::LinterDriver() {
 
 bool LinterDriver::parseCommandLine(int argc, char** argv) {
     return slangDriver.parseCommandLine(argc, argv);
+}
+
+int LinterDriver::explain(const std::string& query) const {
+    // A rule, or a finding ID reported by one (naming / style conventions).
+    const rules::Rule* rule = nullptr;
+    const rules::SubRule* sub = nullptr;
+    std::vector<rules::SubRule> subs;
+    for (const auto& r : rules::RuleRegistry::instance().getRules()) {
+        if (r->getId() == query || r->getName() == query) {
+            rule = r.get();
+            break;
+        }
+    }
+    if (!rule) {
+        for (const auto& r : rules::RuleRegistry::instance().getRules()) {
+            subs = r->getSubRules();
+            for (const auto& s : subs) {
+                if (s.id == query) {
+                    rule = r.get();
+                    sub = &s;
+                    break;
+                }
+            }
+            if (rule) break;
+        }
+    }
+    if (!rule) {
+        std::cerr << "Error: unknown rule '" << query << "' (see --list-rules)\n";
+        return 2;
+    }
+    const std::string id = sub ? sub->id : std::string(rule->getId());
+    const bool tty = isatty(fileno(stdout));
+    std::cout << (tty ? "\033[1m" : "") << id << "  " << (sub ? sub->name : std::string(rule->getName()))
+              << (tty ? "\033[0m" : "") << "  ["
+              << rule->getCategory() << ", " << severityToString(sub ? sub->severity : rule->getDefaultSeverity())
+              << "]\n\n" << (sub ? sub->description : std::string(rule->getDescription())) << "\n";
+    if (sub) std::cout << "\nReported by " << rule->getId() << " (" << rule->getName() << ").\n";
+
+    auto guidelines = rules::guidelinesForRule(id);
+    if (guidelines.empty() && sub) guidelines = rules::guidelinesForRule(rule->getId());
+    if (!guidelines.empty()) {
+        std::cout << "\nMethodology guidelines:\n";
+        for (auto g : guidelines) {
+            if (const auto* gl = rules::findGuideline(g)) {
+                std::cout << "  " << gl->id << " (" << rules::levelName(gl->level) << ") " << gl->statement << "\n";
+            }
+        }
+    }
+
+    const auto* extra = rules::findRuleExtra(id);
+    if (!extra && sub) extra = rules::findRuleExtra(rule->getId());
+    if (extra && !extra->options.empty()) {
+        std::cout << "\nOptions, set in .uvmcheck/config.py:\n    class " << rule->getName() << "(RuleConfig):\n";
+        for (const auto& o : extra->options) {
+            std::cout << "        " << o.key << " = " << o.defaultValue << "    # default\n";
+        }
+    }
+    auto show = [](std::string_view title, std::string_view where, std::string_view text) {
+        if (text.empty()) return;
+        std::cout << "\n" << title << " (" << where << "):\n";
+        size_t lines = 0, pos = 0;
+        while (pos < text.size() && lines < 60) {
+            size_t end = text.find('\n', pos);
+            std::cout << "    " << text.substr(pos, end == std::string_view::npos ? std::string_view::npos : end - pos) << "\n";
+            if (end == std::string_view::npos) break;
+            pos = end + 1;
+            ++lines;
+        }
+        if (pos < text.size() && lines == 60) std::cout << "    ...\n";
+    };
+    if (extra) {
+        show("Flagged", std::string(extra->testDir) + "/bad.sv", extra->badExample);
+        show("Not flagged", std::string(extra->testDir) + "/good.sv", extra->goodExample);
+    }
+    std::cout << "\nWaive one finding with  // uvmcheck:waive " << id << " -- <reason>  on the flagged line.\n";
+    return 0;
 }
 
 bool LinterDriver::loadProjectConfig() {
@@ -150,6 +230,10 @@ int LinterDriver::run() {
         ConfigManager::instance().dumpDefaultConfig(out);
         std::cout << "[uvmcheck] Default configuration template written to: " << *dumpConfigPath << "\n";
         return 0;
+    }
+
+    if (explainRule.has_value()) {
+        return explain(*explainRule);
     }
 
     if (listRules.value_or(false)) {

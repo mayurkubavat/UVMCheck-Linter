@@ -183,6 +183,12 @@ Verification teams can author custom corporate or project verification checks in
 ```
 See [Python Rule SDK Documentation](docs/python_rule_sdk.md) for full API reference, context query helpers, and tutorials.
 
+### Explain a rule
+`--explain SV-DUP-002` (ID or name) prints what the rule checks, the methodology guidelines
+it enforces, the options it reads with their defaults, and a flagged and a fixed example.
+The examples are the rule's regression tests (`tests/rules/<category>/<ID>/`), compiled into
+the binary at build time, so they always match what the rule does.
+
 ### Testbench map
 `--map tb_map.html` draws the testbench as the linter sees it: the component tree from the
 test down (which class creates which), each component's TLM ports and `connect()` calls,

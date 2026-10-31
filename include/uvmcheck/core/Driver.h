@@ -18,6 +18,7 @@ public:
     int run();
 
 private:
+    int explain(const std::string& rule) const;
     slang::driver::Driver slangDriver;
     std::optional<bool> showHelp;
     std::optional<bool> showVersion;
@@ -39,6 +40,7 @@ private:
     std::optional<bool> noConfig;
     std::optional<std::string> changedSince;
     std::optional<std::string> mapOutputPath;
+    std::optional<std::string> explainRule;
     std::optional<bool> waiverReport;
     std::optional<bool> strictWaivers;
     std::vector<std::string> libraryPathArgs;
