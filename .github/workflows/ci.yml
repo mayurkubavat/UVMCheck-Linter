@@ -78,11 +78,12 @@ jobs:
         if: matrix.lsp
         run: python3 tests/test_lsp.py
 
-      - name: Catalog, config, guide, history and engine checks
+      - name: Catalog, config, baseline, guide, history and engine checks
         if: matrix.tools
         run: |
           python3 tests/test_catalog.py --binary build/uvmcheck
           python3 tests/test_config.py --binary build/uvmcheck
+          python3 tests/test_baseline.py --binary build/uvmcheck
           python3 tests/test_guidelines.py --binary build/uvmcheck
           python3 tests/test_history.py --binary build/uvmcheck
           python3 tests/engine_equivalence.py --binary build/uvmcheck

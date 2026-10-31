@@ -233,6 +233,16 @@ Establish a zero-new-defects baseline without fixing thousands of pre-existing l
 ./build/uvmcheck tb/*.sv
 ```
 
+Baseline entries are matched by a fingerprint of the rule, the file's path relative to the
+project root (the folder holding `.uvmcheck/`) and the text of the flagged line, so adding or
+removing lines elsewhere in a file, or checking the project out somewhere else, does not
+bring old findings back. Editing the flagged line does: that finding is treated as touched
+and must be fixed or re-baselined. Entries that no longer match anything are reported so the
+baseline only shrinks; `--update-baseline` drops them.
+
+Inline waivers go on the flagged line (`// uvmcheck:waive SV-COR-008 reason`) or on the line
+above it (`// uvmcheck-disable-next-line SV-COR-008`).
+
 ### Waivers Configuration
 Document approved exceptions in `.uvmcheck/waivers.json` (auto-discovered) or in your `config.py`:
 ```json

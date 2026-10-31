@@ -336,6 +336,15 @@ int LinterDriver::run() {
 
     // Process Waivers and Baseline
     waivers::WaiverEngine waiverEngine(slangDriver.sourceManager);
+    {
+        // Baseline paths are relative to the project root: the folder that holds .uvmcheck/
+        // (or the loaded config file), else the working directory.
+        fs::path cfg = ConfigManager::instance().getLoadedConfigPath();
+        if (!cfg.empty()) {
+            fs::path dir = fs::absolute(cfg).parent_path();
+            waiverEngine.setProjectRoot(dir.filename() == ".uvmcheck" ? dir.parent_path() : dir);
+        }
+    }
     for (const auto& cw : ConfigManager::instance().getWaivers()) {
         waivers::ExternalWaiver w;
         w.ruleId = cw.ruleId;
@@ -357,7 +366,7 @@ int LinterDriver::run() {
 
     if (!waiversPathToLoad.empty()) {
         if (!waiverEngine.loadWaivers(waiversPathToLoad)) {
-            std::cerr << "Warning: Could not open waiver file: " << waiversPathToLoad << "\n";
+            std::cerr << "Warning: Could not load waiver file: " << waiverEngine.getLastError() << "\n";
         } else {
             info << "[uvmcheck] Loaded external waivers from " << waiversPathToLoad << "\n";
         }
@@ -375,7 +384,7 @@ int LinterDriver::run() {
 
     if (!baselinePathToLoad.empty()) {
         if (!waiverEngine.loadBaseline(baselinePathToLoad)) {
-            std::cerr << "Warning: Could not open baseline file: " << baselinePathToLoad << "\n";
+            std::cerr << "Warning: Could not load baseline file: " << waiverEngine.getLastError() << "\n";
         } else {
             info << "[uvmcheck] Loaded baseline from " << baselinePathToLoad << "\n";
         }
@@ -398,6 +407,11 @@ int LinterDriver::run() {
     // Filter violations (applies inline waivers + external waivers + baseline suppressions)
     auto activeViolations = waiverEngine.filter(diags.getViolations());
     size_t waivedCount = waiverEngine.getWaivedCount();
+    if (size_t stale = waiverEngine.getStaleBaselineCount(); stale > 0 && !baselineOutputPath.has_value()) {
+        info << "[uvmcheck] " << stale << " baseline entr" << (stale == 1 ? "y" : "ies")
+             << " matched no finding (fixed, or the flagged line changed); "
+                "run with --update-baseline to drop them\n";
+    }
 
     // Replace violations with active ones
     diags.getViolations() = std::move(activeViolations);
