@@ -58,8 +58,18 @@ static void writeReport(std::ostream& os,
            << "\"severity\": \"" << core::severityToString(v.severity) << "\", "
            << "\"file\": \"" << escapeJson(v.filePath) << "\", "
            << "\"line\": " << v.line << ", "
-           << "\"column\": " << v.column << ", "
-           << "\"message\": \"" << escapeJson(v.message) << "\"";
+           << "\"column\": " << v.column << ", ";
+        if (v.endColumn > v.column) os << "\"endColumn\": " << v.endColumn << ", ";
+        os << "\"message\": \"" << escapeJson(v.message) << "\"";
+        if (!v.related.empty()) {
+            os << ", \"related\": [";
+            for (size_t r = 0; r < v.related.size(); ++r) {
+                const auto& rl = v.related[r];
+                os << (r ? ", " : "") << "{\"file\": \"" << escapeJson(rl.filePath) << "\", \"line\": " << rl.line
+                   << ", \"column\": " << rl.column << ", \"message\": \"" << escapeJson(rl.message) << "\"}";
+            }
+            os << "]";
+        }
         auto guidelines = rules::guidelinesForRule(v.ruleId);
         if (!guidelines.empty()) os << ", \"guidelines\": " << jsonList(guidelines);
         os << "}";

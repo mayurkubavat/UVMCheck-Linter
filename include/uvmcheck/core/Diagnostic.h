@@ -31,6 +31,15 @@ struct FixItHint {
     std::string description;
 };
 
+/// Another place that explains a finding: the first copy of a clone, the
+/// base-class member being shadowed, the declaration a use refers to.
+struct RelatedLocation {
+    std::string filePath;
+    size_t line = 0;
+    size_t column = 0;
+    std::string message;
+};
+
 struct Violation {
     std::string ruleId;
     std::string ruleName;
@@ -39,8 +48,12 @@ struct Violation {
     std::string filePath;
     size_t line = 0;
     size_t column = 0;
+    /// One past the last column of the flagged text on `line` (0 = unknown).
+    /// Defaults to the end of the identifier or token at `column`.
+    size_t endColumn = 0;
     std::string snippet;
     std::vector<FixItHint> fixIts;
+    std::vector<RelatedLocation> related;
 };
 
 class ProjectConfig;
@@ -59,12 +72,30 @@ public:
     /// suppression counts to ours. Used to merge per-rule engines.
     void absorb(DiagnosticEngine& other);
 
-    void addViolation(std::string_view ruleId,
-                      std::string_view ruleName,
-                      std::string_view message,
-                      Severity severity,
-                      slang::SourceLocation loc,
-                      std::vector<FixItHint> fixIts = {});
+    /// Records a finding. Returns it so the caller can attach related
+    /// locations or a range, or nullptr when project policy dropped it. The
+    /// pointer is valid until the next finding is added.
+    Violation* addViolation(std::string_view ruleId,
+                            std::string_view ruleName,
+                            std::string_view message,
+                            Severity severity,
+                            slang::SourceLocation loc,
+                            std::vector<FixItHint> fixIts = {});
+
+    /// Same, with the full extent of the flagged code (end kept when it is on
+    /// the start line) and related locations.
+    Violation* addViolation(std::string_view ruleId,
+                            std::string_view ruleName,
+                            std::string_view message,
+                            Severity severity,
+                            slang::SourceRange range,
+                            std::vector<std::pair<slang::SourceLocation, std::string>> related,
+                            std::vector<FixItHint> fixIts = {});
+
+    /// Attaches a related location to a finding (no-op on nullptr or an invalid location).
+    void addRelated(Violation* v, slang::SourceLocation loc, std::string message) const;
+    /// Sets the finding's end column from a range ending on its start line.
+    void setRange(Violation* v, slang::SourceRange range) const;
 
     void addDirectViolation(std::string_view ruleId,
                             std::string_view ruleName,

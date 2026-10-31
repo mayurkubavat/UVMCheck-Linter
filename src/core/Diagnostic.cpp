@@ -1,3 +1,4 @@
+#include <cctype>
 #include "uvmcheck/core/Diagnostic.h"
 #include "uvmcheck/core/ProjectConfig.h"
 
@@ -50,7 +51,7 @@ bool DiagnosticEngine::applyProjectPolicy(std::string_view ruleId, std::string_v
     return false;
 }
 
-void DiagnosticEngine::addViolation(std::string_view ruleId,
+Violation* DiagnosticEngine::addViolation(std::string_view ruleId,
                                     std::string_view ruleName,
                                     std::string_view message,
                                     Severity severity,
@@ -60,12 +61,12 @@ void DiagnosticEngine::addViolation(std::string_view ruleId,
     std::string_view originFile;
     if (loc.valid()) {
         fileName = sourceManager.getFileName(loc);
-        if (isMockLibrary(fileName)) return;
+        if (isMockLibrary(fileName)) return nullptr;
         if (projectConfig && sourceManager.isMacroLoc(loc)) {
             originFile = sourceManager.getFileName(sourceManager.getFullyOriginalLoc(loc));
         }
     }
-    if (applyProjectPolicy(ruleId, fileName, originFile, severity)) return;
+    if (applyProjectPolicy(ruleId, fileName, originFile, severity)) return nullptr;
 
     Violation v;
     v.ruleId = ruleId;
@@ -79,9 +80,55 @@ void DiagnosticEngine::addViolation(std::string_view ruleId,
         v.line = sourceManager.getLineNumber(loc);
         v.column = sourceManager.getColumnNumber(loc);
         v.snippet = std::string(sourceManager.getSourceLine(loc));
+        // Default extent: the identifier (or single token character) at the column.
+        size_t end = v.column > 0 ? v.column - 1 : 0;
+        if (end < v.snippet.size()) {
+            auto ident = [](char c) {
+                return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '$' || c == '`';
+            };
+            size_t start = end;
+            while (end < v.snippet.size() && ident(v.snippet[end])) ++end;
+            if (end == start) ++end;
+            v.endColumn = end + 1;
+        }
     }
 
     violations.push_back(std::move(v));
+    return &violations.back();
+}
+
+Violation* DiagnosticEngine::addViolation(std::string_view ruleId,
+                                          std::string_view ruleName,
+                                          std::string_view message,
+                                          Severity severity,
+                                          slang::SourceRange range,
+                                          std::vector<std::pair<slang::SourceLocation, std::string>> related,
+                                          std::vector<FixItHint> fixIts) {
+    Violation* v = addViolation(ruleId, ruleName, message, severity, range.start(), std::move(fixIts));
+    setRange(v, range);
+    for (auto& [loc, msg] : related) addRelated(v, loc, std::move(msg));
+    return v;
+}
+
+void DiagnosticEngine::setRange(Violation* v, slang::SourceRange range) const {
+    if (!v || !range.start().valid() || !range.end().valid()) return;
+    auto start = sourceManager.getFullyOriginalLoc(range.start());
+    auto end = sourceManager.getFullyOriginalLoc(range.end());
+    if (start.buffer() != end.buffer() || end.offset() <= start.offset()) return;
+    if (sourceManager.getLineNumber(end) != v->line) return;
+    size_t col = sourceManager.getColumnNumber(end);
+    if (col > v->column) v->endColumn = col;
+}
+
+void DiagnosticEngine::addRelated(Violation* v, slang::SourceLocation loc, std::string message) const {
+    if (!v || !loc.valid()) return;
+    loc = sourceManager.getFullyOriginalLoc(loc);
+    RelatedLocation r;
+    r.filePath = std::string(sourceManager.getFileName(loc));
+    r.line = sourceManager.getLineNumber(loc);
+    r.column = sourceManager.getColumnNumber(loc);
+    r.message = std::move(message);
+    v->related.push_back(std::move(r));
 }
 
 void DiagnosticEngine::addDirectViolation(std::string_view ruleId,
@@ -136,7 +183,13 @@ void DiagnosticEngine::printSummary(std::ostream& os) const {
             os << "    " << dim << v.snippet << reset << "\n";
             os << "    " << color;
             for (size_t i = 1; i < v.column; ++i) os << " ";
-            os << "^" << reset << "\n";
+            os << "^";
+            for (size_t i = v.column + 1; i < v.endColumn; ++i) os << "~";
+            os << reset << "\n";
+        }
+        for (const auto& r : v.related) {
+            os << "    " << dim << "note: " << r.filePath << ":" << r.line << ":" << r.column << ": "
+               << r.message << reset << "\n";
         }
     }
 

@@ -82,12 +82,26 @@ bool SarifReporter::writeSarif(const std::string& outputPath,
              << "                \"artifactLocation\": { \"uri\": \"" << escapeJson(v.filePath) << "\" },\n"
              << "                \"region\": {\n"
              << "                  \"startLine\": " << v.line << ",\n"
-             << "                  \"startColumn\": " << v.column << "\n"
+             << "                  \"startColumn\": " << v.column;
+        if (v.endColumn > v.column) file << ",\n                  \"endColumn\": " << v.endColumn;
+        file << "\n"
              << "                }\n"
              << "              }\n"
              << "            }\n"
-             << "          ]\n"
-             << "        }" << (i + 1 < violations.size() ? "," : "") << "\n";
+             << "          ]";
+        if (!v.related.empty()) {
+            file << ",\n          \"relatedLocations\": [";
+            for (size_t r = 0; r < v.related.size(); ++r) {
+                const auto& rl = v.related[r];
+                file << (r ? "," : "") << "\n            { \"id\": " << r
+                     << ", \"message\": { \"text\": \"" << escapeJson(rl.message) << "\" }"
+                     << ", \"physicalLocation\": { \"artifactLocation\": { \"uri\": \"" << escapeJson(rl.filePath)
+                     << "\" }, \"region\": { \"startLine\": " << rl.line << ", \"startColumn\": " << rl.column
+                     << " } } }";
+            }
+            file << "\n          ]";
+        }
+        file << "\n        }" << (i + 1 < violations.size() ? "," : "") << "\n";
     }
 
     file << "      ]\n"

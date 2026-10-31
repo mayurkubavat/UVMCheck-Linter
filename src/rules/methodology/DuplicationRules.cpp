@@ -226,7 +226,7 @@ public:
             coveredUntil[b.list] = b.last;
             size_t tokens = windowTokens(lw, b.first, b.last).size();
             size_t count = b.last - b.first + 1;
-            diags.addViolation(
+            auto* v = diags.addViolation(
                 "SV-DUP-002", "CloneFragments",
                 std::to_string(count) + " statements (" + std::to_string(tokens) + " tokens) in '" +
                     routineName(*lw.routine) + "' repeat code in '" + routineName(*lo.routine) + "' (" +
@@ -234,6 +234,8 @@ public:
                     "literals. A fix in one copy will be missed in the other; move the shared steps "
                     "into a helper routine or a common base class.",
                 core::Severity::Warning, swe::locOf(*lw.stmts[b.first].stmt));
+            diags.addRelated(v, swe::locOf(*lo.stmts[a.first].stmt), "first copy, in '" + routineName(*lo.routine) + "'");
+            diags.setRange(v, lw.stmts[b.first].stmt->sourceRange);
         }
     }
 };
@@ -282,7 +284,7 @@ public:
                     }
                 }
                 if (match) {
-                    diags.addViolation(
+                    auto* v = diags.addViolation(
                         "SV-DUP-003", "DuplicatedConstraint",
                         "Constraint '" + std::string(member.name) + "' in '" + std::string(meth::plainName(*cls)) +
                             "' repeats constraint '" + std::string(match->constraint->name) + "' of '" +
@@ -291,6 +293,8 @@ public:
                             "class both extend or in a shared constraint policy, so a change reaches "
                             "both.",
                         core::Severity::Warning, member.location);
+                    diags.addRelated(v, match->constraint->location,
+                                     "first copy, in '" + std::string(meth::plainName(*match->cls)) + "'");
                 } else {
                     firsts.push_back({cls, &member});
                 }
@@ -402,13 +406,14 @@ public:
             if (locs.size() < minCount) continue;
             std::set<std::string> files;
             for (auto loc : locs) files.insert(std::string(sm->getRawFileName(loc.buffer())));
-            diags.addViolation(
+            auto* v = diags.addViolation(
                 "SV-DUP-004", "RepeatedStringLiteral",
                 "The string \"" + value + "\" is written " + std::to_string(locs.size()) + " times in " +
                     std::to_string(files.size()) + (files.size() == 1 ? " file" : " files") +
                     ". Declare it once as a localparam string or static const in the package, so a "
                     "change or a typo cannot split the copies.",
                 core::Severity::Info, locs.front());
+            for (size_t k = 1; k < locs.size() && k <= 20; ++k) diags.addRelated(v, locs[k], "also written here");
         }
     }
 };
@@ -483,7 +488,7 @@ public:
                                       std::back_inserter(common));
                 size_t largest = std::max(classCount[a], classCount[b]);
                 if (common.size() < minClasses || int64_t(common.size() * 100) < minPercent * int64_t(largest)) continue;
-                diags.addViolation(
+                auto* v = diags.addViolation(
                     "SV-DUP-005", "CopiedAgentPackage",
                     "Package '" + std::string(b->name) + "' matches '" + std::string(a->name) + "' (" +
                         where(comp, a->location) + ") in " + std::to_string(common.size()) + " of " +
@@ -491,6 +496,7 @@ public:
                         "agent; make one parameterized agent, or a shared base with small subclasses, "
                         "so a fix lands in both.",
                     core::Severity::Info, b->location);
+                diags.addRelated(v, a->location, "package '" + std::string(a->name) + "'");
                 break;
             }
         }

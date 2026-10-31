@@ -85,7 +85,7 @@ public:
                 if (it != knownBodies.end()) {
                     // Avoid reporting duplicate against itself in the same class
                     if (it->second.className != cls->name) {
-                        diags.addViolation(
+                        auto* v = diags.addViolation(
                             "SV-DUP-001",
                             "DuplicateMethodBody",
                             "Subroutine '" + std::string(sub.name) + "' in class '" + std::string(cls->name) +
@@ -95,6 +95,8 @@ public:
                             core::Severity::Warning,
                             sub.location
                         );
+                        diags.addRelated(v, it->second.location, "first copy, " + it->second.className +
+                                         "::" + it->second.methodName);
                     }
                 } else {
                     knownBodies[normalized] = MethodOrigin{

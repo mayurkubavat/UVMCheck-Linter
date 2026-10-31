@@ -18,11 +18,18 @@ struct LspFix {
     LspEdit edit;
 };
 
+struct LspRelated {
+    std::string uri;
+    int line = 0, character = 0;
+    std::string message;
+};
+
 struct LspDiagnostic {
     int line = 0, startChar = 0, endChar = 0; // 0-based, single-line range
     int severity = 2;                         // 1 error, 2 warning, 3 information
     std::string code, ruleName, message;
     std::vector<LspFix> fixes;
+    std::vector<LspRelated> related;
 };
 
 /// Language server. Each lint compiles the project the way the CLI does

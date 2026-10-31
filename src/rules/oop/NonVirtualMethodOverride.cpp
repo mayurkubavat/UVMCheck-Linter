@@ -38,7 +38,7 @@ public:
                         if (baseMethod.flags.has(slang::ast::MethodFlags::BuiltIn)) break;
 
                         if (!baseMethod.isVirtual()) {
-                            diags.addViolation(
+                            auto* v = diags.addViolation(
                                 "SV-OOP-001",
                                 "NonVirtualMethodOverride",
                                 "Method '" + std::string(sub.name) + "' in class '" +
@@ -47,6 +47,8 @@ public:
                                 core::Severity::Warning,
                                 sub.location
                             );
+                            diags.addRelated(v, baseMethod.location, "non-virtual method in '" +
+                                             std::string(ancClass.name) + "'");
                         }
                         break; // Stop after finding immediate ancestor definition
                     }

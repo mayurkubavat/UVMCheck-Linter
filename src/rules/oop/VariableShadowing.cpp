@@ -34,7 +34,7 @@ public:
                             const auto& baseClass = base->as<slang::ast::ClassType>();
                             const auto* shadow = baseClass.find(prop.name);
                             if (shadow && shadow->kind == slang::ast::SymbolKind::ClassProperty) {
-                                diags.addViolation(
+                                auto* v = diags.addViolation(
                                     "SV-OOP-004",
                                     "VariableShadowing",
                                     "Class property '" + std::string(prop.name) + "' in derived class '" +
@@ -43,6 +43,8 @@ public:
                                     core::Severity::Warning,
                                     prop.location
                                 );
+                                diags.addRelated(v, shadow->location, "shadowed property in '" +
+                                                 std::string(baseClass.name) + "'");
                                 break;
                             }
                             base = baseClass.getBaseClass();
@@ -61,7 +63,7 @@ public:
                         for (const auto* arg : sub.getArguments()) {
                             const auto* classProp = cls->find(arg->name);
                             if (classProp && classProp->kind == slang::ast::SymbolKind::ClassProperty) {
-                                diags.addViolation(
+                                auto* v = diags.addViolation(
                                     "SV-OOP-004",
                                     "VariableShadowing",
                                     "Method argument '" + std::string(arg->name) + "' in method '" +
@@ -71,6 +73,7 @@ public:
                                     core::Severity::Warning,
                                     arg->location
                                 );
+                                diags.addRelated(v, classProp->location, "class property");
                             }
                         }
                     }

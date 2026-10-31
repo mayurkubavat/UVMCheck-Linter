@@ -100,10 +100,6 @@ std::string rangeJson(int sl, int sc, int el, int ec) {
     return ss.str();
 }
 
-bool isIdentChar(char c) {
-    return std::isalnum(static_cast<unsigned char>(c)) || c == '_' || c == '$' || c == '`';
-}
-
 /// Line `line` (0-based) of `text`.
 std::string_view lineOf(std::string_view text, int line) {
     size_t pos = 0;
@@ -377,15 +373,17 @@ std::map<std::string, std::vector<LspDiagnostic>> LspServer::lintOpenDocuments()
         LspDiagnostic d;
         d.line = v.line > 0 ? static_cast<int>(v.line) - 1 : 0;
         d.startChar = v.column > 0 ? static_cast<int>(v.column) - 1 : 0;
-        size_t end = static_cast<size_t>(d.startChar);
-        while (end < v.snippet.size() && isIdentChar(v.snippet[end])) ++end;
-        if (end == static_cast<size_t>(d.startChar)) end = std::min(v.snippet.size(), end + 1);
-        d.endChar = std::max(static_cast<int>(end), d.startChar + 1);
+        d.endChar = v.endColumn > v.column ? static_cast<int>(v.endColumn) - 1 : d.startChar + 1;
         d.severity = v.severity == core::Severity::Error ? 1 : v.severity == core::Severity::Info ? 3 : 2;
         d.code = v.ruleId;
         d.ruleName = v.ruleName;
         d.message = v.message;
 
+        for (const auto& r : v.related) {
+            if (r.filePath.empty() || r.line == 0) continue;
+            d.related.push_back({pathToUri(canonical(r.filePath)), static_cast<int>(r.line) - 1,
+                                 r.column > 0 ? static_cast<int>(r.column) - 1 : 0, r.message});
+        }
         for (const auto& fix : v.fixIts) {
             auto s = fix.range.start(), e = fix.range.end();
             if (!s.valid() || !e.valid() || sm.isMacroLoc(s) || sm.isMacroLoc(e)) continue;
@@ -417,7 +415,18 @@ void LspServer::publishDiagnostics(const std::string& uri, const std::vector<Lsp
         const auto& d = diags[i];
         ss << (i ? "," : "") << "{\"range\":" << rangeJson(d.line, d.startChar, d.line, d.endChar)
            << ",\"severity\":" << d.severity << ",\"code\":" << quote(d.code)
-           << ",\"source\":\"uvmcheck\",\"message\":" << quote(d.message) << "}";
+           << ",\"source\":\"uvmcheck\",\"message\":" << quote(d.message);
+        if (!d.related.empty()) {
+            ss << ",\"relatedInformation\":[";
+            for (size_t r = 0; r < d.related.size(); ++r) {
+                const auto& rl = d.related[r];
+                ss << (r ? "," : "") << "{\"location\":{\"uri\":" << quote(rl.uri) << ",\"range\":"
+                   << rangeJson(rl.line, rl.character, rl.line, rl.character) << "},\"message\":"
+                   << quote(rl.message) << "}";
+            }
+            ss << "]";
+        }
+        ss << "}";
     }
     ss << "]}}";
     sendMessage(ss.str());

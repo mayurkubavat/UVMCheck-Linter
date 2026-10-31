@@ -122,6 +122,18 @@ std::unique_ptr<Rule> createYourRule() { return std::make_unique<uvm::YourRule>(
 UVMCHECK_REGISTER_RULE(uvmcheck::rules::createYourRule)
 ```
 
+When a finding has a second half, say where it is. `addViolation` returns the
+finding (or `nullptr` if project policy dropped it); attach related locations
+and the full extent of the flagged code to it. They reach the console
+(`note:` lines), JSON (`endColumn`, `related`), SARIF (`relatedLocations`) and
+the editor:
+
+```cpp
+auto* v = diags.addViolation(getId(), getName(), msg, severity, copy.location);
+diags.addRelated(v, original.location, "first copy, in 'my_driver'");
+diags.setRange(v, stmt.sourceRange); // optional; defaults to the identifier at the location
+```
+
 `getCategory()` must return one of the categories in `ruleCategories()` (`uvmcheck/rules/Rule.h`);
 the category also sets the rule's default presets.
 
