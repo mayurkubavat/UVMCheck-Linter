@@ -183,6 +183,13 @@ Verification teams can author custom corporate or project verification checks in
 ```
 See [Python Rule SDK Documentation](docs/python_rule_sdk.md) for full API reference, context query helpers, and tutorials.
 
+### Testbench map
+`--map tb_map.html` draws the testbench as the linter sees it: the component tree from the
+test down (which class creates which), each component's TLM ports and `connect()` calls,
+and the config_db fields set and read, with ports that are never connected, gets without a
+set and sets nobody reads marked. Findings are attached to the component class they fall
+in. Use a `.json` path for the same data in machine-readable form.
+
 ### Language Server Protocol (LSP) & IDE Integration
 Run UVMCheck as an in-editor daemon for live, incremental linting in VS Code and Cursor:
 ```bash

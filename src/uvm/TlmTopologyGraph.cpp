@@ -25,19 +25,22 @@ public:
 
     void handle(const slang::ast::CallExpression& expr) {
         if (expr.getSubroutineName() == "connect" && expr.syntax) {
-            std::string text(expr.syntax->toString());
-            auto args = expr.arguments();
-            std::string arg0Text;
-            if (!args.empty() && args[0] && args[0]->syntax) {
-                arg0Text = std::string(args[0]->syntax->toString());
+            // "a.b.port.connect(c.imp)" -> source "a.b.port", target "c.imp".
+            std::string text = rules::swe::normalizedText(expr.syntax);
+            std::string source = text, target;
+            if (size_t at = text.rfind(".connect"); at != std::string::npos) {
+                source = text.substr(0, at);
+                size_t open = text.find('(', at), close = text.rfind(')');
+                if (open != std::string::npos && close != std::string::npos && close > open)
+                    target = text.substr(open + 1, close - open - 1);
             }
-
-            connections.push_back({
-                currentClass,
-                text,
-                arg0Text,
-                expr.sourceRange.start()
-            });
+            auto trim = [](std::string& x) {
+                while (!x.empty() && x.front() == ' ') x.erase(0, 1);
+                while (!x.empty() && x.back() == ' ') x.pop_back();
+            };
+            trim(source);
+            trim(target);
+            connections.push_back({currentClass, source, target, expr.sourceRange.start()});
         }
         visitDefault(expr);
     }

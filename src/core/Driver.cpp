@@ -14,6 +14,7 @@
 #include "uvmcheck/core/ProjectSources.h"
 #include "uvmcheck/core/ProjectInit.h"
 #include "uvmcheck/core/ChangedLines.h"
+#include "uvmcheck/reporting/TestbenchMap.h"
 #include "uvmcheck/style/NamingEngine.h"
 #include "uvmcheck/engine/RuleEngine.h"
 #include <iostream>
@@ -60,6 +61,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--engine", engineMode, "Rule execution engine: single-pass (default, parallel shared walk) or isolated (one walk per rule, sequential)", "<mode>");
     slangDriver.cmdLine.add("--waiver-report", waiverReport, "Report waiver and baseline hygiene: unused, ownerless and expired waivers, stale waiver comments, waived findings per rule and owner");
     slangDriver.cmdLine.add("--strict-waivers", strictWaivers, "Exit with status 4 when a waiver, waiver comment or baseline entry matched nothing, or a waiver has expired (implies --waiver-report)");
+    slangDriver.cmdLine.add("--map", mapOutputPath, "Write the testbench map: component tree, TLM connections and config_db flows with findings attached (HTML, or JSON for a .json path)", "<file>");
     slangDriver.cmdLine.add("--changed-since", changedSince, "Report only findings on lines added or changed since this git revision (and in untracked files): a new-code-is-clean gate without a baseline", "<git-ref>");
     slangDriver.cmdLine.add("--no-config", noConfig, "Do not look for a project configuration (tests, one-off checks)");
     slangDriver.cmdLine.add("--init", initProject, "Set up this folder: find the sources and UVM, learn the naming conventions the code already follows, and write .uvmcheck/config.py and a first baseline");
@@ -637,6 +639,14 @@ int LinterDriver::run() {
             std::cerr << "Error: Failed to write JSON report to: " << *jsonOutputPath << "\n";
         } else if (!jsonToStdout) {
             info << "[uvmcheck] JSON report written to: " << *jsonOutputPath << "\n";
+        }
+    }
+
+    if (mapOutputPath.has_value()) {
+        if (reporting::writeTestbenchMap(*mapOutputPath, *compilation, uvmModel, diags.getViolations())) {
+            info << "[uvmcheck] Testbench map written to: " << *mapOutputPath << "\n";
+        } else {
+            std::cerr << "Error: Failed to write testbench map to: " << *mapOutputPath << "\n";
         }
     }
 
