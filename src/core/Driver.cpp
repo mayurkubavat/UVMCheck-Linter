@@ -12,6 +12,8 @@
 #include "uvmcheck/plugins/PythonPluginManager.h"
 #include "uvmcheck/lsp/LspServer.h"
 #include "uvmcheck/core/ProjectSources.h"
+#include "uvmcheck/core/ProjectInit.h"
+#include "uvmcheck/style/NamingEngine.h"
 #include "uvmcheck/engine/RuleEngine.h"
 #include <iostream>
 #include <iomanip>
@@ -53,6 +55,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--history", useHistory, "Read git history for the change-based rules (SV-EVO-001 hotspots, SV-EVO-002 change coupling); off by default");
     slangDriver.cmdLine.add("--profile-rules", profileRules, "Print per-phase and per-rule execution times to stderr");
     slangDriver.cmdLine.add("--engine", engineMode, "Rule execution engine: single-pass (default, parallel shared walk) or isolated (one walk per rule, sequential)", "<mode>");
+    slangDriver.cmdLine.add("--init", initProject, "Set up this folder: find the sources and UVM, learn the naming conventions the code already follows, and write .uvmcheck/config.py and a first baseline");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
 }
 
@@ -180,16 +183,39 @@ int LinterDriver::run() {
         return 0;
     }
 
-    if (!loadProjectConfig()) {
-        return 2;
-    }
+    const bool initMode = initProject.value_or(false);
+    init::Discovery discovery;
+    if (initMode) {
+        // A fresh project: ignore any config further up the tree.
+        std::error_code ec;
+        for (const char* existing : {".uvmcheck/config.py", ".uvmcheck/config.json", "uvmcheck_config.py"}) {
+            if (fs::exists(existing, ec)) {
+                std::cerr << "Error: " << existing << " already exists; remove it to run --init again\n";
+                return 2;
+            }
+        }
+        const bool cliFiles = slangDriver.sourceLoader.hasFiles();
+        discovery = init::discover(".", cliFiles ? slangDriver.sourceLoader.getFilePaths()
+                                                 : std::vector<fs::path>{});
+        if (!cliFiles && !discovery.build.hasSources()) {
+            std::cerr << "Error: no SystemVerilog sources found under " << discovery.root.string() << "\n";
+            return 2;
+        }
+        std::cout << "[uvmcheck] init: " << discovery.svFiles << " SystemVerilog files; "
+                  << (discovery.filelistsRel.empty() ? std::to_string(discovery.sourcesRel.size()) + " top-level sources"
+                                                     : std::to_string(discovery.filelistsRel.size()) + " file list(s)")
+                  << "; " << discovery.uvmNote << "\n";
+        if (!applyBuildSettings(slangDriver, discovery.build, !cliFiles)) return 2;
+    } else {
+        if (!loadProjectConfig()) {
+            return 2;
+        }
 
-    if (runLsp.value_or(false)) {
-        lsp::LspServer server;
-        return server.run();
-    }
+        if (runLsp.value_or(false)) {
+            lsp::LspServer server;
+            return server.run();
+        }
 
-    {
         // Sources from the project config, when the command line names none.
         const auto& build = ConfigManager::instance().getProjectConfig().build();
         const bool useConfigSources = !slangDriver.sourceLoader.hasFiles() && build.hasSources();
@@ -226,6 +252,33 @@ int LinterDriver::run() {
 
     // Construct UVM knowledge model
     uvm::UvmModel uvmModel(*compilation);
+
+    std::vector<init::NamingChoice> learntNaming;
+    if (initMode) {
+        // Learn the naming conventions, write the config, then lint with it.
+        fs::path libraryDir;
+        if (!discovery.libraryRel.empty()) {
+            std::string expanded;
+            if (expandEnvVars(discovery.libraryRel.front(), expanded)) {
+                fs::path p(expanded);
+                libraryDir = (p.is_relative() ? discovery.root / p : p).lexically_normal();
+            }
+        }
+        learntNaming = init::inferNaming(uvmModel, ConfigManager::instance().getNamingEngine(), libraryDir);
+        std::error_code ec;
+        fs::create_directories(".uvmcheck", ec);
+        {
+            std::ofstream out(".uvmcheck/config.py");
+            out << init::renderConfig(discovery, learntNaming);
+            if (!out) {
+                std::cerr << "Error: cannot write .uvmcheck/config.py\n";
+                return 2;
+            }
+        }
+        configFilePath = ".uvmcheck/config.py";
+        if (!loadProjectConfig()) return 2;
+        if (!baselineOutputPath.has_value()) baselineOutputPath = ".uvmcheck/baseline.json";
+    }
     double elaborateSeconds = std::chrono::duration<double>(Clock::now() - elaborateStart).count();
 
     // Initialize diagnostic engine
@@ -506,6 +559,22 @@ int LinterDriver::run() {
         } else {
             std::cerr << "Error: Failed to write HTML report to: " << *htmlOutputPath << "\n";
         }
+    }
+
+    if (initMode) {
+        std::cout << "\n[uvmcheck] Wrote .uvmcheck/config.py";
+        if (learntNaming.empty()) {
+            std::cout << " (the default naming conventions already fit this code)";
+        }
+        std::cout << "\n";
+        for (const auto& n : learntNaming) {
+            std::cout << "  naming " << n.target << ": "
+                      << (n.disable ? "disabled" : "pattern " + n.pattern) << " (" << n.evidence << ")\n";
+        }
+        std::cout << "[uvmcheck] Existing findings are in the baseline " << *baselineOutputPath
+                  << "; from now on only new findings are reported.\n"
+                  << "Review the config, then run `uvmcheck` from this folder.\n";
+        return 0;
     }
 
     // Print summary

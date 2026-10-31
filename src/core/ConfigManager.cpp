@@ -151,9 +151,11 @@ void ConfigManager::applyNaming(const json::Value& namingBlock) {
             const auto* v = tBlock.find(key);
             return (v && v->isString()) ? v->asString() : std::string();
         };
-        if (auto s = getStr("prefix"); !s.empty()) spec.prefix = s;
-        if (auto s = getStr("suffix"); !s.empty()) spec.suffix = s;
-        if (auto s = getStr("pattern"); !s.empty()) spec.regexPattern = s;
+        // Present keys replace the default, even when empty ("suffix": "" drops it).
+        auto has = [&](const char* key) { const auto* v = tBlock.find(key); return v && v->isString(); };
+        if (has("prefix")) spec.prefix = getStr("prefix");
+        if (has("suffix")) spec.suffix = getStr("suffix");
+        if (has("pattern")) spec.regexPattern = getStr("pattern");
         if (auto s = getStr("casing"); !s.empty()) {
             if (s == "snake_case") spec.casing = style::CasingStyle::SnakeCase;
             else if (s == "PascalCase") spec.casing = style::CasingStyle::PascalCase;

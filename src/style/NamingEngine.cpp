@@ -154,6 +154,30 @@ bool NamingEngine::checkPattern(const NamingTargetSpec& spec, std::string_view n
     return true;
 }
 
+std::string NamingEngine::classTargetKind(const uvm::UvmModel& model, const slang::ast::ClassType& cls) {
+    std::string targetKind = "Class";
+    if (model.isDerivedFrom(cls, "uvm_driver")) {
+        targetKind = "UvmDriver";
+    } else if (model.isDerivedFrom(cls, "uvm_monitor")) {
+        targetKind = "UvmMonitor";
+    } else if (model.isDerivedFrom(cls, "uvm_sequencer")) {
+        targetKind = "UvmSequencer";
+    } else if (model.isDerivedFrom(cls, "uvm_sequence") || model.isDerivedFrom(cls, "uvm_sequence_base")) {
+        targetKind = "UvmSequence";
+    } else if (model.isDerivedFrom(cls, "uvm_sequence_item")) {
+        targetKind = "UvmSequenceItem";
+    } else if (model.isDerivedFrom(cls, "uvm_agent")) {
+        targetKind = "UvmAgent";
+    } else if (model.isDerivedFrom(cls, "uvm_env")) {
+        targetKind = "UvmEnv";
+    } else if (model.isDerivedFrom(cls, "uvm_test")) {
+        targetKind = "UvmTest";
+    } else if (model.isDerivedFrom(cls, "uvm_scoreboard")) {
+        targetKind = "UvmScoreboard";
+    }
+    return targetKind;
+}
+
 bool NamingEngine::validate(const std::string& targetKind,
                             std::string_view name,
                             std::string& outViolationReason,
@@ -495,26 +519,7 @@ void NamingEngine::run(slang::ast::Compilation& compilation,
         std::string className = std::string(cls->name);
 
         // Determine specific UVM classification
-        std::string targetKind = "Class";
-        if (uvmModel.isDerivedFrom(*cls, "uvm_driver")) {
-            targetKind = "UvmDriver";
-        } else if (uvmModel.isDerivedFrom(*cls, "uvm_monitor")) {
-            targetKind = "UvmMonitor";
-        } else if (uvmModel.isDerivedFrom(*cls, "uvm_sequencer")) {
-            targetKind = "UvmSequencer";
-        } else if (uvmModel.isDerivedFrom(*cls, "uvm_sequence") || uvmModel.isDerivedFrom(*cls, "uvm_sequence_base")) {
-            targetKind = "UvmSequence";
-        } else if (uvmModel.isDerivedFrom(*cls, "uvm_sequence_item")) {
-            targetKind = "UvmSequenceItem";
-        } else if (uvmModel.isDerivedFrom(*cls, "uvm_agent")) {
-            targetKind = "UvmAgent";
-        } else if (uvmModel.isDerivedFrom(*cls, "uvm_env")) {
-            targetKind = "UvmEnv";
-        } else if (uvmModel.isDerivedFrom(*cls, "uvm_test")) {
-            targetKind = "UvmTest";
-        } else if (uvmModel.isDerivedFrom(*cls, "uvm_scoreboard")) {
-            targetKind = "UvmScoreboard";
-        }
+        std::string targetKind = classTargetKind(uvmModel, *cls);
 
         std::string reason, suggested;
         if (!validate(targetKind, className, reason, suggested)) {

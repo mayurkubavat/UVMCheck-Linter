@@ -56,6 +56,9 @@ public:
              const uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) const;
 
+    /// Naming target kind for a class: "UvmDriver", "UvmMonitor", ... or "Class".
+    static std::string classTargetKind(const uvm::UvmModel& model, const slang::ast::ClassType& cls);
+
     /// Helper to test casing styles
     static bool isSnakeCase(std::string_view name);
     static bool isPascalCase(std::string_view name);

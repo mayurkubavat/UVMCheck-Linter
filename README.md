@@ -210,6 +210,13 @@ See [`editors/vscode/`](editors/vscode/) for the ready-to-use VS Code / Cursor e
 
 ## Project Configuration
 
+On an existing testbench, start with `uvmcheck --init` in its root folder. It
+finds the sources (or a `.f` file list) and the UVM library, learns the naming
+conventions your code already follows (for example drivers ending in `_bfm`
+rather than `_driver`), writes `.uvmcheck/config.py`, and records today's
+findings in `.uvmcheck/baseline.json` so the next run shows only new ones.
+Review the generated config; it is ordinary Python you can edit.
+
 Describe your project once in `.uvmcheck/config.py` or `uvmcheck_config.py` (auto-discovered from the working directory upward):
 
 ```python
