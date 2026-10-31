@@ -14,3 +14,4 @@ dependencies = []
 
 [project.scripts]
 uvmcheck-plugins = "uvmcheck.plugin_runner:main"
+uvmcheck-report = "uvmcheck.report:main"

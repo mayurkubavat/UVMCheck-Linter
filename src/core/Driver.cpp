@@ -776,8 +776,9 @@ int LinterDriver::run() {
 
     // Write JSON report if requested
     if (jsonOutputPath.has_value()) {
+        // Fingerprints let report tools match findings across runs (see A3).
         if (!reporting::JsonReporter::writeJson(*jsonOutputPath, diags.getViolations(), compileErrors, waivedCount,
-                                                   conformance)) {
+                                                   conformance, waiverEngine.fingerprints(diags.getViolations()))) {
             std::cerr << "Error: Failed to write JSON report to: " << *jsonOutputPath << "\n";
         } else if (!jsonToStdout) {
             info << "[uvmcheck] JSON report written to: " << *jsonOutputPath << "\n";

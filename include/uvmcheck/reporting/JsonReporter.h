@@ -21,7 +21,8 @@ public:
                           const std::vector<core::Violation>& violations,
                           size_t compileErrors,
                           size_t waivedCount,
-                          const std::vector<GuidelineResult>& conformance = {});
+                          const std::vector<GuidelineResult>& conformance = {},
+                          const std::vector<std::string>& fingerprints = {});
 
     /// The guide itself: every guideline with its level, statement and rules.
     static bool writeGuidelines(const std::string& outputPath);

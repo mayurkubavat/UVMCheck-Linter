@@ -1,5 +1,7 @@
 #include "uvmcheck/reporting/JsonReporter.h"
+#include "uvmcheck/rules/RuleRegistry.h"
 #include <algorithm>
+#include <unordered_map>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -41,7 +43,14 @@ static void writeReport(std::ostream& os,
                         const std::vector<core::Violation>& violations,
                         size_t compileErrors,
                         size_t waivedCount,
-                        const std::vector<GuidelineResult>& conformance) {
+                        const std::vector<GuidelineResult>& conformance,
+                        const std::vector<std::string>& fingerprints) {
+    // Category of each rule ID; sub-rules take their reporting rule's category.
+    std::unordered_map<std::string, std::string> categories;
+    for (const auto& r : rules::RuleRegistry::instance().getRules()) {
+        categories[std::string(r->getId())] = std::string(r->getCategory());
+        for (const auto& sub : r->getSubRules()) categories[sub.id] = std::string(r->getCategory());
+    }
     os << "{\n"
        << "  \"tool\": \"uvmcheck\",\n"
        << "  \"version\": \"0.1.0\",\n"
@@ -54,7 +63,10 @@ static void writeReport(std::ostream& os,
         os << (i == 0 ? "\n" : ",\n")
            << "    {"
            << "\"ruleId\": \"" << escapeJson(v.ruleId) << "\", "
-           << "\"ruleName\": \"" << escapeJson(v.ruleName) << "\", "
+           << "\"ruleName\": \"" << escapeJson(v.ruleName) << "\", ";
+        if (auto c = categories.find(v.ruleId); c != categories.end())
+            os << "\"category\": \"" << escapeJson(c->second) << "\", ";
+        os
            << "\"severity\": \"" << core::severityToString(v.severity) << "\", "
            << "\"file\": \"" << escapeJson(v.filePath) << "\", "
            << "\"line\": " << v.line << ", "
@@ -72,6 +84,7 @@ static void writeReport(std::ostream& os,
         }
         auto guidelines = rules::guidelinesForRule(v.ruleId);
         if (!guidelines.empty()) os << ", \"guidelines\": " << jsonList(guidelines);
+        if (i < fingerprints.size()) os << ", \"fingerprint\": \"" << escapeJson(fingerprints[i]) << "\"";
         os << "}";
     }
 
@@ -184,15 +197,16 @@ bool JsonReporter::writeJson(const std::string& outputPath,
                              const std::vector<core::Violation>& violations,
                              size_t compileErrors,
                              size_t waivedCount,
-                             const std::vector<GuidelineResult>& conformance) {
+                             const std::vector<GuidelineResult>& conformance,
+                             const std::vector<std::string>& fingerprints) {
     if (outputPath == "-") {
-        writeReport(std::cout, violations, compileErrors, waivedCount, conformance);
+        writeReport(std::cout, violations, compileErrors, waivedCount, conformance, fingerprints);
         return true;
     }
 
     std::ofstream file(outputPath);
     if (!file.is_open()) return false;
-    writeReport(file, violations, compileErrors, waivedCount, conformance);
+    writeReport(file, violations, compileErrors, waivedCount, conformance, fingerprints);
     return true;
 }
 

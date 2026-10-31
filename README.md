@@ -178,6 +178,15 @@ Fixes land in the file that holds the code, including included `.svh` files. Wai
 ./build/uvmcheck tb/*.sv --html report.html
 ```
 
+### Comparing and merging reports
+`--json` reports carry a fingerprint per finding that survives edits elsewhere in the file, so runs can be compared:
+```bash
+python3 -m uvmcheck.report diff  main.json branch.json --fail-on-new     # new and fixed findings
+python3 -m uvmcheck.report merge blk_a.json blk_b.json -o all.json       # one report from several jobs
+python3 -m uvmcheck.report trend w1.json w2.json w3.json -o trend.html   # burn-down by category, guideline, block, rule
+```
+Run them from `python/`, or `pip install ./python` and use `uvmcheck-report`. JSON findings also name their rule's `category`.
+
 ### Custom Python Rules Plugin SDK
 Verification teams can author custom corporate or project verification checks in pure Python without recompiling C++:
 ```bash
