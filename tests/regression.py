@@ -30,7 +30,8 @@ UVM library:
 
 Compile errors (from slang's --diag-json) are tracked as pseudo-findings named
 COMPILE:<code> in the all-rules baselines, so a test file that newly stops
-compiling fails the run. Some bad.sv files are illegal SystemVerilog on purpose
+compiling fails the run. The linter's own SV-CMP-* findings for the same
+diagnostics are left out of all-rules runs, except in the SV-CMP tests. Some bad.sv files are illegal SystemVerilog on purpose
 (the rule detects the illegal construct); others are broken because the stub or
 the file is incomplete. The baseline records both until the broken ones are fixed.
 """
@@ -127,6 +128,11 @@ class Linter:
 
         # Keep findings in the test file only; the real UVM library has thousands of its own.
         # Reported paths are relative to the linter's working directory.
+        # Compiler diagnostics (SV-CMP-*) are tracked as COMPILE:<code> below,
+        # so outside their own tests they are left out.
+        keep_cmp = bool(rule_id) or sv_file.parent.name.startswith("SV-CMP-")
+        report["violations"] = [v for v in report["violations"]
+                                if keep_cmp or not v["ruleId"].startswith("SV-CMP-")]
         findings = [(v["ruleId"], v["line"]) for v in report["violations"]
                     if v["file"] and (Path(self.workdir) / v["file"]).resolve() == sv_file]
         # The rule's findings in helper files next to the test, as (rule, "file:line").

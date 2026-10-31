@@ -136,6 +136,9 @@ Run or debug a specific rule against a source file in milliseconds:
 ./build/uvmcheck tb/my_scb.sv --rule ScoreboardLeftoverQueue
 ```
 
+### Compiler errors and warnings
+The compiler's own diagnostics are findings too: errors are `SV-CMP-001` and warnings `SV-CMP-002`. They appear in the console, JSON, SARIF, HTML and the editor, and can be waived or baselined like any other finding. `-W` options and `` `pragma diagnostic `` decide which warnings are reported and at what severity (`-Wno-redef-macro`, `-Werror=index-oob`). Disable the rules to get slang's plain diagnostic output back.
+
 ### Performance & Threading
 Rules run on a single-pass, parallel engine: most rules hand their visitors to one
 shared walk per shard, which routes each syntax/AST node only to the rules that

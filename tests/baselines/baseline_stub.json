@@ -685,6 +685,20 @@
     "SV-STY-104@15",
     "SV-STY-104@16"
   ],
+  "correctness/SV-CMP-001/bad.sv": [
+    "COMPILE:IndexOOB@23",
+    "COMPILE:UndeclaredIdentifier@18",
+    "SV-CMP-002@5",
+    "SV-CNS-001@5",
+    "SV-LANG-002@23",
+    "SV-RDB-002@23",
+    "SV-STY-010@23"
+  ],
+  "correctness/SV-CMP-001/good.sv": [
+    "SV-CNS-001@4",
+    "SV-RDB-002@22",
+    "SV-STY-010@22"
+  ],
   "correctness/SV-COR-001/bad.sv": [
     "SV-COR-008@11",
     "SV-DED-006@8",

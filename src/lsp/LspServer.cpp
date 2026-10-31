@@ -1,3 +1,4 @@
+#include "uvmcheck/rules/CompilerDiagnostics.h"
 #include "uvmcheck/lsp/LspServer.h"
 #include "uvmcheck/core/ConfigManager.h"
 #include "uvmcheck/core/Json.h"
@@ -312,6 +313,7 @@ std::map<std::string, std::vector<LspDiagnostic>> LspServer::lintOpenDocuments()
     }
 
     auto compilation = driver.createCompilation();
+    rules::CompilerDiagnosticEngineScope compilerEngineScope(driver.diagEngine);
     (void)compilation->getAllDiagnostics();
     uvm::UvmModel uvmModel(*compilation);
 

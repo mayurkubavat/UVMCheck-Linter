@@ -1,5 +1,6 @@
 #include "uvmcheck/core/Driver.h"
 #include "uvmcheck/rules/RuleRegistry.h"
+#include "uvmcheck/rules/CompilerDiagnostics.h"
 #include "uvmcheck/rules/BuiltinRules.h"
 #include "uvmcheck/waivers/WaiverEngine.h"
 #include "uvmcheck/reporting/SarifReporter.h"
@@ -18,6 +19,7 @@
 #include "uvmcheck/rules/RuleExtras.h"
 #include "uvmcheck/style/NamingEngine.h"
 #include "uvmcheck/engine/RuleEngine.h"
+#include "slang/diagnostics/TextDiagnosticClient.h"
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -346,12 +348,6 @@ int LinterDriver::run() {
     const bool jsonToStdout = jsonOutputPath.has_value() && *jsonOutputPath == "-";
     std::ostream& info = jsonToStdout ? std::cerr : std::cout;
 
-    // Check if there are compilation syntax/elaboration errors. Elaboration
-    // diagnostics only reach the engine through reportCompilation.
-    slangDriver.reportCompilation(*compilation, /* quiet */ true);
-    (void)slangDriver.reportDiagnostics(/* quiet */ jsonToStdout);
-    const size_t compileErrors = static_cast<size_t>(slangDriver.diagEngine.getNumErrors());
-
     // Fully elaborate up front. Rules then only read the AST, which is what
     // makes it safe to run them in parallel (same protocol as slang's own
     // analysis passes), and every rule sees the same, complete design.
@@ -486,6 +482,19 @@ int LinterDriver::run() {
         if (selected) activeRules.push_back(rule.get());
     }
 
+    // Compiler errors and warnings. When SV-CMP-001 runs they are reported
+    // as findings (waivable, in every report), so slang does not print them
+    // a second time. Elaboration diagnostics only reach slang's engine
+    // through reportCompilation.
+    rules::CompilerDiagnosticEngineScope compilerEngineScope(slangDriver.diagEngine);
+    const bool compilerFindings = std::any_of(activeRules.begin(), activeRules.end(), [](const rules::Rule* r) {
+        return rules::isCompilerDiagnosticRule(r->getId());
+    });
+    if (compilerFindings) slangDriver.diagEngine.removeClient(slangDriver.textDiagClient);
+    slangDriver.reportCompilation(*compilation, /* quiet */ true);
+    (void)slangDriver.reportDiagnostics(/* quiet */ jsonToStdout || compilerFindings);
+    const size_t compileErrors = static_cast<size_t>(slangDriver.diagEngine.getNumErrors());
+
     engine::RuleEngine ruleEngine(*compilation, uvmModel, slangDriver.sourceManager, engineOptions);
 
     // Custom Python rules only read the UVM model, so they run alongside the built-in rules
@@ -511,6 +520,7 @@ int LinterDriver::run() {
     fs::path projectRoot = ConfigManager::instance().getProjectRoot();
     if (projectRoot.empty()) projectRoot = fs::current_path();
     waiverEngine.setProjectRoot(projectRoot);
+    // --no-config also skips the default .uvmcheck/waivers.json and baseline.json.
     // Shown and opened relative to the working directory when the root is (or is under) it.
     const fs::path uvmcheckDir = [&] {
         fs::path rel = fs::weakly_canonical(projectRoot).lexically_proximate(fs::weakly_canonical(fs::current_path()));
@@ -531,7 +541,7 @@ int LinterDriver::run() {
     std::string waiversPathToLoad;
     if (waiversFilePath.has_value()) {
         waiversPathToLoad = *waiversFilePath;
-    } else {
+    } else if (!noConfig.value_or(false)) {
         std::error_code ec;
         if (fs::exists(uvmcheckDir / "waivers.json", ec)) {
             waiversPathToLoad = (uvmcheckDir / "waivers.json").generic_string();
@@ -549,7 +559,7 @@ int LinterDriver::run() {
     std::string baselinePathToLoad;
     if (baselineInputPath.has_value()) {
         baselinePathToLoad = *baselineInputPath;
-    } else {
+    } else if (!noConfig.value_or(false)) {
         std::error_code ec;
         if (fs::exists(uvmcheckDir / "baseline.json", ec)) {
             baselinePathToLoad = (uvmcheckDir / "baseline.json").generic_string();

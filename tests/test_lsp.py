@@ -113,6 +113,15 @@ def test_standalone(binary, workdir):
             assert d["source"] == "uvmcheck"
         print(f"  [PASS] didOpen: {len(diags)} diagnostics, multi-line text, real ranges")
 
+        # Compiler errors show up next to the lint findings.
+        broken = "module bad_ref;\n  logic a;\n  assign a = missing_sig;\nendmodule\n"
+        client.notify("textDocument/didChange", {"textDocument": {"uri": uri, "version": 2},
+                                                 "contentChanges": [{"text": broken}]})
+        cmp = [d for d in client.diagnostics_for(uri) if d["code"] == "SV-CMP-001"]
+        assert cmp and cmp[0]["severity"] == 1 and cmp[0]["range"]["start"]["line"] == 2, cmp
+        assert "missing_sig" in cmp[0]["message"], cmp[0]
+        print("  [PASS] compiler error reported as SV-CMP-001")
+
         client.notify("textDocument/didClose", {"textDocument": {"uri": uri}})
         assert client.diagnostics_for(uri) == [], "expected empty diagnostics on didClose"
         print("  [PASS] diagnostics cleared on didClose")
