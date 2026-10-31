@@ -34,6 +34,25 @@ inline bool hasProfile(uint32_t mask, RuleProfile profile) {
     return (mask & static_cast<uint32_t>(profile)) != 0;
 }
 
+/// The closed set of rule categories. Every rule's getCategory() returns one of these;
+/// tests/test_catalog.py enforces it. Profiles default from the category (getProfiles()).
+inline const std::vector<std::string_view>& ruleCategories() {
+    static const std::vector<std::string_view> categories = {
+        "UVM", "OOP", "Architecture", "Correctness", "Concurrency", "Randomization",
+        "Coverage", "SVA", "Types", "DeadCode", "Performance", "Portability", "Security",
+        "DPI", "RTL_TB_Bridge", "Deprecated", "Style", "Naming", "Maintainability", "Advisory"};
+    return categories;
+}
+
+/// A finding ID a rule reports besides its own (the configurable naming and style engines
+/// report one ID per convention). Listed in the rule catalog like a rule.
+struct SubRule {
+    std::string id;
+    std::string name;
+    std::string description;
+    core::Severity severity;
+};
+
 class Rule {
 public:
     virtual ~Rule() = default;
@@ -52,6 +71,9 @@ public:
 
     /// Default severity (Error, Warning, Info)
     virtual core::Severity getDefaultSeverity() const = 0;
+
+    /// Other finding IDs this rule reports (see SubRule).
+    virtual std::vector<SubRule> getSubRules() const { return {}; }
 
     /// Methodology guidelines this rule enforces ("MG-4.1" ...); see docs/methodology/.
     virtual std::vector<std::string_view> getGuidelines() const {

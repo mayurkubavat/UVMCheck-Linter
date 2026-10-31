@@ -69,3 +69,5 @@ std::unique_ptr<Rule> createEmptyAlwaysOrInitial() {
     return std::make_unique<deadcode::EmptyAlwaysOrInitial>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createEmptyAlwaysOrInitial)

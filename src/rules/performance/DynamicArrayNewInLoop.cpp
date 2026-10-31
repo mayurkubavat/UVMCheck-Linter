@@ -91,3 +91,5 @@ std::unique_ptr<Rule> createDynamicArrayNewInLoop() {
     return std::make_unique<performance::DynamicArrayNewInLoop>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDynamicArrayNewInLoop)

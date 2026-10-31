@@ -79,7 +79,7 @@ public:
         return "Detects constraint distribution blocks where all weights evaluate to zero. At least one "
                "weight in a distribution must evaluate to non-zero per IEEE 1800 § 18.5.4.";
     }
-    std::string_view getCategory() const override { return "Random"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -96,3 +96,5 @@ std::unique_ptr<Rule> createZeroWeightDistribution() {
     return std::make_unique<random::ZeroWeightDistribution>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createZeroWeightDistribution)

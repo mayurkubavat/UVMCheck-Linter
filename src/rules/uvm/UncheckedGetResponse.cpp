@@ -74,3 +74,5 @@ std::unique_ptr<Rule> createUncheckedGetResponse() {
     return std::make_unique<uvm::UncheckedGetResponse>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUncheckedGetResponse)

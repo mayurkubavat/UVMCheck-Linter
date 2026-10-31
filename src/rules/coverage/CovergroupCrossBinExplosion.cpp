@@ -70,3 +70,5 @@ std::unique_ptr<Rule> createCovergroupCrossBinExplosion() {
     return std::make_unique<coverage::CovergroupCrossBinExplosion>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCovergroupCrossBinExplosion)

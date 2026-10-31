@@ -75,3 +75,5 @@ std::unique_ptr<Rule> createAbstractClassInstantiation() {
     return std::make_unique<oop::AbstractClassInstantiation>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAbstractClassInstantiation)

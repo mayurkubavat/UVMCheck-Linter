@@ -120,3 +120,5 @@ std::unique_ptr<Rule> createBlockingInObserver() {
     return std::make_unique<uvm::BlockingInObserver>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createBlockingInObserver)

@@ -113,3 +113,5 @@ std::unique_ptr<Rule> createUvmTransactionAliasing() {
     return std::make_unique<uvm::UvmTransactionAliasing>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmTransactionAliasing)

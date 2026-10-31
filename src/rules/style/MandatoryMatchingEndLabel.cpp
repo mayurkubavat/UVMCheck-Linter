@@ -157,3 +157,6 @@ std::unique_ptr<Rule> createMismatchedEndLabel() {
     return std::make_unique<style::MismatchedEndLabel>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMandatoryMatchingEndLabel)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMismatchedEndLabel)

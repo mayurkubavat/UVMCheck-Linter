@@ -62,3 +62,5 @@ std::unique_ptr<Rule> createDpiTypeWidthAlignment() {
     return std::make_unique<dpi::DpiTypeWidthAlignment>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDpiTypeWidthAlignment)

@@ -85,3 +85,5 @@ std::unique_ptr<Rule> createOneStatementPerLine() {
     return std::make_unique<style::OneStatementPerLine>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createOneStatementPerLine)

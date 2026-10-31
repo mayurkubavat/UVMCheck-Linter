@@ -188,3 +188,5 @@ std::unique_ptr<Rule> createRalMapAddressIntervalOverlap() {
     return std::make_unique<uvm::RalMapAddressIntervalOverlap>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRalMapAddressIntervalOverlap)

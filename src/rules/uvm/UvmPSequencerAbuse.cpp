@@ -46,3 +46,5 @@ std::unique_ptr<Rule> createUvmPSequencerAbuse() {
     return std::make_unique<uvm::UvmPSequencerAbuse>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmPSequencerAbuse)

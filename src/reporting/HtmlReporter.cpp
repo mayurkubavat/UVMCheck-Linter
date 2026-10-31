@@ -1,3 +1,4 @@
+#include <algorithm>
 #include "uvmcheck/reporting/HtmlReporter.h"
 #include <fstream>
 #include <sstream>
@@ -25,24 +26,16 @@ std::string HtmlReporter::escapeHtml(std::string_view str) {
     return out;
 }
 
-static std::string getCategory(std::string_view ruleId) {
-    if (ruleId.starts_with("UVM-")) return "UVM";
-    if (ruleId.starts_with("SV-OOP-") || ruleId.starts_with("SV-OCP-") || ruleId.starts_with("SV-ENC-")) return "OOP";
-    if (ruleId.starts_with("SV-THR-") || ruleId.starts_with("SV-INT-") || ruleId.starts_with("SV-CB-") ||
-        ruleId.starts_with("SV-FOR-") || ruleId.starts_with("SV-RCE-") || ruleId.starts_with("SV-EVT-")) return "Concurrency";
-    if (ruleId.starts_with("SV-PRF-") || ruleId.starts_with("SV-LOC-") || ruleId.starts_with("SV-ASC-") || ruleId.starts_with("SV-ARR-")) return "Performance";
-    if (ruleId.starts_with("SV-STY-") || ruleId.starts_with("SV-NAM-")) return "Style";
-    if (ruleId.starts_with("SV-DED-")) return "DeadCode";
-    if (ruleId.starts_with("SV-SML-")) return "Smell";
-    if (ruleId.starts_with("SV-COR-") || ruleId.starts_with("SV-DLY-") || ruleId.starts_with("SV-STR-") || ruleId.starts_with("SV-LANG-")) return "Correctness";
-    if (ruleId.starts_with("SV-COV-")) return "Coverage";
-    if (ruleId.starts_with("SV-RND-")) return "Random";
-    if (ruleId.starts_with("SEC-"))    return "Security";
-    if (ruleId.starts_with("PORT-"))   return "Portability";
-    if (ruleId.starts_with("DPI-"))    return "DPI";
-    if (ruleId.starts_with("SVA-"))    return "SVA";
-    if (ruleId.starts_with("RAL-"))    return "RAL";
-    return "General";
+/// Category of each rule ID (sub-rules take their reporting rule's category), from the
+/// rules' own metadata.
+static std::unordered_map<std::string, std::string> categoryMap(
+    const std::vector<std::unique_ptr<rules::Rule>>& rules) {
+    std::unordered_map<std::string, std::string> map;
+    for (const auto& r : rules) {
+        map[std::string(r->getId())] = std::string(r->getCategory());
+        for (const auto& sub : r->getSubRules()) map[sub.id] = std::string(r->getCategory());
+    }
+    return map;
 }
 
 bool HtmlReporter::writeHtml(const std::string& outputPath,
@@ -50,6 +43,12 @@ bool HtmlReporter::writeHtml(const std::string& outputPath,
                              const std::vector<std::unique_ptr<rules::Rule>>& rules) {
     std::ofstream out(outputPath);
     if (!out.is_open()) return false;
+
+    const auto categories = categoryMap(rules);
+    auto getCategory = [&](const std::string& ruleId) -> std::string {
+        auto it = categories.find(ruleId);
+        return it != categories.end() ? it->second : "Custom";
+    };
 
     // Metrics aggregation
     size_t errorCount = 0;
@@ -212,9 +211,11 @@ bool HtmlReporter::writeHtml(const std::string& outputPath,
         if (count > maxCategoryVal) maxCategoryVal = count;
     }
 
-    static const std::vector<std::string> standardCategories = {"UVM", "Performance", "Smell", "Concurrency", "Style", "OOP", "Security", "Portability"};
-    for (const auto& cat : standardCategories) {
-        size_t count = categoryCounts[cat];
+    // Categories that have findings, most findings first.
+    std::vector<std::pair<std::string, size_t>> byCategory(categoryCounts.begin(), categoryCounts.end());
+    std::sort(byCategory.begin(), byCategory.end(),
+              [](const auto& a, const auto& b) { return a.second != b.second ? a.second > b.second : a.first < b.first; });
+    for (const auto& [cat, count] : byCategory) {
         double pct = (static_cast<double>(count) / static_cast<double>(maxCategoryVal)) * 100.0;
         out << "        <div class=\"bar-row\">\n"
             << "          <span class=\"bar-label\">" << cat << "</span>\n"

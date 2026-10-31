@@ -83,3 +83,5 @@ std::unique_ptr<Rule> createDirectRalMirrorTampering() {
     return std::make_unique<uvm::DirectRalMirrorTampering>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDirectRalMirrorTampering)

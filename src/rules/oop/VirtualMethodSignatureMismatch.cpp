@@ -60,3 +60,5 @@ std::unique_ptr<Rule> createVirtualMethodSignatureMismatch() {
     return std::make_unique<oop::VirtualMethodSignatureMismatch>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createVirtualMethodSignatureMismatch)

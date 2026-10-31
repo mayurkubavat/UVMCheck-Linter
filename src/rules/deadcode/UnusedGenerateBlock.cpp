@@ -67,3 +67,5 @@ std::unique_ptr<Rule> createUnusedGenerateBlock() {
     return std::make_unique<deadcode::UnusedGenerateBlock>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnusedGenerateBlock)

@@ -109,3 +109,5 @@ std::unique_ptr<Rule> createUvmTlmPortSuffix() {
     return std::make_unique<style::UvmTlmPortSuffix>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmTlmPortSuffix)

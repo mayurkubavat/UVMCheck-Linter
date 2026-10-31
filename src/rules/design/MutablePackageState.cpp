@@ -45,3 +45,5 @@ std::unique_ptr<Rule> createMutablePackageState() {
     return std::make_unique<design::MutablePackageState>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMutablePackageState)

@@ -66,3 +66,5 @@ std::unique_ptr<Rule> createProgramBlockDeprecation() {
     return std::make_unique<deprecated::ProgramBlockDeprecation>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createProgramBlockDeprecation)

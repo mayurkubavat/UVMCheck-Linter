@@ -132,3 +132,5 @@ std::unique_ptr<Rule> createNonShortCircuitLogical() {
     return std::make_unique<correctness::NonShortCircuitLogical>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNonShortCircuitLogical)

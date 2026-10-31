@@ -110,3 +110,5 @@ std::unique_ptr<Rule> createMissingTimescaleInModule() {
     return std::make_unique<correctness::MissingTimescaleInModule>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMissingTimescaleInModule)

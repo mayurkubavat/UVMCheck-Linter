@@ -68,3 +68,5 @@ std::unique_ptr<Rule> createTypedefNameSuffix() {
     return std::make_unique<style::TypedefNameSuffix>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTypedefNameSuffix)

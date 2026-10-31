@@ -112,3 +112,5 @@ std::unique_ptr<Rule> createIllegalBinOverlap() {
     return std::make_unique<coverage::IllegalBinOverlap>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIllegalBinOverlap)

@@ -67,3 +67,5 @@ std::unique_ptr<Rule> createNonConsecutiveRepetitionZeroBound() {
     return std::make_unique<sva::NonConsecutiveRepetitionZeroBound>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNonConsecutiveRepetitionZeroBound)

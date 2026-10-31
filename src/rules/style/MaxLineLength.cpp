@@ -70,3 +70,5 @@ std::unique_ptr<Rule> createMaxLineLength() {
     return std::make_unique<style::MaxLineLength>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMaxLineLength)

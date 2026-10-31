@@ -112,3 +112,5 @@ std::unique_ptr<Rule> createNonVirtualInterfaceInClass() {
     return std::make_unique<oop::NonVirtualInterfaceInClass>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNonVirtualInterfaceInClass)

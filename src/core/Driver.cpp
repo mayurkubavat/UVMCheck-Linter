@@ -31,7 +31,7 @@ LinterDriver::LinterDriver() {
 
     slangDriver.cmdLine.add("-h,--help", showHelp, "Display available options");
     slangDriver.cmdLine.add("--version", showVersion, "Display version information and exit");
-    slangDriver.cmdLine.add("--list-rules", listRules, "List all available linter rules and exit");
+    slangDriver.cmdLine.add("--list-rules", listRules, "List all available linter rules and exit; with --json, write the rule catalog as JSON");
     slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: soundness, methodology, performance, style, security, smells, advisory, reuse, guide, all", "<name>");
     slangDriver.cmdLine.add("--guideline", guidelineSelector, "Run only the rules that enforce these methodology guidelines or chapters (comma-separated, e.g. MG-4,MG-3.1)", "<ids>");
     slangDriver.cmdLine.add("--list-guidelines", listGuidelines, "List the methodology guide (guidelines and the rules that enforce them) and exit; with --json, write it as JSON");
@@ -124,6 +124,14 @@ int LinterDriver::run() {
     }
 
     if (listRules.value_or(false)) {
+        if (jsonOutputPath.has_value()) {
+            if (!reporting::JsonReporter::writeRuleCatalog(*jsonOutputPath,
+                                                           rules::RuleRegistry::instance().getRules())) {
+                std::cerr << "Error: Failed to write rule catalog to: " << *jsonOutputPath << "\n";
+                return 1;
+            }
+            return 0;
+        }
         std::cout << "\n=== Registered UVMCheck Rules ===\n\n";
         std::cout << std::left << std::setw(15) << "Rule ID"
                   << std::setw(28) << "Name"

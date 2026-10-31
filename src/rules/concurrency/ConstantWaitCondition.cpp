@@ -77,3 +77,5 @@ std::unique_ptr<Rule> createConstantWaitCondition() {
     return std::make_unique<concurrency::ConstantWaitCondition>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConstantWaitCondition)

@@ -101,3 +101,5 @@ std::unique_ptr<Rule> createUvmCreateStringMismatch() {
     return std::make_unique<style::UvmCreateStringMismatch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmCreateStringMismatch)

@@ -66,3 +66,5 @@ std::unique_ptr<Rule> createAssertWithoutElse() {
     return std::make_unique<sva::AssertWithoutElse>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAssertWithoutElse)

@@ -292,3 +292,8 @@ std::unique_ptr<Rule> createIncompleteRegAdapter() { return std::make_unique<met
 std::unique_ptr<Rule> createCheckFailureAsWarning() { return std::make_unique<methodology::CheckFailureAsWarning>(); }
 std::unique_ptr<Rule> createFatalInCheckerPath() { return std::make_unique<methodology::FatalInCheckerPath>(); }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCallbackNotRegistered)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIncompleteRegAdapter)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCheckFailureAsWarning)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createFatalInCheckerPath)

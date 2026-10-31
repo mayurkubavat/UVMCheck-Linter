@@ -65,3 +65,5 @@ std::unique_ptr<Rule> createSelfAssignment() {
     return std::make_unique<correctness::SelfAssignment>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSelfAssignment)

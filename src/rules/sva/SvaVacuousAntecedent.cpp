@@ -74,3 +74,5 @@ std::unique_ptr<Rule> createSvaVacuousAntecedent() {
     return std::make_unique<sva::SvaVacuousAntecedent>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSvaVacuousAntecedent)

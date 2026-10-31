@@ -50,3 +50,5 @@ std::unique_ptr<Rule> createUvmSequencePrePostBodyMisuse() {
     return std::make_unique<uvm::UvmSequencePrePostBodyMisuse>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmSequencePrePostBodyMisuse)

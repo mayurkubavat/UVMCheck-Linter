@@ -44,3 +44,5 @@ std::unique_ptr<Rule> createProcessTerminationInClass() {
     return std::make_unique<errors::ProcessTerminationInClass>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createProcessTerminationInClass)

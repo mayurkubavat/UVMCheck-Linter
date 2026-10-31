@@ -162,3 +162,5 @@ std::unique_ptr<Rule> createFailureNotReported() {
     return std::make_unique<errors::FailureNotReported>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createFailureNotReported)

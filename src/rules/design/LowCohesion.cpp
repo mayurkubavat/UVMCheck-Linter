@@ -126,3 +126,7 @@ std::unique_ptr<Rule> createDeepInheritance() {
     return std::make_unique<design::DeepInheritance>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLowCohesion)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createHighCoupling)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDeepInheritance)

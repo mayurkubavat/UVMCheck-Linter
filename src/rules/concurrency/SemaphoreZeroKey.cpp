@@ -74,3 +74,5 @@ std::unique_ptr<Rule> createSemaphoreZeroKey() {
     return std::make_unique<concurrency::SemaphoreZeroKey>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSemaphoreZeroKey)

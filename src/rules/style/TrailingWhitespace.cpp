@@ -83,3 +83,5 @@ std::unique_ptr<Rule> createTrailingWhitespace() {
     return std::make_unique<style::TrailingWhitespace>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTrailingWhitespace)

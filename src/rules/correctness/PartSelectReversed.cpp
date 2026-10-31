@@ -180,3 +180,5 @@ std::unique_ptr<Rule> createPartSelectReversed() {
     return std::make_unique<correctness::PartSelectReversed>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createPartSelectReversed)

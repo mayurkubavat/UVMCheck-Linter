@@ -88,3 +88,5 @@ std::unique_ptr<Rule> createTimeInAssertionAction() {
     return std::make_unique<sva::TimeInAssertionAction>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTimeInAssertionAction)

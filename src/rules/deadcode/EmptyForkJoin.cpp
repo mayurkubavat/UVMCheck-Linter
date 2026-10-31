@@ -66,3 +66,5 @@ std::unique_ptr<Rule> createEmptyForkJoin() {
     return std::make_unique<deadcode::EmptyForkJoin>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createEmptyForkJoin)

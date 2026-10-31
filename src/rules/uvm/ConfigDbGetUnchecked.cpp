@@ -74,3 +74,5 @@ std::unique_ptr<Rule> createConfigDbGetUnchecked() {
     return std::make_unique<uvm::ConfigDbGetUnchecked>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConfigDbGetUnchecked)

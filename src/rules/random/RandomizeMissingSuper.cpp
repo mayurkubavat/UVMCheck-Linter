@@ -38,7 +38,7 @@ public:
         return "Overridden pre_randomize() and post_randomize() callback methods must invoke super.pre_randomize() "
                "or super.post_randomize() to prevent bypassing base-class transaction setup and validation routines.";
     }
-    std::string_view getCategory() const override { return "Safety"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     void run(slang::ast::Compilation& /*compilation*/,
@@ -101,3 +101,5 @@ std::unique_ptr<Rule> createRandomizeMissingSuper() {
     return std::make_unique<random::RandomizeMissingSuper>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRandomizeMissingSuper)

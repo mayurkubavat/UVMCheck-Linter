@@ -52,7 +52,7 @@ public:
         return "Flags 'randomize() with {}' containing an empty inline constraint block. "
                "Empty inline constraint blocks incur dynamic solver scope allocation overhead while adding no constraints.";
     }
-    std::string_view getCategory() const override { return "Random"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -69,3 +69,5 @@ std::unique_ptr<Rule> createEmptyRandomizeWith() {
     return std::make_unique<random::EmptyRandomizeWith>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createEmptyRandomizeWith)

@@ -79,3 +79,5 @@ std::unique_ptr<Rule> createUvmSequenceDirectVifAccess() {
     return std::make_unique<uvm::UvmSequenceDirectVifAccess>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmSequenceDirectVifAccess)

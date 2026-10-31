@@ -105,7 +105,7 @@ public:
         return "Detects cyclic dependencies in solve...before constraint ordering (e.g. solve a before b and solve b before a). "
                "Cyclic solve-before constraints create an unsatisfiable dependency graph in the solver.";
     }
-    std::string_view getCategory() const override { return "Random"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -122,3 +122,5 @@ std::unique_ptr<Rule> createCyclicSolveBefore() {
     return std::make_unique<random::CyclicSolveBefore>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCyclicSolveBefore)

@@ -114,7 +114,16 @@ public:
 };
 
 } // namespace uvmcheck::rules::uvm
+
+namespace uvmcheck::rules {
+std::unique_ptr<Rule> createYourRule() { return std::make_unique<uvm::YourRule>(); }
+} // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createYourRule)
 ```
+
+`getCategory()` must return one of the categories in `ruleCategories()` (`uvmcheck/rules/Rule.h`);
+the category also sets the rule's default presets.
 
 **How the engine runs it.** `co_await ctx.visitAst(v)` suspends the rule; the
 engine then does one walk per shard and routes each node only to visitors that
@@ -134,12 +143,19 @@ Rules that need a custom traversal can still override
 `tests/engine_equivalence.py` checks that both styles give the same findings
 as the reference `--engine isolated` mode.
 
-### 3. Register the Rule
-Add your rule factory to `src/rules/BuiltinRules.cpp`. If the rule enforces a guideline of the
+### 3. Register and Document the Rule
+The `UVMCHECK_REGISTER_RULE` line at the end of the rule file registers it; there is no central
+list to edit. If the rule enforces a guideline of the
 [UVM Methodology Guide](docs/methodology/README.md), add its ID to that guideline in
-`src/rules/Guidelines.cpp` and to the guideline's "Enforced by" line in the chapter page;
-`tests/test_guidelines.py` fails if the two disagree. The guide also describes how to turn a
-software-engineering principle into a rule and how to score a candidate before it runs by default.
+`src/rules/Guidelines.cpp`. Then regenerate the docs from the rules' own metadata:
+
+```bash
+python3 scripts/gen_rule_docs.py          # docs/rules/catalog.json, docs/rules/README.md, MG "Enforced by" lines
+python3 scripts/gen_rule_docs.py --check  # what CI runs (tests/test_catalog.py): fails if any of them is stale
+```
+
+The guide also describes how to turn a software-engineering principle into a rule and how to
+score a candidate before it runs by default.
 
 ### 4. Create Paired Unit Tests
 Every rule in UVMCheck **must** have paired `bad.sv` and `good.sv` test cases plus an `expect.json`:
@@ -186,5 +202,5 @@ longer fires, so the baseline only shrinks. After fixing a false positive, refre
 
 1. **Commit Hygiene**: Ensure code compiles warning-free on Clang and GCC.
 2. **Zero Regressions**: All 450+ unit tests must pass before opening a PR.
-3. **Documentation**: Update the [Rule Catalog](docs/rules/uvmcheck_rule_catalog.md) when introducing new rules or modifying rule semantics.
+3. **Documentation**: Run `scripts/gen_rule_docs.py` after adding a rule or changing its metadata; the [Rule Catalog](docs/rules/README.md) is generated, not edited.
 4. **Automated Fixes**: If your rule supports `--fix`, include test cases verifying the exact textual rewrite output.

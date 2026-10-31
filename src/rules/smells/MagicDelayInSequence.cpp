@@ -62,7 +62,7 @@ public:
     std::string_view getDescription() const override {
         return "Disallow hardcoded physical delays (#delay) inside uvm_sequence. Sequences must be clocking-block and frequency agnostic.";
     }
-    std::string_view getCategory() const override { return "Smell"; }
+    std::string_view getCategory() const override { return "Maintainability"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     void run(slang::ast::Compilation& compilation,
@@ -80,3 +80,5 @@ std::unique_ptr<Rule> createMagicDelayInSequence() {
     return std::make_unique<smells::MagicDelayInSequence>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMagicDelayInSequence)

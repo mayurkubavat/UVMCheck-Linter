@@ -81,3 +81,5 @@ std::unique_ptr<Rule> createVirtualInterfaceModportDriveInversion() {
     return std::make_unique<uvm::VirtualInterfaceModportDriveInversion>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createVirtualInterfaceModportDriveInversion)

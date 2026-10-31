@@ -65,3 +65,5 @@ std::unique_ptr<Rule> createUvmComponentNamingConvention() {
     return std::make_unique<style::UvmComponentNamingConvention>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmComponentNamingConvention)

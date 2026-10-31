@@ -48,3 +48,5 @@ std::unique_ptr<Rule> createFileHandleNotClosed() {
     return std::make_unique<concurrency::FileHandleNotClosed>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createFileHandleNotClosed)

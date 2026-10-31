@@ -94,3 +94,5 @@ std::unique_ptr<Rule> createNonRandFieldConstrained() {
     return std::make_unique<random::NonRandFieldConstrained>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNonRandFieldConstrained)

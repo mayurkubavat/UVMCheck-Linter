@@ -79,3 +79,5 @@ std::unique_ptr<Rule> createFixedDelayBeforeDrop() {
     return std::make_unique<errors::FixedDelayBeforeDrop>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createFixedDelayBeforeDrop)

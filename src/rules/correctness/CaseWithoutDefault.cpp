@@ -63,3 +63,5 @@ std::unique_ptr<Rule> createCaseWithoutDefault() {
     return std::make_unique<correctness::CaseWithoutDefault>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCaseWithoutDefault)

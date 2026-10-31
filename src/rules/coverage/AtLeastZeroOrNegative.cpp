@@ -113,3 +113,5 @@ std::unique_ptr<Rule> createAtLeastZeroOrNegative() {
     return std::make_unique<coverage::AtLeastZeroOrNegative>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAtLeastZeroOrNegative)

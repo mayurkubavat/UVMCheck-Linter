@@ -82,3 +82,5 @@ std::unique_ptr<Rule> createArrayReductionWidthTruncation() {
     return std::make_unique<performance::ArrayReductionWidthTruncation>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createArrayReductionWidthTruncation)

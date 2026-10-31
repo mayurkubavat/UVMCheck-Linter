@@ -117,7 +117,7 @@ public:
         return "Detects duplicate or redundant constraint expressions within the same class scope. "
                "Redundant constraints enlarge solver expression graphs and increase solver solve latency without adding constraints.";
     }
-    std::string_view getCategory() const override { return "Random"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -134,3 +134,5 @@ std::unique_ptr<Rule> createRedundantConstraint() {
     return std::make_unique<random::RedundantConstraint>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRedundantConstraint)

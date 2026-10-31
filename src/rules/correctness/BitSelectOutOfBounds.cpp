@@ -93,3 +93,5 @@ std::unique_ptr<Rule> createBitSelectOutOfBounds() {
     return std::make_unique<correctness::BitSelectOutOfBounds>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createBitSelectOutOfBounds)

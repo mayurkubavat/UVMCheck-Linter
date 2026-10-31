@@ -111,3 +111,5 @@ std::unique_ptr<Rule> createEmptySequenceBody() {
     return std::make_unique<uvm::EmptySequenceBody>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createEmptySequenceBody)

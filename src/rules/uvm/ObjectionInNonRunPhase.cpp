@@ -71,3 +71,5 @@ std::unique_ptr<Rule> createObjectionInNonRunPhase() {
     return std::make_unique<uvm::ObjectionInNonRunPhase>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createObjectionInNonRunPhase)

@@ -49,3 +49,5 @@ std::unique_ptr<Rule> createGodClass() {
     return std::make_unique<design::GodClass>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createGodClass)

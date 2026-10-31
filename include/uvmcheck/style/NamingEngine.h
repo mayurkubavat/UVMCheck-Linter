@@ -67,6 +67,9 @@ public:
     static std::string toSnakeCase(std::string_view name);
     static std::string toAllCaps(std::string_view name);
 
+    /// All naming targets, keyed by target kind.
+    const std::unordered_map<std::string, NamingTargetSpec>& getRules() const { return rules; }
+
     /// Reset all naming targets to industry defaults (IEEE 1800 / UVM standard)
     void loadDefaultRules();
 

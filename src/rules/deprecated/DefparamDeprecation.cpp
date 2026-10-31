@@ -51,3 +51,5 @@ std::unique_ptr<Rule> createDefparamDeprecation() {
     return std::make_unique<deprecated::DefparamDeprecation>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDefparamDeprecation)

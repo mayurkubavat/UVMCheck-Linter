@@ -71,3 +71,5 @@ std::unique_ptr<Rule> createVirtualCallInConstructor() {
     return std::make_unique<oop::VirtualCallInConstructor>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createVirtualCallInConstructor)

@@ -74,3 +74,5 @@ std::unique_ptr<Rule> createUvmTlmTryGetUnchecked() {
     return std::make_unique<uvm::UvmTlmTryGetUnchecked>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmTlmTryGetUnchecked)

@@ -57,3 +57,5 @@ std::unique_ptr<Rule> createClassMemberPrefix() {
     return std::make_unique<style::ClassMemberPrefix>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createClassMemberPrefix)

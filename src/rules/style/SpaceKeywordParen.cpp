@@ -91,3 +91,5 @@ std::unique_ptr<Rule> createSpaceKeywordParen() {
     return std::make_unique<style::SpaceKeywordParen>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSpaceKeywordParen)

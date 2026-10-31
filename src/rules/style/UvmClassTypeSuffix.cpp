@@ -123,3 +123,5 @@ std::unique_ptr<Rule> createUvmClassTypeSuffix() {
     return std::make_unique<style::UvmClassTypeSuffix>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmClassTypeSuffix)

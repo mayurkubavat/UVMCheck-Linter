@@ -136,3 +136,5 @@ std::unique_ptr<Rule> createLowVerbosityDebugReport() {
     return std::make_unique<uvm::LowVerbosityDebugReport>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLowVerbosityDebugReport)

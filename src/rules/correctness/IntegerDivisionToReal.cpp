@@ -61,3 +61,5 @@ std::unique_ptr<Rule> createIntegerDivisionToReal() {
     return std::make_unique<correctness::IntegerDivisionToReal>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIntegerDivisionToReal)

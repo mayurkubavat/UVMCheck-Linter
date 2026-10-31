@@ -111,3 +111,5 @@ std::unique_ptr<Rule> createScoreboardSilentDrop() {
     return std::make_unique<uvm::ScoreboardSilentDrop>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createScoreboardSilentDrop)

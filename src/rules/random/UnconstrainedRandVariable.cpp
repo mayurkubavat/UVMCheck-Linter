@@ -90,7 +90,7 @@ public:
     std::string_view getDescription() const override {
         return "Flags non-static 'rand' class properties that are never constrained in any constraint block within the class.";
     }
-    std::string_view getCategory() const override { return "Random"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -107,3 +107,5 @@ std::unique_ptr<Rule> createUnconstrainedRandVariable() {
     return std::make_unique<random::UnconstrainedRandVariable>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnconstrainedRandVariable)

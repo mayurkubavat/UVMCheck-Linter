@@ -75,3 +75,5 @@ std::unique_ptr<Rule> createNonInvertibleConstraintOp() {
     return std::make_unique<random::NonInvertibleConstraintOp>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNonInvertibleConstraintOp)

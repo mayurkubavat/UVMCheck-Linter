@@ -59,3 +59,5 @@ std::unique_ptr<Rule> createPassArrayByValue() {
     return std::make_unique<performance::PassArrayByValue>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createPassArrayByValue)

@@ -113,3 +113,5 @@ std::unique_ptr<Rule> createTautologicalCheckCompare() {
     return std::make_unique<correctness::TautologicalCheckCompare>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTautologicalCheckCompare)

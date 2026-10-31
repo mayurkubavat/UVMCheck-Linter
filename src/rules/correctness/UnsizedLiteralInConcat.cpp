@@ -86,3 +86,5 @@ std::unique_ptr<Rule> createUnsizedLiteralInConcat() {
     return std::make_unique<correctness::UnsizedLiteralInConcat>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnsizedLiteralInConcat)

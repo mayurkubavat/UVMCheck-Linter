@@ -73,3 +73,5 @@ std::unique_ptr<Rule> createConstraintInsideInvertedRange() {
     return std::make_unique<random::ConstraintInsideInvertedRange>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConstraintInsideInvertedRange)

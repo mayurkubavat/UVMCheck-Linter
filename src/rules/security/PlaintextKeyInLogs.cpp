@@ -102,3 +102,5 @@ std::unique_ptr<Rule> createPlaintextKeyInLogs() {
     return std::make_unique<security::PlaintextKeyInLogs>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createPlaintextKeyInLogs)

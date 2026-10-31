@@ -92,3 +92,5 @@ std::unique_ptr<Rule> createEqualityWithXz() {
     return std::make_unique<correctness::EqualityWithXz>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createEqualityWithXz)

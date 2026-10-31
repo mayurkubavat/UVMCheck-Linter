@@ -223,3 +223,7 @@ std::unique_ptr<Rule> createHandleToEnvOrTest() { return std::make_unique<method
 std::unique_ptr<Rule> createForeignComponentStateWrite() { return std::make_unique<methodology::ForeignComponentStateWrite>(); }
 std::unique_ptr<Rule> createHierarchicalReferenceInClass() { return std::make_unique<methodology::HierarchicalReferenceInClass>(); }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createHandleToEnvOrTest)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createForeignComponentStateWrite)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createHierarchicalReferenceInClass)

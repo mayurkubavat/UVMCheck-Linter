@@ -149,3 +149,5 @@ std::unique_ptr<Rule> createUnwrittenClassProperty() {
     return std::make_unique<deadcode::UnwrittenClassProperty>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnwrittenClassProperty)

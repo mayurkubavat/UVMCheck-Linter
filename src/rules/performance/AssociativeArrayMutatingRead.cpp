@@ -134,3 +134,5 @@ std::unique_ptr<Rule> createAssociativeArrayMutatingRead() {
     return std::make_unique<performance::AssociativeArrayMutatingRead>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAssociativeArrayMutatingRead)

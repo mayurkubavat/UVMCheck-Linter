@@ -86,3 +86,5 @@ std::unique_ptr<Rule> createPositionalFlagLiterals() {
     return std::make_unique<readability::PositionalFlagLiterals>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createPositionalFlagLiterals)

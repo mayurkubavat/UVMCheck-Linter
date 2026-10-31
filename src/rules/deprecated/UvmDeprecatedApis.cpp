@@ -186,3 +186,8 @@ std::unique_ptr<Rule> createUvmDeprecatedTestDone() {
     return std::make_unique<deprecated::UvmDeprecatedTestDone>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmDeprecatedConfigCalls)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmDeprecatedReportServer)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmDeprecatedPrinterKnobs)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmDeprecatedTestDone)

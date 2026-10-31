@@ -79,3 +79,5 @@ std::unique_ptr<Rule> createUvmConfigDbGlobalWildcard() {
     return std::make_unique<uvm::UvmConfigDbGlobalWildcard>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmConfigDbGlobalWildcard)

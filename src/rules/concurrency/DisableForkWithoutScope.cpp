@@ -76,3 +76,5 @@ std::unique_ptr<Rule> createDisableForkWithoutScope() {
     return std::make_unique<concurrency::DisableForkWithoutScope>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDisableForkWithoutScope)

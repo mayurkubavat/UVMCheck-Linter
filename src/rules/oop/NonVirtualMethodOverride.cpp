@@ -64,3 +64,5 @@ std::unique_ptr<Rule> createNonVirtualMethodOverride() {
     return std::make_unique<oop::NonVirtualMethodOverride>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNonVirtualMethodOverride)

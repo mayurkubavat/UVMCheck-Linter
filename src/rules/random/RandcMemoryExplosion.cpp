@@ -59,3 +59,5 @@ std::unique_ptr<Rule> createRandcMemoryExplosion() {
     return std::make_unique<random::RandcMemoryExplosion>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRandcMemoryExplosion)

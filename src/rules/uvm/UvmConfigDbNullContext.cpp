@@ -84,3 +84,5 @@ std::unique_ptr<Rule> createUvmConfigDbNullContext() {
     return std::make_unique<uvm::UvmConfigDbNullContext>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmConfigDbNullContext)

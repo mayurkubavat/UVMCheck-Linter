@@ -69,7 +69,7 @@ public:
         return "Flags '.rand_mode(0)' or '.constraint_mode(0)' calls that are never restored with '1' in the routine. "
                "Unrestored disabled random modes permanently corrupt stimulus generation for subsequent transactions.";
     }
-    std::string_view getCategory() const override { return "Random"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -86,3 +86,5 @@ std::unique_ptr<Rule> createUnrestoredRandMode() {
     return std::make_unique<random::UnrestoredRandMode>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnrestoredRandMode)

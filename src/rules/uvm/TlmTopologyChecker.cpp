@@ -44,3 +44,5 @@ std::unique_ptr<Rule> createTlmTopologyChecker() {
     return std::make_unique<uvm::TlmTopologyChecker>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTlmTopologyChecker)

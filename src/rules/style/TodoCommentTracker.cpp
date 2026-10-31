@@ -79,3 +79,5 @@ std::unique_ptr<Rule> createTodoCommentTracker() {
     return std::make_unique<style::TodoCommentTracker>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTodoCommentTracker)

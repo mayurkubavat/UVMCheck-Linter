@@ -151,3 +151,5 @@ std::unique_ptr<Rule> createRalOrphanRegister() {
     return std::make_unique<ral::RalOrphanRegister>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRalOrphanRegister)

@@ -112,3 +112,5 @@ std::unique_ptr<Rule> createUnshieldedVerbosityFormatEval() {
     return std::make_unique<performance::UnshieldedVerbosityFormatEval>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnshieldedVerbosityFormatEval)

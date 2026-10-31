@@ -56,3 +56,5 @@ std::unique_ptr<Rule> createInterfaceNamingConvention() {
     return std::make_unique<style::InterfaceNamingConvention>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createInterfaceNamingConvention)

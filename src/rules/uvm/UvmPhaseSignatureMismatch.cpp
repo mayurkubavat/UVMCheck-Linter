@@ -114,3 +114,5 @@ std::unique_ptr<Rule> createUvmPhaseSignatureMismatch() {
     return std::make_unique<uvm::UvmPhaseSignatureMismatch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmPhaseSignatureMismatch)

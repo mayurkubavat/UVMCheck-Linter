@@ -51,3 +51,5 @@ std::unique_ptr<Rule> createQueryChangesState() {
     return std::make_unique<design::QueryChangesState>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createQueryChangesState)

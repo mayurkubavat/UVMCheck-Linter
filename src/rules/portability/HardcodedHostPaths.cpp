@@ -77,3 +77,5 @@ std::unique_ptr<Rule> createHardcodedHostPaths() {
     return std::make_unique<portability::HardcodedHostPaths>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createHardcodedHostPaths)

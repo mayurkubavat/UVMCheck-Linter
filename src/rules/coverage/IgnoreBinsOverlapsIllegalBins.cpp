@@ -105,3 +105,5 @@ std::unique_ptr<Rule> createIgnoreBinsOverlapsIllegalBins() {
     return std::make_unique<coverage::IgnoreBinsOverlapsIllegalBins>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIgnoreBinsOverlapsIllegalBins)

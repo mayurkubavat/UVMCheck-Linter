@@ -78,3 +78,5 @@ std::unique_ptr<Rule> createUnboundedDynamicArrayInConstraint() {
     return std::make_unique<performance::UnboundedDynamicArrayInConstraint>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnboundedDynamicArrayInConstraint)

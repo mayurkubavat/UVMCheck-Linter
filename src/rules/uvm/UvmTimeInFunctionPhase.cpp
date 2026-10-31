@@ -102,3 +102,5 @@ std::unique_ptr<Rule> createUvmTimeInFunctionPhase() {
     return std::make_unique<uvm::UvmTimeInFunctionPhase>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmTimeInFunctionPhase)

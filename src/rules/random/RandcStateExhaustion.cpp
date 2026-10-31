@@ -61,3 +61,5 @@ std::unique_ptr<Rule> createRandcStateExhaustion() {
     return std::make_unique<random::RandcStateExhaustion>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRandcStateExhaustion)

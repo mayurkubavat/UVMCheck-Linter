@@ -107,3 +107,5 @@ std::unique_ptr<Rule> createInlineShadowNoLocal() {
     return std::make_unique<random::InlineShadowNoLocal>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createInlineShadowNoLocal)

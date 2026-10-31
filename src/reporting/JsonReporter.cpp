@@ -1,4 +1,5 @@
 #include "uvmcheck/reporting/JsonReporter.h"
+#include <algorithm>
 #include <cstdio>
 #include <fstream>
 #include <iostream>
@@ -105,6 +106,67 @@ bool JsonReporter::writeGuidelines(const std::string& outputPath) {
     std::ofstream file(outputPath);
     if (!file.is_open()) return false;
     writeGuide(file);
+    return true;
+}
+
+static std::vector<std::string_view> profileNames(uint32_t mask) {
+    using P = rules::RuleProfile;
+    static const std::pair<P, std::string_view> names[] = {
+        {P::Soundness, "soundness"}, {P::Methodology, "methodology"}, {P::Performance, "performance"},
+        {P::Style, "style"},         {P::Security, "security"},       {P::Smells, "smells"},
+        {P::Advisory, "advisory"}};
+    std::vector<std::string_view> out;
+    for (const auto& [p, n] : names) {
+        if (rules::hasProfile(mask, p)) out.push_back(n);
+    }
+    return out;
+}
+
+static void writeCatalog(std::ostream& os, const std::vector<std::unique_ptr<rules::Rule>>& rules) {
+    struct Entry {
+        std::string id, name, category, severity, description, parent;
+        std::vector<std::string_view> profiles, guidelines;
+    };
+    std::vector<Entry> entries;
+    for (const auto& r : rules) {
+        auto profiles = profileNames(r->getProfiles());
+        auto guidelines = r->getGuidelines();
+        entries.push_back({std::string(r->getId()), std::string(r->getName()),
+                           std::string(r->getCategory()),
+                           std::string(core::severityToString(r->getDefaultSeverity())),
+                           std::string(r->getDescription()), "", profiles, guidelines});
+        for (const auto& sub : r->getSubRules()) {
+            entries.push_back({sub.id, sub.name, std::string(r->getCategory()),
+                               std::string(core::severityToString(sub.severity)), sub.description,
+                               std::string(r->getId()), profiles, rules::guidelinesForRule(sub.id)});
+        }
+    }
+    std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) { return a.id < b.id; });
+
+    os << "{\n  \"version\": \"2.0\",\n  \"generated\": \"uvmcheck --list-rules --json\",\n"
+       << "  \"categories\": " << jsonList(rules::ruleCategories()) << ",\n  \"rules\": [\n";
+    for (size_t i = 0; i < entries.size(); ++i) {
+        const auto& e = entries[i];
+        os << "    {\"id\": \"" << escapeJson(e.id) << "\", \"name\": \"" << escapeJson(e.name)
+           << "\", \"category\": \"" << escapeJson(e.category) << "\", \"severity\": \""
+           << escapeJson(e.severity) << "\", \"profiles\": " << jsonList(e.profiles)
+           << ", \"guidelines\": " << jsonList(e.guidelines);
+        if (!e.parent.empty()) os << ", \"reportedBy\": \"" << escapeJson(e.parent) << "\"";
+        os << ",\n     \"description\": \"" << escapeJson(e.description) << "\"}"
+           << (i + 1 < entries.size() ? "," : "") << "\n";
+    }
+    os << "  ]\n}\n";
+}
+
+bool JsonReporter::writeRuleCatalog(const std::string& outputPath,
+                                    const std::vector<std::unique_ptr<rules::Rule>>& rules) {
+    if (outputPath == "-") {
+        writeCatalog(std::cout, rules);
+        return true;
+    }
+    std::ofstream file(outputPath);
+    if (!file.is_open()) return false;
+    writeCatalog(file, rules);
     return true;
 }
 

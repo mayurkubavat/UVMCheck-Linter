@@ -86,3 +86,5 @@ std::unique_ptr<Rule> createSelfComparison() {
     return std::make_unique<correctness::SelfComparison>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSelfComparison)

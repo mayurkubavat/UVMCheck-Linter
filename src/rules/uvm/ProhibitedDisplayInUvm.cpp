@@ -74,3 +74,5 @@ std::unique_ptr<Rule> createProhibitedDisplayInUvm() {
     return std::make_unique<uvm::ProhibitedDisplayInUvm>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createProhibitedDisplayInUvm)

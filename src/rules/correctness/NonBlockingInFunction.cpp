@@ -98,3 +98,5 @@ std::unique_ptr<Rule> createNonBlockingInFunction() {
     return std::make_unique<correctness::NonBlockingInFunction>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNonBlockingInFunction)

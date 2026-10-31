@@ -70,3 +70,5 @@ std::unique_ptr<Rule> createRandomizeInConstructor() {
     return std::make_unique<random::RandomizeInConstructor>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRandomizeInConstructor)

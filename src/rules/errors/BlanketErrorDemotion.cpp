@@ -117,3 +117,5 @@ std::unique_ptr<Rule> createBlanketErrorDemotion() {
     return std::make_unique<errors::BlanketErrorDemotion>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createBlanketErrorDemotion)

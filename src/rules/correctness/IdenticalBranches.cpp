@@ -127,3 +127,5 @@ std::unique_ptr<Rule> createIdenticalBranches() {
     return std::make_unique<correctness::IdenticalBranches>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIdenticalBranches)

@@ -96,3 +96,5 @@ std::unique_ptr<Rule> createDowncastWithoutDynamicCast() {
     return std::make_unique<oop::DowncastWithoutDynamicCast>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDowncastWithoutDynamicCast)

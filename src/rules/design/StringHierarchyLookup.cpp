@@ -50,3 +50,5 @@ std::unique_ptr<Rule> createStringHierarchyLookup() {
     return std::make_unique<design::StringHierarchyLookup>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createStringHierarchyLookup)

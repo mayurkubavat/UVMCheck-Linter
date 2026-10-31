@@ -81,3 +81,5 @@ std::unique_ptr<Rule> createDisableIffReset() {
     return std::make_unique<sva::DisableIffReset>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDisableIffReset)

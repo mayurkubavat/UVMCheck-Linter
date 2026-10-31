@@ -55,3 +55,5 @@ std::unique_ptr<Rule> createStreamingConcatenationSizeMismatch() {
     return std::make_unique<correctness::StreamingConcatenationSizeMismatch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createStreamingConcatenationSizeMismatch)

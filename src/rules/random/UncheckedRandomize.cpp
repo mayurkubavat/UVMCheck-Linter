@@ -46,7 +46,7 @@ public:
         return "The return value of randomize() must be checked. Silently ignoring failure leaves "
                "transactions un-randomized or corrupt, concealing verification testbench bugs.";
     }
-    std::string_view getCategory() const override { return "Safety"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -63,3 +63,5 @@ std::unique_ptr<Rule> createUncheckedRandomize() {
     return std::make_unique<random::UncheckedRandomize>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUncheckedRandomize)

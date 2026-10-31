@@ -127,3 +127,5 @@ std::unique_ptr<Rule> createClockingBlockOutputReadSkew() {
     return std::make_unique<concurrency::ClockingBlockOutputReadSkew>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createClockingBlockOutputReadSkew)

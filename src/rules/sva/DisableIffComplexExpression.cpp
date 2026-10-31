@@ -105,3 +105,5 @@ std::unique_ptr<Rule> createDisableIffComplexExpression() {
     return std::make_unique<sva::DisableIffComplexExpression>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDisableIffComplexExpression)

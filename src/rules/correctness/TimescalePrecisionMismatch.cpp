@@ -101,3 +101,5 @@ std::unique_ptr<Rule> createTimescalePrecisionMismatch() {
     return std::make_unique<correctness::TimescalePrecisionMismatch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTimescalePrecisionMismatch)

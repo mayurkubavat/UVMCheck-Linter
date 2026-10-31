@@ -74,3 +74,5 @@ std::unique_ptr<Rule> createProprietaryVendorCalls() {
     return std::make_unique<portability::ProprietaryVendorCalls>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createProprietaryVendorCalls)

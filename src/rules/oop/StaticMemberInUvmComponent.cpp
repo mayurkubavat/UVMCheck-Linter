@@ -51,3 +51,5 @@ std::unique_ptr<Rule> createStaticMemberInUvmComponent() {
     return std::make_unique<oop::StaticMemberInUvmComponent>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createStaticMemberInUvmComponent)

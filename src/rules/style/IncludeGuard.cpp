@@ -13,7 +13,7 @@ public:
         return "Every included header file (.svh) must be wrapped in standard macro include guards "
                "(`ifndef / `define / `endif) to prevent circular definitions and compiler redefinition errors.";
     }
-    std::string_view getCategory() const override { return "Preprocessor"; }
+    std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
     void run(slang::ast::Compilation& compilation,
@@ -59,3 +59,5 @@ std::unique_ptr<Rule> createIncludeGuard() {
     return std::make_unique<style::IncludeGuard>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIncludeGuard)

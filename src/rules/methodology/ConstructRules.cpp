@@ -799,3 +799,13 @@ std::unique_ptr<Rule> createImplicitEnumBaseType() { return std::make_unique<met
 std::unique_ptr<Rule> createLegacyIntegerType() { return std::make_unique<methodology::LegacyIntegerType>(); }
 std::unique_ptr<Rule> createFunctionOutputArguments() { return std::make_unique<methodology::FunctionOutputArguments>(); }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createStringModeParameter)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDefineForConstant)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMacroAsRoutine)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIfdefInReusableClass)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createStringAsEnum)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createManualBitFieldSlicing)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createImplicitEnumBaseType)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLegacyIntegerType)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createFunctionOutputArguments)

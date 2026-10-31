@@ -125,3 +125,5 @@ std::unique_ptr<Rule> createAssignmentInExpression() {
     return std::make_unique<correctness::AssignmentInExpression>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAssignmentInExpression)

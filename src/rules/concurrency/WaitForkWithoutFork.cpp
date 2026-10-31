@@ -107,3 +107,5 @@ std::unique_ptr<Rule> createWaitForkWithoutFork() {
     return std::make_unique<concurrency::WaitForkWithoutFork>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createWaitForkWithoutFork)

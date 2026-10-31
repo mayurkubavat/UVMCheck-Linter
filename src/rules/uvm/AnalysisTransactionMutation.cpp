@@ -94,3 +94,5 @@ std::unique_ptr<Rule> createAnalysisTransactionMutation() {
     return std::make_unique<uvm::AnalysisTransactionMutation>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAnalysisTransactionMutation)

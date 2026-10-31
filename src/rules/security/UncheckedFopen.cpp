@@ -132,3 +132,5 @@ std::unique_ptr<Rule> createUncheckedFopen() {
     return std::make_unique<security::UncheckedFopen>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUncheckedFopen)

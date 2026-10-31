@@ -53,3 +53,5 @@ std::unique_ptr<Rule> createRandomSystemFunction() {
     return std::make_unique<deprecated::RandomSystemFunction>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRandomSystemFunction)

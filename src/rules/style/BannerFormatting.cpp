@@ -83,7 +83,7 @@ public:
         return "Standardizes method separator pre-banners. Enforces 70–80 character uniform dashed separator lines "
                "and flags ragged or arbitrary-width comment separators.";
     }
-    std::string_view getCategory() const override { return "Documentation"; }
+    std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -101,7 +101,7 @@ public:
         return "Standardizes major section divider banners to uniform 70–80 character widths. "
                "Prevents ragged ASCII banners across verification packages and testbench files.";
     }
-    std::string_view getCategory() const override { return "Documentation"; }
+    std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
     void run(slang::ast::Compilation& compilation,
@@ -124,3 +124,6 @@ std::unique_ptr<Rule> createSectionHeaderBanner() {
     return std::make_unique<style::SectionHeaderBanner>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMethodBannerStyle)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSectionHeaderBanner)

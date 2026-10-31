@@ -505,3 +505,8 @@ std::unique_ptr<Rule> createDuplicatedConstraint() { return std::make_unique<met
 std::unique_ptr<Rule> createRepeatedStringLiteral() { return std::make_unique<methodology::RepeatedStringLiteral>(); }
 std::unique_ptr<Rule> createCopiedAgentPackage() { return std::make_unique<methodology::CopiedAgentPackage>(); }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCloneFragments)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDuplicatedConstraint)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRepeatedStringLiteral)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCopiedAgentPackage)

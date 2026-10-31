@@ -151,3 +151,5 @@ std::unique_ptr<Rule> createMismatchedFieldInCopyCompare() {
     return std::make_unique<correctness::MismatchedFieldInCopyCompare>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMismatchedFieldInCopyCompare)

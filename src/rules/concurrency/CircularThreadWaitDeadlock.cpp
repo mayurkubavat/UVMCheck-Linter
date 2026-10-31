@@ -149,3 +149,5 @@ std::unique_ptr<Rule> createCircularThreadWaitDeadlock() {
     return std::make_unique<concurrency::CircularThreadWaitDeadlock>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCircularThreadWaitDeadlock)

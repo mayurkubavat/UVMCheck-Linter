@@ -68,3 +68,5 @@ std::unique_ptr<Rule> createAccidentalEmptyConditional() {
     return std::make_unique<deadcode::AccidentalEmptyConditional>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAccidentalEmptyConditional)

@@ -86,3 +86,5 @@ std::unique_ptr<Rule> createEmptyVirtualMethodWithoutPure() {
     return std::make_unique<oop::EmptyVirtualMethodWithoutPure>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createEmptyVirtualMethodWithoutPure)

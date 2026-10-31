@@ -77,3 +77,5 @@ std::unique_ptr<Rule> createClassShallowCopyAliasing() {
     return std::make_unique<oop::ClassShallowCopyAliasing>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createClassShallowCopyAliasing)

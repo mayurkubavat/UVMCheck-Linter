@@ -113,3 +113,5 @@ std::unique_ptr<Rule> createModifyingLoopIndexInsideFor() {
     return std::make_unique<correctness::ModifyingLoopIndexInsideFor>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createModifyingLoopIndexInsideFor)

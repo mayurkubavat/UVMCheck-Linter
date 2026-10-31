@@ -197,3 +197,6 @@ namespace uvmcheck::rules {
 std::unique_ptr<Rule> createHotspot() { return std::make_unique<methodology::Hotspot>(); }
 std::unique_ptr<Rule> createChangeCoupling() { return std::make_unique<methodology::ChangeCoupling>(); }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createHotspot)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createChangeCoupling)

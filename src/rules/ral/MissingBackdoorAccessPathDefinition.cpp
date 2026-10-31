@@ -72,3 +72,5 @@ std::unique_ptr<Rule> createMissingBackdoorAccessPathDefinition() {
     return std::make_unique<ral::MissingBackdoorAccessPathDefinition>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMissingBackdoorAccessPathDefinition)

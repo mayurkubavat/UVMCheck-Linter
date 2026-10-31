@@ -53,3 +53,5 @@ std::unique_ptr<Rule> createLargeClass() {
     return std::make_unique<metrics::LargeClass>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLargeClass)

@@ -108,3 +108,5 @@ std::unique_ptr<Rule> createStringConcatInLoop() {
     return std::make_unique<performance::StringConcatInLoop>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createStringConcatInLoop)

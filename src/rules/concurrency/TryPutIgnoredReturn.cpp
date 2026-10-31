@@ -73,3 +73,5 @@ std::unique_ptr<Rule> createTryPutIgnoredReturn() {
     return std::make_unique<concurrency::TryPutIgnoredReturn>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTryPutIgnoredReturn)

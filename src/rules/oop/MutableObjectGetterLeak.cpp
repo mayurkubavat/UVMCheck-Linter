@@ -131,3 +131,5 @@ std::unique_ptr<Rule> createMutableObjectGetterLeak() {
     return std::make_unique<oop::MutableObjectGetterLeak>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMutableObjectGetterLeak)

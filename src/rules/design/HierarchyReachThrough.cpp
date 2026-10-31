@@ -108,3 +108,5 @@ std::unique_ptr<Rule> createHierarchyReachThrough() {
     return std::make_unique<design::HierarchyReachThrough>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createHierarchyReachThrough)

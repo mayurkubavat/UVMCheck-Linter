@@ -236,3 +236,9 @@ std::unique_ptr<Rule> createDutCheckingInAgent() { return std::make_unique<metho
 std::unique_ptr<Rule> createTestBuildsLeafComponents() { return std::make_unique<methodology::TestBuildsLeafComponents>(); }
 std::unique_ptr<Rule> createMonitorDependsOnActivePath() { return std::make_unique<methodology::MonitorDependsOnActivePath>(); }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDriverGeneratesStimulus)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCoverageOutsideObservers)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDutCheckingInAgent)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTestBuildsLeafComponents)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMonitorDependsOnActivePath)

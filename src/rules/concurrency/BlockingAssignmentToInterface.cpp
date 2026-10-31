@@ -73,3 +73,5 @@ std::unique_ptr<Rule> createBlockingAssignmentToInterface() {
     return std::make_unique<concurrency::BlockingAssignmentToInterface>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createBlockingAssignmentToInterface)

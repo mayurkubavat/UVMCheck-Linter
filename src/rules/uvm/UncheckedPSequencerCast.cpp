@@ -94,3 +94,5 @@ std::unique_ptr<Rule> createUncheckedPSequencerCast() {
     return std::make_unique<uvm::UncheckedPSequencerCast>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUncheckedPSequencerCast)

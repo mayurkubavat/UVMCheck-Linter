@@ -39,6 +39,9 @@ else()
     FetchContent_Declare(
         slang
         GIT_REPOSITORY https://github.com/MikePopoloski/slang.git
+        # Pinned: rule findings and the test baselines depend on slang's elaboration and
+        # diagnostics, which change between releases. Bump deliberately and refresh baselines.
+        GIT_TAG v12.1
         GIT_SHALLOW ON)
     FetchContent_MakeAvailable(slang)
 endif()
@@ -94,7 +97,9 @@ endif()
 
 # CLI executable
 add_executable(uvmcheck src/main.cpp)
-target_link_libraries(uvmcheck PRIVATE libuvmcheck slang::slang)
+# Rules register themselves from static initializers in their own files, so the whole
+# library is linked in; otherwise the linker drops rule objects nothing references.
+target_link_libraries(uvmcheck PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,libuvmcheck>" slang::slang)
 set_target_properties(uvmcheck PROPERTIES OUTPUT_NAME "uvmcheck")
 
 # CTest Integration
@@ -132,6 +137,11 @@ add_test(
 add_test(
     NAME methodology_guide_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_guidelines.py --binary $<TARGET_FILE:uvmcheck>
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME rule_catalog_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_catalog.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(

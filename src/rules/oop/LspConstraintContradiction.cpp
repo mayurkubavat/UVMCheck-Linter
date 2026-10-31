@@ -64,3 +64,5 @@ std::unique_ptr<Rule> createLspConstraintContradiction() {
     return std::make_unique<oop::LspConstraintContradiction>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLspConstraintContradiction)

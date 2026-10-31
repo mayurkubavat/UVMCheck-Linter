@@ -86,3 +86,5 @@ std::unique_ptr<Rule> createQueueSlicePopFirst() {
     return std::make_unique<performance::QueueSlicePopFirst>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createQueueSlicePopFirst)

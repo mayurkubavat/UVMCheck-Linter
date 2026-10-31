@@ -76,3 +76,5 @@ std::unique_ptr<Rule> createBlockingEventTriggerInClockedBlock() {
     return std::make_unique<concurrency::BlockingEventTriggerInClockedBlock>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createBlockingEventTriggerInClockedBlock)

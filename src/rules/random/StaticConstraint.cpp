@@ -57,7 +57,7 @@ public:
         return "Disallows static constraints. Static constraints share solver state across all class instances in the simulation, "
                "causing hidden dependencies and test flakiness.";
     }
-    std::string_view getCategory() const override { return "Random"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -74,3 +74,5 @@ std::unique_ptr<Rule> createStaticConstraint() {
     return std::make_unique<random::StaticConstraint>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createStaticConstraint)

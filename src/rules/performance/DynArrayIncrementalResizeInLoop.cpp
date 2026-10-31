@@ -80,3 +80,5 @@ std::unique_ptr<Rule> createDynArrayIncrementalResizeInLoop() {
     return std::make_unique<performance::DynArrayIncrementalResizeInLoop>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDynArrayIncrementalResizeInLoop)

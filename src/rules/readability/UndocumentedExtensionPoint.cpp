@@ -91,3 +91,5 @@ std::unique_ptr<Rule> createUndocumentedExtensionPoint() {
     return std::make_unique<readability::UndocumentedExtensionPoint>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUndocumentedExtensionPoint)

@@ -71,7 +71,7 @@ public:
     std::string_view getDescription() const override {
         return "Disallow declaring scratchpad variables or loop induction counters as class properties. Move declarations to method stack frames to ensure thread safety and re-entrancy.";
     }
-    std::string_view getCategory() const override { return "Smell"; }
+    std::string_view getCategory() const override { return "Maintainability"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -88,3 +88,5 @@ std::unique_ptr<Rule> createScratchpadClassProperty() {
     return std::make_unique<smells::ScratchpadClassProperty>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createScratchpadClassProperty)

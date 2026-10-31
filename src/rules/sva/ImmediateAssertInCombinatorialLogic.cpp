@@ -71,3 +71,5 @@ std::unique_ptr<Rule> createImmediateAssertInCombinatorialLogic() {
     return std::make_unique<sva::ImmediateAssertInCombinatorialLogic>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createImmediateAssertInCombinatorialLogic)

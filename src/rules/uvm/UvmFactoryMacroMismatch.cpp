@@ -115,3 +115,5 @@ std::unique_ptr<Rule> createUvmFactoryMacroMismatch() {
     return std::make_unique<uvm::UvmFactoryMacroMismatch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmFactoryMacroMismatch)

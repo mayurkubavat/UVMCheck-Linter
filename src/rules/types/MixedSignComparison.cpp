@@ -95,7 +95,7 @@ public:
         return "Comparing signed and unsigned integers causes implicit unsigned coercion of the signed operand. "
                "Negative values evaluate as huge positive numbers, causing comparisons to silently invert logic.";
     }
-    std::string_view getCategory() const override { return "Arithmetic"; }
+    std::string_view getCategory() const override { return "Types"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -112,3 +112,5 @@ std::unique_ptr<Rule> createMixedSignComparison() {
     return std::make_unique<types::MixedSignComparison>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMixedSignComparison)

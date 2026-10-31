@@ -81,3 +81,5 @@ std::unique_ptr<Rule> createUnreferencedParameter() {
     return std::make_unique<deadcode::UnreferencedParameter>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnreferencedParameter)

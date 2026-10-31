@@ -77,3 +77,5 @@ std::unique_ptr<Rule> createRepeatedEnumSwitch() {
     return std::make_unique<design::RepeatedEnumSwitch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRepeatedEnumSwitch)

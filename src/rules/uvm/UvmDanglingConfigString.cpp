@@ -101,3 +101,5 @@ std::unique_ptr<Rule> createUvmDanglingConfigString() {
     return std::make_unique<uvm::UvmDanglingConfigString>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmDanglingConfigString)

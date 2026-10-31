@@ -68,3 +68,5 @@ std::unique_ptr<Rule> createMissingSuperNew() {
     return std::make_unique<oop::MissingSuperNew>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMissingSuperNew)

@@ -44,7 +44,7 @@
 | **Style & Formatting** | 21 | Mandatory end labels, line length limits, capitalization, naming conventions |
 | **Software Engineering** | 47 | Copy-paste bugs, failures that are not reported, checkers that cannot fail, testbench layer rules, god classes, cohesion and coupling metrics, cognitive complexity, lock and file-handle leaks |
 
-> For comprehensive rule specifications, rationales, and bad/good examples across all 334 rules, explore the [Rule Catalog](docs/rules/uvmcheck_rule_catalog.md).
+> Every rule, with its category, severity, presets, guidelines and links to its bad/good examples, is listed in the generated [Rule Catalog](docs/rules/README.md) (`uvmcheck --list-rules --json -` gives the same data as JSON).
 
 ---
 

@@ -48,3 +48,5 @@ std::unique_ptr<Rule> createConstraintNameSuffix() {
     return std::make_unique<style::ConstraintNameSuffix>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConstraintNameSuffix)

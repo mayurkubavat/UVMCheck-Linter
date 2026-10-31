@@ -363,3 +363,10 @@ std::unique_ptr<Rule> createAbsoluteConfigDbPath() { return std::make_unique<met
 std::unique_ptr<Rule> createOverrideByNameString() { return std::make_unique<methodology::OverrideByNameString>(); }
 std::unique_ptr<Rule> createIncompleteItemContract() { return std::make_unique<methodology::IncompleteItemContract>(); }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAgentIgnoresIsActive)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAgentWithoutConfigObject)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createHardcodedTopology)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAbsoluteConfigDbPath)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createOverrideByNameString)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIncompleteItemContract)

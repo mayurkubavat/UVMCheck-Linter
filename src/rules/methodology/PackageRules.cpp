@@ -470,3 +470,9 @@ std::unique_ptr<Rule> createUnusedPackageImport() { return std::make_unique<meth
 std::unique_ptr<Rule> createPackageLayerInversion() { return std::make_unique<methodology::PackageLayerInversion>(); }
 std::unique_ptr<Rule> createUnstablePackageDependedOn() { return std::make_unique<methodology::UnstablePackageDependedOn>(); }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createFileClassNameMismatch)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createWildcardImportOutsidePackage)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnusedPackageImport)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createPackageLayerInversion)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnstablePackageDependedOn)

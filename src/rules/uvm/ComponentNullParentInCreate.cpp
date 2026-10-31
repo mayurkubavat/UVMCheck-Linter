@@ -84,3 +84,5 @@ std::unique_ptr<Rule> createComponentNullParentInCreate() {
     return std::make_unique<uvm::ComponentNullParentInCreate>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createComponentNullParentInCreate)

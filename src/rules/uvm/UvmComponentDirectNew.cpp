@@ -55,3 +55,5 @@ std::unique_ptr<Rule> createUvmComponentDirectNew() {
     return std::make_unique<uvm::UvmComponentDirectNew>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmComponentDirectNew)

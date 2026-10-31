@@ -88,3 +88,5 @@ std::unique_ptr<Rule> createMultiClockConcurrentAssertionDomain() {
     return std::make_unique<sva::MultiClockConcurrentAssertionDomain>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMultiClockConcurrentAssertionDomain)

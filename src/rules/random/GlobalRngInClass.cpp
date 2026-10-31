@@ -41,7 +41,7 @@ public:
         return "Calling $urandom or $random inside class components or sequences corrupts global thread random "
                "stability. Use std::randomize() or object-scoped randomization to preserve simulation repeatability.";
     }
-    std::string_view getCategory() const override { return "Reproducibility"; }
+    std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     void run(slang::ast::Compilation& /*compilation*/,
@@ -70,3 +70,5 @@ std::unique_ptr<Rule> createGlobalRngInClass() {
     return std::make_unique<random::GlobalRngInClass>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createGlobalRngInClass)

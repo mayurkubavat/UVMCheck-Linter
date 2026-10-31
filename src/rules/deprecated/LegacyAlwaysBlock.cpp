@@ -55,3 +55,5 @@ std::unique_ptr<Rule> createLegacyAlwaysBlock() {
     return std::make_unique<deprecated::LegacyAlwaysBlock>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLegacyAlwaysBlock)

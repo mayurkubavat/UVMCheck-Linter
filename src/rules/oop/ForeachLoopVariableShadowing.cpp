@@ -138,3 +138,5 @@ std::unique_ptr<Rule> createForeachLoopVariableShadowing() {
     return std::make_unique<oop::ForeachLoopVariableShadowing>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createForeachLoopVariableShadowing)

@@ -137,3 +137,5 @@ std::unique_ptr<Rule> createRalAddressCollision() {
     return std::make_unique<ral::RalAddressCollision>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRalAddressCollision)

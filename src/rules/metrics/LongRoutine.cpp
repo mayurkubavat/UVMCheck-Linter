@@ -39,3 +39,5 @@ std::unique_ptr<Rule> createLongRoutine() {
     return std::make_unique<metrics::LongRoutine>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLongRoutine)

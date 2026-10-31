@@ -160,3 +160,5 @@ std::unique_ptr<Rule> createSuperBuildPhaseOrder() {
     return std::make_unique<uvm::SuperBuildPhaseOrder>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSuperBuildPhaseOrder)

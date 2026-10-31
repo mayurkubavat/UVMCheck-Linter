@@ -70,3 +70,5 @@ std::unique_ptr<Rule> createTaskWithNonVoidReturnType() {
     return std::make_unique<types::TaskWithNonVoidReturnType>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTaskWithNonVoidReturnType)

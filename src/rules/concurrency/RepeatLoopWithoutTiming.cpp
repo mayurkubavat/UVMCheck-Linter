@@ -132,3 +132,5 @@ std::unique_ptr<Rule> createRepeatLoopWithoutTiming() {
     return std::make_unique<concurrency::RepeatLoopWithoutTiming>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRepeatLoopWithoutTiming)

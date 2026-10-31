@@ -71,3 +71,5 @@ std::unique_ptr<Rule> createRealEquality() {
     return std::make_unique<correctness::RealEquality>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRealEquality)

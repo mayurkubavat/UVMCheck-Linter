@@ -67,3 +67,5 @@ std::unique_ptr<Rule> createUnboundedTransitionBins() {
     return std::make_unique<coverage::UnboundedTransitionBins>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnboundedTransitionBins)

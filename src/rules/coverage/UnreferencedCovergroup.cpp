@@ -152,3 +152,5 @@ std::unique_ptr<Rule> createUnreferencedCovergroup() {
     return std::make_unique<coverage::UnreferencedCovergroup>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnreferencedCovergroup)

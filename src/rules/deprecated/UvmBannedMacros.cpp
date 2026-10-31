@@ -92,7 +92,7 @@ public:
         return "Bans the `uvm_field_* macro suite. Mandates manual do_copy, do_compare, and do_print methods "
                "to eliminate severe simulation performance overhead and uncontrollable deep copy bugs.";
     }
-    std::string_view getCategory() const override { return "AntiPattern"; }
+    std::string_view getCategory() const override { return "Deprecated"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     void run(slang::ast::Compilation& compilation,
@@ -110,7 +110,7 @@ public:
         return "Discourages black-box `uvm_do macros in sequence bodies. "
                "Mandates explicit start_item / finish_item transaction handshakes.";
     }
-    std::string_view getCategory() const override { return "AntiPattern"; }
+    std::string_view getCategory() const override { return "Deprecated"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     void run(slang::ast::Compilation& compilation,
@@ -130,3 +130,6 @@ std::unique_ptr<Rule> createUvmBannedUvmDoMacros() {
     return std::make_unique<deprecated::UvmBannedUvmDoMacros>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmBannedFieldMacros)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmBannedUvmDoMacros)

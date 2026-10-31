@@ -113,3 +113,5 @@ std::unique_ptr<Rule> createSequenceAbortSafety() {
     return std::make_unique<uvm::SequenceAbortSafety>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSequenceAbortSafety)

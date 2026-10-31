@@ -66,3 +66,5 @@ std::unique_ptr<Rule> createChainedAssignmentAliasing() {
     return std::make_unique<oop::ChainedAssignmentAliasing>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createChainedAssignmentAliasing)

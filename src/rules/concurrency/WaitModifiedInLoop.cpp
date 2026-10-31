@@ -167,3 +167,5 @@ std::unique_ptr<Rule> createWaitModifiedInLoop() {
     return std::make_unique<concurrency::WaitModifiedInLoop>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createWaitModifiedInLoop)

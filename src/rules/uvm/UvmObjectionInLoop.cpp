@@ -100,3 +100,5 @@ std::unique_ptr<Rule> createUvmObjectionInLoop() {
   return std::make_unique<uvm::UvmObjectionInLoop>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmObjectionInLoop)

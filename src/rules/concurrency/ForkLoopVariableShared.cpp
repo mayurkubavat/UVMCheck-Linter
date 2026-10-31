@@ -113,3 +113,5 @@ std::unique_ptr<Rule> createForkLoopVariableShared() {
     return std::make_unique<concurrency::ForkLoopVariableShared>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createForkLoopVariableShared)

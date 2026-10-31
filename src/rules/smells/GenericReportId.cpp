@@ -69,7 +69,7 @@ public:
     std::string_view getDescription() const override {
         return "Disallow generic single-word report IDs ('ERR', 'INFO', 'DEBUG') in UVM reporting macros. Use feature-scoped hierarchical identifiers to support precise log filtering.";
     }
-    std::string_view getCategory() const override { return "Smell"; }
+    std::string_view getCategory() const override { return "Maintainability"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -86,3 +86,5 @@ std::unique_ptr<Rule> createGenericReportId() {
     return std::make_unique<smells::GenericReportId>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createGenericReportId)

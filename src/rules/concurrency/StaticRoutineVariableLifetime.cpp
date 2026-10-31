@@ -68,3 +68,5 @@ std::unique_ptr<Rule> createStaticRoutineVariableLifetime() {
     return std::make_unique<concurrency::StaticRoutineVariableLifetime>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createStaticRoutineVariableLifetime)

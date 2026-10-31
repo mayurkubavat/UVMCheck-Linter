@@ -147,3 +147,5 @@ std::unique_ptr<Rule> createLockNotReleased() {
     return std::make_unique<concurrency::LockNotReleased>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLockNotReleased)

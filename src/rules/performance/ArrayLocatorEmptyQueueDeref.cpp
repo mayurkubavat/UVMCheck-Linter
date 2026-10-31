@@ -84,3 +84,5 @@ std::unique_ptr<Rule> createArrayLocatorEmptyQueueDeref() {
     return std::make_unique<performance::ArrayLocatorEmptyQueueDeref>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createArrayLocatorEmptyQueueDeref)

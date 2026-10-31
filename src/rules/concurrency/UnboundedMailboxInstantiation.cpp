@@ -98,3 +98,5 @@ std::unique_ptr<Rule> createUnboundedMailboxInstantiation() {
     return std::make_unique<concurrency::UnboundedMailboxInstantiation>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnboundedMailboxInstantiation)

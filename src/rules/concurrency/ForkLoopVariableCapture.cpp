@@ -165,3 +165,5 @@ std::unique_ptr<Rule> createForkLoopVariableCapture() {
     return std::make_unique<concurrency::ForkLoopVariableCapture>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createForkLoopVariableCapture)

@@ -82,3 +82,5 @@ std::unique_ptr<Rule> createCrossWithAllBinsIgnored() {
     return std::make_unique<coverage::CrossWithAllBinsIgnored>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCrossWithAllBinsIgnored)

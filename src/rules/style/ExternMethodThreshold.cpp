@@ -78,3 +78,5 @@ std::unique_ptr<Rule> createExternMethodThreshold() {
     return std::make_unique<style::ExternMethodThreshold>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createExternMethodThreshold)

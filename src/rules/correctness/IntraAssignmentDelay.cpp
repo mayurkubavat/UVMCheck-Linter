@@ -68,3 +68,5 @@ std::unique_ptr<Rule> createIntraAssignmentDelay() {
     return std::make_unique<correctness::IntraAssignmentDelay>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIntraAssignmentDelay)

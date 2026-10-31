@@ -78,3 +78,5 @@ std::unique_ptr<Rule> createDirectMirrorSetWithoutWrite() {
     return std::make_unique<ral::DirectMirrorSetWithoutWrite>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDirectMirrorSetWithoutWrite)

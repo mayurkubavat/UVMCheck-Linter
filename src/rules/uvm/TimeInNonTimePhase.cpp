@@ -112,3 +112,5 @@ std::unique_ptr<Rule> createTimeInNonTimePhase() {
     return std::make_unique<uvm::TimeInNonTimePhase>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTimeInNonTimePhase)

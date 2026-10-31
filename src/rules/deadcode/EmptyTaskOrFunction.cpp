@@ -120,3 +120,5 @@ std::unique_ptr<Rule> createEmptyTaskOrFunction() {
     return std::make_unique<deadcode::EmptyTaskOrFunction>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createEmptyTaskOrFunction)

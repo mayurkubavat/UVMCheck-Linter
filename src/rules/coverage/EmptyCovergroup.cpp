@@ -64,3 +64,5 @@ std::unique_ptr<Rule> createEmptyCovergroup() {
     return std::make_unique<coverage::EmptyCovergroup>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createEmptyCovergroup)

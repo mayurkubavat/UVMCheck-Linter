@@ -57,3 +57,5 @@ std::unique_ptr<Rule> createCrossWithEmptyBins() {
     return std::make_unique<coverage::CrossWithEmptyBins>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCrossWithEmptyBins)

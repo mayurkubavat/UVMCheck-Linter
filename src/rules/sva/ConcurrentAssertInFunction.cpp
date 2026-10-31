@@ -84,3 +84,5 @@ std::unique_ptr<Rule> createConcurrentAssertInFunction() {
     return std::make_unique<sva::ConcurrentAssertInFunction>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConcurrentAssertInFunction)

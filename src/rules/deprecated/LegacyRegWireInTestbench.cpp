@@ -51,7 +51,7 @@ public:
     std::string_view getDescription() const override {
         return "Discourages legacy 'reg' and 'wire' keywords in SystemVerilog testbenches in favor of 'logic'.";
     }
-    std::string_view getCategory() const override { return "AntiPattern"; }
+    std::string_view getCategory() const override { return "Deprecated"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -68,3 +68,5 @@ std::unique_ptr<Rule> createLegacyRegWireInTestbench() {
     return std::make_unique<deprecated::LegacyRegWireInTestbench>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLegacyRegWireInTestbench)

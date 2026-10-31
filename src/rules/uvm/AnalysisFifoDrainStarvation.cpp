@@ -161,3 +161,5 @@ std::unique_ptr<Rule> createAnalysisFifoDrainStarvation() {
     return std::make_unique<uvm::AnalysisFifoDrainStarvation>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createAnalysisFifoDrainStarvation)

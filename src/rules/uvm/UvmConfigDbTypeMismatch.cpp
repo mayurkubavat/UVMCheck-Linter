@@ -121,3 +121,5 @@ std::unique_ptr<Rule> createUvmConfigDbTypeMismatch() {
     return std::make_unique<uvm::UvmConfigDbTypeMismatch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmConfigDbTypeMismatch)

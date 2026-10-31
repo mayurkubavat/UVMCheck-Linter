@@ -40,3 +40,5 @@ std::unique_ptr<Rule> createComplexCondition() {
     return std::make_unique<metrics::ComplexCondition>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createComplexCondition)

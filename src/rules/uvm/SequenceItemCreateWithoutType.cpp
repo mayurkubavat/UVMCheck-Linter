@@ -161,3 +161,5 @@ std::unique_ptr<Rule> createSequenceItemCreateWithoutType() {
     return std::make_unique<uvm::SequenceItemCreateWithoutType>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSequenceItemCreateWithoutType)

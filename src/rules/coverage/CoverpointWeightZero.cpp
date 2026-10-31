@@ -71,3 +71,5 @@ std::unique_ptr<Rule> createCoverpointWeightZero() {
     return std::make_unique<coverage::CoverpointWeightZero>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCoverpointWeightZero)

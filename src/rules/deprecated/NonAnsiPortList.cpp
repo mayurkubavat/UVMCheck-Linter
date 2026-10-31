@@ -75,3 +75,5 @@ std::unique_ptr<Rule> createNonAnsiPortList() {
     return std::make_unique<deprecated::NonAnsiPortList>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNonAnsiPortList)

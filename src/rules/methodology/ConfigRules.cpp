@@ -351,3 +351,7 @@ std::unique_ptr<Rule> createConfigDbAsRuntimeChannel() { return std::make_unique
 std::unique_ptr<Rule> createScatteredConfigKeyLiteral() { return std::make_unique<methodology::ScatteredConfigKeyLiteral>(); }
 std::unique_ptr<Rule> createSharedConfigMutatedAtRuntime() { return std::make_unique<methodology::SharedConfigMutatedAtRuntime>(); }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConfigDbAsRuntimeChannel)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createScatteredConfigKeyLiteral)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSharedConfigMutatedAtRuntime)

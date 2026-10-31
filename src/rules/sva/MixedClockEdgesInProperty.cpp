@@ -87,3 +87,5 @@ std::unique_ptr<Rule> createMixedClockEdgesInProperty() {
     return std::make_unique<sva::MixedClockEdgesInProperty>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMixedClockEdgesInProperty)

@@ -61,3 +61,5 @@ std::unique_ptr<Rule> createUvmPhaseJumpHazard() {
     return std::make_unique<uvm::UvmPhaseJumpHazard>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmPhaseJumpHazard)

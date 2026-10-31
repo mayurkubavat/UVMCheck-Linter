@@ -48,3 +48,5 @@ std::unique_ptr<Rule> createRefArgumentNeverWritten() {
     return std::make_unique<readability::RefArgumentNeverWritten>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRefArgumentNeverWritten)

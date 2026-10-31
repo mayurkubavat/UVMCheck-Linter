@@ -69,3 +69,5 @@ std::unique_ptr<Rule> createFileIncludedInMultiplePackages() {
     return std::make_unique<design::FileIncludedInMultiplePackages>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createFileIncludedInMultiplePackages)

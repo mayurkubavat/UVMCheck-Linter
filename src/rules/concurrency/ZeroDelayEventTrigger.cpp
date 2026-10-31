@@ -66,3 +66,5 @@ std::unique_ptr<Rule> createZeroDelayEventTrigger() {
     return std::make_unique<concurrency::ZeroDelayEventTrigger>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createZeroDelayEventTrigger)

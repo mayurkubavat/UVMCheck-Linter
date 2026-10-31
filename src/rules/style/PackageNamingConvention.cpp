@@ -56,3 +56,5 @@ std::unique_ptr<Rule> createPackageNamingConvention() {
     return std::make_unique<style::PackageNamingConvention>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createPackageNamingConvention)

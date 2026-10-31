@@ -97,3 +97,5 @@ std::unique_ptr<Rule> createMutexTryGetWithoutCheck() {
     return std::make_unique<concurrency::MutexTryGetWithoutCheck>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMutexTryGetWithoutCheck)

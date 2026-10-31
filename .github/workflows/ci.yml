@@ -53,6 +53,8 @@ jobs:
             needs_uvm: true
           - suite: LSP integration
             lsp: true
+          - suite: tool checks
+            tools: true
     name: test (${{ matrix.suite }})
     steps:
       - uses: actions/checkout@v4
@@ -69,9 +71,18 @@ jobs:
         run: git clone --depth 1 --branch "$UVM_CORE_REF" https://github.com/accellera-official/uvm-core.git uvm-core
 
       - name: Rule tests
-        if: ${{ !matrix.lsp }}
+        if: ${{ !matrix.lsp && !matrix.tools }}
         run: python3 tests/regression.py --binary build/uvmcheck ${{ matrix.args }}
 
       - name: LSP test
         if: matrix.lsp
         run: python3 tests/test_lsp.py
+
+      - name: Catalog, config, guide, history and engine checks
+        if: matrix.tools
+        run: |
+          python3 tests/test_catalog.py --binary build/uvmcheck
+          python3 tests/test_config.py --binary build/uvmcheck
+          python3 tests/test_guidelines.py --binary build/uvmcheck
+          python3 tests/test_history.py --binary build/uvmcheck
+          python3 tests/engine_equivalence.py --binary build/uvmcheck

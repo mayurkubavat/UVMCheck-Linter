@@ -58,3 +58,5 @@ std::unique_ptr<Rule> createCoverpointDefaultBinHazard() {
     return std::make_unique<coverage::CoverpointDefaultBinHazard>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCoverpointDefaultBinHazard)

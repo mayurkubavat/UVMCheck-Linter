@@ -86,3 +86,5 @@ std::unique_ptr<Rule> createPhaseObjectionMismatch() {
     return std::make_unique<uvm::PhaseObjectionMismatch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createPhaseObjectionMismatch)

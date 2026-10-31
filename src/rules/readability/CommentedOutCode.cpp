@@ -139,3 +139,5 @@ std::unique_ptr<Rule> createCommentedOutCode() {
     return std::make_unique<readability::CommentedOutCode>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCommentedOutCode)

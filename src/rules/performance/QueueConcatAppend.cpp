@@ -89,3 +89,5 @@ std::unique_ptr<Rule> createQueueConcatAppend() {
     return std::make_unique<performance::QueueConcatAppend>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createQueueConcatAppend)

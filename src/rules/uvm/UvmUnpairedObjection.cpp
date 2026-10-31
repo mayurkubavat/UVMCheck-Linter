@@ -96,3 +96,5 @@ std::unique_ptr<Rule> createUvmUnpairedObjection() {
     return std::make_unique<uvm::UvmUnpairedObjection>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmUnpairedObjection)

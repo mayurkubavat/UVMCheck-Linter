@@ -43,3 +43,5 @@ std::unique_ptr<Rule> createConfigDbCrossComponentResolver() {
     return std::make_unique<uvm::ConfigDbCrossComponentResolver>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConfigDbCrossComponentResolver)

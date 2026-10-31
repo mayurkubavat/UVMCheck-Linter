@@ -91,3 +91,5 @@ std::unique_ptr<Rule> createRedundantCastToSameType() {
     return std::make_unique<types::RedundantCastToSameType>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRedundantCastToSameType)

@@ -124,3 +124,5 @@ std::unique_ptr<Rule> createRalPredictorAdapterWiring() {
     return std::make_unique<uvm::RalPredictorAdapterWiring>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRalPredictorAdapterWiring)

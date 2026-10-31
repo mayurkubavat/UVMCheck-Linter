@@ -81,3 +81,5 @@ std::unique_ptr<Rule> createForkInsideFunction() {
     return std::make_unique<concurrency::ForkInsideFunction>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createForkInsideFunction)

@@ -96,3 +96,5 @@ std::unique_ptr<Rule> createSuspiciousArgumentOrder() {
     return std::make_unique<correctness::SuspiciousArgumentOrder>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSuspiciousArgumentOrder)

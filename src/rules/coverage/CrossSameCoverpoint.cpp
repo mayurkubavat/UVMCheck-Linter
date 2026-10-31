@@ -70,3 +70,5 @@ std::unique_ptr<Rule> createCrossSameCoverpoint() {
     return std::make_unique<coverage::CrossSameCoverpoint>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCrossSameCoverpoint)

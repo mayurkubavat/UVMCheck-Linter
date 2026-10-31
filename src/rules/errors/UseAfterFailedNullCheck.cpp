@@ -181,3 +181,5 @@ std::unique_ptr<Rule> createUseAfterFailedNullCheck() {
     return std::make_unique<errors::UseAfterFailedNullCheck>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUseAfterFailedNullCheck)

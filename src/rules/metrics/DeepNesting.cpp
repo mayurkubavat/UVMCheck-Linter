@@ -40,3 +40,5 @@ std::unique_ptr<Rule> createDeepNesting() {
     return std::make_unique<metrics::DeepNesting>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDeepNesting)

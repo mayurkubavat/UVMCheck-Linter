@@ -101,3 +101,5 @@ std::unique_ptr<Rule> createUvmFactoryMissingUtils() {
     return std::make_unique<uvm::UvmFactoryMissingUtils>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmFactoryMissingUtils)

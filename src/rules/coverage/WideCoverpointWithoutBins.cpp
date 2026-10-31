@@ -83,3 +83,5 @@ std::unique_ptr<Rule> createWideCoverpointWithoutBins() {
     return std::make_unique<coverage::WideCoverpointWithoutBins>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createWideCoverpointWithoutBins)

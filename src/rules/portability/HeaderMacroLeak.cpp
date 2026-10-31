@@ -100,3 +100,5 @@ std::unique_ptr<Rule> createHeaderMacroLeak() {
     return std::make_unique<portability::HeaderMacroLeak>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createHeaderMacroLeak)

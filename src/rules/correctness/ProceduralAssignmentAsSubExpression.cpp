@@ -82,3 +82,5 @@ std::unique_ptr<Rule> createProceduralAssignmentAsSubExpression() {
     return std::make_unique<correctness::ProceduralAssignmentAsSubExpression>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createProceduralAssignmentAsSubExpression)

@@ -83,3 +83,5 @@ std::unique_ptr<Rule> createBuildPhaseCrossComponentAccess() {
     return std::make_unique<uvm::BuildPhaseCrossComponentAccess>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createBuildPhaseCrossComponentAccess)

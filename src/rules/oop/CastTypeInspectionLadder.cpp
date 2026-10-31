@@ -75,3 +75,5 @@ std::unique_ptr<Rule> createCastTypeInspectionLadder() {
     return std::make_unique<oop::CastTypeInspectionLadder>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCastTypeInspectionLadder)

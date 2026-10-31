@@ -1,5 +1,8 @@
 #pragma once
 
+#include <memory>
+#include "uvmcheck/rules/Rule.h"
+
 #include <string>
 #include <vector>
 #include "uvmcheck/core/Diagnostic.h"
@@ -22,6 +25,11 @@ public:
 
     /// The guide itself: every guideline with its level, statement and rules.
     static bool writeGuidelines(const std::string& outputPath);
+
+    /// The rule catalog: every registered rule and sub-rule with its metadata, sorted by ID.
+    /// docs/rules/catalog.json is generated from this (scripts/gen_rule_docs.py).
+    static bool writeRuleCatalog(const std::string& outputPath,
+                                 const std::vector<std::unique_ptr<rules::Rule>>& rules);
 };
 
 } // namespace uvmcheck::reporting

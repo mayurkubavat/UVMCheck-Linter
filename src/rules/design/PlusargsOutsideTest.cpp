@@ -58,3 +58,5 @@ std::unique_ptr<Rule> createPlusargsOutsideTest() {
     return std::make_unique<design::PlusargsOutsideTest>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createPlusargsOutsideTest)

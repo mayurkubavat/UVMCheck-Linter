@@ -123,3 +123,5 @@ std::unique_ptr<Rule> createSequenceItemTypeCompatibility() {
     return std::make_unique<uvm::SequenceItemTypeCompatibility>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSequenceItemTypeCompatibility)

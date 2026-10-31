@@ -77,3 +77,5 @@ std::unique_ptr<Rule> createUncheckedDynamicCast() {
     return std::make_unique<oop::UncheckedDynamicCast>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUncheckedDynamicCast)

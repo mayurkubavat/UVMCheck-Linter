@@ -107,3 +107,5 @@ std::unique_ptr<Rule> createUvmUnconnectedTlmPort() {
     return std::make_unique<uvm::UvmUnconnectedTlmPort>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmUnconnectedTlmPort)

@@ -98,3 +98,5 @@ std::unique_ptr<Rule> createUnusedPureRoutineResult() {
     return std::make_unique<deadcode::UnusedPureRoutineResult>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnusedPureRoutineResult)

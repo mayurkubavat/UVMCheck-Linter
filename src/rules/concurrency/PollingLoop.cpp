@@ -133,3 +133,5 @@ std::unique_ptr<Rule> createPollingLoop() {
     return std::make_unique<concurrency::PollingLoop>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createPollingLoop)

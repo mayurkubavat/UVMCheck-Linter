@@ -153,3 +153,5 @@ std::unique_ptr<Rule> createSequenceBodyWithoutStartItem() {
     return std::make_unique<uvm::SequenceBodyWithoutStartItem>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSequenceBodyWithoutStartItem)

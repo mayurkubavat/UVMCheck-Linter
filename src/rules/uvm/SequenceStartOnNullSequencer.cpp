@@ -85,3 +85,5 @@ std::unique_ptr<Rule> createSequenceStartOnNullSequencer() {
     return std::make_unique<uvm::SequenceStartOnNullSequencer>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSequenceStartOnNullSequencer)

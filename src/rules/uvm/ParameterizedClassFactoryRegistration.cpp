@@ -109,3 +109,5 @@ std::unique_ptr<Rule> createParameterizedClassFactoryRegistration() {
     return std::make_unique<uvm::ParameterizedClassFactoryRegistration>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createParameterizedClassFactoryRegistration)

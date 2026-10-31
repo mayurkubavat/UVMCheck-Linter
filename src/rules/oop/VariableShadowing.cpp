@@ -106,3 +106,5 @@ std::unique_ptr<Rule> createVariableShadowing() {
     return std::make_unique<oop::VariableShadowing>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createVariableShadowing)

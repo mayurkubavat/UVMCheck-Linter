@@ -100,3 +100,5 @@ std::unique_ptr<Rule> createUnboundedThreadSpawn() {
     return std::make_unique<concurrency::UnboundedThreadSpawn>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnboundedThreadSpawn)

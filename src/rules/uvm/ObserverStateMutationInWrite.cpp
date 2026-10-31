@@ -99,3 +99,5 @@ std::unique_ptr<Rule> createObserverStateMutationInWrite() {
     return std::make_unique<uvm::ObserverStateMutationInWrite>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createObserverStateMutationInWrite)

@@ -110,3 +110,5 @@ std::unique_ptr<Rule> createOrphanSubsequenceObjectionHang() {
     return std::make_unique<uvm::OrphanSubsequenceObjectionHang>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createOrphanSubsequenceObjectionHang)

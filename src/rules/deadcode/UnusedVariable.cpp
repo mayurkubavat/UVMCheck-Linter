@@ -82,3 +82,5 @@ std::unique_ptr<Rule> createUnusedVariable() {
     return std::make_unique<deadcode::UnusedVariable>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnusedVariable)

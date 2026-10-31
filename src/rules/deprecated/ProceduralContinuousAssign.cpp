@@ -54,3 +54,5 @@ std::unique_ptr<Rule> createProceduralContinuousAssign() {
     return std::make_unique<deprecated::ProceduralContinuousAssign>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createProceduralContinuousAssign)

@@ -69,3 +69,5 @@ std::unique_ptr<Rule> createOffByOneQueueIndex() {
     return std::make_unique<correctness::OffByOneQueueIndex>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createOffByOneQueueIndex)

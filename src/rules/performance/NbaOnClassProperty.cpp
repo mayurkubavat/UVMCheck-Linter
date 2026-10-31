@@ -58,3 +58,5 @@ std::unique_ptr<Rule> createNbaOnClassProperty() {
     return std::make_unique<performance::NbaOnClassProperty>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNbaOnClassProperty)

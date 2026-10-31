@@ -74,3 +74,5 @@ std::unique_ptr<Rule> createSequencePriorityRange() {
     return std::make_unique<uvm::SequencePriorityRange>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSequencePriorityRange)

@@ -75,3 +75,5 @@ std::unique_ptr<Rule> createUvmMissingSuperPhase() {
     return std::make_unique<uvm::UvmMissingSuperPhase>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUvmMissingSuperPhase)

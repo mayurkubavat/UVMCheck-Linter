@@ -71,3 +71,5 @@ std::unique_ptr<Rule> createUnlabeledAssertion() {
     return std::make_unique<sva::UnlabeledAssertion>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnlabeledAssertion)

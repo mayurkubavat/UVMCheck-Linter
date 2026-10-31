@@ -108,7 +108,7 @@ public:
     std::string_view getDescription() const override {
         return "Detects subroutines with high McCabe Cyclomatic Complexity ($M > 15$). Complex control flow obscures edge cases and inhibits functional verification.";
     }
-    std::string_view getCategory() const override { return "Smell"; }
+    std::string_view getCategory() const override { return "Maintainability"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -125,3 +125,5 @@ std::unique_ptr<Rule> createCyclomaticComplexityGodMethod() {
     return std::make_unique<smells::CyclomaticComplexityGodMethod>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCyclomaticComplexityGodMethod)

@@ -62,3 +62,5 @@ std::unique_ptr<Rule> createUnusedRoutineArgument() {
     return std::make_unique<deadcode::UnusedRoutineArgument>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createUnusedRoutineArgument)

@@ -60,7 +60,7 @@ public:
         return "Disallow unsized integer and numeric literals without explicit bit-width declarations. "
                "Prevents silent 32-bit zero-extension and sign extension bugs.";
     }
-    std::string_view getCategory() const override { return "Safety"; }
+    std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
@@ -77,3 +77,5 @@ std::unique_ptr<Rule> createExplicitLiteralWidth() {
     return std::make_unique<style::ExplicitLiteralWidth>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createExplicitLiteralWidth)

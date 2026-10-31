@@ -85,3 +85,5 @@ std::unique_ptr<Rule> createLayerDependency() {
     return std::make_unique<design::LayerDependency>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createLayerDependency)

@@ -82,3 +82,5 @@ std::unique_ptr<Rule> createTypeSwitchByName() {
     return std::make_unique<design::TypeSwitchByName>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTypeSwitchByName)

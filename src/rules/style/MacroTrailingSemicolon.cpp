@@ -77,3 +77,5 @@ std::unique_ptr<Rule> createMacroTrailingSemicolon() {
     return std::make_unique<style::MacroTrailingSemicolon>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMacroTrailingSemicolon)

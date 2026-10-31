@@ -86,3 +86,5 @@ std::unique_ptr<Rule> createRepeatedElseIfCondition() {
     return std::make_unique<correctness::RepeatedElseIfCondition>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRepeatedElseIfCondition)

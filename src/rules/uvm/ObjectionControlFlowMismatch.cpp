@@ -48,3 +48,5 @@ std::unique_ptr<Rule> createObjectionControlFlowMismatch() {
     return std::make_unique<uvm::ObjectionControlFlowMismatch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createObjectionControlFlowMismatch)

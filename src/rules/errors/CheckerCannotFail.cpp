@@ -142,3 +142,5 @@ std::unique_ptr<Rule> createCheckerCannotFail() {
     return std::make_unique<errors::CheckerCannotFail>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCheckerCannotFail)

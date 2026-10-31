@@ -82,3 +82,5 @@ std::unique_ptr<Rule> createClassInstantiationInLoop() {
     return std::make_unique<performance::ClassInstantiationInLoop>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createClassInstantiationInLoop)

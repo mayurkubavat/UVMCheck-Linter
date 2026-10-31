@@ -47,3 +47,5 @@ std::unique_ptr<Rule> createConstantReseed() {
     return std::make_unique<random::ConstantReseed>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConstantReseed)

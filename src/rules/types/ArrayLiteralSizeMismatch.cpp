@@ -77,3 +77,5 @@ std::unique_ptr<Rule> createArrayLiteralSizeMismatch() {
     return std::make_unique<types::ArrayLiteralSizeMismatch>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createArrayLiteralSizeMismatch)

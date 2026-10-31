@@ -128,3 +128,5 @@ std::unique_ptr<Rule> createScoreboardLeftoverQueue() {
     return std::make_unique<uvm::ScoreboardLeftoverQueue>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createScoreboardLeftoverQueue)

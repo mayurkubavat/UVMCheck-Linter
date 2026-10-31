@@ -115,3 +115,5 @@ std::unique_ptr<Rule> createDuplicateMethodBody() {
     return std::make_unique<oop::DuplicateMethodBody>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDuplicateMethodBody)

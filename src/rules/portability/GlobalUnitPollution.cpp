@@ -63,3 +63,5 @@ std::unique_ptr<Rule> createGlobalUnitPollution() {
     return std::make_unique<portability::GlobalUnitPollution>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createGlobalUnitPollution)

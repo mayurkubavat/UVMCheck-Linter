@@ -96,3 +96,5 @@ std::unique_ptr<Rule> createConsecutiveDeadStore() {
     return std::make_unique<deadcode::ConsecutiveDeadStore>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConsecutiveDeadStore)

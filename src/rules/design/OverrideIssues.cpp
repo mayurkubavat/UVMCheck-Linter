@@ -130,3 +130,6 @@ std::unique_ptr<Rule> createEmptyOverrideOfConcrete() {
     return std::make_unique<design::EmptyOverrideOfConcrete>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createOverrideOnlyCallsSuper)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createEmptyOverrideOfConcrete)

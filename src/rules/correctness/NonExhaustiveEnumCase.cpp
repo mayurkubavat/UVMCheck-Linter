@@ -106,3 +106,5 @@ std::unique_ptr<Rule> createNonExhaustiveEnumCase() {
     return std::make_unique<correctness::NonExhaustiveEnumCase>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createNonExhaustiveEnumCase)

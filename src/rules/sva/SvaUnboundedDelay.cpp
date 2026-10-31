@@ -77,3 +77,5 @@ std::unique_ptr<Rule> createSvaUnboundedDelay() {
     return std::make_unique<sva::SvaUnboundedDelay>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSvaUnboundedDelay)

@@ -63,3 +63,5 @@ std::unique_ptr<Rule> createCasexProhibited() {
     return std::make_unique<correctness::CasexProhibited>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCasexProhibited)

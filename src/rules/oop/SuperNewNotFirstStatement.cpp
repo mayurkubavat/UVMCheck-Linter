@@ -80,3 +80,5 @@ std::unique_ptr<Rule> createSuperNewNotFirstStatement() {
     return std::make_unique<oop::SuperNewNotFirstStatement>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSuperNewNotFirstStatement)

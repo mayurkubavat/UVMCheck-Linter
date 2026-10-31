@@ -41,3 +41,5 @@ std::unique_ptr<Rule> createTooManyArguments() {
     return std::make_unique<metrics::TooManyArguments>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createTooManyArguments)

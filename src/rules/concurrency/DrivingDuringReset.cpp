@@ -85,3 +85,5 @@ std::unique_ptr<Rule> createDrivingDuringReset() {
     return std::make_unique<concurrency::DrivingDuringReset>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createDrivingDuringReset)

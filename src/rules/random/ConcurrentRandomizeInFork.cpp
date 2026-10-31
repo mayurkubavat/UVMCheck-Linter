@@ -115,3 +115,5 @@ std::unique_ptr<Rule> createConcurrentRandomizeInFork() {
     return std::make_unique<random::ConcurrentRandomizeInFork>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConcurrentRandomizeInFork)

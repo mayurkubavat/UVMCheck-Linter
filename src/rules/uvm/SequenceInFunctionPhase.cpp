@@ -73,3 +73,5 @@ std::unique_ptr<Rule> createSequenceInFunctionPhase() {
     return std::make_unique<uvm::SequenceInFunctionPhase>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSequenceInFunctionPhase)

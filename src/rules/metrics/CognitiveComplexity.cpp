@@ -40,3 +40,5 @@ std::unique_ptr<Rule> createCognitiveComplexity() {
     return std::make_unique<metrics::CognitiveComplexity>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCognitiveComplexity)

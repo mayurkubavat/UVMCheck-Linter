@@ -112,3 +112,5 @@ std::unique_ptr<Rule> createRedundantBoolean() {
     return std::make_unique<readability::RedundantBoolean>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createRedundantBoolean)

@@ -171,3 +171,5 @@ std::unique_ptr<Rule> createComponentNameMismatch() {
     return std::make_unique<uvm::ComponentNameMismatch>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createComponentNameMismatch)

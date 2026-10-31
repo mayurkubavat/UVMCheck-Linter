@@ -103,3 +103,5 @@ std::unique_ptr<Rule> createOverlappingRangesInCoverpointBin() {
     return std::make_unique<coverage::OverlappingRangesInCoverpointBin>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createOverlappingRangesInCoverpointBin)

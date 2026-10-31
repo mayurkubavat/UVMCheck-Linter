@@ -57,3 +57,5 @@ std::unique_ptr<Rule> createStringKeyAssociativeArray() {
     return std::make_unique<performance::StringKeyAssociativeArray>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createStringKeyAssociativeArray)

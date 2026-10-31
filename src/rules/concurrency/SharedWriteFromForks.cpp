@@ -144,3 +144,5 @@ std::unique_ptr<Rule> createSharedWriteFromForks() {
     return std::make_unique<concurrency::SharedWriteFromForks>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSharedWriteFromForks)

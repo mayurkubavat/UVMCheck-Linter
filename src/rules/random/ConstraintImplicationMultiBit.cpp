@@ -80,3 +80,5 @@ std::unique_ptr<Rule> createConstraintImplicationMultiBit() {
     return std::make_unique<random::ConstraintImplicationMultiBit>();
 }
 } // namespace uvmcheck::rules
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConstraintImplicationMultiBit)

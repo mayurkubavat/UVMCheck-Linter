@@ -69,3 +69,5 @@ std::unique_ptr<Rule> createProceduralZeroDelay() {
     return std::make_unique<performance::ProceduralZeroDelay>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createProceduralZeroDelay)

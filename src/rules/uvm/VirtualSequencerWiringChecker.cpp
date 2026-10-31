@@ -128,3 +128,5 @@ std::unique_ptr<Rule> createVirtualSequencerWiringChecker() {
     return std::make_unique<uvm::VirtualSequencerWiringChecker>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createVirtualSequencerWiringChecker)

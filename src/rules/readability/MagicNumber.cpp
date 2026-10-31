@@ -95,3 +95,5 @@ std::unique_ptr<Rule> createMagicNumber() {
     return std::make_unique<readability::MagicNumber>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createMagicNumber)

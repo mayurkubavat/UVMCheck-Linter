@@ -95,3 +95,5 @@ std::unique_ptr<Rule> createZeroDelayEventWaitLoop() {
     return std::make_unique<concurrency::ZeroDelayEventWaitLoop>();
 }
 }
+
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createZeroDelayEventWaitLoop)
