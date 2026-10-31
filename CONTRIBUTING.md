@@ -139,7 +139,11 @@ follow two rules:
   and each has its own `RuleContext`.
 
 Rules that need a custom traversal can still override
-`run(compilation, uvmModel, diags)`; they run as independent parallel jobs.
+`run(compilation, uvmModel, diags)`; they run as independent parallel jobs. Querying the
+UVM model there (classes, methods) is fine, but a `run()` that walks the whole design
+(`compilation.getRoot().visit(...)` or a loop over `getSyntaxTrees()`) fails
+`tests/test_engine_gate.py` unless its file is on `tests/engine_legacy_allowlist.txt`,
+which only shrinks. `swe::UserCodeVisitor` takes part in the shared walk.
 `tests/engine_equivalence.py` checks that both styles give the same findings
 as the reference `--engine isolated` mode.
 

@@ -52,9 +52,9 @@ public:
     std::string_view getCategory() const override { return "Correctness"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(Compilation& compilation, const uvm::UvmModel&, core::DiagnosticEngine& diags) override {
-        SelfAssignmentVisitor v(diags);
-        compilation.getRoot().visit(v);
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        SelfAssignmentVisitor v(ctx.diags());
+        co_await ctx.visitAst(v);
     }
 };
 

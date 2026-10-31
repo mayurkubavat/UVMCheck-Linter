@@ -150,6 +150,11 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(
+    NAME engine_gate_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_engine_gate.py
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
     NAME history_rules_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_history.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}

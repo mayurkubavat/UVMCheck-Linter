@@ -31,7 +31,7 @@ public:
     }
 };
 
-class ForkInLoopVisitor : public slang::syntax::SyntaxVisitor<ForkInLoopVisitor> {
+class ForkInLoopVisitor : public engine::SyntaxVisitor<ForkInLoopVisitor> {
 public:
     explicit ForkInLoopVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -146,15 +146,9 @@ public:
     std::string_view getCategory() const override { return "Concurrency"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
-        ForkInLoopVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        ForkInLoopVisitor visitor(ctx.diags());
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

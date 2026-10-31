@@ -149,9 +149,9 @@ public:
     std::string_view getCategory() const override { return "Correctness"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(Compilation& compilation, const uvm::UvmModel&, core::DiagnosticEngine& diags) override {
-        FailureNotReportedVisitor v(diags);
-        compilation.getRoot().visit(v);
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        FailureNotReportedVisitor v(ctx.diags());
+        co_await ctx.visitAst(v);
     }
 };
 

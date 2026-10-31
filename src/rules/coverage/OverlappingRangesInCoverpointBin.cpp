@@ -9,7 +9,7 @@
 
 namespace uvmcheck::rules::coverage {
 
-class OverlappingBinRangeVisitor : public slang::syntax::SyntaxVisitor<OverlappingBinRangeVisitor> {
+class OverlappingBinRangeVisitor : public engine::SyntaxVisitor<OverlappingBinRangeVisitor> {
 public:
     explicit OverlappingBinRangeVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -84,15 +84,9 @@ public:
     std::string_view getCategory() const override { return "Coverage"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
-        OverlappingBinRangeVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            if (tree) {
-                tree->root().visit(visitor);
-            }
-        }
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        OverlappingBinRangeVisitor visitor(ctx.diags());
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

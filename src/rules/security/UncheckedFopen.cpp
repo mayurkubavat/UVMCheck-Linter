@@ -7,7 +7,7 @@
 
 namespace uvmcheck::rules::security {
 
-class UncheckedFopenVisitor : public slang::syntax::SyntaxVisitor<UncheckedFopenVisitor> {
+class UncheckedFopenVisitor : public engine::SyntaxVisitor<UncheckedFopenVisitor> {
 public:
     explicit UncheckedFopenVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
@@ -115,13 +115,9 @@ public:
     std::string_view getCategory() const override { return "Security"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
-             const uvmcheck::uvm::UvmModel& /*uvmModel*/,
-             core::DiagnosticEngine& diags) override {
-        UncheckedFopenVisitor visitor(diags);
-        for (const auto& tree : compilation.getSyntaxTrees()) {
-            tree->root().visit(visitor);
-        }
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        UncheckedFopenVisitor visitor(ctx.diags());
+        co_await ctx.visitSyntax(visitor);
     }
 };
 

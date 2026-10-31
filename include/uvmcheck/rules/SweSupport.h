@@ -22,6 +22,7 @@
 #include "slang/ast/symbols/ClassSymbols.h"
 #include "slang/ast/symbols/SubroutineSymbols.h"
 #include "slang/ast/types/AllTypes.h"
+#include "uvmcheck/engine/Visitors.h"
 #include "uvmcheck/uvm/UvmModel.h"
 
 namespace uvmcheck::rules::swe {
@@ -131,9 +132,10 @@ std::string receiverText(const slang::ast::CallExpression& call);
 /// Root visitor that skips the UVM library and the test stub, and also walks the default
 /// specialization of parameterized classes (which slang does not visit on its own).
 /// Derived visitors that declare their own handle() overloads must add
-/// `using UserCodeVisitor::handle;`.
+/// `using UserCodeVisitor::handle;`. It can take part in the engine's shared walk
+/// (co_await ctx.visitAst(v)) or be run on its own (root.visit(v)).
 template<typename TDerived>
-class UserCodeVisitor : public slang::ast::ASTVisitor<TDerived, slang::ast::VisitFlags::AllGood> {
+class UserCodeVisitor : public engine::AstVisitor<TDerived, slang::ast::VisitFlags::AllGood> {
 public:
     void handle(const slang::ast::ClassType& cls) {
         if (isLibrarySymbol(cls)) return;

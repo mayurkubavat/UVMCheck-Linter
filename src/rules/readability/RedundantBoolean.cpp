@@ -99,9 +99,9 @@ public:
     std::string_view getCategory() const override { return "Advisory"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
-    void run(Compilation& compilation, const uvm::UvmModel&, core::DiagnosticEngine& diags) override {
-        RedundantVisitor v(diags);
-        compilation.getRoot().visit(v);
+    engine::RuleTask check(engine::RuleContext& ctx) override {
+        RedundantVisitor v(ctx.diags());
+        co_await ctx.visitAst(v);
     }
 };
 
