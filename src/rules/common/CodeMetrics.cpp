@@ -401,13 +401,14 @@ RoutineMetrics computeRoutineMetrics(const SubroutineSymbol& sub) {
 
 const std::vector<ClassMetrics>& classMetrics(Compilation& comp, const uvm::UvmModel& model) {
     static std::mutex mu;
-    static const Compilation* cachedFor = nullptr;
+    static uint64_t cachedFor = 0; // UvmModel::generation(); 0 = nothing cached
     static std::vector<ClassMetrics> cache;
+    (void)comp;
     std::lock_guard<std::mutex> lock(mu);
-    if (cachedFor != &comp) {
+    if (cachedFor != model.generation()) {
         cache.clear();
         for (const auto* cls : swe::userClasses(model)) cache.push_back(computeClass(*cls));
-        cachedFor = &comp;
+        cachedFor = model.generation();
     }
     return cache;
 }

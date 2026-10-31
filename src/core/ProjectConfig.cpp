@@ -119,6 +119,8 @@ fs::path resolveSymlinks(const fs::path& p) {
 
 } // namespace
 
+bool expandEnvVars(std::string_view in, std::string& out) { return expandEnv(in, out); }
+
 bool globMatch(std::string_view glob, std::string_view path) {
     if (glob.empty()) return false;
     return matchSegments(splitSegments(glob), 0, splitSegments(path), 0);

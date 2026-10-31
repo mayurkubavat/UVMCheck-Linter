@@ -59,6 +59,23 @@ std::string normalizePathForMatching(std::string_view path);
 /// Full-path glob match (see PathPattern for syntax). Exposed for testing.
 bool globMatch(std::string_view glob, std::string_view path);
 
+/// Expands $VAR, ${VAR} and a leading ~ from the environment. Returns false
+/// when a variable is unset.
+bool expandEnvVars(std::string_view in, std::string& out);
+
+/// What to compile when no source files are named on the command line, and
+/// what the language server compiles around an open file. Paths are absolute
+/// (resolved against the project root) with environment variables expanded.
+struct BuildSettings {
+    std::vector<std::string> sources;     // files or globs (slang -f style patterns)
+    std::vector<std::string> filelists;   // .f command files, paths relative to the file
+    std::vector<std::string> includeDirs; // +incdir / -I
+    std::vector<std::string> defines;     // NAME or NAME=VALUE
+
+    bool hasSources() const { return !sources.empty() || !filelists.empty(); }
+    bool empty() const { return !hasSources() && includeDirs.empty() && defines.empty(); }
+};
+
 /// Per-rule overrides from the "rules" section of the project config.
 struct RuleSettings {
     std::optional<bool> enabled;
@@ -113,6 +130,9 @@ public:
     bool reportLibraryMacroExpansions() const { return reportLibraryMacros; }
     void setReportLibraryMacroExpansions(bool v) { reportLibraryMacros = v; }
 
+    BuildSettings& build() { return buildSettings; }
+    const BuildSettings& build() const { return buildSettings; }
+
     bool hasPathFilters() const { return !library.empty() || !exclude.empty() || anyRuleExcludes; }
     void noteRuleExcludes() { anyRuleExcludes = true; }
 
@@ -126,6 +146,7 @@ private:
     std::unordered_map<std::string, RuleSettings> rules;
     bool anyRuleExcludes = false;
     bool reportLibraryMacros = false;
+    BuildSettings buildSettings;
 
     const json::Value* findOption(std::string_view ruleId, std::string_view key) const;
 };

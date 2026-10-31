@@ -1,3 +1,4 @@
+#include <atomic>
 #include "uvmcheck/uvm/UvmModel.h"
 #include "slang/ast/symbols/CompilationUnitSymbols.h"
 #include "slang/ast/symbols/VariableSymbols.h"
@@ -32,6 +33,8 @@ static bool globMatch(std::string_view pattern, std::string_view text) {
 
 UvmModel::UvmModel(slang::ast::Compilation& comp)
     : compilation(comp) {
+    static std::atomic<uint64_t> nextGeneration{1};
+    generationId = nextGeneration++;
     indexScope(compilation.getRoot());
     buildComponentDag();
 }

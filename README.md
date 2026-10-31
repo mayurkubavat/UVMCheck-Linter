@@ -189,7 +189,22 @@ Run UVMCheck as an in-editor daemon for live, incremental linting in VS Code and
 # Launch LSP JSON-RPC daemon over stdin/stdout
 ./build/uvmcheck --lsp
 ```
-See [`editors/vscode/`](editors/vscode/) for the ready-to-use VS Code / Cursor extension providing real-time problem markers, diagnostics on save/edit, and quick-fixes.
+The server finds the project config from the workspace root and compiles the
+project the way the CLI does, with your unsaved buffers in place of the files on
+disk. Give the config `sources` (or `filelists`), `include_dirs` and `defines`
+so a class in an included `.svh` is linted with the UVM library and the rest of
+the testbench around it; without them, the open files are compiled on their own.
+Each finding carries its rule ID and a precise range, and offers a "Waive RULE on
+this line" quick fix (plus the rule's own fix where it has one).
+
+```python
+class Project(ProjectConfig):
+    sources = ["$UVM_HOME/src/uvm_pkg.sv", "tb/tb_pkg.sv", "tb/tb_top.sv"]
+    include_dirs = ["$UVM_HOME/src", "tb"]
+    defines = ["UVM_NO_DPI"]
+```
+
+See [`editors/vscode/`](editors/vscode/) for the ready-to-use VS Code / Cursor extension.
 
 ---
 

@@ -101,6 +101,10 @@ with `config = DmaBlock`. For anything dynamic, override `rule_configs()` or
 
 | Setting | Meaning |
 | :--- | :--- |
+| `sources` | Files or globs to compile when the command line names none (`uvmcheck` alone then lints the project). The language server compiles these around the file you are editing. |
+| `filelists` | `.f` file lists (paths inside are relative to the list), as with `-F`. |
+| `include_dirs` | `+incdir` directories; apply to every run, also when files are given on the command line. |
+| `defines` | `"NAME"` or `"NAME=VALUE"` macro definitions; apply to every run. |
 | `library_paths` | Globs for third-party code (UVM, VIP). Files are still compiled; violations in them are dropped. |
 | `exclude_paths` | Globs for your own files whose violations should be dropped. |
 | `report_library_macro_expansions` | Default `False`: code produced by a library macro (`` `uvm_object_utils `` etc.) inside your file counts as library code. |
@@ -116,8 +120,9 @@ Unknown rule names produce a warning so typos do not go unnoticed.
 
 ### Path globs
 
-* Relative paths are relative to the config file; `--library` / `--exclude`
-  on the command line are relative to the working directory.
+* Relative paths are relative to the config file, or to the project root (the
+  folder holding `.uvmcheck/`) for a config inside `.uvmcheck/`. `--library` /
+  `--exclude` on the command line are relative to the working directory.
 * `*` and `?` match within one folder name, `**` matches any number of folders.
 * A pattern naming a folder covers everything under it (`"ip/vip"` = `"ip/vip/**"`).
 * A pattern with no `/` matches that name at any depth (`"generated"`, `"*_pkg.sv"`).

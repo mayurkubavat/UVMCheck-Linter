@@ -1,147 +1,231 @@
 #!/usr/bin/env python3
 """
-Integration test for UVMCheck LSP (Language Server Protocol) Daemon.
-Tests initialize, didOpen (with live diagnostics), didChange, and shutdown protocol over stdin/stdout.
+Integration test for the UVMCheck language server (uvmcheck --lsp).
+
+1. Standalone: a buffer with no project config is linted on its own
+   (multi-line text, real ranges, diagnostics cleared on close).
+2. Project: a .uvmcheck/config.json names the sources and include dirs; an
+   include-only file open in the editor is linted inside the full compile, so
+   a rule that needs the UVM base classes declared elsewhere fires. The
+   "waive" code action's edit, applied to the buffer, makes the finding go.
 """
 
-import subprocess
 import json
 import os
+import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
-def encode_lsp_message(obj):
-    content = json.dumps(obj)
-    header = f"Content-Length: {len(content)}\r\n\r\n"
-    return (header + content).encode("utf-8")
+ROOT = Path(__file__).resolve().parent.parent
 
-def read_lsp_message(proc):
-    header_line = b""
-    while b"\r\n\r\n" not in header_line and b"\n\n" not in header_line:
-        chunk = proc.stdout.readline()
-        if not chunk:
-            return None
-        header_line += chunk
 
-    # Parse Content-Length
-    for line in header_line.decode("utf-8").splitlines():
-        if line.lower().startswith("content-length:"):
-            length = int(line.split(":")[1].strip())
-            payload = proc.stdout.read(length)
-            return json.loads(payload.decode("utf-8"))
-    return None
+def encode(obj):
+    content = json.dumps(obj).encode("utf-8")
+    return f"Content-Length: {len(content)}\r\n\r\n".encode("utf-8") + content
+
+
+class Client:
+    def __init__(self, binary, cwd):
+        self.proc = subprocess.Popen([binary, "--lsp"], stdin=subprocess.PIPE,
+                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE, cwd=cwd)
+        self.next_id = 1
+
+    def send(self, obj):
+        self.proc.stdin.write(encode(obj))
+        self.proc.stdin.flush()
+
+    def read(self):
+        length = None
+        while True:
+            line = self.proc.stdout.readline()
+            if not line:
+                return None
+            line = line.decode("utf-8").strip()
+            if not line:
+                break
+            if line.lower().startswith("content-length:"):
+                length = int(line.split(":")[1])
+        return json.loads(self.proc.stdout.read(length).decode("utf-8"))
+
+    def request(self, method, params=None):
+        rid = self.next_id
+        self.next_id += 1
+        self.send({"jsonrpc": "2.0", "id": rid, "method": method, "params": params or {}})
+        while True:
+            msg = self.read()
+            assert msg is not None, f"no response to {method}"
+            if msg.get("id") == rid:
+                return msg
+
+    def notify(self, method, params):
+        self.send({"jsonrpc": "2.0", "method": method, "params": params})
+
+    def diagnostics_for(self, uri):
+        """Reads publishDiagnostics notifications until one arrives for `uri`."""
+        while True:
+            msg = self.read()
+            if msg is None:
+                err = self.proc.stderr.read().decode("utf-8", "replace") if self.proc.poll() is not None else ""
+                raise AssertionError(f"no diagnostics for {uri}; server stderr:\n{err[-2000:]}")
+            if msg.get("method") == "textDocument/publishDiagnostics" and msg["params"]["uri"] == uri:
+                return msg["params"]["diagnostics"]
+
+    def close(self):
+        resp = self.request("shutdown")
+        assert "result" in resp
+        self.notify("exit", {})
+        assert self.proc.wait(timeout=5) == 0, "server did not exit cleanly"
+
+
+def open_doc(client, uri, text, version=1):
+    client.notify("textDocument/didOpen", {"textDocument": {
+        "uri": uri, "languageId": "systemverilog", "version": version, "text": text}})
+
+
+def apply_edit(text, edit):
+    lines = text.split("\n")
+    start, end = edit["range"]["start"], edit["range"]["end"]
+    def offset(pos):
+        return sum(len(l) + 1 for l in lines[:pos["line"]]) + pos["character"]
+    return text[:offset(start)] + edit["newText"] + text[offset(end):]
+
+
+def test_standalone(binary, workdir):
+    client = Client(binary, workdir)
+    try:
+        init = client.request("initialize", {"processId": os.getpid(), "rootUri": None, "capabilities": {}})
+        caps = init["result"]["capabilities"]
+        assert caps["textDocumentSync"]["change"] == 1, "expected full text sync"
+        print("  [PASS] initialize handshake")
+
+        text = "module bad_timescale;\n  logic clk;\n  initial #10 clk = 1;\nendmodule\n"
+        uri = Path(workdir, "test.sv").as_uri()
+        open_doc(client, uri, text)
+        diags = client.diagnostics_for(uri)
+        tim = [d for d in diags if d["code"] == "SV-TIM-002"]
+        assert tim, f"expected SV-TIM-002, got {[d['code'] for d in diags]}"
+        # Multi-line text must arrive intact: the delay is on the third line.
+        assert tim[0]["range"]["start"]["line"] == 2, tim[0]
+        for d in diags:
+            r = d["range"]
+            assert r["end"]["character"] > r["start"]["character"], f"empty range: {d}"
+            assert d["source"] == "uvmcheck"
+        print(f"  [PASS] didOpen: {len(diags)} diagnostics, multi-line text, real ranges")
+
+        client.notify("textDocument/didClose", {"textDocument": {"uri": uri}})
+        assert client.diagnostics_for(uri) == [], "expected empty diagnostics on didClose"
+        print("  [PASS] diagnostics cleared on didClose")
+        client.close()
+        print("  [PASS] shutdown / exit")
+    finally:
+        if client.proc.poll() is None:
+            client.proc.kill()
+
+
+ITEMS = """class packet_item extends uvm_sequence_item;
+  `uvm_object_utils(packet_item)
+  function new(string name = "packet_item"); super.new(name); endfunction
+endclass
+
+class bad_packet_item extends packet_item;
+  `uvm_object_utils(bad_packet_item)
+  function new(string name = "bad_packet_item"); super.new(name); endfunction
+endclass
+"""
+
+DRIVER = """class my_driver extends uvm_driver#(packet_item);
+  `uvm_component_utils(my_driver)
+  function new(string name, uvm_component parent); super.new(name, parent); endfunction
+
+  virtual function void build_phase(uvm_phase phase);
+    super.build_phase(phase);
+    set_type_override("packet_item", "bad_packet_item");
+  endfunction
+endclass
+"""
+
+PKG = '`include "uvm_mock.svh"\n`include "items.svh"\n`include "driver.svh"\n'
+
+
+def test_project(binary, workdir):
+    proj = Path(workdir, "proj")
+    (proj / ".uvmcheck").mkdir(parents=True)
+    (proj / "items.svh").write_text(ITEMS)
+    (proj / "driver.svh").write_text(DRIVER)
+    (proj / "tb_pkg.sv").write_text(PKG)
+    (proj / ".uvmcheck" / "config.json").write_text(json.dumps({
+        "sources": ["tb_pkg.sv"],
+        "include_dirs": [".", str(ROOT / "tests" / "common")],
+    }))
+
+    # Start outside the project: the config is found from the workspace root.
+    elsewhere = Path(workdir, "elsewhere")
+    elsewhere.mkdir()
+    client = Client(binary, str(elsewhere))
+    try:
+        client.request("initialize", {"processId": os.getpid(), "rootUri": proj.as_uri(), "capabilities": {}})
+
+        uri = (proj / "driver.svh").as_uri()
+        open_doc(client, uri, DRIVER)
+        diags = client.diagnostics_for(uri)
+        fac = [d for d in diags if d["code"] == "UVM-FAC-005"]
+        assert fac, f"expected UVM-FAC-005 from the project compile, got {[d['code'] for d in diags]}"
+        assert fac[0]["range"]["start"]["line"] == 6, fac[0]
+        print("  [PASS] include-only file linted inside the project compile (UVM-FAC-005)")
+
+        # Relinting the same text gives the same findings (no state kept between runs).
+        client.notify("textDocument/didChange", {"textDocument": {"uri": uri, "version": 2},
+                                                 "contentChanges": [{"text": DRIVER}]})
+        again = client.diagnostics_for(uri)
+        assert again == diags, "relint of unchanged text changed the findings"
+        print("  [PASS] relint is stable")
+
+        # Unsaved edits are what gets linted, not the file on disk.
+        edited = DRIVER.replace('    set_type_override("packet_item", "bad_packet_item");\n', "")
+        client.notify("textDocument/didChange", {"textDocument": {"uri": uri, "version": 2},
+                                                 "contentChanges": [{"text": edited}]})
+        assert not [d for d in client.diagnostics_for(uri) if d["code"] == "UVM-FAC-005"]
+        client.notify("textDocument/didChange", {"textDocument": {"uri": uri, "version": 3},
+                                                 "contentChanges": [{"text": DRIVER}]})
+        assert [d for d in client.diagnostics_for(uri) if d["code"] == "UVM-FAC-005"]
+        print("  [PASS] didChange lints the editor buffer")
+
+        resp = client.request("textDocument/codeAction", {
+            "textDocument": {"uri": uri},
+            "range": fac[0]["range"],
+            "context": {"diagnostics": [fac[0]]}})
+        actions = resp["result"]
+        waive = [a for a in actions if a["title"].startswith("Waive UVM-FAC-005")]
+        assert waive, f"expected a waive action, got {[a['title'] for a in actions]}"
+        edit = waive[0]["edit"]["changes"][uri][0]
+        assert "uvmcheck:waive-next-line UVM-FAC-005" in edit["newText"]
+        assert edit["newText"].startswith("    //"), "waiver comment should keep the line's indent"
+        waived = apply_edit(DRIVER, edit)
+        client.notify("textDocument/didChange", {"textDocument": {"uri": uri, "version": 4},
+                                                 "contentChanges": [{"text": waived}]})
+        assert not [d for d in client.diagnostics_for(uri) if d["code"] == "UVM-FAC-005"], \
+            "finding should be waived after applying the code action"
+        print("  [PASS] waive code action removes the finding")
+        client.close()
+    finally:
+        if client.proc.poll() is None:
+            client.proc.kill()
+
 
 def main():
-    binary_path = os.path.abspath("build/uvmcheck")
-    if not os.path.isfile(binary_path):
-        print(f"Error: binary {binary_path} not found.")
+    binary = os.path.abspath(sys.argv[1] if len(sys.argv) > 1 else str(ROOT / "build" / "uvmcheck"))
+    if not os.path.isfile(binary):
+        print(f"Error: binary {binary} not found.")
         sys.exit(1)
+    print("[LSP TEST] uvmcheck --lsp")
+    with tempfile.TemporaryDirectory() as tmp:
+        standalone = Path(tmp, "standalone")
+        standalone.mkdir()
+        test_standalone(binary, str(standalone))
+        test_project(binary, tmp)
+    print("All LSP checks passed.")
 
-    print("[LSP TEST] Launching uvmcheck --lsp daemon...")
-    proc = subprocess.Popen(
-        [binary_path, "--lsp"],
-        stdin=subprocess.PIPE,
-        stdout=subprocess.PIPE,
-        stderr=subprocess.PIPE
-    )
-
-    try:
-        # Step 1: Send 'initialize'
-        init_req = {
-            "jsonrpc": "2.0",
-            "id": 1,
-            "method": "initialize",
-            "params": {
-                "processId": os.getpid(),
-                "rootUri": "file:///workspace",
-                "capabilities": {}
-            }
-        }
-        proc.stdin.write(encode_lsp_message(init_req))
-        proc.stdin.flush()
-
-        init_resp = read_lsp_message(proc)
-        assert init_resp is not None, "Failed to read initialize response"
-        assert init_resp.get("id") == 1, "Initialize response ID mismatch"
-        capabilities = init_resp["result"]["capabilities"]
-        assert capabilities.get("textDocumentSync") == 1, "Expected full text sync"
-        print("  [PASS] LSP 'initialize' handshake succeeded.")
-
-        # Step 2: Send 'textDocument/didOpen' with buggy SystemVerilog snippet
-        bad_sv_content = (
-            "module bad_timescale;\n"
-            "  logic clk;\n"
-            "  initial #10 clk = 1;\n"
-            "endmodule\n"
-        )
-        did_open = {
-            "jsonrpc": "2.0",
-            "method": "textDocument/didOpen",
-            "params": {
-                "textDocument": {
-                    "uri": "file:///workspace/test.sv",
-                    "languageId": "systemverilog",
-                    "version": 1,
-                    "text": bad_sv_content
-                }
-            }
-        }
-        proc.stdin.write(encode_lsp_message(did_open))
-        proc.stdin.flush()
-
-        diag_notification = read_lsp_message(proc)
-        assert diag_notification is not None, "Failed to receive diagnostics notification"
-        assert diag_notification.get("method") == "textDocument/publishDiagnostics"
-        params = diag_notification.get("params", {})
-        assert params.get("uri") == "file:///workspace/test.sv"
-        diagnostics = params.get("diagnostics", [])
-        print(f"  [PASS] Received {len(diagnostics)} live diagnostics on didOpen.")
-        assert any(d.get("code") == "SV-TIM-002" for d in diagnostics), \
-            "Expected an SV-TIM-002 diagnostic for missing timescale"
-        print(f"         Code: {diagnostics[0].get('code')}, Message: {diagnostics[0].get('message')[:60]}...")
-
-        # Step 3: Send 'textDocument/didClose' -> should clear diagnostics
-        did_close = {
-            "jsonrpc": "2.0",
-            "method": "textDocument/didClose",
-            "params": {
-                "textDocument": {
-                    "uri": "file:///workspace/test.sv"
-                }
-            }
-        }
-        proc.stdin.write(encode_lsp_message(did_close))
-        proc.stdin.flush()
-
-        clear_diag = read_lsp_message(proc)
-        assert clear_diag is not None
-        assert clear_diag.get("params", {}).get("diagnostics") == [], "Expected empty diagnostics on didClose"
-        print("  [PASS] Diagnostics cleared on didClose.")
-
-        # Step 4: Shutdown & Exit
-        shutdown_req = {
-            "jsonrpc": "2.0",
-            "id": 2,
-            "method": "shutdown"
-        }
-        proc.stdin.write(encode_lsp_message(shutdown_req))
-        proc.stdin.flush()
-
-        shutdown_resp = read_lsp_message(proc)
-        assert shutdown_resp.get("id") == 2
-        print("  [PASS] LSP 'shutdown' acknowledged.")
-
-        exit_notif = {
-            "jsonrpc": "2.0",
-            "method": "exit"
-        }
-        proc.stdin.write(encode_lsp_message(exit_notif))
-        proc.stdin.flush()
-        proc.wait(timeout=2)
-        print("  [PASS] LSP daemon exited cleanly with code 0.\n")
-
-    finally:
-        if proc.poll() is None:
-            proc.kill()
 
 if __name__ == "__main__":
     main()

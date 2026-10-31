@@ -11,6 +11,7 @@
 #include "uvmcheck/core/ConfigManager.h"
 #include "uvmcheck/plugins/PythonPluginManager.h"
 #include "uvmcheck/lsp/LspServer.h"
+#include "uvmcheck/core/ProjectSources.h"
 #include "uvmcheck/engine/RuleEngine.h"
 #include <iostream>
 #include <iomanip>
@@ -62,7 +63,9 @@ bool LinterDriver::parseCommandLine(int argc, char** argv) {
 bool LinterDriver::loadProjectConfig() {
     auto& cfgMgr = ConfigManager::instance();
     // Keep stdout parseable when the JSON report goes there.
-    std::ostream& info = jsonOutputPath.has_value() && *jsonOutputPath == "-" ? std::cerr : std::cout;
+    // (The language server owns stdout for JSON-RPC.)
+    std::ostream& info = (jsonOutputPath.has_value() && *jsonOutputPath == "-") || runLsp.value_or(false)
+                             ? std::cerr : std::cout;
     if (configFilePath.has_value()) {
         if (!cfgMgr.loadFromFile(*configFilePath)) {
             std::cerr << "Error: " << cfgMgr.getLastError() << "\n";
@@ -184,6 +187,13 @@ int LinterDriver::run() {
     if (runLsp.value_or(false)) {
         lsp::LspServer server;
         return server.run();
+    }
+
+    {
+        // Sources from the project config, when the command line names none.
+        const auto& build = ConfigManager::instance().getProjectConfig().build();
+        const bool useConfigSources = !slangDriver.sourceLoader.hasFiles() && build.hasSources();
+        if (!applyBuildSettings(slangDriver, build, useConfigSources)) return 2;
     }
 
     if (!slangDriver.processOptions()) {

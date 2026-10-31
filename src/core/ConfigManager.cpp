@@ -193,6 +193,34 @@ bool ConfigManager::readPathList(const json::Value& v, std::string_view key, con
     return true;
 }
 
+bool ConfigManager::readBuildList(const json::Value& v, std::string_view key, const fs::path& baseDir,
+                                  bool isPath, std::vector<std::string>& out) {
+    std::vector<const json::Value*> items;
+    if (v.isString()) {
+        items.push_back(&v);
+    } else if (v.isArray()) {
+        for (const auto& item : v.asArray()) items.push_back(&item);
+    } else {
+        return error(std::string(key) + " must be a list of strings");
+    }
+    for (const auto* item : items) {
+        if (!item->isString()) return error(std::string(key) + " must contain only strings");
+        std::string expanded;
+        if (!expandEnvVars(item->asString(), expanded)) {
+            warn(std::string(key) + ": '" + item->asString() +
+                 "' uses an unset environment variable; entry ignored");
+            continue;
+        }
+        if (isPath) {
+            fs::path p(expanded);
+            if (p.is_relative()) p = baseDir / p;
+            expanded = p.lexically_normal().generic_string();
+        }
+        out.push_back(std::move(expanded));
+    }
+    return true;
+}
+
 bool ConfigManager::applyRules(const json::Value& rulesBlock, const fs::path& baseDir) {
     if (!rulesBlock.isObject()) return error("'rules' must be an object keyed by rule ID or name");
 
@@ -320,7 +348,8 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
 
     static const std::unordered_set<std::string_view> knownKeys = {
         "version", "source", "warnings", "library_paths", "exclude_paths",
-        "report_library_macro_expansions", "rules", "waivers", "style", "naming"};
+        "report_library_macro_expansions", "rules", "waivers", "style", "naming",
+        "sources", "filelists", "include_dirs", "defines"};
     for (const auto& [key, _] : root.asObject()) {
         if (!knownKeys.count(key)) warn("unknown top-level key '" + key + "' ignored");
     }
@@ -330,6 +359,19 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
     }
     if (const auto* v = root.find("exclude_paths")) {
         if (!readPathList(*v, "exclude_paths", baseDir, projectConfig.excludePaths())) return false;
+    }
+    auto& build = projectConfig.build();
+    if (const auto* v = root.find("sources")) {
+        if (!readBuildList(*v, "sources", baseDir, true, build.sources)) return false;
+    }
+    if (const auto* v = root.find("filelists")) {
+        if (!readBuildList(*v, "filelists", baseDir, true, build.filelists)) return false;
+    }
+    if (const auto* v = root.find("include_dirs")) {
+        if (!readBuildList(*v, "include_dirs", baseDir, true, build.includeDirs)) return false;
+    }
+    if (const auto* v = root.find("defines")) {
+        if (!readBuildList(*v, "defines", baseDir, false, build.defines)) return false;
     }
     if (const auto* v = root.find("report_library_macro_expansions")) {
         if (!v->isBool()) return error("report_library_macro_expansions must be true or false");
@@ -372,6 +414,9 @@ bool ConfigManager::loadFromFile(const std::string& filePath) {
 
     std::error_code ec;
     fs::path baseDir = fs::absolute(fs::path(filePath), ec).parent_path();
+    // A config inside .uvmcheck/ describes the folder that holds it: relative
+    // paths are relative to the project root, not to .uvmcheck/ itself.
+    if (baseDir.filename() == ".uvmcheck") baseDir = baseDir.parent_path();
     if (!applyConfig(*root, baseDir)) {
         lastError = filePath + ": " + lastError;
         return false;
@@ -425,12 +470,27 @@ void ConfigManager::dumpDefaultConfig(std::ostream& os) const {
 
 Save as .uvmcheck/config.py (or uvmcheck_config.py) at the root of your
 verification project; uvmcheck finds it automatically (or pass --config path/to/file.py).
-Paths are relative to this file and may use $ENV_VARS, * / ? within a name, and ** across folders.
+Paths are relative to the project root (the folder holding .uvmcheck/) and may
+use $ENV_VARS, * / ? within a name, and ** across folders.
 """
 from uvmcheck.config import ProjectConfig, RuleConfig, Waiver, Severity
 
 
 class Project(ProjectConfig):
+    # What to compile when no files are named on the command line; the editor
+    # integration (uvmcheck --lsp) also compiles these around the open file.
+    sources = [
+        # "$UVM_HOME/src/uvm_pkg.sv",
+        # "tb/tb_pkg.sv",
+        # "tb/tb_top.sv",
+    ]
+    filelists = []          # e.g. ["sim/files.f"]
+    include_dirs = [
+        # "$UVM_HOME/src",
+        # "tb",
+    ]
+    defines = []            # e.g. ["UVM_NO_DPI", "WIDTH=32"]
+
     # Third-party code: compiled so your testbench elaborates, never reported.
     library_paths = [
         "$UVM_HOME",

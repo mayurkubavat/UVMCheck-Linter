@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -15,6 +16,11 @@ namespace uvmcheck::uvm {
 class UvmModel {
 public:
     explicit UvmModel(slang::ast::Compilation& compilation);
+
+    /// Unique per model instance, for the lifetime of the process. Caches keyed
+    /// on a design must use this, not the Compilation's address: a server that
+    /// lints repeatedly can get a new Compilation at a freed one's address.
+    uint64_t generation() const { return generationId; }
 
     /// Checks if a type is derived from a specific base class name
     bool isDerivedFrom(const slang::ast::Type& type, std::string_view baseClassName) const;
@@ -65,6 +71,7 @@ public:
     void dumpSemanticJson(std::ostream& out) const;
 
 private:
+    uint64_t generationId = 0;
     slang::ast::Compilation& compilation;
     std::vector<const slang::ast::ClassType*> discoveredClasses;
     std::vector<std::string> componentPaths;

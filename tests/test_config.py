@@ -265,6 +265,30 @@ def main():
                                   args=["lib/vendor_vip.sv", "src/user_tb.sv", "--library", "lib/*.sv"])
     check("--library glob", files_with(found, "SV-COR-008") == ["user_tb.sv"], out + err)
 
+    # 9. Build settings: sources / filelists / defines from the config, paths
+    #    relative to the project root for a config inside .uvmcheck/.
+    t, rc, found, out, err = case(binary, "Config sources (no files on the command line)",
+                                  ".uvmcheck/config.py", """\
+        from uvmcheck.config import ProjectConfig
+        class Project(ProjectConfig):
+            sources = ["src/*.sv"]
+            library_paths = ["lib"]
+        """, args=[])
+    check("config sources compiled when no files given", rc != 2 and files_with(found, "SV-COR-008") == ["user_tb.sv"],
+          f"rc={rc}\n{out}{err}")
+
+    t, rc, found, out, err = case(binary, "Config filelist + define", ".uvmcheck/config.json",
+                                  '{"filelists": ["files.f"], "defines": ["WITH_EXTRA"]}', args=[],
+                                  extra={"files.f": "src/user_tb.sv\nsrc/extra.sv\n",
+                                         "src/extra.sv": "`ifdef WITH_EXTRA\nmodule extra; int x; initial x = x; endmodule\n`endif\n"})
+    check("filelist read relative to the list", files_with(found, "SV-COR-008") == ["user_tb.sv"], out + err)
+    check("define applied (guarded module compiled)", "extra.sv" in {f for f, _, _ in found}, out + err)
+
+    t, rc, found, out, err = case(binary, "Files on the command line win over config sources",
+                                  ".uvmcheck/config.json", '{"sources": ["lib/*.sv"]}',
+                                  args=["src/user_tb.sv"])
+    check("config sources ignored when files are given", files_with(found, "SV-COR-008") == ["user_tb.sv"], out + err)
+
     t, rc, found, out, err = case(binary, "Broken JSON", ".uvmcheck.json", '{\n  "library_paths": [lib]\n}')
     check("invalid JSON fails with line:col", rc == 2 and ":2:" in err, f"rc={rc}\n{err}")
 

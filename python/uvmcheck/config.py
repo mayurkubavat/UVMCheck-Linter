@@ -212,6 +212,12 @@ class Waiver:
 class ProjectConfig:
     """Base class for a project config.
 
+    sources        Files or globs to compile when none are given on the command
+                   line (and around a file open in the editor).
+    filelists      .f command files (-f style; their paths are relative to the
+                   file list).
+    include_dirs   +incdir directories.
+    defines        "NAME" or "NAME=VALUE" macro definitions.
     library_paths  Third-party code (UVM, VIP). Compiled so your code
                    elaborates, but violations inside it are not reported.
     exclude_paths  Your own files that should not be linted (generated code).
@@ -227,6 +233,10 @@ class ProjectConfig:
     ``to_dict()`` for anything more dynamic.
     """
 
+    sources: List[str] = []
+    filelists: List[str] = []
+    include_dirs: List[str] = []
+    defines: List[str] = []
     library_paths: List[str] = []
     exclude_paths: List[str] = []
     report_library_macro_expansions: bool = False
@@ -251,6 +261,10 @@ class ProjectConfig:
             "report_library_macro_expansions": bool(self.report_library_macro_expansions),
             "rules": {rc.rule_key(): rc.to_dict() for rc in self.rule_configs()},
         }
+        for key in ("sources", "filelists", "include_dirs", "defines"):
+            values = _path_list(name, key, getattr(self, key))
+            if values:
+                out[key] = values
         out["waivers"] = []
         warnings: List[str] = []
         for w in self.waivers:

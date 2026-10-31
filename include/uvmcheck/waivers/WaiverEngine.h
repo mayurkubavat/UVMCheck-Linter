@@ -35,6 +35,10 @@ public:
 
     /// Root that baseline paths are relative to (the folder holding .uvmcheck/, or the
     /// working directory). Defaults to the working directory.
+    /// Supplies a file's current text (e.g. an unsaved editor buffer) for
+    /// inline waiver lookups, instead of reading it from disk.
+    void setFileText(const std::string& filePath, std::string_view text);
+
     void setProjectRoot(std::filesystem::path root) { projectRoot = std::move(root); }
 
     /// Load external waiver rules from a JSON file: a list of {"rule", "path", "line",

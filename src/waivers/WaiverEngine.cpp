@@ -100,6 +100,20 @@ bool waiverCommentCovers(std::string_view text, std::string_view keyword, std::s
 
 WaiverEngine::WaiverEngine(const slang::SourceManager& sm) : sourceManager(sm) {}
 
+void WaiverEngine::setFileText(const std::string& filePath, std::string_view text) {
+    std::vector<std::string> lines;
+    size_t pos = 0;
+    while (pos <= text.size()) {
+        size_t end = text.find('\n', pos);
+        std::string_view l = text.substr(pos, end == std::string_view::npos ? std::string_view::npos : end - pos);
+        if (!l.empty() && l.back() == '\r') l.remove_suffix(1);
+        lines.emplace_back(l);
+        if (end == std::string_view::npos) break;
+        pos = end + 1;
+    }
+    fileLines[filePath] = std::move(lines);
+}
+
 std::string_view WaiverEngine::lineText(const core::Violation& v, size_t line) {
     if (line == v.line && !v.snippet.empty()) return v.snippet;
     if (v.filePath.empty() || line == 0) return {};
