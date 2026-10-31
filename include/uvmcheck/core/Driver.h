@@ -31,6 +31,7 @@ private:
     std::optional<std::string> waiversFilePath;
     std::optional<std::string> presetName;
     std::optional<bool> autoFix;
+    std::optional<bool> autoFixDryRun;
     std::optional<std::string> configFilePath;
     std::optional<std::string> dumpConfigPath;
     std::optional<std::string> ruleFilter;

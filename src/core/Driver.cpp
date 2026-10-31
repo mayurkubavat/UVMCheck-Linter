@@ -15,6 +15,7 @@
 #include "uvmcheck/core/ProjectSources.h"
 #include "uvmcheck/core/ProjectInit.h"
 #include "uvmcheck/core/ChangedLines.h"
+#include "uvmcheck/core/FixPlanner.h"
 #include "uvmcheck/reporting/TestbenchMap.h"
 #include "uvmcheck/rules/RuleExtras.h"
 #include "uvmcheck/style/NamingEngine.h"
@@ -29,6 +30,7 @@
 #include <unordered_set>
 #include <algorithm>
 #include <unordered_map>
+#include <map>
 #include <chrono>
 #include <filesystem>
 
@@ -49,6 +51,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--list-guidelines", listGuidelines, "List the methodology guide (guidelines and the rules that enforce them) and exit; with --json, write it as JSON");
     slangDriver.cmdLine.add("--conformance", showConformance, "Report pass/fail per methodology guideline (implied by --guideline and the reuse and guide presets)");
     slangDriver.cmdLine.add("--fix", autoFix, "Automatically apply fix-it rewrites to source files where supported");
+    slangDriver.cmdLine.add("--fix-dry-run", autoFixDryRun, "Print the fix-it rewrites as a unified diff without changing any file");
     slangDriver.cmdLine.add("--sarif", sarifOutputPath, "Output results to specified SARIF 2.1.0 file", "<file>");
     slangDriver.cmdLine.add("--json", jsonOutputPath, "Output results as JSON to specified file ('-' for stdout)", "<file>");
     slangDriver.cmdLine.add("--html", htmlOutputPath, "Generate standalone interactive HTML quality dashboard", "<file>");
@@ -663,52 +666,85 @@ int LinterDriver::run() {
         }
     }
 
-    // Apply automated fix-its if requested
-    if (autoFix.value_or(false)) {
-        std::unordered_map<std::string, std::vector<FixItHint>> fileFixes;
+    // Apply automated fix-its if requested (or show them with --fix-dry-run).
+    const bool fixDryRun = autoFixDryRun.value_or(false);
+    if (autoFix.value_or(false) || fixDryRun) {
+        auto& sm = slangDriver.sourceManager;
+        // Edits per source buffer. A fix in a macro expansion has no single
+        // place in the file to rewrite and is left alone.
+        std::map<std::string, std::pair<slang::BufferID, std::vector<fix::TextEdit>>> fileEdits;
+        size_t macroFixes = 0;
         for (const auto& v : diags.getViolations()) {
-            for (const auto& fix : v.fixIts) {
-                if (fix.range.start().valid() && !v.filePath.empty()) {
-                    fileFixes[v.filePath].push_back(fix);
+            for (const auto& f : v.fixIts) {
+                const auto start = f.range.start(), end = f.range.end();
+                if (!start.valid() || !end.valid()) continue;
+                if (!sm.isFileLoc(start) || !sm.isFileLoc(end) || start.buffer() != end.buffer()) {
+                    ++macroFixes;
+                    continue;
                 }
+                const std::string path = std::string(sm.getFullPath(start.buffer()).string());
+                if (path.empty()) continue;
+                auto& entry = fileEdits[path];
+                entry.first = start.buffer();
+                entry.second.push_back({start.offset(), end.offset(), f.replacementText, v.ruleId});
             }
         }
 
-        size_t totalFixed = 0;
-        for (const auto& [path, fixes] : fileFixes) {
+        size_t applied = 0, skipped = 0, changedFiles = 0;
+        for (auto& [path, entry] : fileEdits) {
+            const std::string display = fs::path(path).lexically_proximate(fs::current_path()).generic_string();
             std::ifstream in(path, std::ios::binary);
-            if (!in.is_open()) continue;
+            if (!in.is_open()) {
+                std::cerr << "Warning: --fix: cannot read " << display << "\n";
+                continue;
+            }
             std::string content((std::istreambuf_iterator<char>(in)), std::istreambuf_iterator<char>());
             in.close();
-
-            auto sortedFixes = fixes;
-            std::sort(sortedFixes.begin(), sortedFixes.end(), [](const FixItHint& a, const FixItHint& b) {
-                return a.range.start().offset() > b.range.start().offset();
-            });
-
-            bool modified = false;
-            for (const auto& fix : sortedFixes) {
-                size_t startOffset = fix.range.start().offset();
-                size_t endOffset = fix.range.end().offset();
-                if (startOffset <= endOffset && endOffset <= content.size()) {
-                    content.replace(startOffset, endOffset - startOffset, fix.replacementText);
-                    modified = true;
-                    totalFixed++;
-                }
+            // Offsets refer to the text that was linted; never rewrite a file edited since.
+            std::string_view linted = sm.getSourceText(entry.first);
+            if (!linted.empty() && linted.back() == '\0') linted.remove_suffix(1);
+            if (content != linted) {
+                std::cerr << "Warning: --fix: " << display << " changed since it was linted; skipped\n";
+                continue;
             }
 
-            if (modified) {
-                std::ofstream out(path, std::ios::binary | std::ios::trunc);
-                if (out.is_open()) {
-                    out << content;
-                    out.close();
+            auto plan = fix::planEdits(content, std::move(entry.second), display);
+            applied += plan.applied;
+            skipped += plan.skipped.size();
+            if (plan.updated == content) continue;
+            ++changedFiles;
+            if (fixDryRun) {
+                info << plan.diff;
+                continue;
+            }
+            // Write a sibling file and rename it over the original, so an
+            // interrupted run never leaves a half-written source.
+            const fs::path tmp = fs::path(path).concat(".uvmcheck-fix.tmp");
+            {
+                std::ofstream out(tmp, std::ios::binary | std::ios::trunc);
+                out << plan.updated;
+                if (!out) {
+                    std::cerr << "Warning: --fix: cannot write " << display << "\n";
+                    std::error_code ec;
+                    fs::remove(tmp, ec);
+                    continue;
                 }
+            }
+            std::error_code ec;
+            fs::permissions(tmp, fs::status(path, ec).permissions(), ec);
+            fs::rename(tmp, path, ec);
+            if (ec) {
+                std::cerr << "Warning: --fix: cannot replace " << display << ": " << ec.message() << "\n";
+                fs::remove(tmp, ec);
             }
         }
 
-        if (totalFixed > 0) {
-            info << "[uvmcheck] Automatically applied " << totalFixed << " fix-it(s) across "
-                      << fileFixes.size() << " file(s).\n";
+        if (applied > 0 || skipped > 0 || macroFixes > 0) {
+            info << "[uvmcheck] " << (fixDryRun ? "Would apply " : "Applied ") << applied << " fix-it(s) in "
+                 << changedFiles << " file(s)";
+            if (skipped) info << "; " << skipped << " overlapping fix-it(s) left for another --fix run";
+            if (macroFixes) info << "; " << macroFixes << " inside macro expansions not applied";
+            info << ".\n";
         }
     }
 

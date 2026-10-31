@@ -158,10 +158,12 @@ On the 86k-line Accellera `uvm-core` library, a full all-rules run takes about
 0.5 s on 4 cores (previously about 2.9 s on the same machine).
 
 ### Automated Fix-It Rewrites
-Automatically refactor compliant syntax without manual editing:
+Some findings carry a mechanical rewrite (`casex` to `casez`, `== 'x` to `===`, ...). Preview them as a unified diff, then apply:
 ```bash
-./build/uvmcheck tb/legacy_code.sv --fix
+./build/uvmcheck tb/legacy_code.sv --fix-dry-run   # print the diff, change nothing
+./build/uvmcheck tb/legacy_code.sv --fix           # rewrite the files
 ```
+Fixes land in the file that holds the code, including included `.svh` files. Waived and baselined findings are not fixed. A file edited after it was read is skipped, fixes inside macro expansions are left alone, and when two fixes overlap the second waits for the next `--fix` run. Each file is written to a temporary copy and renamed into place.
 
 ### Reporting (SARIF, JSON & HTML)
 ```bash
