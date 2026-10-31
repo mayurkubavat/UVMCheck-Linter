@@ -59,6 +59,11 @@ public:
     const std::vector<ConfigWaiver>& getWaivers() const { return waivers; }
     /// Waivers dropped because their expiry date has passed (labels).
     const std::vector<std::string>& getExpiredWaivers() const { return expiredWaivers; }
+    /// For a layered Python config: the config files it was built from, child first.
+    const std::vector<std::string>& getLayers() const { return layers; }
+    /// The folder the config describes: the parent of .uvmcheck/ or the config's own folder
+    /// (empty when no config is loaded).
+    std::filesystem::path getProjectRoot() const;
 
     /// Warns about rule keys that match no registered rule, and maps rule
     /// names onto IDs. Call after the config is loaded and rules registered.
@@ -76,6 +81,7 @@ private:
     ProjectConfig projectConfig;
     std::vector<ConfigWaiver> waivers;
     std::vector<std::string> expiredWaivers;
+    std::vector<std::string> layers;
     size_t waiverGroups = 0;
     bool configLoaded = false;
     std::string loadedConfigPath;

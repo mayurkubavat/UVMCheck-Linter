@@ -97,6 +97,32 @@ parent's. If a file defines several unrelated `ProjectConfig` classes, pick one
 with `config = DmaBlock`. For anything dynamic, override `rule_configs()` or
 `to_dict()`.
 
+## Where the config is found, and sub-tree configs
+
+uvmcheck looks for `.uvmcheck/config.py` (and the other names above) from the
+working directory upwards; if there is none, from the folder of the first
+source file upwards, so a run started in a separate `sim/` folder still finds
+the project's config. `.uvmcheck/waivers.json` and `.uvmcheck/baseline.json`
+are read from the same project root. `--no-config` skips the search.
+
+A sub-tree such as a VIP or a block-level env can keep its own
+`.uvmcheck/config.py` that builds on the project's. `parent_project()` returns
+the project class of the next `.uvmcheck/config.py` further up, with its
+relative paths anchored to the parent's root:
+
+```python
+# blocks/dma/.uvmcheck/config.py
+from uvmcheck.config import parent_project, RuleConfig
+
+class DmaBlock(parent_project()):
+    exclude_paths = parent_project().exclude_paths + ["gen/**"]
+
+    class MaxLineLength(RuleConfig):
+        max_columns = 160
+```
+
+Running from `blocks/dma/` prints the layers that were loaded.
+
 ## Reference
 
 | Setting | Meaning |

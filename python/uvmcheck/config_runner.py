@@ -16,11 +16,27 @@ import os
 import sys
 import traceback
 
+from . import config as config_module
 from .config import ConfigError, ProjectConfig
 
 
 def load_config(path: str) -> ProjectConfig:
+    explicit = load_config_class(path)
+    return explicit if isinstance(explicit, ProjectConfig) else explicit()
+
+
+def load_config_class(path: str):
+    """The selected ProjectConfig class of a config file (or the instance it names)."""
     path = os.path.abspath(path)
+    config_module._loaded_layers.append(path)
+    config_module._loading.append(path)
+    try:
+        return _load(path)
+    finally:
+        config_module._loading.pop()
+
+
+def _load(path: str):
     config_dir = os.path.dirname(path)
     # Let configs import shared team bases sitting next to them.
     if config_dir not in sys.path:
@@ -32,7 +48,8 @@ def load_config(path: str) -> ProjectConfig:
         if parent_dir and parent_dir not in sys.path:
             sys.path.insert(1, parent_dir)
 
-    module_name = "_uvmcheck_project_config"
+    # Unique per file, so a layered config and its parent do not replace each other.
+    module_name = "_uvmcheck_project_config_%d" % len(config_module._loaded_layers)
     spec = importlib.util.spec_from_file_location(module_name, path)
     if not spec or not spec.loader:
         raise ConfigError(f"cannot import {path}")
@@ -43,7 +60,7 @@ def load_config(path: str) -> ProjectConfig:
     explicit = getattr(module, "config", None)
     if explicit is not None:
         if inspect.isclass(explicit) and issubclass(explicit, ProjectConfig):
-            return explicit()
+            return explicit
         if isinstance(explicit, ProjectConfig):
             return explicit
         raise ConfigError("'config' must be a ProjectConfig subclass or instance")
@@ -57,7 +74,7 @@ def load_config(path: str) -> ProjectConfig:
     if len(leaves) > 1:
         names = ", ".join(sorted(c.__name__ for c in leaves))
         raise ConfigError(f"several ProjectConfig classes found ({names}); set 'config = <one of them>'")
-    return leaves[0]()
+    return leaves[0]
 
 
 def main() -> int:
@@ -70,6 +87,8 @@ def main() -> int:
         cfg = load_config(args.config)
         data = cfg.to_dict()
         data["source"] = type(cfg).__qualname__
+        if len(config_module._loaded_layers) > 1:
+            data["layers"] = list(config_module._loaded_layers)
     except ConfigError as e:
         sys.stderr.write(f"{args.config}: {e}\n")
         return 1

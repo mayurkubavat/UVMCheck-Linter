@@ -36,12 +36,15 @@ which serializes the selected config to JSON with ``to_dict()``.
 """
 
 import datetime
+import importlib.util
 import inspect
+import os
+import sys
 from typing import Any, Dict, List, Optional, Union
 
 from .rule import Severity
 
-__all__ = ["ProjectConfig", "RuleConfig", "Waiver", "Severity", "ConfigError"]
+__all__ = ["ProjectConfig", "RuleConfig", "Waiver", "Severity", "ConfigError", "parent_project"]
 
 
 class ConfigError(Exception):
@@ -285,3 +288,83 @@ class ProjectConfig:
         if self.naming:
             out["naming"] = dict(self.naming)
         return out
+
+
+# ---------------------------------------------------------------------------
+# Layered configs: a sub-tree (a VIP, a block-level env) can keep its own
+# .uvmcheck/config.py and build on the project's:
+#
+#     from uvmcheck.config import parent_project
+#
+#     class BlockEnv(parent_project()):
+#         exclude_paths = parent_project().exclude_paths + ["gen/**"]
+#
+# The loader sets the path of the config being loaded; parent_project() finds
+# the next .uvmcheck/config.py further up and returns its project class with
+# its relative paths made absolute, so they keep pointing where the parent
+# meant them to.
+
+_loading: List[str] = []          # stack of config files being loaded (absolute)
+_loaded_layers: List[str] = []    # every config file loaded for this run, child first
+_parent_cache: Dict[str, type] = {}
+
+_PATH_ATTRS = ("sources", "filelists", "include_dirs", "library_paths", "exclude_paths")
+
+
+def _project_root(config_path: str) -> str:
+    d = os.path.dirname(os.path.abspath(config_path))
+    return os.path.dirname(d) if os.path.basename(d) == ".uvmcheck" else d
+
+
+def _anchor(path: str, root: str) -> str:
+    """Absolute form of a relative path; env-var, home, absolute and bare-name globs stay as written."""
+    if not path or path.startswith(("$", "~", "/")) or "/" not in path:
+        return path
+    return os.path.normpath(os.path.join(root, path))
+
+
+def _anchored_class(cls: type, root: str) -> type:
+    """A subclass of a parent project whose relative paths are absolute."""
+    attrs: Dict[str, Any] = {}
+    for name in _PATH_ATTRS:
+        value = getattr(cls, name, [])
+        if isinstance(value, str):
+            value = [value]
+        attrs[name] = [_anchor(p, root) for p in value]
+    waivers = []
+    for w in getattr(cls, "waivers", []):
+        if inspect.isclass(w) and issubclass(w, Waiver):
+            w = w()
+        if isinstance(w, Waiver) and w.paths:
+            w = Waiver(rules=list(w.rules), paths=[_anchor(p, root) for p in w.paths], line=w.line,
+                       reason=w.reason, owner=w.owner, expires=w.expires)
+        waivers.append(w)
+    attrs["waivers"] = waivers
+    for rc in cls().rule_configs():
+        if rc.exclude_paths:
+            attrs[rc.__name__] = type(rc.__name__, (rc,), {
+                "rule": rc.rule_key(), "exclude_paths": [_anchor(p, root) for p in rc.exclude_paths]})
+    return type(cls.__name__, (cls,), attrs)
+
+
+def parent_project() -> type:
+    """The project class of the nearest .uvmcheck/config.py above this one."""
+    if not _loading:
+        raise ConfigError("parent_project() can only be called from a config being loaded by uvmcheck")
+    current = _loading[-1]
+    if current in _parent_cache:
+        return _parent_cache[current]
+    start = os.path.dirname(_project_root(current))
+    d = start
+    while True:
+        candidate = os.path.join(d, ".uvmcheck", "config.py")
+        if os.path.isfile(candidate) and os.path.abspath(candidate) != current:
+            break
+        parent = os.path.dirname(d)
+        if parent == d:
+            raise ConfigError(f"parent_project(): no .uvmcheck/config.py above {_project_root(current)}")
+        d = parent
+    from .config_runner import load_config_class  # late import: the runner imports this module
+    cls = _anchored_class(load_config_class(candidate), _project_root(candidate))
+    _parent_cache[current] = cls
+    return cls

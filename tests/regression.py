@@ -101,7 +101,8 @@ class Linter:
             cmd += ["--rule", rule_id]
         else:
             cmd += ["--preset", "all"]  # all-rules mode includes the opt-in Advisory rules
-        cmd += ["--json", json_path, "--diag-json", diag_path]
+        # Rule tests must not pick up the repository's own .uvmcheck/ configuration.
+        cmd += ["--no-config", "--json", json_path, "--diag-json", diag_path]
 
         start_time = time.time()
         res = subprocess.run(cmd, capture_output=True, text=True, cwd=self.workdir)

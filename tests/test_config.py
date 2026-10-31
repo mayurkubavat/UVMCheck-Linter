@@ -344,6 +344,40 @@ def main():
     check("violation waived by auto-discovered .uvmcheck/waivers.json", files_with(found, "SV-COR-008") == ["vendor_vip.sv"], out + err)
     check("waiver file auto-loaded banner present", "Loaded external waivers from .uvmcheck/waivers.json" in out, out)
 
+    # 10. Discovery from the sources, and layered sub-tree configs.
+    with tempfile.TemporaryDirectory() as d:
+        root = Path(d) / "proj"
+        root.mkdir()
+        make_project(root)
+        (root / ".uvmcheck").mkdir()
+        (root / ".uvmcheck" / "config.py").write_text(textwrap.dedent("""\
+            from uvmcheck.config import ProjectConfig
+            class Project(ProjectConfig):
+                library_paths = ["lib/**"]
+            """))
+        sim = Path(d) / "sim"   # outside the project tree
+        sim.mkdir()
+        rc, found, out, err = run(binary, sim, [str(root / "lib/vendor_vip.sv"), str(root / "src/user_tb.sv")])
+        print("\nConfig found from the source files (run outside the tree)")
+        check("config discovered from the first source", "Auto-discovered configuration" in out and
+              files_with(found, "SV-COR-008") == ["user_tb.sv"], out + err)
+
+        blk = root / "blk"
+        (blk / ".uvmcheck").mkdir(parents=True)
+        (blk / ".uvmcheck" / "config.py").write_text(textwrap.dedent("""\
+            from uvmcheck.config import parent_project, RuleConfig
+            class Block(parent_project()):
+                class SelfComparison(RuleConfig):
+                    enabled = False
+            """))
+        rc, found, out, err = run(binary, blk, ["../lib/vendor_vip.sv", "../src/user_tb.sv"])
+        print("\nLayered config (block config extends the project config)")
+        check("layers reported", "Configuration layers:" in out, out + err)
+        check("parent's relative library path still points at the parent's lib/",
+              "vendor_vip.sv" not in {f for f, _, _ in found}, out + err)
+        check("block's own override applies", files_with(found, "SV-COR-008") == [], out + err)
+        check("parent's rules still run", files_with(found, "SV-COR-001") == ["user_tb.sv"], out + err)
+
     print(f"\n{'FAILED' if failures else 'PASSED'}: {len(failures)} failure(s)")
     return 1 if failures else 0
 

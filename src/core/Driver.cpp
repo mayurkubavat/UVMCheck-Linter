@@ -59,6 +59,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--engine", engineMode, "Rule execution engine: single-pass (default, parallel shared walk) or isolated (one walk per rule, sequential)", "<mode>");
     slangDriver.cmdLine.add("--waiver-report", waiverReport, "Report waiver and baseline hygiene: unused, ownerless and expired waivers, stale waiver comments, waived findings per rule and owner");
     slangDriver.cmdLine.add("--strict-waivers", strictWaivers, "Exit with status 4 when a waiver, waiver comment or baseline entry matched nothing, or a waiver has expired (implies --waiver-report)");
+    slangDriver.cmdLine.add("--no-config", noConfig, "Do not look for a project configuration (tests, one-off checks)");
     slangDriver.cmdLine.add("--init", initProject, "Set up this folder: find the sources and UVM, learn the naming conventions the code already follows, and write .uvmcheck/config.py and a first baseline");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
 }
@@ -79,11 +80,25 @@ bool LinterDriver::loadProjectConfig() {
             return false;
         }
         info << "[uvmcheck] Loaded configuration from " << *configFilePath << "\n";
-    } else if (cfgMgr.autoDiscover(".")) {
-        info << "[uvmcheck] Auto-discovered configuration: " << cfgMgr.getLoadedConfigPath() << "\n";
-    } else if (!cfgMgr.getLastError().empty()) {
-        std::cerr << "Error: " << cfgMgr.getLastError() << "\n";
-        return false;
+    } else if (!noConfig.value_or(false)) {
+        // From the working directory up; failing that, from the first source file up, so a
+        // run from a sim/ folder outside the tree still finds the project's .uvmcheck/.
+        bool found = cfgMgr.autoDiscover(".");
+        if (!found && cfgMgr.getLastError().empty() && slangDriver.sourceLoader.hasFiles()) {
+            auto files = slangDriver.sourceLoader.getFilePaths();
+            if (!files.empty()) found = cfgMgr.autoDiscover(fs::absolute(files.front()).parent_path().string());
+        }
+        if (found) {
+            info << "[uvmcheck] Auto-discovered configuration: " << cfgMgr.getLoadedConfigPath() << "\n";
+        } else if (!cfgMgr.getLastError().empty()) {
+            std::cerr << "Error: " << cfgMgr.getLastError() << "\n";
+            return false;
+        }
+    }
+    if (cfgMgr.getLayers().size() > 1) {
+        info << "[uvmcheck] Configuration layers:";
+        for (const auto& l : cfgMgr.getLayers()) info << " " << l;
+        info << "\n";
     }
 
     // Command-line globs are relative to the working directory.
@@ -403,15 +418,16 @@ int LinterDriver::run() {
 
     // Process Waivers and Baseline
     waivers::WaiverEngine waiverEngine(slangDriver.sourceManager);
-    {
-        // Baseline paths are relative to the project root: the folder that holds .uvmcheck/
-        // (or the loaded config file), else the working directory.
-        fs::path cfg = ConfigManager::instance().getLoadedConfigPath();
-        if (!cfg.empty()) {
-            fs::path dir = fs::absolute(cfg).parent_path();
-            waiverEngine.setProjectRoot(dir.filename() == ".uvmcheck" ? dir.parent_path() : dir);
-        }
-    }
+    // Baseline paths, and the default waivers/baseline files, are relative to the project
+    // root: the folder that holds .uvmcheck/ (or the loaded config file), else the working directory.
+    fs::path projectRoot = ConfigManager::instance().getProjectRoot();
+    if (projectRoot.empty()) projectRoot = fs::current_path();
+    waiverEngine.setProjectRoot(projectRoot);
+    // Shown and opened relative to the working directory when the root is (or is under) it.
+    const fs::path uvmcheckDir = [&] {
+        fs::path rel = fs::weakly_canonical(projectRoot).lexically_proximate(fs::weakly_canonical(fs::current_path()));
+        return (rel == "." ? fs::path() : rel) / ".uvmcheck";
+    }();
     for (const auto& cw : ConfigManager::instance().getWaivers()) {
         waivers::ExternalWaiver w;
         w.ruleId = cw.ruleId;
@@ -429,8 +445,8 @@ int LinterDriver::run() {
         waiversPathToLoad = *waiversFilePath;
     } else {
         std::error_code ec;
-        if (fs::exists(".uvmcheck/waivers.json", ec)) {
-            waiversPathToLoad = ".uvmcheck/waivers.json";
+        if (fs::exists(uvmcheckDir / "waivers.json", ec)) {
+            waiversPathToLoad = (uvmcheckDir / "waivers.json").generic_string();
         }
     }
 
@@ -447,8 +463,8 @@ int LinterDriver::run() {
         baselinePathToLoad = *baselineInputPath;
     } else {
         std::error_code ec;
-        if (fs::exists(".uvmcheck/baseline.json", ec)) {
-            baselinePathToLoad = ".uvmcheck/baseline.json";
+        if (fs::exists(uvmcheckDir / "baseline.json", ec)) {
+            baselinePathToLoad = (uvmcheckDir / "baseline.json").generic_string();
         }
     }
 

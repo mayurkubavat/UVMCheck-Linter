@@ -363,7 +363,7 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
     static const std::unordered_set<std::string_view> knownKeys = {
         "version", "source", "warnings", "library_paths", "exclude_paths",
         "report_library_macro_expansions", "rules", "waivers", "style", "naming",
-        "sources", "filelists", "include_dirs", "defines", "expired_waivers"};
+        "sources", "filelists", "include_dirs", "defines", "expired_waivers", "layers"};
     for (const auto& [key, _] : root.asObject()) {
         if (!knownKeys.count(key)) warn("unknown top-level key '" + key + "' ignored");
     }
@@ -396,6 +396,12 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
     }
     if (const auto* v = root.find("waivers")) {
         if (!applyWaivers(*v, baseDir)) return false;
+    }
+    if (const auto* v = root.find("layers"); v && v->isArray()) {
+        // Layered Python configs: this file and the parents it built on, child first.
+        for (const auto& l : v->asArray()) {
+            if (l.isString()) layers.push_back(l.asString());
+        }
     }
     if (const auto* v = root.find("expired_waivers"); v && v->isArray()) {
         // Dropped by the Python config loader; kept for --strict-waivers.
@@ -445,6 +451,13 @@ bool ConfigManager::loadFromFile(const std::string& filePath) {
     configLoaded = true;
     loadedConfigPath = filePath;
     return true;
+}
+
+fs::path ConfigManager::getProjectRoot() const {
+    if (!configLoaded) return {};
+    std::error_code ec;
+    fs::path dir = fs::absolute(loadedConfigPath, ec).parent_path();
+    return dir.filename() == ".uvmcheck" ? dir.parent_path() : dir;
 }
 
 bool ConfigManager::autoDiscover(const std::string& startDir) {
