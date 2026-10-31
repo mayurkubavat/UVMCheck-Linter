@@ -292,6 +292,14 @@ Run with waivers automatically discovered:
 ```
 (Or pass `--waivers path/to/waivers.json` explicitly).
 
+### New code is clean, without a baseline
+`--changed-since <git-ref>` reports only findings on lines added or changed since that
+revision, plus everything in untracked files. In a pull request job:
+
+```bash
+./build/uvmcheck --changed-since origin/main
+```
+
 ### Keeping suppressions honest
 Waivers and baselines pile up unless something prunes them. `--waiver-report` lists
 waivers that matched nothing in this run, expired waivers, waivers without an owner,

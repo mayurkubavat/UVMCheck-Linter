@@ -37,6 +37,7 @@ private:
     std::optional<bool> runLsp;
     std::optional<bool> initProject;
     std::optional<bool> noConfig;
+    std::optional<std::string> changedSince;
     std::optional<bool> waiverReport;
     std::optional<bool> strictWaivers;
     std::vector<std::string> libraryPathArgs;

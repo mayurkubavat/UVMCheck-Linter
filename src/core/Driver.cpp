@@ -13,6 +13,7 @@
 #include "uvmcheck/lsp/LspServer.h"
 #include "uvmcheck/core/ProjectSources.h"
 #include "uvmcheck/core/ProjectInit.h"
+#include "uvmcheck/core/ChangedLines.h"
 #include "uvmcheck/style/NamingEngine.h"
 #include "uvmcheck/engine/RuleEngine.h"
 #include <iostream>
@@ -59,6 +60,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--engine", engineMode, "Rule execution engine: single-pass (default, parallel shared walk) or isolated (one walk per rule, sequential)", "<mode>");
     slangDriver.cmdLine.add("--waiver-report", waiverReport, "Report waiver and baseline hygiene: unused, ownerless and expired waivers, stale waiver comments, waived findings per rule and owner");
     slangDriver.cmdLine.add("--strict-waivers", strictWaivers, "Exit with status 4 when a waiver, waiver comment or baseline entry matched nothing, or a waiver has expired (implies --waiver-report)");
+    slangDriver.cmdLine.add("--changed-since", changedSince, "Report only findings on lines added or changed since this git revision (and in untracked files): a new-code-is-clean gate without a baseline", "<git-ref>");
     slangDriver.cmdLine.add("--no-config", noConfig, "Do not look for a project configuration (tests, one-off checks)");
     slangDriver.cmdLine.add("--init", initProject, "Set up this folder: find the sources and UVM, learn the naming conventions the code already follows, and write .uvmcheck/config.py and a first baseline");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
@@ -497,6 +499,21 @@ int LinterDriver::run() {
         info << "[uvmcheck] " << stale << " baseline entr" << (stale == 1 ? "y" : "ies")
              << " matched no finding (fixed, or the flagged line changed); "
                 "run with --update-baseline to drop them\n";
+    }
+
+    if (changedSince.has_value()) {
+        ChangedLines changed;
+        if (!changed.load(*changedSince, projectRoot)) {
+            std::cerr << "Error: --changed-since: " << changed.error() << "\n";
+            return 2;
+        }
+        size_t before = activeViolations.size();
+        std::erase_if(activeViolations, [&](const Violation& v) {
+            return v.filePath.empty() || !changed.contains(v.filePath, v.line);
+        });
+        info << "[uvmcheck] --changed-since " << *changedSince << ": " << activeViolations.size()
+             << " finding(s) on changed lines in " << changed.fileCount() << " changed file(s); "
+             << before - activeViolations.size() << " elsewhere not shown\n";
     }
 
     // Replace violations with active ones
