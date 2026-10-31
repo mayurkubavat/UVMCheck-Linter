@@ -36,6 +36,8 @@ private:
     std::optional<std::string> pythonRulesPath;
     std::optional<bool> runLsp;
     std::optional<bool> initProject;
+    std::optional<bool> waiverReport;
+    std::optional<bool> strictWaivers;
     std::vector<std::string> libraryPathArgs;
     std::vector<std::string> excludePathArgs;
     std::optional<bool> profileRules;

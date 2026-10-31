@@ -309,10 +309,19 @@ bool ConfigManager::applyWaivers(const json::Value& list, const fs::path& baseDi
             // Legacy waiver files used "file" for the path.
             if (const auto* f = w.find("file"); f && f->isString()) paths.push_back(f->asString());
         }
+        std::string label;
+        if (const auto* l = w.find("label"); l && l->isString()) label = l->asString();
+        if (label.empty()) {
+            label = "waiver #" + std::to_string(waiverGroups + expiredWaivers.size() + 1) + " (" + ruleIds.front() + ")";
+        }
         if (const auto* e = w.find("expires"); e && e->isString() && e->asString() < today) {
             warn("waiver for " + ruleIds.front() + " expired on " + e->asString() + "; it no longer applies");
+            expiredWaivers.push_back(label + " expired " + e->asString());
             continue;
         }
+        std::string owner;
+        if (const auto* o = w.find("owner"); o && o->isString()) owner = o->asString();
+        const size_t group = waiverGroups++;
         size_t line = 0;
         if (const auto* l = w.find("line"); l && l->isNumber() && l->asNumber() >= 1) {
             line = static_cast<size_t>(l->asNumber());
@@ -338,6 +347,9 @@ bool ConfigManager::applyWaivers(const json::Value& list, const fs::path& baseDi
                 cw.path = g;
                 cw.line = line;
                 cw.reason = reason->asString();
+                cw.owner = owner;
+                cw.label = label;
+                cw.group = group;
                 waivers.push_back(std::move(cw));
             }
         }
@@ -351,7 +363,7 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
     static const std::unordered_set<std::string_view> knownKeys = {
         "version", "source", "warnings", "library_paths", "exclude_paths",
         "report_library_macro_expansions", "rules", "waivers", "style", "naming",
-        "sources", "filelists", "include_dirs", "defines"};
+        "sources", "filelists", "include_dirs", "defines", "expired_waivers"};
     for (const auto& [key, _] : root.asObject()) {
         if (!knownKeys.count(key)) warn("unknown top-level key '" + key + "' ignored");
     }
@@ -384,6 +396,12 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
     }
     if (const auto* v = root.find("waivers")) {
         if (!applyWaivers(*v, baseDir)) return false;
+    }
+    if (const auto* v = root.find("expired_waivers"); v && v->isArray()) {
+        // Dropped by the Python config loader; kept for --strict-waivers.
+        for (const auto& e : v->asArray()) {
+            if (e.isString()) expiredWaivers.push_back(e.asString());
+        }
     }
     if (const auto* v = root.find("warnings"); v && v->isArray()) {
         // Emitted by the Python config loader (e.g. expired waivers).

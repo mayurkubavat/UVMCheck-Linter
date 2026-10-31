@@ -280,7 +280,8 @@ Document approved exceptions in `.uvmcheck/waivers.json` (auto-discovered) or in
       "rule": "UVM-OBJ-002",
       "file": "tb/stress_seq.sv",
       "line": 142,
-      "reason": "Objection in loop verified for stress bench iteration"
+      "reason": "Objection in loop verified for stress bench iteration",
+      "owner": "mayur"
     }
   ]
 }
@@ -290,6 +291,18 @@ Run with waivers automatically discovered:
 ./build/uvmcheck tb/*.sv
 ```
 (Or pass `--waivers path/to/waivers.json` explicitly).
+
+### Keeping suppressions honest
+Waivers and baselines pile up unless something prunes them. `--waiver-report` lists
+waivers that matched nothing in this run, expired waivers, waivers without an owner,
+waiver comments in your sources that no longer waive anything, baseline entries whose
+finding is gone, and how many findings are waived per rule and per owner.
+`--strict-waivers` prints the same and exits with status 4 while any unused, expired or
+stale entry remains, so CI keeps the suppression list as short as the code allows:
+
+```bash
+./build/uvmcheck --strict-waivers   # in CI, after the normal lint step
+```
 
 ---
 

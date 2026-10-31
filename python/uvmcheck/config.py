@@ -194,7 +194,7 @@ class Waiver:
         return datetime.date.fromisoformat(str(self.expires)) < (today or datetime.date.today())
 
     def to_dict(self) -> Dict[str, Any]:
-        out: Dict[str, Any] = {"rules": list(self.rules) or ["*"], "reason": self.reason}
+        out: Dict[str, Any] = {"rules": list(self.rules) or ["*"], "reason": self.reason, "label": self.label}
         if self.paths:
             out["paths"] = list(self.paths)
         if self.line:
@@ -275,6 +275,7 @@ class ProjectConfig:
             if w.is_expired():
                 owner = f" (owner: {w.owner})" if w.owner else ""
                 warnings.append(f"waiver {w.label} expired on {w.expires}{owner}; it no longer applies")
+                out.setdefault("expired_waivers", []).append(f"{w.label} expired {w.expires}{owner}")
                 continue
             out["waivers"].append(w.to_dict())
         if warnings:

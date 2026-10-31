@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <cstdio>
 #include <fstream>
+#include <regex>
 #include <map>
 #include <numeric>
 #include <sstream>
@@ -114,17 +115,25 @@ void WaiverEngine::setFileText(const std::string& filePath, std::string_view tex
     fileLines[filePath] = std::move(lines);
 }
 
+const std::vector<std::string>& WaiverEngine::fileLinesOf(const std::string& path) {
+    auto it = fileLines.find(path);
+    if (it == fileLines.end()) {
+        std::vector<std::string> lines;
+        std::ifstream in(path);
+        for (std::string l; std::getline(in, l);) {
+            if (!l.empty() && l.back() == '\r') l.pop_back();
+            lines.push_back(std::move(l));
+        }
+        it = fileLines.emplace(path, std::move(lines)).first;
+    }
+    return it->second;
+}
+
 std::string_view WaiverEngine::lineText(const core::Violation& v, size_t line) {
     if (line == v.line && !v.snippet.empty()) return v.snippet;
     if (v.filePath.empty() || line == 0) return {};
-    auto it = fileLines.find(v.filePath);
-    if (it == fileLines.end()) {
-        std::vector<std::string> lines;
-        std::ifstream in(v.filePath);
-        for (std::string l; std::getline(in, l);) lines.push_back(std::move(l));
-        it = fileLines.emplace(v.filePath, std::move(lines)).first;
-    }
-    return line <= it->second.size() ? std::string_view(it->second[line - 1]) : std::string_view();
+    const auto& lines = fileLinesOf(v.filePath);
+    return line <= lines.size() ? std::string_view(lines[line - 1]) : std::string_view();
 }
 
 std::string WaiverEngine::legacyFingerprint(const core::Violation& v) const {
@@ -166,30 +175,43 @@ std::vector<std::string> WaiverEngine::fingerprints(const std::vector<core::Viol
     return result;
 }
 
+// On the finding's own line:
+//   // uvmcheck:waive RULE_ID     // uvmcheck:disable RULE_ID     // lint:off RULE_ID
+// On the line above:
+//   // uvmcheck-disable-next-line RULE_ID     // uvmcheck:waive-next-line RULE_ID
+static constexpr std::string_view kSameLine[] = {"uvmcheck:waive", "uvmcheck:disable",
+                                                 "uvmcheck-disable", "lint:waive", "lint:off"};
+static constexpr std::string_view kNextLine[] = {"uvmcheck-disable-next-line",
+                                                 "uvmcheck:waive-next-line",
+                                                 "uvmcheck:disable-next-line"};
+
 bool WaiverEngine::hasInlineWaiver(const core::Violation& v) {
-    // On the finding's own line:
-    //   // uvmcheck:waive RULE_ID     // uvmcheck:disable RULE_ID     // lint:off RULE_ID
-    // On the line above:
-    //   // uvmcheck-disable-next-line RULE_ID     // uvmcheck:waive-next-line RULE_ID
-    static constexpr std::string_view sameLine[] = {"uvmcheck:waive", "uvmcheck:disable",
-                                                    "uvmcheck-disable", "lint:waive", "lint:off"};
-    static constexpr std::string_view nextLine[] = {"uvmcheck-disable-next-line",
-                                                    "uvmcheck:waive-next-line",
-                                                    "uvmcheck:disable-next-line"};
     std::string_view here = lineText(v, v.line);
-    for (auto kw : sameLine) {
-        if (waiverCommentCovers(here, kw, v.ruleId)) return true;
+    for (auto kw : kSameLine) {
+        if (waiverCommentCovers(here, kw, v.ruleId)) {
+            usedInline.insert(v.filePath + '\n' + std::to_string(v.line));
+            return true;
+        }
     }
     if (v.line > 1) {
         std::string_view above = lineText(v, v.line - 1);
-        for (auto kw : nextLine) {
-            if (waiverCommentCovers(above, kw, v.ruleId)) return true;
+        for (auto kw : kNextLine) {
+            if (waiverCommentCovers(above, kw, v.ruleId)) {
+                usedInline.insert(v.filePath + '\n' + std::to_string(v.line - 1));
+                return true;
+            }
         }
     }
     return false;
 }
 
-bool WaiverEngine::matchesExternalWaiver(const core::Violation& v) const {
+void WaiverEngine::addWaiver(ExternalWaiver waiver) {
+    if (waiver.label.empty()) waiver.label = "waiver for " + waiver.ruleId;
+    if (waiver.group >= groupMatches.size()) groupMatches.resize(waiver.group + 1, 0);
+    externalWaivers.push_back(std::move(waiver));
+}
+
+const ExternalWaiver* WaiverEngine::matchExternalWaiver(const core::Violation& v) {
     for (const auto& w : externalWaivers) {
         if (w.ruleId != "*" && w.ruleId != v.ruleId) continue;
         if (w.line != 0 && w.line != v.line) continue;
@@ -203,21 +225,34 @@ bool WaiverEngine::matchesExternalWaiver(const core::Violation& v) const {
             while (!pat.empty() && pat.back() == '*') pat.pop_back();
             if (!pat.empty() && v.filePath.find(pat) == std::string::npos) continue;
         }
-        return true;
+        if (w.group < groupMatches.size()) groupMatches[w.group]++;
+        return &w;
     }
-    return false;
+    return nullptr;
 }
 
 std::vector<core::Violation> WaiverEngine::filter(const std::vector<core::Violation>& violations) {
     std::vector<core::Violation> active;
     waivedCount = 0;
     matchedFingerprints.clear();
+    usedInline.clear();
+    waivedByRule.clear();
+    waivedByOwner.clear();
+    std::fill(groupMatches.begin(), groupMatches.end(), 0);
     const bool useBaseline = !baselineFingerprints.empty() || !legacyFingerprints.empty();
     auto fps = useBaseline ? fingerprints(violations) : std::vector<std::string>(violations.size());
 
     for (size_t i = 0; i < violations.size(); ++i) {
         const auto& v = violations[i];
-        bool waived = hasInlineWaiver(v) || matchesExternalWaiver(v);
+        // Evaluate both, so a waiver shadowed by an inline comment still counts as used.
+        const bool inlineWaived = hasInlineWaiver(v);
+        const ExternalWaiver* external = matchExternalWaiver(v);
+        bool waived = inlineWaived || external;
+        if (waived) {
+            waivedByRule[v.ruleId]++;
+            waivedByOwner[external && !external->owner.empty() ? external->owner
+                          : inlineWaived ? std::string("(inline comment)") : std::string("(no owner)")]++;
+        }
         if (!waived && useBaseline) {
             if (baselineFingerprints.count(fps[i])) {
                 matchedFingerprints.insert(fps[i]);
@@ -234,6 +269,53 @@ std::vector<core::Violation> WaiverEngine::filter(const std::vector<core::Violat
         }
     }
     return active;
+}
+
+WaiverHygiene WaiverEngine::hygiene(const std::vector<std::string>& files,
+                                    const std::unordered_set<std::string>& activeRules) {
+    WaiverHygiene h;
+    std::vector<bool> seenGroup(groupMatches.size(), false), ownerless(groupMatches.size(), false);
+    for (const auto& w : externalWaivers) {
+        if (w.group >= seenGroup.size() || seenGroup[w.group]) continue;
+        seenGroup[w.group] = true;
+        h.written++;
+        if (w.owner.empty()) h.withoutOwner++;
+        if (groupMatches[w.group] == 0) h.unused.push_back(w.label);
+    }
+    for (const auto& [rule, n] : waivedByRule) h.byRule.emplace_back(rule, n);
+    for (const auto& [owner, n] : waivedByOwner) h.byOwner.emplace_back(owner, n);
+    auto byCount = [](const auto& a, const auto& b) { return a.second != b.second ? a.second > b.second : a.first < b.first; };
+    std::sort(h.byRule.begin(), h.byRule.end(), byCount);
+    std::sort(h.byOwner.begin(), h.byOwner.end(), byCount);
+
+    // Waiver comments in user files: unused if they name an active rule and waived nothing.
+    static const std::regex ruleRe(R"([A-Z][A-Z0-9]*-[A-Z][A-Z0-9]*-[0-9]+[A-Za-z0-9.]*|\*)");
+    for (const auto& file : files) {
+        const auto& lines = fileLinesOf(file);
+        for (size_t i = 0; i < lines.size(); ++i) {
+            const std::string& l = lines[i];
+            size_t at = std::string::npos;
+            for (auto kw : kNextLine) at = std::min(at, l.find(kw));
+            for (auto kw : kSameLine) at = std::min(at, l.find(kw));
+            if (at == std::string::npos) continue;
+            size_t comment = l.rfind("//", at);
+            if (comment == std::string::npos && l.rfind("/*", at) == std::string::npos) continue;
+            h.inlineComments++;
+            if (usedInline.count(file + '\n' + std::to_string(i + 1))) continue;
+            bool namesActive = false;
+            std::string rest = l.substr(at);
+            for (std::sregex_iterator m(rest.begin(), rest.end(), ruleRe), end; m != end; ++m) {
+                namesActive |= m->str() == "*" || activeRules.count(m->str()) > 0;
+            }
+            if (namesActive) {
+                std::string text = l.substr(comment == std::string::npos ? at : comment);
+                h.unusedInline.push_back({file, i + 1, text});
+            }
+        }
+    }
+    h.baselineEntries = baselineFingerprints.size() + legacyFingerprints.size();
+    h.staleBaseline = getStaleBaselineCount();
+    return h;
 }
 
 size_t WaiverEngine::getStaleBaselineCount() const {
@@ -263,7 +345,11 @@ bool WaiverEngine::loadWaivers(const std::string& waiverFilePath) {
         if (const auto* l = obj.find("line"); l && l->isNumber() && l->asNumber() > 0)
             w.line = static_cast<size_t>(l->asNumber());
         w.reason = str(obj, "reason");
-        externalWaivers.push_back(std::move(w));
+        w.owner = str(obj, "owner");
+        w.group = groupMatches.size();
+        w.label = fs::path(waiverFilePath).filename().string() + " #" + std::to_string(externalWaivers.size() + 1) +
+                  " (" + w.ruleId + (w.pathPattern.empty() ? "" : " in " + w.pathPattern) + ")";
+        addWaiver(std::move(w));
     }
     return true;
 }

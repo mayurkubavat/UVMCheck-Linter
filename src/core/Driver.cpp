@@ -18,6 +18,8 @@
 #include <iostream>
 #include <iomanip>
 #include <fstream>
+#include <set>
+#include <unordered_set>
 #include <algorithm>
 #include <unordered_map>
 #include <chrono>
@@ -55,6 +57,8 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--history", useHistory, "Read git history for the change-based rules (SV-EVO-001 hotspots, SV-EVO-002 change coupling); off by default");
     slangDriver.cmdLine.add("--profile-rules", profileRules, "Print per-phase and per-rule execution times to stderr");
     slangDriver.cmdLine.add("--engine", engineMode, "Rule execution engine: single-pass (default, parallel shared walk) or isolated (one walk per rule, sequential)", "<mode>");
+    slangDriver.cmdLine.add("--waiver-report", waiverReport, "Report waiver and baseline hygiene: unused, ownerless and expired waivers, stale waiver comments, waived findings per rule and owner");
+    slangDriver.cmdLine.add("--strict-waivers", strictWaivers, "Exit with status 4 when a waiver, waiver comment or baseline entry matched nothing, or a waiver has expired (implies --waiver-report)");
     slangDriver.cmdLine.add("--init", initProject, "Set up this folder: find the sources and UVM, learn the naming conventions the code already follows, and write .uvmcheck/config.py and a first baseline");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
 }
@@ -414,6 +418,9 @@ int LinterDriver::run() {
         w.line = cw.line;
         w.reason = cw.reason;
         w.glob = cw.path;
+        w.owner = cw.owner;
+        w.label = cw.label;
+        w.group = cw.group;
         waiverEngine.addWaiver(std::move(w));
     }
 
@@ -478,6 +485,54 @@ int LinterDriver::run() {
 
     // Replace violations with active ones
     diags.getViolations() = std::move(activeViolations);
+
+    bool hygieneFailed = false;
+    if (waiverReport.value_or(false) || strictWaivers.value_or(false)) {
+        // User files of this compilation: library and excluded files are not scanned for comments.
+        std::vector<std::string> userFiles;
+        std::set<std::string> seenFiles;
+        for (const auto& tree : slangDriver.syntaxTrees) {
+            for (auto id : tree->getSourceBufferIds()) {
+                std::string name(slangDriver.sourceManager.getRawFileName(id));
+                if (name.empty() || !seenFiles.insert(name).second) continue;
+                if (projectConfig.classifyPath(normalizePathForMatching(name)) != SuppressionReason::None) continue;
+                if (name.find("uvm_mock.svh") != std::string::npos) continue;
+                userFiles.push_back(name);
+            }
+        }
+        std::unordered_set<std::string> activeIds;
+        for (const auto* r : activeRules) activeIds.insert(std::string(r->getId()));
+        auto h = waiverEngine.hygiene(userFiles, activeIds);
+        const auto& expired = ConfigManager::instance().getExpiredWaivers();
+        hygieneFailed = !h.unused.empty() || !h.unusedInline.empty() || h.staleBaseline > 0 || !expired.empty();
+
+        std::ostream& rep = jsonToStdout ? std::cerr : std::cout;
+        rep << "\n=== Waiver hygiene ===\n";
+        rep << "Waivers: " << h.written << " written, " << h.unused.size() << " matched nothing, "
+            << expired.size() << " expired, " << h.withoutOwner << " without an owner\n";
+        for (const auto& u : h.unused) rep << "  unused:  " << u << "\n";
+        for (const auto& e : expired) rep << "  expired: " << e << "\n";
+        rep << "Waiver comments: " << h.inlineComments << " in source, " << h.unusedInline.size()
+            << " waive nothing\n";
+        for (const auto& u : h.unusedInline) {
+            rep << "  " << u.filePath << ":" << u.line << ": " << u.text << "\n";
+        }
+        rep << "Baseline: " << h.baselineEntries << " entr" << (h.baselineEntries == 1 ? "y" : "ies") << ", "
+            << h.staleBaseline << " no longer match (fixed or changed)\n";
+        if (!h.byRule.empty()) {
+            rep << "Waived findings by rule:";
+            for (size_t i = 0; i < h.byRule.size() && i < 10; ++i)
+                rep << (i ? ", " : " ") << h.byRule[i].first << " " << h.byRule[i].second;
+            rep << (h.byRule.size() > 10 ? ", ..." : "") << "\n";
+            rep << "Waived findings by owner:";
+            for (size_t i = 0; i < h.byOwner.size(); ++i)
+                rep << (i ? ", " : " ") << h.byOwner[i].first << " " << h.byOwner[i].second;
+            rep << "\n";
+        }
+        if (strictWaivers.value_or(false) && hygieneFailed) {
+            rep << "[uvmcheck] --strict-waivers: remove or fix the entries above (exit 4)\n";
+        }
+    }
 
     // Apply automated fix-its if requested
     if (autoFix.value_or(false)) {
@@ -588,7 +643,8 @@ int LinterDriver::run() {
                   << " violation(s) suppressed by inline waivers or baseline.\033[0m\n";
     }
 
-    return diags.errorCount() > 0 ? 1 : 0;
+    if (diags.errorCount() > 0) return 1;
+    return strictWaivers.value_or(false) && hygieneFailed ? 4 : 0;
 }
 
 } // namespace uvmcheck::core

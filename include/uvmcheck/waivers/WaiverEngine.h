@@ -19,6 +19,27 @@ struct ExternalWaiver {
     size_t line = 0;         // 0 means any line
     std::string reason;
     std::optional<core::PathPattern> glob; // project-config waivers match by glob instead
+    std::string owner;
+    std::string label;  // how the hygiene report names it, e.g. "waivers.json #3"
+    size_t group = 0;   // entries expanded from one written waiver share a group
+};
+
+/// A waiver comment in a source file (`// uvmcheck:waive RULE` and friends).
+struct InlineWaiver {
+    std::string filePath;
+    size_t line = 0;
+    std::string text;
+};
+
+/// What --waiver-report and --strict-waivers look at after filter().
+struct WaiverHygiene {
+    size_t written = 0;                       // config + waiver-file waivers, as written
+    std::vector<std::string> unused;          // labels of written waivers that matched nothing
+    size_t withoutOwner = 0;
+    std::vector<std::pair<std::string, size_t>> byRule, byOwner; // findings waived
+    size_t inlineComments = 0;
+    std::vector<InlineWaiver> unusedInline;
+    size_t baselineEntries = 0, staleBaseline = 0;
 };
 
 /// Suppresses findings through inline comments, external/config waivers and a baseline.
@@ -33,12 +54,12 @@ class WaiverEngine {
 public:
     explicit WaiverEngine(const slang::SourceManager& sm);
 
-    /// Root that baseline paths are relative to (the folder holding .uvmcheck/, or the
-    /// working directory). Defaults to the working directory.
     /// Supplies a file's current text (e.g. an unsaved editor buffer) for
     /// inline waiver lookups, instead of reading it from disk.
     void setFileText(const std::string& filePath, std::string_view text);
 
+    /// Root that baseline paths are relative to (the folder holding .uvmcheck/, or the
+    /// working directory). Defaults to the working directory.
     void setProjectRoot(std::filesystem::path root) { projectRoot = std::move(root); }
 
     /// Load external waiver rules from a JSON file: a list of {"rule", "path", "line",
@@ -46,7 +67,7 @@ public:
     bool loadWaivers(const std::string& waiverFilePath);
 
     /// Add a waiver declared in the project config
-    void addWaiver(ExternalWaiver waiver) { externalWaivers.push_back(std::move(waiver)); }
+    void addWaiver(ExternalWaiver waiver);
 
     /// Load baseline entries from a JSON file
     bool loadBaseline(const std::string& baselinePath);
@@ -62,6 +83,12 @@ public:
     /// Baseline entries that matched no finding in the last filter() call: fixed findings,
     /// or findings whose line changed. --update-baseline drops them.
     size_t getStaleBaselineCount() const;
+
+    /// Usage of every waiver in the last filter() call. `files` are the user
+    /// files to scan for waiver comments; a comment counts as unused only if it
+    /// names a rule in `activeRules` (or '*') and waived nothing.
+    WaiverHygiene hygiene(const std::vector<std::string>& files,
+                          const std::unordered_set<std::string>& activeRules);
 
     /// Fingerprint of each violation, in the same order (exposed for testing).
     std::vector<std::string> fingerprints(const std::vector<core::Violation>& violations);
@@ -79,14 +106,18 @@ private:
     std::unordered_set<std::string> legacyFingerprints;
     std::unordered_set<std::string> matchedFingerprints;
     std::vector<ExternalWaiver> externalWaivers;
+    std::vector<size_t> groupMatches;                       // findings matched per waiver group
+    std::unordered_set<std::string> usedInline;              // "file\nline" of comments that waived something
+    std::unordered_map<std::string, size_t> waivedByRule, waivedByOwner;
     std::unordered_map<std::string, std::vector<std::string>> fileLines;
     size_t waivedCount = 0;
     std::string lastError;
 
     std::string_view lineText(const core::Violation& v, size_t line);
+    const std::vector<std::string>& fileLinesOf(const std::string& path);
     std::string legacyFingerprint(const core::Violation& v) const;
     bool hasInlineWaiver(const core::Violation& v);
-    bool matchesExternalWaiver(const core::Violation& v) const;
+    const ExternalWaiver* matchExternalWaiver(const core::Violation& v);
 };
 
 } // namespace uvmcheck::waivers

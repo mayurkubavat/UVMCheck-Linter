@@ -86,6 +86,7 @@ jobs:
           python3 tests/test_baseline.py --binary build/uvmcheck
           python3 tests/test_findings.py --binary build/uvmcheck
           python3 tests/test_init.py --binary build/uvmcheck
+          python3 tests/test_waivers.py --binary build/uvmcheck
           python3 tests/test_engine_gate.py
           python3 tests/test_python_rules.py --binary build/uvmcheck
           python3 tests/test_guidelines.py --binary build/uvmcheck

@@ -20,6 +20,9 @@ struct ConfigWaiver {
     std::optional<PathPattern> path;
     size_t line = 0; // 0 = any line
     std::string reason;
+    std::string owner;
+    std::string label; // e.g. "Waiver(SV-COR-001)" or the waiver subclass name
+    size_t group = 0;  // index of the waiver as written (one waiver can expand to many entries)
 };
 
 class ConfigManager {
@@ -54,6 +57,8 @@ public:
     const ProjectConfig& getProjectConfig() const { return projectConfig; }
 
     const std::vector<ConfigWaiver>& getWaivers() const { return waivers; }
+    /// Waivers dropped because their expiry date has passed (labels).
+    const std::vector<std::string>& getExpiredWaivers() const { return expiredWaivers; }
 
     /// Warns about rule keys that match no registered rule, and maps rule
     /// names onto IDs. Call after the config is loaded and rules registered.
@@ -70,6 +75,8 @@ private:
     style::StyleEngine styleEngine;
     ProjectConfig projectConfig;
     std::vector<ConfigWaiver> waivers;
+    std::vector<std::string> expiredWaivers;
+    size_t waiverGroups = 0;
     bool configLoaded = false;
     std::string loadedConfigPath;
     std::string lastError;
