@@ -107,6 +107,23 @@ def main():
         res = run(binary, real, "--fix")
         check("fix-it" not in res.stdout, "second --fix has nothing left to do", res.stdout)
 
+        only = Path(tmp, "only")
+        only.mkdir()
+        setup(only)
+        res = run(binary, only, "--fix", "--fix-rule", "SV-COR-009")
+        top = (only / "top.sv").read_text()
+        check("casez (sel)" in top and "a == 1'bx" in top and (only / "helpers.svh").read_text() == HELPER,
+              "--fix-rule limits the fixes to that rule", top)
+
+        # An out-of-block method is labelled with its own name, not cls::name.
+        ob = Path(tmp, "outofblock")
+        ob.mkdir()
+        (ob / "top.sv").write_text("class ob_c;\n    extern function void go();\nendclass : ob_c\n"
+                                   "function void ob_c::go();\nendfunction\n")
+        run(binary, ob, "--fix", "--fix-rule", "SV-STY-005")
+        text = (ob / "top.sv").read_text()
+        check("endfunction : go\n" in text, "end label fix uses the method name", text)
+
     if failures:
         print(f"{len(failures)} check(s) failed")
         return 1

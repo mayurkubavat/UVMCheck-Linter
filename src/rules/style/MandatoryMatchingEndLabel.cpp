@@ -20,7 +20,10 @@ public:
             if (checkMissing) {
                 std::vector<core::FixItHint> fixIts;
                 if (fn.end.range().start().valid()) {
-                    fixIts.push_back({fn.end.range(), std::string(fn.end.valueText()) + " : " + routineName, "Add matching end label"});
+                    // An out-of-block method (cls::name) is labelled with its own name.
+                    auto sep = routineName.rfind("::");
+                    std::string label = sep == std::string::npos ? routineName : routineName.substr(sep + 2);
+                    fixIts.push_back({fn.end.range(), std::string(fn.end.valueText()) + " : " + label, "Add matching end label"});
                 }
                 diags.addViolation(
                     "SV-STY-005",

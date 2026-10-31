@@ -31,6 +31,7 @@
 #include <algorithm>
 #include <unordered_map>
 #include <map>
+#include <sstream>
 #include <chrono>
 #include <filesystem>
 
@@ -52,6 +53,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--conformance", showConformance, "Report pass/fail per methodology guideline (implied by --guideline and the reuse and guide presets)");
     slangDriver.cmdLine.add("--fix", autoFix, "Automatically apply fix-it rewrites to source files where supported");
     slangDriver.cmdLine.add("--fix-dry-run", autoFixDryRun, "Print the fix-it rewrites as a unified diff without changing any file");
+    slangDriver.cmdLine.add("--fix-rule", autoFixRules, "With --fix or --fix-dry-run, apply only these rules' fixes (comma-separated IDs or names)", "<rules>");
     slangDriver.cmdLine.add("--sarif", sarifOutputPath, "Output results to specified SARIF 2.1.0 file", "<file>");
     slangDriver.cmdLine.add("--json", jsonOutputPath, "Output results as JSON to specified file ('-' for stdout)", "<file>");
     slangDriver.cmdLine.add("--html", htmlOutputPath, "Generate standalone interactive HTML quality dashboard", "<file>");
@@ -674,7 +676,17 @@ int LinterDriver::run() {
         // place in the file to rewrite and is left alone.
         std::map<std::string, std::pair<slang::BufferID, std::vector<fix::TextEdit>>> fileEdits;
         size_t macroFixes = 0;
+        std::set<std::string> onlyRules;
+        if (autoFixRules.has_value()) {
+            std::stringstream list(*autoFixRules);
+            for (std::string item; std::getline(list, item, ',');) {
+                item.erase(0, item.find_first_not_of(" \t"));
+                item.erase(item.find_last_not_of(" \t") + 1);
+                if (!item.empty()) onlyRules.insert(item);
+            }
+        }
         for (const auto& v : diags.getViolations()) {
+            if (!onlyRules.empty() && !onlyRules.count(v.ruleId) && !onlyRules.count(v.ruleName)) continue;
             for (const auto& f : v.fixIts) {
                 const auto start = f.range.start(), end = f.range.end();
                 if (!start.valid() || !end.valid()) continue;
