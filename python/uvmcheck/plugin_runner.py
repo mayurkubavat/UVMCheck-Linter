@@ -11,7 +11,9 @@ from .context import Context
 def load_rules_from_file(file_path: str) -> List[Type[Rule]]:
     """Dynamically import a Python file and discover all Rule subclasses."""
     rule_classes = []
-    module_name = os.path.splitext(os.path.basename(file_path))[0]
+    # Unique module name, so two rule files with the same base name do not collide.
+    module_name = "uvmcheck_rules_" + os.path.splitext(os.path.basename(file_path))[0] + \
+        "_" + str(abs(hash(os.path.abspath(file_path))))
     
     spec = importlib.util.spec_from_file_location(module_name, file_path)
     if not spec or not spec.loader:
@@ -26,7 +28,8 @@ def load_rules_from_file(file_path: str) -> List[Type[Rule]]:
         return []
 
     for name, obj in inspect.getmembers(module, inspect.isclass):
-        if issubclass(obj, Rule) and obj is not Rule:
+        # Rules defined in this file (not ones it imports, such as a base rule it extends).
+        if issubclass(obj, Rule) and obj is not Rule and obj.__module__ == module_name:
             rule_classes.append(obj)
 
     return rule_classes
@@ -41,7 +44,20 @@ def discover_rules(target_path: str) -> List[Type[Rule]]:
             for file in sorted(files):
                 if file.endswith(".py") and not file.startswith("__"):
                     discovered.extend(load_rules_from_file(os.path.join(root, file)))
-    return discovered
+    return leaf_rules(discovered)
+
+
+def leaf_rules(classes: List[Type[Rule]]) -> List[Type[Rule]]:
+    """Drops abstract rules and rules that another discovered rule extends."""
+    leaves = []
+    for c in classes:
+        if c.__dict__.get("abstract", False):
+            continue
+        if any(o is not c and issubclass(o, c) for o in classes):
+            continue
+        leaves.append(c)
+    return leaves
+
 
 def main():
     parser = argparse.ArgumentParser(description="UVMCheck Python Rule Plugin Runner")
@@ -68,12 +84,21 @@ def main():
 
     context = Context(model_data)
 
-    for rule_cls in rule_classes:
-        try:
-            rule_instance = rule_cls()
-            rule_instance.analyze(context)
-        except Exception as e:
-            sys.stderr.write(f"[uvmcheck-python] Exception running rule {rule_cls.__name__}: {e}\n")
+    # stdout carries the findings JSON; anything a rule prints goes to stderr instead.
+    real_stdout = sys.stdout
+    sys.stdout = sys.stderr
+    failed = False
+    try:
+        for rule_cls in rule_classes:
+            try:
+                rule_cls().analyze(context)
+            except Exception:
+                import traceback
+                sys.stderr.write(f"[uvmcheck-python] Exception running rule {rule_cls.__name__}:\n")
+                traceback.print_exc()
+                failed = True
+    finally:
+        sys.stdout = real_stdout
 
     results = [
         {
@@ -89,6 +114,8 @@ def main():
     ]
 
     print(json.dumps(results, indent=2))
+    if failed:
+        sys.exit(2)
 
 if __name__ == "__main__":
     main()

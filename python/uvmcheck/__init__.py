@@ -4,7 +4,8 @@ Enables verification teams to author custom SystemVerilog and UVM lint rules in 
 """
 
 from .rule import Rule, Severity, Violation
-from .context import Context, ClassInfo, MemberInfo
+from .context import (Context, ClassInfo, MemberInfo, MethodInfo, PropertyInfo, CallInfo,
+                      Argument, ConfigDbAccess, TlmPort, TlmConnection)
 from .config import ProjectConfig, RuleConfig, Waiver, ConfigError
 
 __version__ = "0.1.0"
@@ -15,6 +16,13 @@ __all__ = [
     "Context",
     "ClassInfo",
     "MemberInfo",
+    "MethodInfo",
+    "PropertyInfo",
+    "CallInfo",
+    "Argument",
+    "ConfigDbAccess",
+    "TlmPort",
+    "TlmConnection",
     "ProjectConfig",
     "RuleConfig",
     "Waiver",

@@ -322,7 +322,7 @@ int LinterDriver::run() {
     if (pythonRulesPath.has_value()) {
         info << "[uvmcheck] Executing custom Python rules from: " << *pythonRulesPath << "\n";
         ruleEngine.addExternalJob("python rules", [&](DiagnosticEngine& pyDiags) {
-            plugins::PythonPluginManager::runPythonRules(*pythonRulesPath, uvmModel, pyDiags);
+            plugins::PythonPluginManager::runPythonRules(*pythonRulesPath, *compilation, uvmModel, pyDiags);
         });
     }
 
