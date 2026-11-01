@@ -150,7 +150,8 @@ const std::vector<Entry>& entries() {
         {{"MG-9.1", "MG-9", kEvolvability, L::Should,
           "Routines and classes stay within complexity and size budgets, and dead or commented-out "
           "code is removed."},
-         {"SV-MET-001", "SV-MET-002", "SV-MET-003", "SV-MET-004", "SV-MET-005", "SV-SML-004",
+         {"SV-MET-001", "SV-MET-002", "SV-MET-003", "SV-MET-004", "SV-MET-005", "SV-MET-007",
+          "SV-MET-008", "SV-SML-004",
           "SV-STY-009", "SV-RDB-002", "SV-RDB-003", "SV-RDB-005", "SV-API-001", "SV-DED-001",
           "SV-DED-005", "SV-DED-006", "SV-DED-011", "SV-DED-012", "SV-DED-013"}},
         {{"MG-9.2", "MG-9", kEvolvability, L::May,

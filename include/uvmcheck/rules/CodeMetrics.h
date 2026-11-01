@@ -29,6 +29,20 @@ struct RoutineMetrics {
 
 RoutineMetrics computeRoutineMetrics(const slang::ast::SubroutineSymbol& sub);
 
+/// Source lines from the routine's name to the end of its body. 1 when the span is unknown.
+int routineLineSpan(const slang::ast::SubroutineSymbol& sub);
+
+struct RoutineRank {
+    std::string name;
+    std::string file;
+    size_t line = 0;
+    int cognitive = 0;
+    int lines = 0;
+};
+
+/// User routines with the highest cognitive complexity, most complex first.
+std::vector<RoutineRank> mostComplexRoutines(slang::ast::Compilation& comp, const uvm::UvmModel& model, size_t limit);
+
 struct ClassMetrics {
     const slang::ast::ClassType* cls = nullptr;
     int wmc = 0;                // weighted methods per class (sum of cyclomatic complexity)

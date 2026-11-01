@@ -40,7 +40,8 @@ static std::unordered_map<std::string, std::string> categoryMap(
 
 bool HtmlReporter::writeHtml(const std::string& outputPath,
                              const std::vector<core::Violation>& violations,
-                             const std::vector<std::unique_ptr<rules::Rule>>& rules) {
+                             const std::vector<std::unique_ptr<rules::Rule>>& rules,
+                             const std::vector<ComplexityRow>& mostComplex) {
     std::ofstream out(outputPath);
     if (!out.is_open()) return false;
 
@@ -248,6 +249,22 @@ bool HtmlReporter::writeHtml(const std::string& outputPath,
 
     out << "      </div>\n"
         << "    </div>\n\n";
+
+    out << "    <h2 style=\"font-size:1.05rem; margin: 0 0 0.75rem;\">Most complex routines</h2>\n"
+        << "    <table id=\"complexityTable\" style=\"margin-bottom: 1.5rem;\">\n"
+        << "      <thead><tr><th>Cognitive</th><th>Lines</th><th>Routine</th><th>Location</th></tr></thead>\n"
+        << "      <tbody>\n";
+    if (mostComplex.empty()) {
+        out << "        <tr><td colspan=\"4\" style=\"color: var(--text-muted);\">No branching routines in this run.</td></tr>\n";
+    } else {
+        for (const auto& row : mostComplex) {
+            out << "        <tr><td>" << row.cognitive << "</td><td>" << row.lines << "</td><td><code>"
+                << escapeHtml(row.name) << "</code></td><td class=\"loc-text\">" << escapeHtml(row.file);
+            if (row.line) out << ":" << row.line;
+            out << "</td></tr>\n";
+        }
+    }
+    out << "      </tbody>\n    </table>\n\n";
 
     // Filter controls
     out << "    <div class=\"filter-bar\">\n"

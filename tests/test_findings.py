@@ -70,6 +70,30 @@ def main():
                   f"related location is the base-class property ({rel})")
             check(v.get("endColumn", 0) > v["column"], "endColumn covers the property name")
 
+        src = Path(tmp) / "nested.sv"
+        src.write_text(
+            "module nest;\n"
+            "  int n;\n"
+            "  task automatic shallow();\n"
+            "    if (n == 0) n = 1;\n"
+            "  endtask : shallow\n"
+            "  task automatic deep();\n"
+            "    if (n == 0) begin\n"
+            "      if (n == 1) begin\n"
+            "        if (n == 2) n = 3;\n"
+            "      end\n"
+            "    end\n"
+            "  endtask : deep\n"
+            "endmodule : nest\n")
+        html = Path(tmp) / "nest.html"
+        res = subprocess.run([binary, str(src), "--no-config", "--no-cache", "--html", str(html)],
+                             capture_output=True, text=True, cwd=tmp)
+        page = html.read_text() if html.exists() else ""
+        deep = page.find("nest::deep")
+        shallow = page.find("nest::shallow")
+        check(res.returncode in (0, 1) and "Most complex routines" in page and deep != -1 and shallow != -1
+              and deep < shallow, "HTML lists routines with deep ahead of shallow")
+
     if failures:
         print(f"\n{len(failures)} failure(s)")
         sys.exit(1)

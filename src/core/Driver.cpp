@@ -19,6 +19,7 @@
 #include "uvmcheck/core/ResultCache.h"
 #include "uvmcheck/reporting/TestbenchMap.h"
 #include "uvmcheck/rules/RuleExtras.h"
+#include "uvmcheck/rules/CodeMetrics.h"
 #include "uvmcheck/style/NamingEngine.h"
 #include "uvmcheck/engine/RuleEngine.h"
 #include "slang/diagnostics/TextDiagnosticClient.h"
@@ -994,7 +995,13 @@ int LinterDriver::run() {
 
     // Write HTML quality dashboard if requested
     if (htmlOutputPath.has_value()) {
-        if (reporting::HtmlReporter::writeHtml(*htmlOutputPath, diags.getViolations(), allRules)) {
+        std::vector<reporting::ComplexityRow> mostComplex;
+        if (compilation && uvmModel) {
+            for (const auto& rank : rules::metrics::mostComplexRoutines(*compilation, *uvmModel, 12)) {
+                mostComplex.push_back({rank.name, rank.file, rank.line, rank.cognitive, rank.lines});
+            }
+        }
+        if (reporting::HtmlReporter::writeHtml(*htmlOutputPath, diags.getViolations(), allRules, mostComplex)) {
             info << "[uvmcheck] Interactive HTML dashboard generated: " << *htmlOutputPath << "\n";
         } else {
             std::cerr << "Error: Failed to write HTML report to: " << *htmlOutputPath << "\n";

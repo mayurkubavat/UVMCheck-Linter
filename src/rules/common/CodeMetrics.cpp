@@ -399,6 +399,47 @@ RoutineMetrics computeRoutineMetrics(const SubroutineSymbol& sub) {
     return w.m;
 }
 
+int routineLineSpan(const SubroutineSymbol& sub) {
+    const auto* sm = sub.getCompilation().getSourceManager();
+    if (!sm) return 1;
+    auto start = sm->getFullyOriginalLoc(sub.location);
+    auto endLoc = sub.getBody().sourceRange.end();
+    if (!start.valid() || !endLoc.valid()) return 1;
+    auto end = sm->getFullyOriginalLoc(endLoc);
+    if (start.buffer() != end.buffer()) return 1;
+    size_t a = sm->getLineNumber(start);
+    size_t b = sm->getLineNumber(end);
+    return b >= a ? static_cast<int>(b - a + 1) : 1;
+}
+
+std::vector<RoutineRank> mostComplexRoutines(Compilation& comp, const uvm::UvmModel& model, size_t limit) {
+    const auto* sm = comp.getSourceManager();
+    if (!sm) return {};
+    std::vector<RoutineRank> rows;
+    for (const auto* sub : swe::allUserRoutines(comp, model)) {
+        int cognitive = computeRoutineMetrics(*sub).cognitive;
+        if (cognitive <= 0) continue;
+        auto loc = sm->getFullyOriginalLoc(sub->location);
+        std::string name(sub->name);
+        if (const Scope* scope = sub->getParentScope()) {
+            const Symbol& owner = scope->asSymbol();
+            if (!owner.name.empty() && owner.name != "$unit")
+                name = std::string(owner.name) + "::" + name;
+        }
+        std::string file(sm->getFileName(loc));
+        auto slash = file.find_last_of("/\\");
+        if (slash != std::string::npos) file = file.substr(slash + 1);
+        rows.push_back({std::move(name), std::move(file), loc.valid() ? sm->getLineNumber(loc) : 0,
+                        cognitive, routineLineSpan(*sub)});
+    }
+    std::sort(rows.begin(), rows.end(), [](const RoutineRank& a, const RoutineRank& b) {
+        if (a.cognitive != b.cognitive) return a.cognitive > b.cognitive;
+        return a.name < b.name;
+    });
+    if (rows.size() > limit) rows.resize(limit);
+    return rows;
+}
+
 const std::vector<ClassMetrics>& classMetrics(Compilation& comp, const uvm::UvmModel& model) {
     static std::mutex mu;
     static uint64_t cachedFor = 0; // UvmModel::generation(); 0 = nothing cached
