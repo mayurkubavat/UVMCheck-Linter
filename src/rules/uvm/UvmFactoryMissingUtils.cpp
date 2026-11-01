@@ -4,6 +4,7 @@
 #include "slang/syntax/SyntaxTree.h"
 #include "slang/syntax/AllSyntax.h"
 #include "slang/parsing/PreprocessorMetadata.h"
+#include "slang/text/SourceManager.h"
 
 namespace uvmcheck::rules::uvm {
 
@@ -74,6 +75,32 @@ public:
                 std::string baseKind = isComp ? "uvm_component" : "uvm_object";
                 std::string recommendedMacro = isComp ? "`uvm_component_utils" : "`uvm_object_utils";
 
+                // Insert the macro after the class header. Parameterized classes need
+                // the *_param_utils form with their parameters, so they get no fix.
+                std::vector<core::FixItHint> fixes;
+                const auto* sm = compilation.getSourceManager();
+                if (sm && syntax->kind == slang::syntax::SyntaxKind::ClassDeclaration) {
+                    const auto& decl = syntax->as<slang::syntax::ClassDeclarationSyntax>();
+                    const auto semi = decl.semi.location();
+                    if (!decl.parameters && semi.valid() && !sm->isMacroLoc(semi)) {
+                        std::string indent = "    ";
+                        if (!decl.items.empty()) {
+                            std::string_view text = sm->getSourceText(semi.buffer());
+                            size_t pos = decl.items[0]->getFirstToken().location().offset();
+                            size_t start = pos;
+                            while (start > 0 && text[start - 1] != '\n') --start;
+                            size_t end = start;
+                            while (end < pos && (text[end] == ' ' || text[end] == '\t')) ++end;
+                            indent = std::string(text.substr(start, end - start));
+                        }
+                        const auto at = semi + 1;
+                        // Unsafe: get_type_name() and create() change, and `uvm_object_utils
+                        // needs a constructor whose name argument has a default.
+                        fixes.push_back({slang::SourceRange(at, at),
+                                         "\n" + indent + recommendedMacro + "(" + std::string(cls->name) + ")",
+                                         "Register with the factory", core::FixSafety::Unsafe});
+                    }
+                }
                 diags.addViolation(
                     "UVM-FAC-003",
                     "UvmFactoryMissingUtils",
@@ -81,7 +108,8 @@ public:
                     "' is not registered with the UVM factory. Add '" + recommendedMacro +
                     "(" + std::string(cls->name) + ")' to enable testbench factory overrides.",
                     core::Severity::Warning,
-                    cls->location
+                    cls->location,
+                    fixes
                 );
             }
         }
