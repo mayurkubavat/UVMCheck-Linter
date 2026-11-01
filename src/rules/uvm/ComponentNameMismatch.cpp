@@ -115,7 +115,8 @@ private:
                                 fixIts.push_back({
                                     ordArg.expr->sourceRange(),
                                     paramName,
-                                    "Replace hardcoded literal with constructor parameter '" + paramName + "'"
+                                    "Replace hardcoded literal with constructor parameter '" + paramName + "'",
+                                    core::FixSafety::Unsafe
                                 });
                             }
 

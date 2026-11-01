@@ -122,7 +122,9 @@ python3 -m uvmcheck.testing --rules rules/ --tests rule_tests/ --binary uvmcheck
 - `analyze_class(cls, ctx)`, `on_method(cls, method, ctx)`, `on_call(cls, method, call, ctx)`: hooks.
 - `calls`: set of call names `on_call` receives (`None` = all).
 - `option(ctx, key, default)`: rule option from the project config.
-- `report(ctx, message, at=element, severity=None)`: report at any model element.
+- `report(ctx, message, at=element, severity=None, fixes=None)`: report at any model element.
+  `fixes` is a list of `Fix(replacement, description="", safety=FixSafety.Safe, line=0, column=1, end_line=0, end_column=0)`.
+  `FixSafety` is `Safe`, `Unsafe`, or `DisplayOnly`. Safe fixes may be applied by `--fix`; unsafe fixes need `--unsafe-fixes`; display-only fixes are never written automatically.
 
 ### `Context`
 - `classes`: user classes (UVM library and stub excluded), as `ClassInfo`.
@@ -132,7 +134,7 @@ python3 -m uvmcheck.testing --rules rules/ --tests rule_tests/ --binary uvmcheck
 - `component_paths`, `rule_options`.
 - Queries: `find_class(name)`, `classes_with_role(*roles)`, `subclasses_of(name)`, `methods()`,
   `calls(*names)`, `config_sets(field)`, `config_gets(field)`, `option(rule_id, key, default)`.
-- `report(rule_id, message, filename, line, column=1, severity=..., rule_name=None)`.
+- `report(rule_id, message, filename, line, column=1, severity=..., rule_name=None, fixes=None)`.
 
 ### `ClassInfo`
 - `name`, `base_class`, `bases` (nearest first), `role` (driver, monitor, sequencer, agent,

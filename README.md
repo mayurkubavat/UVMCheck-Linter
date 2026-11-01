@@ -19,7 +19,7 @@
 - **Sub-Second Execution**: Analyzes complex verification environments at rates exceeding 20,000 lines per second.
 - **Type-Safe Semantic Analysis**: Unlike regex-based linters, UVMCheck resolves complete symbol hierarchies, parameterizations, and virtual method tables using Slang's typed AST.
 - **Memory-Bounded Compilation**: Optimized build architecture with Ninja job pools, precompiled headers (PCH), and `ccache` keeping peak compile RAM strictly under 1.8 GB on Apple Silicon and Linux dev boxes.
-- **Automated Fix-It Engine (`--fix`)**: Applies automated, zero-error syntactical refactorings (e.g. adding missing end-labels, fixing macro mismatches).
+- **Automated Fix-It Engine (`--fix`)**: Applies rewrites that do not change simulation behaviour (end labels, whitespace). Fixes that can change behaviour need `--unsafe-fixes`; suggestions marked display-only are never applied.
 - **Baseline Technical Debt Management (`--baseline`)**: Snapshot legacy violations into a JSON baseline to enforce zero-regression on new pull requests.
 - **Granular Waivers (`--waivers`)**: Waive rules by rule ID, file glob pattern, or line number with mandatory rationale tracking.
 - **CI/CD Integration**: Emits industry-standard SARIF 2.1.0 (for GitHub Code Scanning / GitLab Code Quality) and interactive, self-contained HTML dashboards.
@@ -161,13 +161,14 @@ On the 86k-line Accellera `uvm-core` library, a full all-rules run takes about
 0.5 s on 4 cores (previously about 2.9 s on the same machine).
 
 ### Automated Fix-It Rewrites
-Some findings carry a mechanical rewrite (`casex` to `casez`, `== 'x` to `===`, ...). Preview them as a unified diff, then apply:
+Each fix is `safe`, `unsafe`, or `display-only`. `--fix` writes only safe fixes (end labels, whitespace, rewrites that keep the same simulation behaviour). `casex` to `casez`, `==` to `===`, scheduling changes, and edits that touch factory names, `config_db`, objections, or phase order are unsafe: they are reported, and applied only with `--unsafe-fixes`. A display-only fix (for example a suggested `at_least` value) is shown in JSON, SARIF, HTML, and the editor, and is never written automatically. Unsafe fixes that were left alone are counted: `N fixes applied, M unsafe fixes skipped (use --unsafe-fixes)`.
 ```bash
 ./build/uvmcheck tb/legacy_code.sv --fix-dry-run   # print the diff, change nothing
-./build/uvmcheck tb/legacy_code.sv --fix           # rewrite the files
+./build/uvmcheck tb/legacy_code.sv --fix           # rewrite safe fixes
+./build/uvmcheck tb/legacy_code.sv --fix --unsafe-fixes   # also apply behaviour-changing fixes
 ./build/uvmcheck tb/legacy_code.sv --fix --fix-rule SV-COR-009,SV-STY-005   # only these rules' fixes
 ```
-Fixes land in the file that holds the code, including included `.svh` files. Waived and baselined findings are not fixed. A file edited after it was read is skipped, fixes inside macro expansions are left alone, and when two fixes overlap the second waits for the next `--fix` run. Each file is written to a temporary copy and renamed into place.
+Fixes land in the file that holds the code, including included `.svh` files. Waived and baselined findings are not fixed. A file edited after it was read is skipped, fixes inside macro expansions are left alone, and when two fixes overlap the second waits for the next `--fix` run. Each file is written to a temporary copy and renamed into place. In the editor a safe fix is the preferred quick fix; unsafe and display-only fixes are offered as ordinary code actions.
 
 ### Reporting (SARIF, JSON & HTML)
 ```bash

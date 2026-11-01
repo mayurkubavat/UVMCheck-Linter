@@ -18,7 +18,8 @@ public:
                     fixIts.push_back({
                         qual.range(),
                         "",
-                        "Remove 'static' keyword to make constraint instance-specific"
+                        "Remove 'static' keyword to make constraint instance-specific",
+                        core::FixSafety::Unsafe
                     });
                 }
 

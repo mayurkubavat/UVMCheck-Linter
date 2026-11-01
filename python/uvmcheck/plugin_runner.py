@@ -108,7 +108,19 @@ def main():
             "severity": v.severity.value,
             "filename": v.filename,
             "line": v.line,
-            "column": v.column
+            "column": v.column,
+            "fixes": [
+                {
+                    "description": f.description,
+                    "replacement": f.replacement,
+                    "safety": f.safety.value if hasattr(f.safety, "value") else str(f.safety),
+                    "line": f.line or v.line,
+                    "column": f.column,
+                    "endLine": f.end_line,
+                    "endColumn": f.end_column,
+                }
+                for f in v.fixes
+            ],
         }
         for v in context.violations
     ]

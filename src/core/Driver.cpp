@@ -51,7 +51,8 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--guideline", guidelineSelector, "Run only the rules that enforce these methodology guidelines or chapters (comma-separated, e.g. MG-4,MG-3.1)", "<ids>");
     slangDriver.cmdLine.add("--list-guidelines", listGuidelines, "List the methodology guide (guidelines and the rules that enforce them) and exit; with --json, write it as JSON");
     slangDriver.cmdLine.add("--conformance", showConformance, "Report pass/fail per methodology guideline (implied by --guideline and the reuse and guide presets)");
-    slangDriver.cmdLine.add("--fix", autoFix, "Automatically apply fix-it rewrites to source files where supported");
+    slangDriver.cmdLine.add("--fix", autoFix, "Apply fix-it rewrites that do not change simulation behaviour");
+    slangDriver.cmdLine.add("--unsafe-fixes", unsafeFixes, "With --fix or --fix-dry-run, also apply fixes that can change simulation behaviour");
     slangDriver.cmdLine.add("--fix-dry-run", autoFixDryRun, "Print the fix-it rewrites as a unified diff without changing any file");
     slangDriver.cmdLine.add("--fix-rule", autoFixRules, "With --fix or --fix-dry-run, apply only these rules' fixes (comma-separated IDs or names)", "<rules>");
     slangDriver.cmdLine.add("--sarif", sarifOutputPath, "Output results to specified SARIF 2.1.0 file", "<file>");
@@ -682,12 +683,15 @@ int LinterDriver::run() {
 
     // Apply automated fix-its if requested (or show them with --fix-dry-run).
     const bool fixDryRun = autoFixDryRun.value_or(false);
+    const bool allowUnsafe = unsafeFixes.value_or(false);
     if (autoFix.value_or(false) || fixDryRun) {
         auto& sm = slangDriver.sourceManager;
         // Edits per source buffer. A fix in a macro expansion has no single
-        // place in the file to rewrite and is left alone.
+        // place in the file to rewrite and is left alone. Display-only
+        // suggestions are never written. Unsafe fixes need --unsafe-fixes.
         std::map<std::string, std::pair<slang::BufferID, std::vector<fix::TextEdit>>> fileEdits;
         size_t macroFixes = 0;
+        size_t unsafeSkipped = 0;
         std::set<std::string> onlyRules;
         if (autoFixRules.has_value()) {
             std::stringstream list(*autoFixRules);
@@ -700,6 +704,11 @@ int LinterDriver::run() {
         for (const auto& v : diags.getViolations()) {
             if (!onlyRules.empty() && !onlyRules.count(v.ruleId) && !onlyRules.count(v.ruleName)) continue;
             for (const auto& f : v.fixIts) {
+                if (f.safety == core::FixSafety::DisplayOnly) continue;
+                if (f.safety == core::FixSafety::Unsafe && !allowUnsafe) {
+                    ++unsafeSkipped;
+                    continue;
+                }
                 const auto start = f.range.start(), end = f.range.end();
                 if (!start.valid() || !end.valid()) continue;
                 if (!sm.isFileLoc(start) || !sm.isFileLoc(end) || start.buffer() != end.buffer()) {
@@ -763,9 +772,14 @@ int LinterDriver::run() {
             }
         }
 
-        if (applied > 0 || skipped > 0 || macroFixes > 0) {
-            info << "[uvmcheck] " << (fixDryRun ? "Would apply " : "Applied ") << applied << " fix-it(s) in "
-                 << changedFiles << " file(s)";
+        if (applied > 0 || skipped > 0 || macroFixes > 0 || unsafeSkipped > 0) {
+            if (unsafeSkipped > 0) {
+                info << "[uvmcheck] " << applied << (fixDryRun ? " fixes would be applied, " : " fixes applied, ")
+                     << unsafeSkipped << " unsafe fixes skipped (use --unsafe-fixes)";
+            } else {
+                info << "[uvmcheck] " << (fixDryRun ? "Would apply " : "Applied ") << applied << " fix-it(s) in "
+                     << changedFiles << " file(s)";
+            }
             if (skipped) info << "; " << skipped << " overlapping fix-it(s) left for another --fix run";
             if (macroFixes) info << "; " << macroFixes << " inside macro expansions not applied";
             info << ".\n";

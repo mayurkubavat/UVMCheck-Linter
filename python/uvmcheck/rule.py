@@ -19,15 +19,34 @@ method or attribute; only leaf classes run (a rule with subclasses in the same f
 treated as a base class).
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, ClassVar, Optional, Set
+from typing import Any, ClassVar, List, Optional, Sequence, Set
 
 
 class Severity(Enum):
     Error = "Error"
     Warning = "Warning"
     Info = "Info"
+
+
+class FixSafety(Enum):
+    """Whether ``--fix`` may write a fix. Display-only is never written."""
+    Safe = "safe"
+    Unsafe = "unsafe"
+    DisplayOnly = "display-only"
+
+
+@dataclass
+class Fix:
+    """A suggested rewrite. ``line``/``column`` are 1-based and optional."""
+    replacement: str
+    description: str = ""
+    safety: FixSafety = FixSafety.Safe
+    line: int = 0
+    column: int = 1
+    end_line: int = 0
+    end_column: int = 0
 
 
 @dataclass
@@ -39,6 +58,7 @@ class Violation:
     filename: str
     line: int
     column: int
+    fixes: List[Fix] = field(default_factory=list)
 
 
 class Rule:
@@ -82,10 +102,11 @@ class Rule:
         return context.option(self.id, key, default, rule_name=type(self).__name__)
 
     def report(self, context: Any, message: str, at: Any = None, severity: Optional[Severity] = None,
-               filename: str = "", line: int = 1, column: int = 1) -> None:
+               filename: str = "", line: int = 1, column: int = 1,
+               fixes: Optional[Sequence[Fix]] = None) -> None:
         """Report a finding at a model element (``at``) or an explicit location."""
         if at is not None:
             filename, line, column = at.filename, at.line, at.column
         context.report(rule_id=self.id, rule_name=self.name, message=message,
                        severity=severity or self.default_severity,
-                       filename=filename, line=line, column=column)
+                       filename=filename, line=line, column=column, fixes=fixes)

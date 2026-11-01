@@ -125,6 +125,22 @@ def test_standalone(binary, workdir):
         client.notify("textDocument/didClose", {"textDocument": {"uri": uri}})
         assert client.diagnostics_for(uri) == [], "expected empty diagnostics on didClose"
         print("  [PASS] diagnostics cleared on didClose")
+        fix_src = ("module m;\n  logic [3:0] sel;\n  logic [1:0] out;\n  always_comb begin\n"
+                   "    casex (sel)\n      4'b1xx0: out = 2'b00;\n      default: out = 2'b10;\n"
+                   "    endcase\n  end\n  function void go();\n  endfunction\nendmodule\n")
+        open_doc(client, uri, fix_src, version=3)
+        client.diagnostics_for(uri)
+        resp = client.request("textDocument/codeAction", {
+            "textDocument": {"uri": uri},
+            "range": {"start": {"line": 0, "character": 0}, "end": {"line": 20, "character": 0}},
+            "context": {"diagnostics": []}})
+        actions = resp["result"]
+        casex = [a for a in actions if "casex" in a["title"] or a["title"].startswith("Replace 'casex'")]
+        label = [a for a in actions if "end label" in a["title"]]
+        assert casex and casex[0]["isPreferred"] is False, f"unsafe fix should not be preferred: {actions}"
+        assert label and label[0]["isPreferred"] is True, f"safe end-label fix should be preferred: {actions}"
+        print("  [PASS] safe fix is preferred; unsafe fix is not")
+
         client.close()
         print("  [PASS] shutdown / exit")
     finally:

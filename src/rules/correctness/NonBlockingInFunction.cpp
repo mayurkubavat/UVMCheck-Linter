@@ -46,7 +46,8 @@ public:
                 fixIts.push_back({
                     expr.operatorToken.range(),
                     "=",
-                    "Replace non-blocking assignment '<=' with blocking assignment '='"
+                    "Replace non-blocking assignment '<=' with blocking assignment '='",
+                    core::FixSafety::Unsafe
                 });
             }
             diags.addViolation(

@@ -16,7 +16,8 @@ public:
             fixIts.push_back({
                 node.caseKeyword.range(),
                 "casez",
-                "Replace 'casex' with 'casez'"
+                "Replace 'casex' with 'casez'",
+                core::FixSafety::Unsafe
             });
 
             diags.addViolation(

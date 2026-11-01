@@ -81,6 +81,23 @@ def main():
         check(any(v["ruleId"] == "PY-CFG-001" for v in found), "other rules still report when one raises")
         check("boom" in err, "the failing rule's traceback is shown")
 
+        fixing = Path(tmp) / "fix_rules"
+        fixing.mkdir()
+        (fixing / "fix.py").write_text(
+            "from uvmcheck import Fix, FixSafety, Rule\n"
+            "class WithFix(Rule):\n"
+            "    id = 'PY-FIX-001'\n"
+            "    def analyze(self, ctx):\n"
+            "        self.report(ctx, 'needs a rewrite', filename='bad.sv', line=1,\n"
+            "                    fixes=[Fix('casez', description='show casex', safety=FixSafety.Unsafe)])\n")
+        src = Path(tmp) / "bad.sv"
+        src.write_text("module m; endmodule\n")
+        found, _ = lint(binary, tmp, fixing, src)
+        hit = [v for v in found if v["ruleId"] == "PY-FIX-001"]
+        check(len(hit) == 1 and hit[0].get("fixes") and hit[0]["fixes"][0]["safety"] == "unsafe"
+              and hit[0]["fixes"][0]["replacement"] == "casez",
+              "a Python rule's fix safety reaches the JSON report")
+
     print(f"python rule tests: {len(failures)} failure(s)")
     return 1 if failures else 0
 

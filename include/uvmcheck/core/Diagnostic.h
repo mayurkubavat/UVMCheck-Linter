@@ -25,10 +25,45 @@ inline const char* severityToString(Severity s) {
     return "UNKNOWN";
 }
 
+/// How automatically a fix may be written back to a source file.
+/// Safe fixes preserve simulation behaviour (labels, whitespace, equivalent
+/// rewrites). Unsafe fixes can change it (X/Z matching, scheduling, widths,
+/// randomization, or factory / config_db / objection / phase semantics) and
+/// are applied only with --unsafe-fixes. DisplayOnly is a suggestion shown in
+/// reports and the editor; it is never written by --fix.
+enum class FixSafety {
+    Safe,
+    Unsafe,
+    DisplayOnly
+};
+
+inline const char* fixSafetyToString(FixSafety s) {
+    switch (s) {
+        case FixSafety::Safe:        return "safe";
+        case FixSafety::Unsafe:      return "unsafe";
+        case FixSafety::DisplayOnly: return "display-only";
+    }
+    return "safe";
+}
+
+inline FixSafety fixSafetyFromString(std::string_view s) {
+    if (s == "unsafe") return FixSafety::Unsafe;
+    if (s == "display-only" || s == "display_only") return FixSafety::DisplayOnly;
+    return FixSafety::Safe;
+}
+
 struct FixItHint {
     slang::SourceRange range;
     std::string replacementText;
     std::string description;
+    FixSafety safety = FixSafety::Safe;
+    /// 1-based region, filled when the finding is recorded so reporters do not
+    /// need a SourceManager. 0 means the region is unknown (for example a
+    /// macro expansion).
+    size_t startLine = 0;
+    size_t startColumn = 0;
+    size_t endLine = 0;
+    size_t endColumn = 0;
 };
 
 /// Another place that explains a finding: the first copy of a clone, the
@@ -103,7 +138,8 @@ public:
                             Severity severity,
                             std::string_view filePath,
                             size_t line,
-                            size_t column);
+                            size_t column,
+                            std::vector<FixItHint> fixIts = {});
 
     const std::vector<Violation>& getViolations() const { return violations; }
     std::vector<Violation>& getViolations() { return violations; }
@@ -150,6 +186,8 @@ private:
     bool applyProjectPolicy(std::string_view ruleId, std::string_view filePath,
                             std::string_view originFile, Severity& severity);
     const PathInfo& classify(std::string_view filePath);
+    /// Fills start/end line and column on hints that still have a source range.
+    void noteFixLocations(std::vector<FixItHint>& fixes) const;
 };
 
 } // namespace uvmcheck::core

@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 """
---fix and --fix-dry-run: the dry run prints a unified diff and changes
-nothing; the diff applies cleanly and gives the same text as --fix; fixes in
-an included file land in that file; a second --fix finds nothing to do.
+--fix and --fix-dry-run apply only safe fixes. casex/case-equality rewrites
+change X/Z matching, so they are skipped until --unsafe-fixes. A display-only
+suggestion (at_least) is never written. The dry run prints a unified diff and
+changes nothing; the diff applies cleanly and gives the same text as --fix;
+fixes in an included file land in that file; a second --fix finds nothing to do.
 """
 
 import argparse
+import json
 import shutil
 import subprocess
 import sys
@@ -87,12 +90,37 @@ def main():
         res = run(binary, dry, "--fix-dry-run")
         check((dry / "top.sv").read_text() == TOP and (dry / "helpers.svh").read_text() == HELPER,
               "dry run changes no file")
-        check("Would apply 3 fix-it(s) in 2 file(s)" in res.stdout, "dry run counts the fixes", res.stdout)
+        check("0 fixes would be applied, 3 unsafe fixes skipped (use --unsafe-fixes)" in res.stdout,
+              "dry run skips unsafe fixes", res.stdout)
+        check("casez" not in extract_diff(res.stdout), "dry run does not preview unsafe rewrites", res.stdout)
+
+        res = run(binary, real, "--fix")
+        check("0 fixes applied, 3 unsafe fixes skipped (use --unsafe-fixes)" in res.stdout,
+              "--fix leaves unsafe fixes unapplied", res.stdout)
+        check((real / "top.sv").read_text() == TOP and (real / "helpers.svh").read_text() == HELPER,
+              "--fix does not rewrite casex or case equality")
+
+        subprocess.run([binary, "top.sv", "--no-config", "--json", "out.json",
+                        "--sarif", "out.sarif", "--html", "out.html"],
+                       cwd=real, capture_output=True, text=True)
+        report = json.loads((real / "out.json").read_text())
+        casex = [v for v in report["violations"] if v["ruleId"] == "SV-COR-009"]
+        check(casex and casex[0]["fixes"][0]["safety"] == "unsafe" and casex[0]["fixes"][0]["replacement"] == "casez",
+              "JSON carries the unsafe fix", casex)
+        sarif = json.loads((real / "out.sarif").read_text())
+        sfixes = [f for r in sarif["runs"][0]["results"] if r["ruleId"] == "SV-COR-009" for f in r.get("fixes", [])]
+        check(sfixes and sfixes[0]["properties"]["safety"] == "unsafe", "SARIF fix property is unsafe", sfixes)
+        page = (real / "out.html").read_text()
+        check('data-safety="unsafe"' in page, "HTML report shows the unsafe fix", page)
+
+        res = run(binary, dry, "--fix-dry-run", "--unsafe-fixes")
+        check((dry / "top.sv").read_text() == TOP, "unsafe dry run still changes no file")
+        check("Would apply 3 fix-it(s) in 2 file(s)" in res.stdout, "unsafe dry run counts the fixes", res.stdout)
         diff = extract_diff(res.stdout)
         check("-        casex (sel)" in diff and "+        casez (sel)" in diff, "diff shows the rewrite", diff)
 
-        res = run(binary, real, "--fix")
-        check("Applied 3 fix-it(s) in 2 file(s)" in res.stdout, "--fix applies the fixes", res.stdout)
+        res = run(binary, real, "--fix", "--unsafe-fixes")
+        check("Applied 3 fix-it(s) in 2 file(s)" in res.stdout, "--unsafe-fixes applies the fixes", res.stdout)
         top, helper = (real / "top.sv").read_text(), (real / "helpers.svh").read_text()
         check("casez (sel)" in top and "a === 1'bx" in top, "fixes applied in the top file", top)
         check("b !== 1'bz" in helper, "fix applied in the included file", helper)
@@ -110,10 +138,24 @@ def main():
         only = Path(tmp, "only")
         only.mkdir()
         setup(only)
-        res = run(binary, only, "--fix", "--fix-rule", "SV-COR-009")
+        res = run(binary, only, "--fix", "--unsafe-fixes", "--fix-rule", "SV-COR-009")
         top = (only / "top.sv").read_text()
         check("casez (sel)" in top and "a == 1'bx" in top and (only / "helpers.svh").read_text() == HELPER,
               "--fix-rule limits the fixes to that rule", top)
+
+        cov = Path(tmp, "cov")
+        cov.mkdir()
+        (cov / "top.sv").write_text(
+            "module cov_m;\n  logic clk, x;\n  covergroup cg @(posedge clk);\n"
+            "    cp: coverpoint x { option.at_least = 0; }\n  endgroup\nendmodule\n")
+        res = subprocess.run([binary, "top.sv", "--no-config", "--rule", "SV-COV-011",
+                              "--fix", "--unsafe-fixes", "--json", "out.json"],
+                             cwd=cov, capture_output=True, text=True)
+        text = (cov / "top.sv").read_text()
+        check("at_least = 0" in text, "display-only fix is not applied", text)
+        cov_report = json.loads((cov / "out.json").read_text())
+        shown = [f for v in cov_report["violations"] if v["ruleId"] == "SV-COV-011" for f in v.get("fixes", [])]
+        check(shown and shown[0]["safety"] == "display-only", "JSON reports the display-only fix", cov_report)
 
         # An out-of-block method is labelled with its own name, not cls::name.
         ob = Path(tmp, "outofblock")

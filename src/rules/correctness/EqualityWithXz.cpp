@@ -31,7 +31,8 @@ public:
                         fixIts.push_back({
                             binSyntax.operatorToken.range(),
                             caseOpStr,
-                            "Replace '" + opStr + "' with case equality '" + caseOpStr + "'"
+                            "Replace '" + opStr + "' with case equality '" + caseOpStr + "'",
+                            core::FixSafety::Unsafe
                         });
                     }
                 }

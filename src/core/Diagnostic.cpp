@@ -51,6 +51,19 @@ bool DiagnosticEngine::applyProjectPolicy(std::string_view ruleId, std::string_v
     return false;
 }
 
+void DiagnosticEngine::noteFixLocations(std::vector<FixItHint>& fixes) const {
+    for (auto& f : fixes) {
+        if (f.startLine != 0) continue;
+        auto s = f.range.start(), e = f.range.end();
+        if (!s.valid() || !e.valid()) continue;
+        if (sourceManager.isMacroLoc(s) || sourceManager.isMacroLoc(e)) continue;
+        f.startLine = sourceManager.getLineNumber(s);
+        f.startColumn = sourceManager.getColumnNumber(s);
+        f.endLine = sourceManager.getLineNumber(e);
+        f.endColumn = sourceManager.getColumnNumber(e);
+    }
+}
+
 Violation* DiagnosticEngine::addViolation(std::string_view ruleId,
                                     std::string_view ruleName,
                                     std::string_view message,
@@ -73,6 +86,7 @@ Violation* DiagnosticEngine::addViolation(std::string_view ruleId,
     v.ruleName = ruleName;
     v.message = message;
     v.severity = severity;
+    noteFixLocations(fixIts);
     v.fixIts = std::move(fixIts);
 
     if (loc.valid()) {
@@ -137,7 +151,8 @@ void DiagnosticEngine::addDirectViolation(std::string_view ruleId,
                                           Severity severity,
                                           std::string_view filePath,
                                           size_t line,
-                                          size_t column) {
+                                          size_t column,
+                                          std::vector<FixItHint> fixIts) {
     if (isMockLibrary(filePath)) return;
     if (applyProjectPolicy(ruleId, filePath, {}, severity)) return;
 
@@ -149,6 +164,7 @@ void DiagnosticEngine::addDirectViolation(std::string_view ruleId,
     v.filePath = std::string(filePath);
     v.line = line;
     v.column = column;
+    v.fixIts = std::move(fixIts);
     violations.push_back(std::move(v));
 }
 

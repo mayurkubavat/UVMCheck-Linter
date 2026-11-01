@@ -61,7 +61,8 @@ public:
                                 slang::SourceRange(dataDecl->type->getFirstToken().location(),
                                                    dataDecl->type->getFirstToken().location()),
                                 "virtual ",
-                                "Insert 'virtual' keyword to declare a virtual interface handle"
+                                "Insert 'virtual' keyword to declare a virtual interface handle",
+                                core::FixSafety::Unsafe
                             });
                         }
 

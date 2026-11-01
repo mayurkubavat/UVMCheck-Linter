@@ -36,7 +36,8 @@ public:
                             fixIts.push_back({
                                 lit.sourceRange,
                                 replacement,
-                                "Replace unsized literal with explicitly sized '" + replacement + "'"
+                                "Replace unsized literal with explicitly sized '" + replacement + "'",
+                                core::FixSafety::Unsafe
                             });
                         }
 

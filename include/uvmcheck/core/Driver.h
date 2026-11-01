@@ -32,6 +32,7 @@ private:
     std::optional<std::string> presetName;
     std::optional<bool> autoFix;
     std::optional<bool> autoFixDryRun;
+    std::optional<bool> unsafeFixes;
     std::optional<bool> includeExperimental;
     std::optional<std::string> autoFixRules;
     std::optional<std::string> configFilePath;

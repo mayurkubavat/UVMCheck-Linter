@@ -11,7 +11,7 @@ on it directly: ``self.report(ctx, "message", at=method)``.
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Iterator, List, Optional, Tuple
 
-from .rule import Severity, Violation
+from .rule import Fix, Severity, Violation
 
 
 @dataclass
@@ -258,6 +258,7 @@ class Context:
         column: int = 1,
         severity: Severity = Severity.Warning,
         rule_name: Optional[str] = None,
+        fixes: Optional[List[Fix]] = None,
     ) -> None:
         """Report a lint violation discovered by a Python rule."""
         self.violations.append(Violation(
@@ -268,4 +269,5 @@ class Context:
             filename=filename,
             line=line,
             column=column,
+            fixes=list(fixes or []),
         ))

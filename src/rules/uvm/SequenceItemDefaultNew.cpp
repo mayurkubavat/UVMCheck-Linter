@@ -43,7 +43,8 @@ public:
                                         slang::SourceRange(port.declarator->name.location() + port.declarator->name.rawText().length(),
                                                            port.declarator->name.location() + port.declarator->name.rawText().length()),
                                         " = \"" + className + "\"",
-                                        "Add default constructor string argument"
+                                        "Add default constructor string argument",
+                                        core::FixSafety::Unsafe
                                     });
 
                                     diags.addViolation(

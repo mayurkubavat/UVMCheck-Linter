@@ -26,7 +26,8 @@ public:
                     fixIts.push_back({
                         expr.operatorToken.range(),
                         "<=",
-                        "Replace blocking assignment '=' with non-blocking clocking drive '<='"
+                        "Replace blocking assignment '=' with non-blocking clocking drive '<='",
+                        core::FixSafety::Unsafe
                     });
                 }
 

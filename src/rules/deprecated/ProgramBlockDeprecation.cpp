@@ -16,10 +16,12 @@ public:
             std::string name = decl.header->name.valueText().empty() ? "anonymous" : std::string(decl.header->name.valueText());
             std::vector<core::FixItHint> fixIts;
             if (decl.header->moduleKeyword.range().start().valid()) {
-                fixIts.push_back({decl.header->moduleKeyword.range(), "module", "Replace 'program' with 'module'"});
+                fixIts.push_back({decl.header->moduleKeyword.range(), "module", "Replace 'program' with 'module'",
+                                  core::FixSafety::Unsafe});
             }
             if (decl.endmodule.range().start().valid()) {
-                fixIts.push_back({decl.endmodule.range(), "endmodule", "Replace 'endprogram' with 'endmodule'"});
+                fixIts.push_back({decl.endmodule.range(), "endmodule", "Replace 'endprogram' with 'endmodule'",
+                                  core::FixSafety::Unsafe});
             }
 
             diags.addViolation(

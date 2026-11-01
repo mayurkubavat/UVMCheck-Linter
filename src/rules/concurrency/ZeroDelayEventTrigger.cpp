@@ -19,7 +19,8 @@ public:
                 fixIts.push_back({
                     stmt.trigger.range(),
                     "->>",
-                    "Replace blocking event trigger '->' with non-blocking event trigger '->>'"
+                    "Replace blocking event trigger '->' with non-blocking event trigger '->>'",
+                    core::FixSafety::Unsafe
                 });
             }
 

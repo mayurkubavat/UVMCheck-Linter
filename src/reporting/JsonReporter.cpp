@@ -73,6 +73,21 @@ static void writeReport(std::ostream& os,
            << "\"column\": " << v.column << ", ";
         if (v.endColumn > v.column) os << "\"endColumn\": " << v.endColumn << ", ";
         os << "\"message\": \"" << escapeJson(v.message) << "\"";
+        if (!v.fixIts.empty()) {
+            os << ", \"fixes\": [";
+            for (size_t f = 0; f < v.fixIts.size(); ++f) {
+                const auto& fix = v.fixIts[f];
+                os << (f ? ", " : "") << "{\"description\": \"" << escapeJson(fix.description)
+                   << "\", \"replacement\": \"" << escapeJson(fix.replacementText)
+                   << "\", \"safety\": \"" << core::fixSafetyToString(fix.safety) << "\"";
+                if (fix.startLine != 0) {
+                    os << ", \"line\": " << fix.startLine << ", \"column\": " << fix.startColumn
+                       << ", \"endLine\": " << fix.endLine << ", \"endColumn\": " << fix.endColumn;
+                }
+                os << "}";
+            }
+            os << "]";
+        }
         if (!v.related.empty()) {
             os << ", \"related\": [";
             for (size_t r = 0; r < v.related.size(); ++r) {

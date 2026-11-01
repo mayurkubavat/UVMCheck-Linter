@@ -316,14 +316,33 @@ bool PythonPluginManager::runPythonRules(const std::string& rulesPath, Compilati
         const auto* v = o.find(k);
         return v && v->isNumber() && v->asNumber() >= 1 ? static_cast<size_t>(v->asNumber()) : size_t(1);
     };
+    auto num0 = [](const core::json::Value& o, std::string_view k) {
+        const auto* v = o.find(k);
+        return v && v->isNumber() && v->asNumber() >= 0 ? static_cast<size_t>(v->asNumber()) : size_t(0);
+    };
     for (const auto& r : results->asArray()) {
         if (!r.isObject()) continue;
         std::string ruleId = str(r, "rule_id");
         if (ruleId.empty()) continue;
         std::string ruleName = str(r, "rule_name");
+        std::vector<core::FixItHint> fixes;
+        if (const auto* listed = r.find("fixes"); listed && listed->isArray()) {
+            for (const auto& item : listed->asArray()) {
+                if (!item.isObject()) continue;
+                core::FixItHint hint;
+                hint.description = str(item, "description");
+                hint.replacementText = str(item, "replacement");
+                hint.safety = core::fixSafetyFromString(str(item, "safety"));
+                hint.startLine = num0(item, "line");
+                hint.startColumn = num0(item, "column");
+                hint.endLine = num0(item, "endLine");
+                hint.endColumn = num0(item, "endColumn");
+                fixes.push_back(std::move(hint));
+            }
+        }
         diags.addDirectViolation(ruleId, ruleName.empty() ? ruleId : ruleName, str(r, "message"),
                                  parseSeverity(str(r, "severity")), str(r, "filename"), num(r, "line"),
-                                 num(r, "column"));
+                                 num(r, "column"), std::move(fixes));
     }
     return true;
 }

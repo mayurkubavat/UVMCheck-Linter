@@ -101,6 +101,31 @@ bool SarifReporter::writeSarif(const std::string& outputPath,
             }
             file << "\n          ]";
         }
+        if (!v.fixIts.empty()) {
+            file << ",\n          \"fixes\": [";
+            for (size_t f = 0; f < v.fixIts.size(); ++f) {
+                const auto& fix = v.fixIts[f];
+                file << (f ? "," : "") << "\n            {"
+                     << "\n              \"description\": { \"text\": \"" << escapeJson(fix.description) << "\" },"
+                     << "\n              \"properties\": { \"safety\": \"" << core::fixSafetyToString(fix.safety)
+                     << "\" }";
+                if (fix.startLine != 0) {
+                    file << ",\n              \"artifactChanges\": [{"
+                         << "\n                \"artifactLocation\": { \"uri\": \"" << escapeJson(v.filePath) << "\" },"
+                         << "\n                \"replacements\": [{"
+                         << "\n                  \"deletedRegion\": { \"startLine\": " << fix.startLine
+                         << ", \"startColumn\": " << fix.startColumn
+                         << ", \"endLine\": " << fix.endLine
+                         << ", \"endColumn\": " << fix.endColumn << " },"
+                         << "\n                  \"insertedContent\": { \"text\": \"" << escapeJson(fix.replacementText)
+                         << "\" }"
+                         << "\n                }]"
+                         << "\n              }]";
+                }
+                file << "\n            }";
+            }
+            file << "\n          ]";
+        }
         file << "\n        }" << (i + 1 < violations.size() ? "," : "") << "\n";
     }
 

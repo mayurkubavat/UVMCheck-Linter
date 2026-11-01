@@ -16,6 +16,9 @@ struct LspEdit {
 struct LspFix {
     std::string title;
     LspEdit edit;
+    /// Safe fixes are the preferred quick fix. Unsafe and display-only fixes
+    /// are offered, but not preferred.
+    bool preferred = true;
 };
 
 struct LspRelated {

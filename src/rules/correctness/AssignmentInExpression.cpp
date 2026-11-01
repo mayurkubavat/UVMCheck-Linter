@@ -27,7 +27,8 @@ public:
                     slang::SourceRange(expr.operatorToken.location(),
                                        expr.operatorToken.location() + expr.operatorToken.rawText().length()),
                     "==",
-                    "Replace assignment '=' with equality operator '=='"
+                    "Replace assignment '=' with equality operator '=='",
+                    core::FixSafety::Unsafe
                 });
             }
 

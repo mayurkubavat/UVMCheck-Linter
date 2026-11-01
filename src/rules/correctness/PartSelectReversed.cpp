@@ -72,7 +72,8 @@ public:
                                     fixIts.push_back({
                                         rngSyntax.sourceRange(),
                                         swapped,
-                                        "Invert part-select bounds to [" + swapped + "]"
+                                        "Invert part-select bounds to [" + swapped + "]",
+                                        core::FixSafety::Unsafe
                                     });
                                 }
 
@@ -149,7 +150,8 @@ public:
                         fixIts.push_back({
                             rng,
                             swapped,
-                            "Invert part-select bounds to [" + swapped + "]"
+                            "Invert part-select bounds to [" + swapped + "]",
+                            core::FixSafety::Unsafe
                         });
                     }
                 }

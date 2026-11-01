@@ -55,7 +55,8 @@ public:
                             fixIts.push_back({
                                 binExpr->right->sourceRange(),
                                 "1",
-                                "Set at_least to 1"
+                                "Set at_least to 1",
+                                core::FixSafety::DisplayOnly
                             });
 
                             diags.addViolation(

@@ -398,6 +398,7 @@ std::map<std::string, std::vector<LspDiagnostic>> LspServer::lintOpenDocuments()
             f.edit.endLine = static_cast<int>(sm.getLineNumber(e)) - 1;
             f.edit.endChar = static_cast<int>(sm.getColumnNumber(e)) - 1;
             f.edit.newText = fix.replacementText;
+            f.preferred = fix.safety == core::FixSafety::Safe;
             d.fixes.push_back(std::move(f));
         }
         out[it->second].push_back(std::move(d));
@@ -456,8 +457,9 @@ std::string LspServer::codeActions(const std::string& uri, int firstLine, int la
     for (const auto& d : it->second) {
         if (d.line < firstLine || d.line > lastLine) continue;
         for (const auto& f : d.fixes) {
-            actions.push_back("{\"title\":" + quote(f.title) + ",\"kind\":\"quickfix\",\"isPreferred\":true,"
-                              "\"diagnostics\":[" + diagJson(d) + "],\"edit\":" + editJson(f.edit) + "}");
+            actions.push_back("{\"title\":" + quote(f.title) + ",\"kind\":\"quickfix\",\"isPreferred\":" +
+                              (f.preferred ? "true" : "false") +
+                              ",\"diagnostics\":[" + diagJson(d) + "],\"edit\":" + editJson(f.edit) + "}");
         }
         if (!waived.insert({d.line, d.code}).second) continue;
         std::string_view line = lineOf(text, d.line);

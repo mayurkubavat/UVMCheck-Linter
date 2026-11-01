@@ -289,6 +289,11 @@ bool HtmlReporter::writeHtml(const std::string& outputPath,
             << "          <td>\n"
             << "            <div class=\"loc-text\">" << escapeHtml(v.filePath) << ":" << v.line << ":" << v.column << "</div>\n"
             << "            <div style=\"margin-top: 0.25rem;\">" << escapeHtml(v.message) << "</div>\n";
+        for (const auto& fix : v.fixIts) {
+            out << "            <div class=\"fix-hint\" data-safety=\"" << core::fixSafetyToString(fix.safety)
+                << "\">Fix (" << core::fixSafetyToString(fix.safety) << "): "
+                << escapeHtml(fix.description.empty() ? fix.replacementText : fix.description) << "</div>\n";
+        }
 
         if (!v.snippet.empty()) {
             std::string codeId = "code_" + std::to_string(i);

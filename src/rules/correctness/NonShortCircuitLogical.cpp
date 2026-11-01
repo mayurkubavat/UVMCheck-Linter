@@ -78,7 +78,8 @@ private:
                     fixIts.push_back({
                         binExpr.operatorToken.range(),
                         replacement,
-                        "Replace non-short-circuiting bitwise '" + op + "' with logical '" + replacement + "'"
+                        "Replace non-short-circuiting bitwise '" + op + "' with logical '" + replacement + "'",
+                        core::FixSafety::Unsafe
                     });
                 }
 
