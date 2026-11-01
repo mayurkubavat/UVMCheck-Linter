@@ -1,0 +1,93 @@
+name: uvmcheck
+description: Lint SystemVerilog/UVM code with uvmcheck and upload the findings to GitHub code scanning (SARIF).
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  args:
+    description: Extra uvmcheck arguments (sources, -f file lists, --preset ...). Empty uses .uvmcheck/config.py.
+    required: false
+    default: ""
+  working-directory:
+    description: Folder to run in (the project root).
+    required: false
+    default: "."
+  changed-since:
+    description: Report only findings on lines changed since this git ref (for example origin/main).
+    required: false
+    default: ""
+  sarif-file:
+    description: Where to write the SARIF report.
+    required: false
+    default: uvmcheck.sarif
+  upload-sarif:
+    description: Upload the SARIF report to code scanning (needs security-events write permission).
+    required: false
+    default: "true"
+  fail-on-findings:
+    description: Fail the step when uvmcheck reports errors.
+    required: false
+    default: "true"
+
+outputs:
+  sarif-file:
+    description: Path of the SARIF report.
+    value: ${{ steps.lint.outputs.sarif }}
+
+runs:
+  using: composite
+  steps:
+    - name: Install build tools
+      shell: bash
+      run: |
+        if ! command -v ninja >/dev/null; then sudo apt-get update && sudo apt-get install -y ninja-build; fi
+
+    - name: Restore uvmcheck build
+      id: cache
+      uses: actions/cache@v4
+      with:
+        path: ${{ github.action_path }}/build/uvmcheck
+        key: uvmcheck-${{ runner.os }}-${{ hashFiles(format('{0}/src/**', github.action_path), format('{0}/include/**', github.action_path), format('{0}/CMakeLists.txt', github.action_path)) }}
+
+    - name: Build uvmcheck
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      working-directory: ${{ github.action_path }}
+      run: cmake --preset default && cmake --build build -j 4 --target uvmcheck
+
+    - name: Lint
+      id: lint
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      env:
+        UVMCHECK: ${{ github.action_path }}/build/uvmcheck
+        ARGS: ${{ inputs.args }}
+        CHANGED: ${{ inputs.changed-since }}
+        SARIF: ${{ inputs.sarif-file }}
+        FAIL: ${{ inputs.fail-on-findings }}
+      run: |
+        extra=()
+        if [ -n "$CHANGED" ]; then extra+=(--changed-since "$CHANGED"); fi
+        set +e
+        # shellcheck disable=SC2086  # ARGS is a word list on purpose
+        "$UVMCHECK" $ARGS "${extra[@]}" --sarif "$SARIF"
+        status=$?
+        set -e
+        echo "sarif=$SARIF" >> "$GITHUB_OUTPUT"
+        if [ "$status" -ge 2 ]; then exit "$status"; fi
+        if [ "$status" -eq 1 ] && [ "$FAIL" = "true" ]; then echo "failed=true" >> "$GITHUB_OUTPUT"; fi
+
+    - name: Upload SARIF
+      if: always() && inputs.upload-sarif == 'true' && steps.lint.outputs.sarif != ''
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ inputs.working-directory }}/${{ inputs.sarif-file }}
+        category: uvmcheck
+
+    - name: Fail on findings
+      if: steps.lint.outputs.failed == 'true'
+      shell: bash
+      run: |
+        echo "uvmcheck reported errors; see the code scanning alerts or the log above."
+        exit 1

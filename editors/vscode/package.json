@@ -37,7 +37,7 @@
         "uvmcheck.executablePath": {
           "type": "string",
           "default": "uvmcheck",
-          "description": "Path to the uvmcheck executable binary (or ensure uvmcheck is on PATH)."
+          "description": "Path to the uvmcheck executable. Left as `uvmcheck`, the binary bundled with the extension is used, else the one on PATH."
         },
         "uvmcheck.preset": {
           "type": "string",
@@ -63,12 +63,14 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
+    "package": "vsce package",
     "watch": "tsc -watch -p ./"
   },
   "devDependencies": {
     "@types/node": "^18.14.0",
     "@types/vscode": "^1.75.0",
-    "typescript": "^5.0.0"
+    "typescript": "^5.0.0",
+    "@vscode/vsce": "^2.24.0"
   },
   "dependencies": {
     "vscode-languageclient": "^8.1.0"

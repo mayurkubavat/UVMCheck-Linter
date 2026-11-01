@@ -236,6 +236,28 @@ See [`editors/vscode/`](editors/vscode/) for the ready-to-use VS Code / Cursor e
 
 ---
 
+### CI, pre-commit and editor
+**GitHub Action.** The repository is a composite action: it builds uvmcheck (cached), lints, and uploads SARIF to code scanning.
+```yaml
+permissions: { contents: read, security-events: write }
+steps:
+  - uses: actions/checkout@v4
+    with: { fetch-depth: 0 }            # needed for changed-since
+  - uses: mayurkubavat/UVMCheck-Linter@main
+    with:
+      changed-since: origin/main         # optional: only findings on changed lines
+      args: ""                           # optional: sources/-f lists; empty uses .uvmcheck/config.py
+```
+
+**pre-commit.** Add to `.pre-commit-config.yaml` (uvmcheck on `PATH`); `uvmcheck` checks lines changed since `HEAD`, `uvmcheck-full` lints the whole project on push:
+```yaml
+- repo: https://github.com/mayurkubavat/UVMCheck-Linter
+  rev: main
+  hooks: [{ id: uvmcheck }, { id: uvmcheck-full }]
+```
+
+**VS Code.** Tagged releases attach a `.vsix` per platform (Linux x64, macOS arm64) with the binary inside; see [editors/vscode](editors/vscode/README.md).
+
 ## Project Configuration
 
 On an existing testbench, start with `uvmcheck --init` in its root folder. It

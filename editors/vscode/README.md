@@ -4,21 +4,20 @@ Real-time, zero-latency SystemVerilog and UVM static analysis in your editor pow
 
 ## Features
 
-- **Real-Time Diagnostics**: Instant feedback on 233+ rules covering UVM methodology, OOP soundness, race conditions, TLM connectivity, and dead code.
+- **Real-Time Diagnostics**: Instant feedback on 330+ rules covering UVM methodology, OOP soundness, race conditions, TLM connectivity, and dead code.
 - **Deep Semantic Analysis**: Cross-component validation of objection CFGs, Config DB type matching, virtual sequencer wiring, and RAL predictor binding.
 - **Incremental Linting**: Live diagnostics as you type over Language Server Protocol (`uvmcheck --lsp`).
-- **Zero Configuration**: Automatically resolves project include trees and UVM package scopes.
+- **Project aware**: Compiles the project from `.uvmcheck/config.py` (sources, file lists, include dirs, defines) with your unsaved edits, and applies its waivers and baseline.
+- **Quick fixes**: Apply a rule's fix-it, or waive a finding on its line with a reason.
 
 ## Requirements
 
-Ensure `uvmcheck` is built and available on your system `PATH`:
+Release builds of the extension (`.vsix` per platform, attached to each GitHub release) bundle the `uvmcheck` binary for Linux x64 and macOS arm64; nothing else is needed. On other platforms, or to use your own build, put `uvmcheck` on `PATH` or set `uvmcheck.executablePath`:
 
 ```bash
 git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
 cd UVMCheck-Linter
-cmake -B build -G Ninja
-ninja -C build
-# Optionally install globally or add to PATH:
+cmake --preset default && cmake --build build
 export PATH="$(pwd)/build:$PATH"
 ```
 

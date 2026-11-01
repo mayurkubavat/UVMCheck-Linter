@@ -1,0 +1,22 @@
+# pre-commit hooks (https://pre-commit.com). uvmcheck must be on PATH.
+# The project is compiled from .uvmcheck/config.py (sources, file lists,
+# include dirs), and only findings on lines changed since HEAD are reported,
+# so a commit is held to "new code is clean" without a baseline.
+- id: uvmcheck
+  name: uvmcheck (changed lines)
+  description: Lint SystemVerilog/UVM changes with uvmcheck
+  entry: uvmcheck --changed-since HEAD
+  language: system
+  pass_filenames: false
+  files: \.(sv|svh|v|vh|f)$
+  require_serial: true
+
+- id: uvmcheck-full
+  name: uvmcheck (whole project)
+  description: Lint the whole project with uvmcheck, honouring the baseline and waivers
+  entry: uvmcheck
+  language: system
+  pass_filenames: false
+  files: \.(sv|svh|v|vh|f)$
+  require_serial: true
+  stages: [manual, pre-push]
