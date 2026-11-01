@@ -42,6 +42,10 @@ private:
     std::optional<bool> runLsp;
     std::optional<bool> initProject;
     std::optional<bool> noConfig;
+    std::optional<bool> noCache;
+    std::optional<bool> clearCache;
+    std::optional<std::string> cacheDirArg;
+    std::vector<std::string> commandArgs;
     std::optional<std::string> changedSince;
     std::optional<std::string> mapOutputPath;
     std::optional<std::string> explainRule;

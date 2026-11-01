@@ -160,6 +160,15 @@ Findings are printed in file/line order and are identical for any thread count.
 On the 86k-line Accellera `uvm-core` library, a full all-rules run takes about
 0.5 s on 4 cores (previously about 2.9 s on the same machine).
 
+Results are cached in `.uvmcheck_cache/` and reused when the tool version, the rule set and its options, waivers, defines, include directories, and each file's includes and imported packages are unchanged. Whole-program rules (duplication, package layering, TLM and register wiring) are reused only when every input is unchanged. The cache is on by default; a corrupt or mismatched entry is ignored and the run is done from scratch. See [docs/result_cache.md](docs/result_cache.md).
+
+```bash
+./build/uvmcheck tb/top.sv                 # writes or reuses .uvmcheck_cache/
+./build/uvmcheck tb/top.sv --no-cache      # always analyze
+./build/uvmcheck tb/top.sv --clear-cache   # delete the cache, then run
+./build/uvmcheck tb/top.sv --cache-dir /tmp/uvmcheck-cache
+```
+
 ### Automated Fix-It Rewrites
 Each fix is `safe`, `unsafe`, or `display-only`. `--fix` writes only safe fixes (end labels, whitespace, rewrites that keep the same simulation behaviour). `casex` to `casez`, `==` to `===`, scheduling changes, and edits that touch factory names, `config_db`, objections, or phase order are unsafe: they are reported, and applied only with `--unsafe-fixes`. A display-only fix (for example a suggested `at_least` value) is shown in JSON, SARIF, HTML, and the editor, and is never written automatically. Unsafe fixes that were left alone are counted: `N fixes applied, M unsafe fixes skipped (use --unsafe-fixes)`.
 ```bash

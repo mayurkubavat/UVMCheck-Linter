@@ -16,6 +16,7 @@
 #include "uvmcheck/core/ProjectInit.h"
 #include "uvmcheck/core/ChangedLines.h"
 #include "uvmcheck/core/FixPlanner.h"
+#include "uvmcheck/core/ResultCache.h"
 #include "uvmcheck/reporting/TestbenchMap.h"
 #include "uvmcheck/rules/RuleExtras.h"
 #include "uvmcheck/style/NamingEngine.h"
@@ -78,11 +79,15 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--changed-since", changedSince, "Report only findings on lines added or changed since this git revision (and in untracked files): a new-code-is-clean gate without a baseline", "<git-ref>");
     slangDriver.cmdLine.add("--experimental", includeExperimental, "Also run experimental rules (new rules still being measured)");
     slangDriver.cmdLine.add("--no-config", noConfig, "Do not look for a project configuration (tests, one-off checks)");
+    slangDriver.cmdLine.add("--no-cache", noCache, "Do not read or write the incremental result cache");
+    slangDriver.cmdLine.add("--cache-dir", cacheDirArg, "Directory for the incremental result cache (default: .uvmcheck_cache)", "<dir>");
+    slangDriver.cmdLine.add("--clear-cache", clearCache, "Delete the result cache, then run");
     slangDriver.cmdLine.add("--init", initProject, "Set up this folder: find the sources and UVM, learn the naming conventions the code already follows, and write .uvmcheck/config.py and a first baseline");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
 }
 
 bool LinterDriver::parseCommandLine(int argc, char** argv) {
+    commandArgs.assign(argv + 1, argv + argc);
     return slangDriver.parseCommandLine(argc, argv);
 }
 
@@ -344,6 +349,111 @@ int LinterDriver::run() {
         return 2;
     }
 
+    // With JSON on stdout, keep stdout parseable by moving status lines to stderr
+    const bool jsonToStdout = jsonOutputPath.has_value() && *jsonOutputPath == "-";
+    std::ostream& info = jsonToStdout ? std::cerr : std::cout;
+
+    DiagnosticEngine diags(slangDriver.sourceManager);
+    const auto& projectConfig = ConfigManager::instance().getProjectConfig();
+    diags.setProjectConfig(&projectConfig);
+
+    // The cache is on by default. A complete hit is used only when every
+    // recorded dependency still has the same bytes; anything else, including
+    // a corrupt file, falls through to a full run. --fix needs source ranges
+    // the cache does not keep, and history, changed-lines, waiver hygiene, and
+    // --update-baseline depend on more than the source text, so those modes do not use it.
+    const bool cacheWanted = !initMode && !noCache.value_or(false) && !autoFix.value_or(false) &&
+                             !autoFixDryRun.value_or(false) && !useHistory.value_or(false) &&
+                             !changedSince.has_value() && !waiverReport.value_or(false) &&
+                             !strictWaivers.value_or(false) && !reportUnusedWaivers.value_or(false) &&
+                             !mapOutputPath.has_value() && !baselineOutputPath.has_value();
+    fs::path cacheDir;
+    if (cacheDirArg.has_value()) {
+        cacheDir = *cacheDirArg;
+    } else {
+        fs::path root = ConfigManager::instance().getProjectRoot();
+        if (root.empty()) root = fs::current_path();
+        cacheDir = root / ".uvmcheck_cache";
+    }
+    if (clearCache.value_or(false)) cache::clear(cacheDir);
+
+    cache::Request cacheReq;
+    cacheReq.enabled = cacheWanted;
+    cacheReq.directory = cacheDir;
+    if (cacheWanted) {
+        cache::EnvInput env;
+        env.defines = slangDriver.options.defines;
+        env.undefines = slangDriver.options.undefines;
+        env.languageVersion = slangDriver.options.languageVersion.value_or("");
+        env.disableLocalIncludes = slangDriver.options.disableLocalIncludes.value_or(false);
+        env.incDirFirst = slangDriver.options.incDirFirst.value_or(false);
+        env.includeDirs = projectConfig.build().includeDirs;
+        for (size_t i = 0; i < commandArgs.size(); i++) {
+            const std::string& a = commandArgs[i];
+            auto takeNext = [&](std::vector<std::string>& out) {
+                if (i + 1 < commandArgs.size()) out.push_back(commandArgs[++i]);
+            };
+            if (a == "-I" || a == "--include") takeNext(env.includeDirs);
+            else if (a.rfind("-I", 0) == 0 && a.size() > 2) env.includeDirs.push_back(a.substr(2));
+            else if (a.rfind("+incdir+", 0) == 0) env.includeDirs.push_back(a.substr(8));
+            else if (a == "-f" || a == "-F") takeNext(env.contentFiles);
+            else if (a.size() > 2 && a.ends_with(".f")) env.contentFiles.push_back(a);
+        }
+        if (ConfigManager::instance().hasLoadedConfig()) {
+            env.contentFiles.push_back(ConfigManager::instance().getLoadedConfigPath());
+            for (const auto& layer : ConfigManager::instance().getLayers()) env.contentFiles.push_back(layer);
+        }
+        if (pythonRulesPath.has_value()) env.contentFiles.push_back(*pythonRulesPath);
+        {
+            fs::path root = ConfigManager::instance().getProjectRoot();
+            if (root.empty()) root = fs::current_path();
+            std::error_code ec;
+            fs::path rel = fs::weakly_canonical(root, ec).lexically_proximate(fs::weakly_canonical(fs::current_path(), ec));
+            fs::path uvmDir = (rel == "." ? fs::path() : rel) / ".uvmcheck";
+            if (waiversFilePath.has_value()) env.contentFiles.push_back(*waiversFilePath);
+            else if (!noConfig.value_or(false)) env.contentFiles.push_back((uvmDir / "waivers.json").string());
+            if (baselineInputPath.has_value()) env.contentFiles.push_back(*baselineInputPath);
+            else if (!noConfig.value_or(false)) env.contentFiles.push_back((uvmDir / "baseline.json").string());
+        }
+        std::ostringstream flags;
+        flags << "preset=" << presetName.value_or("") << "\nrule=" << ruleFilter.value_or("")
+              << "\nguideline=" << guidelineSelector.value_or("")
+              << "\nexperimental=" << (includeExperimental.value_or(false) ? 1 : 0)
+              << "\nengine=" << engineMode.value_or("");
+        for (const auto& g : libraryPathArgs) flags << "\nlib=" << g;
+        for (const auto& g : excludePathArgs) flags << "\nex=" << g;
+        env.flags = flags.str();
+        cacheReq.envKey = cache::environmentKey(env);
+        std::set<std::string> primarySet;
+        for (const auto& p : slangDriver.sourceLoader.getFilePaths()) {
+            std::error_code ec;
+            fs::path c = fs::weakly_canonical(p, ec);
+            if (ec || c.empty()) c = fs::absolute(p).lexically_normal();
+            primarySet.insert(c.generic_string());
+        }
+        cacheReq.primaries.assign(primarySet.begin(), primarySet.end());
+    }
+
+    size_t compileErrors = 0;
+    size_t waivedCount = 0;
+    double elaborateSeconds = 0;
+    bool hygieneFailed = false;
+    bool replayed = false;
+    if (cacheWanted) {
+        if (auto hit = cache::loadComplete(cacheReq)) {
+            diags.getViolations() = std::move(hit->violations);
+            compileErrors = hit->compileErrors;
+            waivedCount = hit->waivedCount;
+            replayed = true;
+            info << "[uvmcheck] cache: " << cacheReq.primaries.size() << " compilation unit"
+                 << (cacheReq.primaries.size() == 1 ? "" : "s") << " served from cache\n";
+        }
+    }
+
+    std::unique_ptr<slang::ast::Compilation> compilation;
+    std::optional<uvm::UvmModel> uvmModel;
+    std::vector<init::NamingChoice> learntNaming;
+    if (!replayed) {
     if (!slangDriver.parseAllSources()) {
         (void)slangDriver.reportDiagnostics(false);
         return 3;
@@ -351,11 +461,7 @@ int LinterDriver::run() {
 
     using Clock = std::chrono::steady_clock;
     auto elaborateStart = Clock::now();
-    auto compilation = slangDriver.createCompilation();
-    
-    // With JSON on stdout, keep stdout parseable by moving status lines to stderr
-    const bool jsonToStdout = jsonOutputPath.has_value() && *jsonOutputPath == "-";
-    std::ostream& info = jsonToStdout ? std::cerr : std::cout;
+    compilation = slangDriver.createCompilation();
 
     // Fully elaborate up front. Rules then only read the AST, which is what
     // makes it safe to run them in parallel (same protocol as slang's own
@@ -363,9 +469,8 @@ int LinterDriver::run() {
     (void)compilation->getAllDiagnostics();
 
     // Construct UVM knowledge model
-    uvm::UvmModel uvmModel(*compilation);
+    uvmModel.emplace(*compilation);
 
-    std::vector<init::NamingChoice> learntNaming;
     if (initMode) {
         // Learn the naming conventions, write the config, then lint with it.
         fs::path libraryDir;
@@ -376,7 +481,7 @@ int LinterDriver::run() {
                 libraryDir = (p.is_relative() ? discovery.root / p : p).lexically_normal();
             }
         }
-        learntNaming = init::inferNaming(uvmModel, ConfigManager::instance().getNamingEngine(), libraryDir);
+        learntNaming = init::inferNaming(*uvmModel, ConfigManager::instance().getNamingEngine(), libraryDir);
         std::error_code ec;
         fs::create_directories(".uvmcheck", ec);
         {
@@ -391,13 +496,8 @@ int LinterDriver::run() {
         if (!loadProjectConfig()) return 2;
         if (!baselineOutputPath.has_value()) baselineOutputPath = ".uvmcheck/baseline.json";
     }
-    double elaborateSeconds = std::chrono::duration<double>(Clock::now() - elaborateStart).count();
-
-    // Initialize diagnostic engine
-    DiagnosticEngine diags(slangDriver.sourceManager);
-
-    const auto& projectConfig = ConfigManager::instance().getProjectConfig();
-    diags.setProjectConfig(&projectConfig);
+    elaborateSeconds = std::chrono::duration<double>(Clock::now() - elaborateStart).count();
+    } // !replayed (parse and elaborate)
 
     // Resolve active rule preset profile
     // Advisory rules only run when asked for by preset or by --rule.
@@ -501,6 +601,12 @@ int LinterDriver::run() {
         if (selected) activeRules.push_back(rule.get());
     }
 
+    waivers::WaiverEngine waiverEngine(slangDriver.sourceManager);
+    fs::path projectRoot = ConfigManager::instance().getProjectRoot();
+    if (projectRoot.empty()) projectRoot = fs::current_path();
+    waiverEngine.setProjectRoot(projectRoot);
+
+    if (!replayed) {
     // Compiler errors and warnings. When SV-CMP-001 runs they are reported
     // as findings (waivable, in every report), so slang does not print them
     // a second time. Elaboration diagnostics only reach slang's engine
@@ -512,15 +618,15 @@ int LinterDriver::run() {
     if (compilerFindings) slangDriver.diagEngine.removeClient(slangDriver.textDiagClient);
     slangDriver.reportCompilation(*compilation, /* quiet */ true);
     (void)slangDriver.reportDiagnostics(/* quiet */ jsonToStdout || compilerFindings);
-    const size_t compileErrors = static_cast<size_t>(slangDriver.diagEngine.getNumErrors());
+    compileErrors = static_cast<size_t>(slangDriver.diagEngine.getNumErrors());
 
-    engine::RuleEngine ruleEngine(*compilation, uvmModel, slangDriver.sourceManager, engineOptions);
+    engine::RuleEngine ruleEngine(*compilation, *uvmModel, slangDriver.sourceManager, engineOptions);
 
     // Custom Python rules only read the UVM model, so they run alongside the built-in rules
     if (pythonRulesPath.has_value()) {
         info << "[uvmcheck] Executing custom Python rules from: " << *pythonRulesPath << "\n";
         ruleEngine.addExternalJob("python rules", [&](DiagnosticEngine& pyDiags) {
-            plugins::PythonPluginManager::runPythonRules(*pythonRulesPath, *compilation, uvmModel, pyDiags);
+            plugins::PythonPluginManager::runPythonRules(*pythonRulesPath, *compilation, *uvmModel, pyDiags);
         });
     }
 
@@ -532,13 +638,8 @@ int LinterDriver::run() {
         ruleEngine.printProfile(std::cerr);
     }
 
-    // Process Waivers and Baseline
-    waivers::WaiverEngine waiverEngine(slangDriver.sourceManager);
-    // Baseline paths, and the default waivers/baseline files, are relative to the project
-    // root: the folder that holds .uvmcheck/ (or the loaded config file), else the working directory.
-    fs::path projectRoot = ConfigManager::instance().getProjectRoot();
-    if (projectRoot.empty()) projectRoot = fs::current_path();
-    waiverEngine.setProjectRoot(projectRoot);
+    // Process Waivers and Baseline. Paths are relative to the project root: the folder
+    // that holds .uvmcheck/ (or the loaded config file), else the working directory.
     // --no-config also skips the default .uvmcheck/waivers.json and baseline.json.
     // Shown and opened relative to the working directory when the root is (or is under) it.
     const fs::path uvmcheckDir = [&] {
@@ -619,7 +720,7 @@ int LinterDriver::run() {
 
     // Filter violations (applies inline waivers + external waivers + baseline suppressions)
     auto activeViolations = waiverEngine.filter(diags.getViolations());
-    size_t waivedCount = waiverEngine.getWaivedCount();
+    waivedCount = waiverEngine.getWaivedCount();
     if (size_t stale = waiverEngine.getStaleBaselineCount(); stale > 0 && !baselineOutputPath.has_value()) {
         info << "[uvmcheck] " << stale << " baseline entr" << (stale == 1 ? "y" : "ies")
              << " matched no finding (fixed, or the flagged line changed); "
@@ -652,7 +753,6 @@ int LinterDriver::run() {
     }
 
     const bool wantUnused = reportUnusedWaivers.value_or(false) || strictWaivers.value_or(false);
-    bool hygieneFailed = false;
     if (waiverReport.value_or(false) || strictWaivers.value_or(false) || wantUnused) {
         // User files of this compilation: library and excluded files are not scanned for comments.
         std::vector<std::string> userFiles;
@@ -726,6 +826,11 @@ int LinterDriver::run() {
         }
         }
     }
+
+    if (compilation) {
+        cache::updateAndStore(cacheReq, *compilation, diags.getViolations(), compileErrors, waivedCount, info);
+    }
+    } // !replayed
 
     // Apply automated fix-its if requested (or show them with --fix-dry-run).
     const bool fixDryRun = autoFixDryRun.value_or(false);
@@ -858,7 +963,8 @@ int LinterDriver::run() {
     }
 
     if (mapOutputPath.has_value()) {
-        if (reporting::writeTestbenchMap(*mapOutputPath, *compilation, uvmModel, diags.getViolations())) {
+        if (compilation && uvmModel &&
+            reporting::writeTestbenchMap(*mapOutputPath, *compilation, *uvmModel, diags.getViolations())) {
             info << "[uvmcheck] Testbench map written to: " << *mapOutputPath << "\n";
         } else {
             std::cerr << "Error: Failed to write testbench map to: " << *mapOutputPath << "\n";
