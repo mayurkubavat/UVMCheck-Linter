@@ -592,7 +592,18 @@ std::string environmentKey(const EnvInput& in) {
     for (const auto& d : inc) h.add(d);
     h.add("|");
     h.add(in.flags);
-    std::vector<std::string> files = in.contentFiles;
+    // A folder (--python-rules <dir>) stands for the files under it.
+    std::vector<std::string> files;
+    for (const auto& f : in.contentFiles) {
+        std::error_code ec;
+        if (std::filesystem::is_directory(f, ec)) {
+            for (const auto& e : std::filesystem::recursive_directory_iterator(f, std::filesystem::directory_options::skip_permission_denied, ec)) {
+                if (e.is_regular_file(ec) && e.path().extension() == ".py") files.push_back(e.path().generic_string());
+            }
+        } else {
+            files.push_back(f);
+        }
+    }
     std::sort(files.begin(), files.end());
     files.erase(std::unique(files.begin(), files.end()), files.end());
     for (const auto& f : files) {
