@@ -47,7 +47,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("-h,--help", showHelp, "Display available options");
     slangDriver.cmdLine.add("--version", showVersion, "Display version information and exit");
     slangDriver.cmdLine.add("--list-rules", listRules, "List all available linter rules and exit; with --json, write the rule catalog as JSON");
-    slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: soundness, methodology, performance, style, security, smells, advisory, reuse, guide, all", "<name>");
+    slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: soundness, methodology, performance, style, security, smells, advisory, reuse, guide, uvm-1800.2, all", "<name>");
     slangDriver.cmdLine.add("--guideline", guidelineSelector, "Run only the rules that enforce these methodology guidelines or chapters (comma-separated, e.g. MG-4,MG-3.1)", "<ids>");
     slangDriver.cmdLine.add("--list-guidelines", listGuidelines, "List the methodology guide (guidelines and the rules that enforce them) and exit; with --json, write it as JSON");
     slangDriver.cmdLine.add("--conformance", showConformance, "Report pass/fail per methodology guideline (implied by --guideline and the reuse and guide presets)");
@@ -404,6 +404,7 @@ int LinterDriver::run() {
     // Guideline selection (--guideline, or the reuse and guide presets) picks rules by the
     // guidelines they enforce, whatever their profile.
     std::vector<std::string> guidelineSelectors;
+    std::string categorySelector; // a preset that picks rules by category
     if (guidelineSelector.has_value()) {
         std::string_view rest = *guidelineSelector;
         while (!rest.empty()) {
@@ -427,7 +428,10 @@ int LinterDriver::run() {
     if (presetName.has_value()) {
         std::string p = *presetName;
         for (char& c : p) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
-        if (p == "reuse") {
+        if (p == "uvm-1800.2" || p == "migration") {
+            // Moving to IEEE 1800.2 UVM: the deprecated and banned API checks.
+            categorySelector = "Deprecated";
+        } else if (p == "reuse") {
             guidelineSelectors.insert(guidelineSelectors.end(), {"MG-1", "MG-2", "MG-3", "MG-4", "MG-5"});
         } else if (p == "guide") {
             for (const auto& g : rules::methodologyGuidelines()) guidelineSelectors.emplace_back(g.id);
@@ -483,7 +487,9 @@ int LinterDriver::run() {
         }
         // A rule named with --rule runs whatever its profile.
         bool selected = ruleFilter.has_value();
-        if (!selected && !guidelineSelectors.empty()) {
+        if (!selected && !categorySelector.empty()) {
+            selected = rule->getCategory() == categorySelector;
+        } else if (!selected && !guidelineSelectors.empty()) {
             for (auto g : rule->getGuidelines()) {
                 for (const auto& sel : guidelineSelectors) selected |= rules::guidelineMatches(sel, g);
             }

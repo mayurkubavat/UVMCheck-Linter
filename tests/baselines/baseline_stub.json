@@ -38,6 +38,14 @@
     "SV-STY-104@9",
     "UVM-FAC-003@5"
   ],
+  "antipattern/UVM-BAN-003/bad.sv": [
+    "SV-DED-006@19",
+    "SV-DED-006@19"
+  ],
+  "antipattern/UVM-BAN-003/good.sv": [
+    "SV-DED-006@19",
+    "SV-DED-006@19"
+  ],
   "concurrency/SV-CNC-003/bad.sv": [
     "SV-DED-006@7",
     "SV-DED-006@8",
@@ -251,6 +259,27 @@
     "SV-STY-104@8",
     "SV-STY-104@9",
     "UVM-FAC-003@5"
+  ],
+  "concurrency/SV-DLY-004/bad.sv": [
+    "SV-DED-005@7",
+    "SV-RDB-002@16",
+    "SV-STY-001@6",
+    "SV-STY-001@7",
+    "SV-STY-009@13",
+    "SV-STY-010@16",
+    "UVM-PHS-001@13"
+  ],
+  "concurrency/SV-DLY-004/good.sv": [
+    "SV-CNC-004@18",
+    "SV-DED-006@7",
+    "SV-RDB-002@28",
+    "SV-STY-001@6",
+    "SV-STY-001@7",
+    "SV-STY-009@17",
+    "SV-STY-010@14",
+    "SV-STY-010@28",
+    "SV-TIM-002@14",
+    "UVM-PHS-001@17"
   ],
   "concurrency/SV-EVT-001/bad.sv": [
     "SV-CON-011@13",
@@ -1198,6 +1227,24 @@
     "SV-STY-104@8",
     "SV-STY-104@9",
     "UVM-FAC-003@5"
+  ],
+  "coverage/SV-COV-017/bad.sv": [
+    "SV-COV-001@6",
+    "SV-NAM-105@6",
+    "SV-STY-010@8",
+    "SV-STY-010@9",
+    "SV-STY-010@9",
+    "SV-STY-010@10",
+    "SV-STY-010@10"
+  ],
+  "coverage/SV-COV-017/good.sv": [
+    "SV-COV-001@6",
+    "SV-NAM-105@6",
+    "SV-STY-010@8",
+    "SV-STY-010@9",
+    "SV-STY-010@9",
+    "SV-STY-010@10",
+    "SV-STY-010@10"
   ],
   "deadcode/SV-DED-001/bad.sv": [
     "SV-STY-005@11",
@@ -3619,6 +3666,14 @@
     "UVM-RUS-006@3",
     "UVM-SCB-002@13"
   ],
+  "methodology/UVM-REP-009/bad.sv": [
+    "SV-STY-010@10",
+    "UVM-PHS-001@9"
+  ],
+  "methodology/UVM-REP-009/good.sv": [
+    "SV-STY-010@10",
+    "UVM-PHS-001@9"
+  ],
   "methodology/UVM-ROL-001/bad.sv": [
     "SV-DED-006@20",
     "SV-RND-015@5",
@@ -4103,6 +4158,7 @@
     "SV-DED-005@7",
     "SV-DED-006@6",
     "SV-DED-006@7",
+    "SV-DLY-004@13",
     "SV-STY-001@6",
     "SV-STY-001@6",
     "SV-STY-001@6",
@@ -5463,6 +5519,21 @@
     "SV-STY-104@9",
     "UVM-FAC-003@5"
   ],
+  "random/SV-RND-023/bad.sv": [
+    "SV-NAM-112@15",
+    "SV-RND-015@6",
+    "SV-STY-010@15",
+    "UVM-RUS-006@12",
+    "UVM-STY-002@15"
+  ],
+  "random/SV-RND-023/good.sv": [
+    "SV-NAM-112@17",
+    "SV-RND-015@6",
+    "SV-RND-015@15",
+    "SV-STY-010@14",
+    "UVM-RUS-006@12",
+    "UVM-STY-002@17"
+  ],
   "random/SV-TST-001/bad.sv": [
     "SV-RDB-002@8",
     "SV-RND-015@5",
@@ -5510,6 +5581,16 @@
     "SV-STY-104@16",
     "SV-STY-104@19",
     "SV-STY-104@20"
+  ],
+  "readability/SV-MAC-002/bad.sv": [
+    "SV-STY-010@10",
+    "SV-STY-010@11",
+    "SV-STY-010@11"
+  ],
+  "readability/SV-MAC-002/good.sv": [
+    "SV-STY-010@11",
+    "SV-STY-010@12",
+    "SV-STY-010@12"
   ],
   "readability/SV-RDB-001/bad.sv": [
     "SV-DED-005@3",
@@ -6260,6 +6341,18 @@
     "SV-STY-104@8",
     "SV-STY-104@9",
     "UVM-FAC-003@5"
+  ],
+  "uvm/RAL-BLK-001/bad.sv": [
+    "RAL-MAP-001@25",
+    "SV-DED-005@21",
+    "SV-STY-001@32",
+    "UVM-PHS-001@36"
+  ],
+  "uvm/RAL-BLK-001/good.sv": [
+    "RAL-MAP-001@25",
+    "SV-DED-005@21",
+    "SV-STY-001@32",
+    "UVM-PHS-001@36"
   ],
   "uvm/RAL-COL-001/bad.sv": [
     "COMPILE:UndeclaredIdentifier@8",

@@ -546,6 +546,8 @@ class uvm_reg_block extends uvm_object;
         super.new(name);
         default_map = new("default_map");
     endfunction
+    function void lock_model();
+    endfunction
 endclass
 
 class uvm_reg_adapter extends uvm_object;

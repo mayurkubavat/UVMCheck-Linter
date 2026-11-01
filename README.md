@@ -109,6 +109,9 @@ Filter rule execution using curated verification profiles:
 # Run the opt-in advisory rules (magic numbers, commented-out code, ...)
 ./build/uvmcheck tb/top.sv --preset advisory
 
+# Moving to IEEE 1800.2 UVM: deprecated and banned API checks only
+./build/uvmcheck tb/top.sv --preset uvm-1800.2
+
 # Run everything, advisory rules included
 ./build/uvmcheck tb/top.sv --preset all
 ```

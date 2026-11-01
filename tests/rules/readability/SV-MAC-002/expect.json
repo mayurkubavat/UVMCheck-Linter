@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SV-MAC-002",
+      "line": 4
+    },
+    {
+      "rule": "SV-MAC-002",
+      "line": 5
+    }
+  ]
+}
