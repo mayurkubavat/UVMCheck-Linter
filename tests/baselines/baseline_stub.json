@@ -2042,7 +2042,8 @@
     "SV-STY-104@49",
     "SV-STY-104@50",
     "SV-STY-104@57",
-    "SV-STY-104@58"
+    "SV-STY-104@58",
+    "UVM-SEQ-014@25"
   ],
   "design/UVM-ARC-002/bad.sv": [
     "SV-INT-001@49",
@@ -2118,7 +2119,8 @@
     "SV-STY-104@63",
     "SV-STY-104@64",
     "UVM-PHS-001@55",
-    "UVM-PHS-001@60"
+    "UVM-PHS-001@60",
+    "UVM-SEQ-014@40"
   ],
   "design/UVM-ARC-003/good.sv": [
     "SV-STY-005@9",
@@ -5803,7 +5805,8 @@
     "SV-STY-104@17",
     "SV-STY-104@18",
     "UVM-FAC-003@4",
-    "UVM-FAC-003@13"
+    "UVM-FAC-003@13",
+    "UVM-SEQ-014@4"
   ],
   "readability/SV-API-001/bad.sv": [
     "SV-STY-005@7",
@@ -7071,7 +7074,8 @@
     "SV-STY-104@33",
     "SV-STY-104@34",
     "UVM-RUS-005@21",
-    "UVM-RUS-005@32"
+    "UVM-RUS-005@32",
+    "UVM-SEQ-015@9"
   ],
   "uvm/UVM-LOG-002/bad.sv": [
     "SV-NAM-001@7",

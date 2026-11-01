@@ -28,7 +28,7 @@ Some rules compare the whole design. A finding they report in one file can chang
 | `SV-PKG-004`, `SV-PKG-005` | The package dependency graph |
 | `SV-EVO-001`, `SV-EVO-002` | Git history across the tree (`--history` does not use the cache) |
 | `UVM-ARC-001`, `UVM-ARC-003` | Layer order, and one file included into several packages |
-| `UVM-TLM-001`, `UVM-TLM-004`, `UVM-VSEQ-001`, `UVM-SEQ-013` | Ports, sequencers, and sequence items wired in another file |
+| `UVM-TLM-001`, `UVM-TLM-004`, `UVM-VSEQ-001`, `UVM-SEQ-013`, `UVM-SEQ-014`, `UVM-SEQ-015` | Ports, sequencers, and sequence items wired in another file |
 | `UVM-CFG-005`, `UVM-CFG-010`, `UVM-CFG-011`, `UVM-PHS-010` | A config or phase access whose other end is another component |
 | `RAL-WIRE-001`, `RAL-MAP-001`, `RAL-MAP-002`, `RAL-COL-001` | Register maps, address ranges, and adapter wiring across the model |
 

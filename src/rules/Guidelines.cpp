@@ -154,7 +154,7 @@ const std::vector<Entry>& entries() {
          {"SV-MET-001", "SV-MET-002", "SV-MET-003", "SV-MET-004", "SV-MET-005", "SV-MET-007",
           "SV-MET-008", "SV-SML-004",
           "SV-STY-009", "SV-RDB-002", "SV-RDB-003", "SV-RDB-005", "SV-API-001", "SV-DED-001",
-          "SV-DED-005", "SV-DED-006", "SV-DED-011", "SV-DED-012", "SV-DED-013"}},
+          "SV-DED-005", "SV-DED-006", "SV-DED-011", "SV-DED-012", "SV-DED-013", "SV-DED-014"}},
         {{"MG-9.2", "MG-9", kEvolvability, L::May,
           "Complex code that changes often is refactored first."},
          {"SV-EVO-001", "SV-EVO-002"}},

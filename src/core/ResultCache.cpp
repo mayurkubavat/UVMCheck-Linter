@@ -116,7 +116,7 @@ const std::unordered_set<std::string_view>& wholeProgramIds() {
         "SV-DUP-001", "SV-DUP-002", "SV-DUP-003", "SV-DUP-004", "SV-DUP-005",
         "SV-PKG-004", "SV-PKG-005", "SV-EVO-001", "SV-EVO-002",
         "UVM-ARC-001", "UVM-ARC-003",
-        "UVM-TLM-001", "UVM-TLM-004", "UVM-VSEQ-001", "UVM-SEQ-013",
+        "UVM-TLM-001", "UVM-TLM-004", "UVM-VSEQ-001", "UVM-SEQ-013", "UVM-SEQ-014", "UVM-SEQ-015",
         "UVM-CFG-005", "UVM-CFG-010", "UVM-CFG-011", "UVM-PHS-010",
         "RAL-WIRE-001", "RAL-MAP-001", "RAL-MAP-002", "RAL-COL-001",
     };
