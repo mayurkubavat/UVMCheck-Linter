@@ -49,7 +49,8 @@ class Project(ProjectConfig):
 
     waivers = [
         Waiver("UVM-OBJ-002", path="tb/stress_seq.sv", line=142,
-               reason="Objection in loop verified for stress bench"),
+               reason="Objection in loop verified for stress bench",
+               message="objection"),
         LegacyMacros,
     ]
 
@@ -134,7 +135,7 @@ Running from `blocks/dma/` prints the layers that were loaded.
 | `library_paths` | Globs for third-party code (UVM, VIP). Files are still compiled; violations in them are dropped. |
 | `exclude_paths` | Globs for your own files whose violations should be dropped. |
 | `report_library_macro_expansions` | Default `False`: code produced by a library macro (`` `uvm_object_utils `` etc.) inside your file counts as library code. |
-| `waivers` | `Waiver(...)` objects or `Waiver` subclasses with `rules`, `paths`, `line`, `reason` (mandatory), `owner`, `expires` (YYYY-MM-DD). Empty `rules` / `paths` mean every rule / file. |
+| `waivers` | `Waiver(...)` objects or `Waiver` subclasses with `rules`, `paths`, `line`, `reason` (mandatory), `owner`, `expires` (YYYY-MM-DD), and optional `message`. Empty `rules` / `paths` mean every rule / file. `message` is a regular expression searched against the diagnostic text; the waiver applies only when rule, path, line, and that expression all match. An invalid expression is an error that names the config file and the waiver. |
 | `style`, `naming` | Same dicts as the legacy JSON `style` / `naming` blocks. |
 | `RuleConfig.rule` | Rule ID (`"SV-STY-016"`) or name (`"MaxLineLength"`); defaults to the class name. |
 | `RuleConfig.enabled` | `False` skips the rule entirely (also for Python plugin rules). |
@@ -161,6 +162,16 @@ Unknown rule names produce a warning so typos do not go unnoticed.
 ./build/uvmcheck tb/top.sv -I $UVM_HOME/src --library '$UVM_HOME' --exclude 'tb/gen/**'
 ```
 
+A waiver comment can carry the same expression in quotes. It is searched, not matched against the whole message:
+
+```systemverilog
+if (a == a) $display("one"); // uvmcheck:waive SV-COR-008 "expression 'a'"
+// uvmcheck: waive SV-COR-008 "expression 'b'"
+if (b == b) $display("two");
+```
+
+`--report-unused-waivers` prints waivers that matched nothing in this run, and waivers whose `expires` date has passed, as `UVM-WV-001` warnings (they also count in the summary). It is off by default: one waiver file is often used for runs that lint different files, so a waiver that matched nothing this time is not always stale. `--strict-waivers` turns the warnings on and still exits 4 while any unused, expired, or stale entry remains.
+
 ### JSON form
 
 The same settings are accepted as JSON (`.uvmcheck.json`), which is also what
@@ -176,7 +187,8 @@ allowed. Rules may use a shorthand: `"SV-COR-009": "error"`, `"MaxLineLength": "
     "GenericReportId": "off"
   },
   "waivers": [
-    { "rule": "UVM-OBJ-002", "path": "tb/stress_seq.sv", "line": 142, "reason": "Stress bench" }
+    { "rule": "UVM-OBJ-002", "path": "tb/stress_seq.sv", "line": 142,
+      "reason": "Stress bench", "message": "objection" }
   ]
 }
 ```

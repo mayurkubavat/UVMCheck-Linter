@@ -1,7 +1,9 @@
 #pragma once
 
 #include <filesystem>
+#include <memory>
 #include <optional>
+#include <regex>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -22,6 +24,17 @@ struct ExternalWaiver {
     std::string owner;
     std::string label;  // how the hygiene report names it, e.g. "waivers.json #3"
     size_t group = 0;   // entries expanded from one written waiver share a group
+    /// Optional ECMAScript regex. Empty matches any message. Compiled once at load.
+    std::string messagePattern;
+    std::shared_ptr<const std::regex> messageRegex;
+};
+
+/// An inline message regex that did not compile.
+struct MessageRegexError {
+    std::string filePath;
+    size_t line = 0;
+    std::string pattern;
+    std::string what;
 };
 
 /// A waiver comment in a source file (`// uvmcheck:waive RULE` and friends).
@@ -63,7 +76,9 @@ public:
     void setProjectRoot(std::filesystem::path root) { projectRoot = std::move(root); }
 
     /// Load external waiver rules from a JSON file: a list of {"rule", "path", "line",
-    /// "reason"} objects, or an object with such a list under "waivers".
+    /// "reason", "message"} objects, or an object with such a list under "waivers".
+    /// `message`, when set, is an ECMAScript regex searched against the diagnostic
+    /// text. An invalid pattern fails the load; the error names this file and the waiver.
     bool loadWaivers(const std::string& waiverFilePath);
 
     /// Add a waiver declared in the project config
@@ -99,6 +114,10 @@ public:
     /// Last error from loadWaivers/loadBaseline (parse errors).
     const std::string& getLastError() const { return lastError; }
 
+    /// Inline `message` patterns that failed to compile. Config and waiver-file
+    /// patterns fail the load instead of landing here.
+    const std::vector<MessageRegexError>& regexErrors() const { return badRegexes; }
+
 private:
     [[maybe_unused]] const slang::SourceManager& sourceManager;
     std::filesystem::path projectRoot = std::filesystem::current_path();
@@ -106,6 +125,8 @@ private:
     std::unordered_set<std::string> legacyFingerprints;
     std::unordered_set<std::string> matchedFingerprints;
     std::vector<ExternalWaiver> externalWaivers;
+    std::unordered_map<std::string, std::shared_ptr<const std::regex>> compiledMessages;
+    std::vector<MessageRegexError> badRegexes;
     std::vector<size_t> groupMatches;                       // findings matched per waiver group
     std::unordered_set<std::string> usedInline;              // "file\nline" of comments that waived something
     std::unordered_map<std::string, size_t> waivedByRule, waivedByOwner;
@@ -115,6 +136,9 @@ private:
 
     std::string_view lineText(const core::Violation& v, size_t line);
     const std::vector<std::string>& fileLinesOf(const std::string& path);
+    /// Compiles `pattern` once. Returns nullptr and records an error when it is invalid.
+    const std::regex* messageRegexFor(const std::string& pattern, const std::string& file, size_t line);
+    bool commentWaives(std::string_view text, const core::Violation& v, size_t commentLine);
     std::string legacyFingerprint(const core::Violation& v) const;
     bool hasInlineWaiver(const core::Violation& v);
     const ExternalWaiver* matchExternalWaiver(const core::Violation& v);

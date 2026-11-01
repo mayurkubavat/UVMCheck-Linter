@@ -47,6 +47,7 @@ private:
     std::optional<std::string> explainRule;
     std::optional<bool> waiverReport;
     std::optional<bool> strictWaivers;
+    std::optional<bool> reportUnusedWaivers;
     std::vector<std::string> libraryPathArgs;
     std::vector<std::string> excludePathArgs;
     std::optional<bool> profileRules;

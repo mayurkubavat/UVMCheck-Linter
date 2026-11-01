@@ -23,6 +23,7 @@ struct ConfigWaiver {
     std::string owner;
     std::string label; // e.g. "Waiver(SV-COR-001)" or the waiver subclass name
     size_t group = 0;  // index of the waiver as written (one waiver can expand to many entries)
+    std::string messagePattern; // empty = any diagnostic message
 };
 
 class ConfigManager {

@@ -7,6 +7,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <ctime>
+#include <regex>
 #include <unordered_set>
 #include <unistd.h>
 
@@ -326,6 +327,16 @@ bool ConfigManager::applyWaivers(const json::Value& list, const fs::path& baseDi
         if (const auto* l = w.find("line"); l && l->isNumber() && l->asNumber() >= 1) {
             line = static_cast<size_t>(l->asNumber());
         }
+        std::string message;
+        if (const auto* m = w.find("message"); m && m->isString()) message = m->asString();
+        if (!message.empty()) {
+            try {
+                std::regex compiled(message);
+                (void)compiled;
+            } catch (const std::regex_error& e) {
+                return error("waiver " + label + ": invalid message regex '" + message + "': " + e.what());
+            }
+        }
 
         std::vector<std::optional<PathPattern>> globs;
         for (const auto& p : paths) {
@@ -350,6 +361,7 @@ bool ConfigManager::applyWaivers(const json::Value& list, const fs::path& baseDi
                 cw.owner = owner;
                 cw.label = label;
                 cw.group = group;
+                cw.messagePattern = message;
                 waivers.push_back(std::move(cw));
             }
         }

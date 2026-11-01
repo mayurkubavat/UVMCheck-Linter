@@ -99,6 +99,77 @@ def main():
         rc, out = run(binary, root, "--strict-waivers")
         check(rc == 0, f"--strict-waivers passes once cleaned up (got {rc})", out)
 
+        print("Message regex")
+        scoped = root / "scoped"
+        scoped.mkdir()
+        (scoped / "user_tb.sv").write_text(
+            "module user_tb;\n  int a, b;\n  initial begin\n"
+            "    if (a == a) $display(\"one\"); // uvmcheck:waive SV-COR-008 \"expression 'a'\"\n"
+            "    // uvmcheck: waive SV-COR-008 \"expression 'b'\"\n"
+            "    if (b == b) $display(\"two\");\n"
+            "  end\nendmodule\n")
+        (scoped / "config.py").write_text(
+            "from uvmcheck.config import ProjectConfig, Waiver\n"
+            "class Project(ProjectConfig):\n"
+            "    waivers = [Waiver('SV-COR-008', reason='only a', message=\"expression 'a'\")]\n")
+        # The inline comments already waive both lines; drop them so the config regex is what decides.
+        (scoped / "user_tb.sv").write_text(
+            "module user_tb;\n  int a, b;\n  initial begin\n"
+            "    if (a == a) $display(\"one\");\n"
+            "    if (b == b) $display(\"two\");\n"
+            "  end\nendmodule\n")
+        rc, out = run(binary, scoped, "--config", "config.py", "--rule", "SV-COR-008", "--json", "out.json")
+        import json
+        found = json.loads((scoped / "out.json").read_text())["violations"]
+        lines = sorted(v["line"] for v in found if v["ruleId"] == "SV-COR-008")
+        check(lines == [5], f"message regex waives only the 'a' finding, got {lines}", out)
+
+        (scoped / "user_tb.sv").write_text(
+            "module user_tb;\n  int a, b;\n  initial begin\n"
+            "    if (a == a) $display(\"one\"); // uvmcheck:waive SV-COR-008 \"expression 'a'\"\n"
+            "    // uvmcheck: waive SV-COR-008 \"no-such-text\"\n"
+            "    if (b == b) $display(\"two\");\n"
+            "  end\nendmodule\n")
+        rc, out = run(binary, scoped, "--no-config", "--rule", "SV-COR-008", "--json", "out.json")
+        found = json.loads((scoped / "out.json").read_text())["violations"]
+        lines = sorted(v["line"] for v in found if v["ruleId"] == "SV-COR-008")
+        check(lines == [6], f"inline message regex waives only a matching diagnostic, got {lines}", out)
+
+        (scoped / "user_tb.sv").write_text(
+            "module user_tb;\n  int a, b;\n  initial begin\n"
+            "    if (a == a) $display(\"one\");\n"
+            "    // uvmcheck: waive SV-COR-008 \"expression 'b'\"\n"
+            "    if (b == b) $display(\"two\");\n"
+            "  end\nendmodule\n")
+        rc, out = run(binary, scoped, "--no-config", "--rule", "SV-COR-008", "--json", "out.json")
+        found = json.loads((scoped / "out.json").read_text())["violations"]
+        lines = sorted(v["line"] for v in found if v["ruleId"] == "SV-COR-008")
+        check(lines == [4], f"'uvmcheck: waive' with a message regex waives the next line, got {lines}", out)
+
+        (scoped / "config.py").write_text(
+            "from uvmcheck.config import ProjectConfig, Waiver\n"
+            "class Project(ProjectConfig):\n"
+            "    waivers = [Waiver('SV-COR-009', reason='nothing casex', message='casex')]\n")
+        rc, out = run(binary, scoped, "--config", "config.py", "--report-unused-waivers", "--rule", "SV-COR-008")
+        check("UVM-WV-001" in out and "matched no diagnostic" in out,
+              "--report-unused-waivers warns about a waiver that matched nothing", out)
+        rc, quiet = run(binary, scoped, "--config", "config.py", "--rule", "SV-COR-008")
+        check("UVM-WV-001" not in quiet, "unused waivers stay quiet without the flag", quiet)
+
+        (scoped / "config.py").write_text(
+            "from uvmcheck.config import ProjectConfig, Waiver\n"
+            "class Project(ProjectConfig):\n"
+            "    waivers = [Waiver('SV-COR-008', reason='bad', message='(')]\n")
+        rc, out = run(binary, scoped, "--config", "config.py")
+        check(rc == 2 and "config.py" in out and "Waiver(SV-COR-008)" in out and "invalid message regex" in out,
+              "invalid message regex names the config file and the waiver", out)
+
+        (scoped / "waivers.json").write_text(
+            '{"waivers":[{"rule":"SV-COR-008","reason":"bad","message":"("}]}')
+        rc, out = run(binary, scoped, "--no-config", "--waivers", "waivers.json")
+        check(rc == 2 and "waivers.json" in out and "invalid message regex" in out,
+              "invalid message regex in a waiver file names that file", out)
+
     if failures:
         print(f"\n{len(failures)} failure(s)")
         sys.exit(1)

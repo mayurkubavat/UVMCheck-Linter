@@ -39,6 +39,7 @@ import datetime
 import importlib.util
 import inspect
 import os
+import re
 import sys
 from typing import Any, Dict, List, Optional, Union
 
@@ -138,10 +139,13 @@ class Waiver:
             reason = "Vendor macros we cannot edit"
             owner = "dv-infra"
             expires = "2027-06-30"
+            message = "trailing semicolon"
 
     ``rules`` / ``paths`` default to every rule / every file; ``line`` to any
-    line. ``paths`` use the same glob syntax as ``library_paths``. A waiver
-    past its ``expires`` date (YYYY-MM-DD) stops applying and is reported.
+    line. ``paths`` use the same glob syntax as ``library_paths``. ``message``,
+    when set, is a regular expression searched against the diagnostic text; the
+    waiver applies only when it matches. A waiver past its ``expires`` date
+    (YYYY-MM-DD) stops applying and is reported.
     """
 
     rules: List[str] = []
@@ -150,11 +154,13 @@ class Waiver:
     reason: str = ""
     owner: Optional[str] = None
     expires: Optional[str] = None
+    message: Optional[str] = None
 
     def __init__(self, rule: Optional[str] = None, *, reason: Optional[str] = None,
                  path: Optional[str] = None, line: Optional[int] = None,
                  rules: Optional[List[str]] = None, paths: Optional[List[str]] = None,
-                 owner: Optional[str] = None, expires: Optional[str] = None):
+                 owner: Optional[str] = None, expires: Optional[str] = None,
+                 message: Optional[str] = None):
         if rule is not None:
             self.rules = [rule]
         if rules is not None:
@@ -171,6 +177,8 @@ class Waiver:
             self.owner = owner
         if expires is not None:
             self.expires = expires
+        if message is not None:
+            self.message = message
         self.validate()
 
     @property
@@ -190,6 +198,11 @@ class Waiver:
                 datetime.date.fromisoformat(str(self.expires))
             except ValueError:
                 raise ConfigError(f"{self.label}: expires must be a YYYY-MM-DD date, got {self.expires!r}")
+        if self.message:
+            try:
+                re.compile(str(self.message))
+            except re.error as exc:
+                raise ConfigError(f"{self.label}: invalid message regex {self.message!r}: {exc}") from exc
 
     def is_expired(self, today: Optional[datetime.date] = None) -> bool:
         if self.expires is None:
@@ -206,6 +219,8 @@ class Waiver:
             out["owner"] = self.owner
         if self.expires:
             out["expires"] = str(self.expires)
+        if self.message:
+            out["message"] = str(self.message)
         return out
 
     def __repr__(self) -> str:
@@ -337,7 +352,7 @@ def _anchored_class(cls: type, root: str) -> type:
             w = w()
         if isinstance(w, Waiver) and w.paths:
             w = Waiver(rules=list(w.rules), paths=[_anchor(p, root) for p in w.paths], line=w.line,
-                       reason=w.reason, owner=w.owner, expires=w.expires)
+                       reason=w.reason, owner=w.owner, expires=w.expires, message=w.message)
         waivers.append(w)
     attrs["waivers"] = waivers
     for rc in cls().rule_configs():

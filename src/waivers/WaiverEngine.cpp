@@ -86,14 +86,27 @@ std::string str(const core::json::Value& obj, std::string_view key) {
     return v && v->isString() ? v->asString() : std::string();
 }
 
-/// True if `text` holds `keyword` followed (anywhere after it) by the rule ID or '*'.
-bool waiverCommentCovers(std::string_view text, std::string_view keyword, std::string_view ruleId) {
-    for (size_t pos = text.find(keyword); pos != std::string_view::npos;
-         pos = text.find(keyword, pos + 1)) {
-        std::string_view rest = text.substr(pos + keyword.size());
-        if (rest.find(ruleId) != std::string_view::npos || rest.find('*') != std::string_view::npos)
+/// Quoted message regex after a waiver keyword. No quote means "any message".
+/// An unclosed quote is an error (err set, returns false).
+bool extractMessagePattern(std::string_view rest, std::string& pattern, std::string& err) {
+    pattern.clear();
+    err.clear();
+    size_t q = rest.find('"');
+    if (q == std::string_view::npos) return true;
+    std::string out;
+    for (size_t i = q + 1; i < rest.size(); ++i) {
+        if (rest[i] == '\\' && i + 1 < rest.size()) {
+            out += rest[++i];
+            continue;
+        }
+        if (rest[i] == '"') {
+            pattern = std::move(out);
             return true;
+        }
+        out += rest[i];
     }
+    err = "unterminated message regex";
+    pattern = std::move(out);
     return false;
 }
 
@@ -185,28 +198,75 @@ static constexpr std::string_view kNextLine[] = {"uvmcheck-disable-next-line",
                                                  "uvmcheck:waive-next-line",
                                                  "uvmcheck:disable-next-line"};
 
-bool WaiverEngine::hasInlineWaiver(const core::Violation& v) {
-    std::string_view here = lineText(v, v.line);
-    for (auto kw : kSameLine) {
-        if (waiverCommentCovers(here, kw, v.ruleId)) {
-            usedInline.insert(v.filePath + '\n' + std::to_string(v.line));
-            return true;
+const std::regex* WaiverEngine::messageRegexFor(const std::string& pattern, const std::string& file, size_t line) {
+    auto it = compiledMessages.find(pattern);
+    if (it == compiledMessages.end()) {
+        std::shared_ptr<const std::regex> compiled;
+        try {
+            compiled = std::make_shared<const std::regex>(pattern);
+        } catch (const std::regex_error& e) {
+            badRegexes.push_back({file, line, pattern, e.what()});
+        }
+        it = compiledMessages.emplace(pattern, std::move(compiled)).first;
+    } else if (!it->second) {
+        // Already reported for this pattern. Still point at this comment if it is a new line.
+        bool seen = false;
+        for (const auto& err : badRegexes) {
+            if (err.filePath == file && err.line == line && err.pattern == pattern) seen = true;
+        }
+        if (!seen) {
+            badRegexes.push_back({file, line, pattern, "invalid regular expression"});
         }
     }
-    if (v.line > 1) {
-        std::string_view above = lineText(v, v.line - 1);
-        for (auto kw : kNextLine) {
-            if (waiverCommentCovers(above, kw, v.ruleId)) {
-                usedInline.insert(v.filePath + '\n' + std::to_string(v.line - 1));
-                return true;
+    return it->second.get();
+}
+
+bool WaiverEngine::commentWaives(std::string_view text, const core::Violation& v, size_t commentLine) {
+    auto keywords = commentLine == v.line
+                        ? std::vector<std::string_view>(std::begin(kSameLine), std::end(kSameLine))
+                        : std::vector<std::string_view>(std::begin(kNextLine), std::end(kNextLine));
+    // `// uvmcheck: waive RULE "regex"` — a space after the colon, same as uvmcheck:waive.
+    keywords.push_back("uvmcheck: waive");
+
+    for (auto kw : keywords) {
+        for (size_t pos = text.find(kw); pos != std::string_view::npos; pos = text.find(kw, pos + 1)) {
+            std::string_view rest = text.substr(pos + kw.size());
+            // "uvmcheck:waive" is a prefix of "uvmcheck:waive-next-line"; don't treat that as same-line.
+            if (!rest.empty() && (rest.front() == '-' || rest.front() == ':')) continue;
+            if (rest.find(v.ruleId) == std::string_view::npos && rest.find('*') == std::string_view::npos) continue;
+            std::string pattern, err;
+            if (!extractMessagePattern(rest, pattern, err)) {
+                badRegexes.push_back({v.filePath, commentLine, pattern, err});
+                return false;
             }
+            if (!pattern.empty()) {
+                const std::regex* re = messageRegexFor(pattern, v.filePath, commentLine);
+                if (!re || !std::regex_search(v.message.begin(), v.message.end(), *re)) continue;
+            }
+            usedInline.insert(v.filePath + '\n' + std::to_string(commentLine));
+            return true;
         }
     }
     return false;
 }
 
+bool WaiverEngine::hasInlineWaiver(const core::Violation& v) {
+    if (commentWaives(lineText(v, v.line), v, v.line)) return true;
+    if (v.line > 1 && commentWaives(lineText(v, v.line - 1), v, v.line - 1)) return true;
+    return false;
+}
+
 void WaiverEngine::addWaiver(ExternalWaiver waiver) {
     if (waiver.label.empty()) waiver.label = "waiver for " + waiver.ruleId;
+    if (!waiver.messagePattern.empty() && !waiver.messageRegex) {
+        try {
+            waiver.messageRegex = std::make_shared<const std::regex>(waiver.messagePattern);
+        } catch (const std::regex_error& e) {
+            lastError = "waiver " + waiver.label + ": invalid message regex '" + waiver.messagePattern +
+                        "': " + e.what();
+            return;
+        }
+    }
     if (waiver.group >= groupMatches.size()) groupMatches.resize(waiver.group + 1, 0);
     externalWaivers.push_back(std::move(waiver));
 }
@@ -225,6 +285,7 @@ const ExternalWaiver* WaiverEngine::matchExternalWaiver(const core::Violation& v
             while (!pat.empty() && pat.back() == '*') pat.pop_back();
             if (!pat.empty() && v.filePath.find(pat) == std::string::npos) continue;
         }
+        if (w.messageRegex && !std::regex_search(v.message.begin(), v.message.end(), *w.messageRegex)) continue;
         if (w.group < groupMatches.size()) groupMatches[w.group]++;
         return &w;
     }
@@ -346,9 +407,19 @@ bool WaiverEngine::loadWaivers(const std::string& waiverFilePath) {
             w.line = static_cast<size_t>(l->asNumber());
         w.reason = str(obj, "reason");
         w.owner = str(obj, "owner");
+        w.messagePattern = str(obj, "message");
         w.group = groupMatches.size();
         w.label = fs::path(waiverFilePath).filename().string() + " #" + std::to_string(externalWaivers.size() + 1) +
                   " (" + w.ruleId + (w.pathPattern.empty() ? "" : " in " + w.pathPattern) + ")";
+        if (!w.messagePattern.empty()) {
+            try {
+                w.messageRegex = std::make_shared<const std::regex>(w.messagePattern);
+            } catch (const std::regex_error& e) {
+                lastError = waiverFilePath + ": waiver " + w.label + ": invalid message regex '" +
+                            w.messagePattern + "': " + e.what();
+                return false;
+            }
+        }
         addWaiver(std::move(w));
     }
     return true;

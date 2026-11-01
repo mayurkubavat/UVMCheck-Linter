@@ -317,7 +317,10 @@ and must be fixed or re-baselined. Entries that no longer match anything are rep
 baseline only shrinks; `--update-baseline` drops them.
 
 Inline waivers go on the flagged line (`// uvmcheck:waive SV-COR-008 reason`) or on the line
-above it (`// uvmcheck-disable-next-line SV-COR-008`).
+above it (`// uvmcheck-disable-next-line SV-COR-008`). A quoted regular expression limits
+the waiver to diagnostics whose message matches it (`// uvmcheck:waive SV-COR-008 "expression 'a'"`
+or `// uvmcheck: waive SV-COR-008 "expression 'a'"`). The same `message` field is accepted on
+a waiver in `config.py` and in JSON.
 
 ### Waivers Configuration
 Document approved exceptions in `.uvmcheck/waivers.json` (auto-discovered) or in your `config.py`:
@@ -359,8 +362,11 @@ Waivers and baselines pile up unless something prunes them. `--waiver-report` li
 waivers that matched nothing in this run, expired waivers, waivers without an owner,
 waiver comments in your sources that no longer waive anything, baseline entries whose
 finding is gone, and how many findings are waived per rule and per owner.
-`--strict-waivers` prints the same and exits with status 4 while any unused, expired or
-stale entry remains, so CI keeps the suppression list as short as the code allows:
+`--report-unused-waivers` also records each unused or expired waiver as a `UVM-WV-001`
+warning in the finding list and the summary. It is off by default, because a shared waiver
+file is often applied to runs that do not contain every waived file. `--strict-waivers`
+turns those warnings on, prints the same hygiene report, and exits with status 4 while any
+unused, expired or stale entry remains:
 
 ```bash
 ./build/uvmcheck --strict-waivers   # in CI, after the normal lint step

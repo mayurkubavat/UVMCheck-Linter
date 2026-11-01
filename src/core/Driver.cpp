@@ -71,7 +71,8 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--profile-rules", profileRules, "Print per-phase and per-rule execution times to stderr");
     slangDriver.cmdLine.add("--engine", engineMode, "Rule execution engine: single-pass (default, parallel shared walk) or isolated (one walk per rule, sequential)", "<mode>");
     slangDriver.cmdLine.add("--waiver-report", waiverReport, "Report waiver and baseline hygiene: unused, ownerless and expired waivers, stale waiver comments, waived findings per rule and owner");
-    slangDriver.cmdLine.add("--strict-waivers", strictWaivers, "Exit with status 4 when a waiver, waiver comment or baseline entry matched nothing, or a waiver has expired (implies --waiver-report)");
+    slangDriver.cmdLine.add("--report-unused-waivers", reportUnusedWaivers, "Report waivers that matched nothing, and expired waivers, as UVM-WV-001 warnings (also implied by --strict-waivers)");
+    slangDriver.cmdLine.add("--strict-waivers", strictWaivers, "Exit with status 4 when a waiver, waiver comment or baseline entry matched nothing, or a waiver has expired (implies --waiver-report and --report-unused-waivers)");
     slangDriver.cmdLine.add("--explain", explainRule, "Explain a rule (ID or name): what it checks, the guidelines it enforces, its options, and a flagged and a fixed example", "<rule>");
     slangDriver.cmdLine.add("--map", mapOutputPath, "Write the testbench map: component tree, TLM connections and config_db flows with findings attached (HTML, or JSON for a .json path)", "<file>");
     slangDriver.cmdLine.add("--changed-since", changedSince, "Report only findings on lines added or changed since this git revision (and in untracked files): a new-code-is-clean gate without a baseline", "<git-ref>");
@@ -553,7 +554,12 @@ int LinterDriver::run() {
         w.owner = cw.owner;
         w.label = cw.label;
         w.group = cw.group;
+        w.messagePattern = cw.messagePattern;
         waiverEngine.addWaiver(std::move(w));
+        if (!waiverEngine.getLastError().empty()) {
+            std::cerr << "Error: " << waiverEngine.getLastError() << "\n";
+            return 2;
+        }
     }
 
     std::string waiversPathToLoad;
@@ -568,7 +574,12 @@ int LinterDriver::run() {
 
     if (!waiversPathToLoad.empty()) {
         if (!waiverEngine.loadWaivers(waiversPathToLoad)) {
-            std::cerr << "Warning: Could not load waiver file: " << waiverEngine.getLastError() << "\n";
+            const std::string& err = waiverEngine.getLastError();
+            if (err.find("invalid message regex") != std::string::npos) {
+                std::cerr << "Error: " << err << "\n";
+                return 2;
+            }
+            std::cerr << "Warning: Could not load waiver file: " << err << "\n";
         } else {
             info << "[uvmcheck] Loaded external waivers from " << waiversPathToLoad << "\n";
         }
@@ -633,8 +644,16 @@ int LinterDriver::run() {
     // Replace violations with active ones
     diags.getViolations() = std::move(activeViolations);
 
+    for (const auto& err : waiverEngine.regexErrors()) {
+        diags.addDirectViolation(
+            "UVM-WV-001", "UnusedWaiver",
+            "invalid message regex '" + err.pattern + "': " + err.what,
+            Severity::Error, err.filePath, err.line == 0 ? 1 : err.line, 1);
+    }
+
+    const bool wantUnused = reportUnusedWaivers.value_or(false) || strictWaivers.value_or(false);
     bool hygieneFailed = false;
-    if (waiverReport.value_or(false) || strictWaivers.value_or(false)) {
+    if (waiverReport.value_or(false) || strictWaivers.value_or(false) || wantUnused) {
         // User files of this compilation: library and excluded files are not scanned for comments.
         std::vector<std::string> userFiles;
         std::set<std::string> seenFiles;
@@ -653,6 +672,32 @@ int LinterDriver::run() {
         const auto& expired = ConfigManager::instance().getExpiredWaivers();
         hygieneFailed = !h.unused.empty() || !h.unusedInline.empty() || h.staleBaseline > 0 || !expired.empty();
 
+        if (wantUnused) {
+            // Off by default: a waiver file is often shared by runs that lint different
+            // files, so "matched nothing this time" is not always a defect. --strict-waivers
+            // asks for that check, so it implies these warnings.
+            const std::string where = ConfigManager::instance().getLoadedConfigPath();
+            for (const auto& label : h.unused) {
+                diags.addDirectViolation(
+                    "UVM-WV-001", "UnusedWaiver",
+                    "waiver " + label + " matched no diagnostic",
+                    Severity::Warning, where, 1, 1);
+            }
+            for (const auto& e : expired) {
+                diags.addDirectViolation(
+                    "UVM-WV-001", "UnusedWaiver",
+                    "expired waiver " + e,
+                    Severity::Warning, where, 1, 1);
+            }
+            for (const auto& u : h.unusedInline) {
+                diags.addDirectViolation(
+                    "UVM-WV-001", "UnusedWaiver",
+                    "waiver comment matched no diagnostic: " + u.text,
+                    Severity::Warning, u.filePath, u.line, 1);
+            }
+        }
+
+        if (waiverReport.value_or(false) || strictWaivers.value_or(false)) {
         std::ostream& rep = jsonToStdout ? std::cerr : std::cout;
         rep << "\n=== Waiver hygiene ===\n";
         rep << "Waivers: " << h.written << " written, " << h.unused.size() << " matched nothing, "
@@ -678,6 +723,7 @@ int LinterDriver::run() {
         }
         if (strictWaivers.value_or(false) && hygieneFailed) {
             rep << "[uvmcheck] --strict-waivers: remove or fix the entries above (exit 4)\n";
+        }
         }
     }
 
