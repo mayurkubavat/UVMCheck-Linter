@@ -51,7 +51,9 @@ public:
     }
 
     void handle(const CallExpression& call) {
-        if (!call.isSystemCall() && call.getSubroutineName() == "lock_model" && call.thisClass())
+        // Calls through a plain uvm_reg_block handle (the UVM library's own) say nothing about user blocks.
+        if (!call.isSystemCall() && call.getSubroutineName() == "lock_model" && call.thisClass() &&
+            isBlock(*call.thisClass()->type))
             locked.insert(&call.thisClass()->type->getCanonicalType());
         visitDefault(call);
     }
