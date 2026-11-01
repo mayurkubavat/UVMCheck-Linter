@@ -17,6 +17,7 @@ class Compilation;
 namespace uvmcheck::core {
 class ProjectConfig;
 struct CompatSettings;
+struct Violation;
 } // namespace uvmcheck::core
 
 namespace uvmcheck::compat {
@@ -64,6 +65,8 @@ public:
     virtual bool configureDriver(DriverContext&) { return true; }
     /// After the compilation is created, before anything elaborates.
     virtual void configureCompilation(slang::ast::Compilation&) {}
+    /// After the rules ran, before waivers and baselines apply.
+    virtual void reviewFindings(slang::ast::Compilation&, std::vector<core::Violation>&) {}
 };
 
 /// The registry of overrides and the set chosen for this run.
@@ -89,6 +92,7 @@ public:
 
     bool configureDriver(DriverContext& ctx) const;
     void configureCompilation(slang::ast::Compilation& compilation) const;
+    void reviewFindings(slang::ast::Compilation& compilation, std::vector<core::Violation>& findings) const;
 
     /// Prints every override, the profiles that include it, and whether it is retired.
     static void list(std::ostream& os);

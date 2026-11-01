@@ -11,6 +11,9 @@ The slang overlay (src/compat/, docs/compat.md):
 - auto-uvm compiles uvm_pkg.sv from $UVM_HOME when the sources use UVM and do
   not list it; uvm-library then keeps warnings inside the UVM library out of
   the report;
+- error-taint downgrades findings inside a task or function that does not
+  compile to Info, keeps the ones on the error's own line, and leaves other
+  subroutines alone;
 - the config's compat section turns overrides on, the command line can turn
   one back off, and the JSON report lists the ones that were active.
 """
@@ -66,7 +69,8 @@ def main():
 
         print("Registry")
         rc, out, err = run(binary, root, "--list-overrides")
-        for oid in ("filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "slang-compat-vcs"):
+        for oid in ("filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "slang-compat-vcs",
+                    "error-taint"):
             check(rc == 0 and oid in out, f"--list-overrides names {oid}", out + err)
         check("questa" in out and "xcelium" in out and "vcs" in out, "--list-overrides names the profiles", out)
         # An override whose fix the linked slang already has must be deleted, not kept around.
@@ -132,6 +136,31 @@ def main():
               err + str(compile_messages(rep)))
         rc, _, err = run(binary, tb, "--no-config", "test.sv", "--override", "auto-uvm")
         check("no uvm_pkg.sv was found" in err, "auto-uvm says when it cannot find UVM", err)
+
+        print("error-taint")
+        (root / "taint.sv").write_text(
+            "module m;\n"
+            "  function void broken();\n"
+            "    #1;\n"
+            "  endfunction\n"
+            "  function void clean();\n"
+            "  endfunction\n"
+            "endmodule : m\n")
+
+        def end_labels(rep):
+            return {v["line"]: v for v in (rep or {}).get("violations", []) if v["ruleId"] == "SV-STY-104"}
+
+        rc, rep, err = report(binary, root, "--no-config", "taint.sv")
+        before = end_labels(rep)
+        check(before.get(4, {}).get("severity") == "WARNING" and before.get(6, {}).get("severity") == "WARNING",
+              "without the override both missing end labels are warnings", str(before))
+        rc, rep, err = report(binary, root, "--no-config", "taint.sv", "--override", "error-taint")
+        after = end_labels(rep)
+        check(after.get(4, {}).get("severity") == "INFO" and "error-taint" in after.get(4, {}).get("message", ""),
+              "a finding in a subroutine that does not compile becomes Info", str(after))
+        check(after.get(6, {}).get("severity") == "WARNING", "a subroutine that compiles is left alone", str(after))
+        check(any(v["ruleId"] == "SV-CMP-001" and v["line"] == 3 and v["severity"] == "ERROR"
+                  for v in rep["violations"]), "the compile error itself stays an error", str(rep["violations"]))
 
         print("Config")
         (tb / "cfg.json").write_text(json.dumps({

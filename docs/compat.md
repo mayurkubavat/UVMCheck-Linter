@@ -44,6 +44,7 @@ result-cache key.
 | `uvm-library` | questa, xcelium, vcs | Treats the folder of every compiled `uvm_pkg.sv` as a library path, so warnings and findings inside UVM are not reported. |
 | `vendor-systasks` | questa, xcelium, vcs | Knows `$fsdb*` (Verdi), `$vcdplus*` (VCS), `$shm_*` and `$record*` (Xcelium) and `$wlfdumpvars` (Questa). Their arguments may name instances, as with `$dumpvars`; a name that does not resolve is still an error. PORT-PRP-001 still reports unguarded calls. |
 | `slang-compat-vcs` | vcs | Turns on slang's own `--compat vcs`. |
+| `error-taint` | none | When a task or function has a compile error, slang keeps what it can of the body, and which parts survive changes between slang releases; rules reading that body can report things that are not there. Findings inside such a subroutine become Info with a note naming the error line. Findings on the error's own line keep their severity, since those rules point at the illegal construct. The cost: a real finding in a broken subroutine is downgraded too until the error is fixed. |
 
 ## Adding an override
 
@@ -55,7 +56,8 @@ It hooks into one stage:
   slang processes its options and loads sources (include dirs, extra sources,
   slang options, library paths);
 - `configureCompilation`: after the compilation is created, before anything
-  elaborates (`Compilation::addSystemSubroutine` and similar).
+  elaborates (`Compilation::addSystemSubroutine` and similar);
+- `reviewFindings`: after the rules ran, before waivers and baselines apply.
 
 It uses only slang's public API. When it stands in for a slang bug, it names the
 upstream issue (`upstream()`) and the first slang major version with the fix

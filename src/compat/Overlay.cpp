@@ -15,6 +15,7 @@ namespace fs = std::filesystem;
 namespace uvmcheck::compat {
 
 std::unique_ptr<Override> createVendorSystemTasks();
+std::unique_ptr<Override> createErrorTaint();
 
 std::string VendorArgs::firstSeen() const {
     if (!includeDirs.empty()) return "-i";
@@ -156,6 +157,7 @@ std::vector<std::unique_ptr<Override>> makeAll() {
     v.push_back(std::make_unique<UvmLibrary>());
     v.push_back(createVendorSystemTasks());
     v.push_back(std::make_unique<SlangCompatVcs>());
+    v.push_back(createErrorTaint());
     return v;
 }
 
@@ -260,6 +262,10 @@ bool Overlay::configureDriver(DriverContext& ctx) const {
 
 void Overlay::configureCompilation(slang::ast::Compilation& compilation) const {
     for (auto* o : chosen) o->configureCompilation(compilation);
+}
+
+void Overlay::reviewFindings(slang::ast::Compilation& compilation, std::vector<core::Violation>& findings) const {
+    for (auto* o : chosen) o->reviewFindings(compilation, findings);
 }
 
 void Overlay::list(std::ostream& os) {

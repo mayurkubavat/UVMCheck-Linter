@@ -681,6 +681,7 @@ int LinterDriver::run() {
     }
 
     ruleEngine.run(activeRules, diags);
+    overlay.reviewFindings(*compilation, diags.getViolations());
 
     if (engineOptions.profile) {
         std::cerr << "[profile] elaborate + UVM model: " << std::fixed << std::setprecision(3)
