@@ -746,7 +746,6 @@
   ],
   "correctness/SV-COR-005/bad.sv": [
     "COMPILE:UndeclaredIdentifier@8",
-    "SV-DED-013@8",
     "SV-STY-005@14",
     "SV-STY-005@15",
     "SV-STY-009@8",
@@ -6558,7 +6557,6 @@
   "types/SV-TYP-010/bad.sv": [
     "COMPILE:BadAssignment@11",
     "COMPILE:TaskReturnType@9",
-    "SV-STY-010@10",
     "SV-TIM-002@10"
   ],
   "types/SV-TYP-010/good.sv": [
@@ -6635,7 +6633,6 @@
     "SV-DED-005@27",
     "SV-DED-005@36",
     "SV-DED-011@22",
-    "SV-DED-013@8",
     "SV-NAM-111@15",
     "SV-STY-005@11",
     "SV-STY-005@12",
@@ -7462,6 +7459,7 @@
     "SV-STY-104@16",
     "SV-STY-104@17",
     "SV-TIM-002@15",
+    "UVM-PHS-001@12",
     "UVM-PHS-002@15"
   ],
   "uvm/UVM-PHS-008/good.sv": [

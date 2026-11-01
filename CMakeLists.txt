@@ -37,8 +37,11 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/MikePopoloski/slang.git
     # Pinned: rule findings and the test baselines depend on slang's elaboration and
     # diagnostics, which change between releases. Bump deliberately and refresh baselines.
-    GIT_TAG v12.1
-    GIT_SHALLOW ON)
+    # A master commit after v12.1: it has the randomize/constraint scoping fixes and the
+    # macro location API. Move back to a release tag once one includes them.
+    GIT_TAG 00b7cbfeaa67b0969890040801925f5646c56b3f # master, 2026-11-01
+    # A commit hash cannot be fetched shallowly.
+    GIT_SHALLOW OFF)
 FetchContent_MakeAvailable(slang)
 
 # Core library sources
