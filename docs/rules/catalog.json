@@ -389,6 +389,8 @@
      "description": "Disallows dynamic array allocation (new[...]) inside simulation loops to prevent heap contention and memory churn."},
     {"id": "SV-PRF-012", "name": "UnboundedDynamicArrayInConstraint", "category": "Performance", "severity": "WARNING", "profiles": ["performance"], "guidelines": [],
      "description": "Flags dynamic array or queue size constraints with an upper bound (< or <=) lacking an explicit lower bound."},
+    {"id": "SV-PRF-013", "name": "ForkInClockedLoop", "category": "Performance", "severity": "WARNING", "profiles": ["performance"], "guidelines": [],
+     "description": "Flags fork/join, join_any, and join_none inside a clocked loop (always_ff, always @(posedge/negedge), or a loop that waits on a clock edge). A thread started on every clock piles work onto the scheduler."},
     {"id": "SV-RCE-001", "name": "ZeroDelayEventTrigger", "category": "Concurrency", "severity": "WARNING", "profiles": ["soundness"], "guidelines": [],
      "description": "Flags blocking event triggers ('-> event') which cause zero-delay simulation race conditions. Recommends non-blocking event triggers ('->> event') or persistent event evaluation ('wait(event.triggered)')."},
     {"id": "SV-RDB-001", "name": "PositionalFlagLiterals", "category": "Maintainability", "severity": "INFO", "profiles": ["smells"], "guidelines": ["MG-2.4"],
