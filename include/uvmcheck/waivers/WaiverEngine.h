@@ -27,6 +27,8 @@ struct ExternalWaiver {
     /// Optional ECMAScript regex. Empty matches any message. Compiled once at load.
     std::string messagePattern;
     std::shared_ptr<const std::regex> messageRegex;
+    /// Set: keep the finding and report it at this severity instead of waiving it.
+    std::optional<core::Severity> severity;
 };
 
 /// An inline message regex that did not compile.
@@ -94,6 +96,8 @@ public:
     std::vector<core::Violation> filter(const std::vector<core::Violation>& violations);
 
     size_t getWaivedCount() const { return waivedCount; }
+    /// Findings kept at another severity by a waiver with a severity (last filter()).
+    size_t getRegradedCount() const { return regradedCount; }
 
     /// Baseline entries that matched no finding in the last filter() call: fixed findings,
     /// or findings whose line changed. --update-baseline drops them.
@@ -132,6 +136,7 @@ private:
     std::unordered_map<std::string, size_t> waivedByRule, waivedByOwner;
     std::unordered_map<std::string, std::vector<std::string>> fileLines;
     size_t waivedCount = 0;
+    size_t regradedCount = 0;
     std::string lastError;
 
     std::string_view lineText(const core::Violation& v, size_t line);

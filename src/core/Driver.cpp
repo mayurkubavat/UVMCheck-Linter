@@ -656,6 +656,7 @@ int LinterDriver::run() {
         w.label = cw.label;
         w.group = cw.group;
         w.messagePattern = cw.messagePattern;
+        w.severity = cw.severity;
         waiverEngine.addWaiver(std::move(w));
         if (!waiverEngine.getLastError().empty()) {
             std::cerr << "Error: " << waiverEngine.getLastError() << "\n";
@@ -721,6 +722,9 @@ int LinterDriver::run() {
     // Filter violations (applies inline waivers + external waivers + baseline suppressions)
     auto activeViolations = waiverEngine.filter(diags.getViolations());
     waivedCount = waiverEngine.getWaivedCount();
+    if (size_t regraded = waiverEngine.getRegradedCount(); regraded > 0) {
+        info << "[uvmcheck] " << regraded << " finding(s) re-graded by waivers with a severity\n";
+    }
     if (size_t stale = waiverEngine.getStaleBaselineCount(); stale > 0 && !baselineOutputPath.has_value()) {
         info << "[uvmcheck] " << stale << " baseline entr" << (stale == 1 ? "y" : "ies")
              << " matched no finding (fixed, or the flagged line changed); "

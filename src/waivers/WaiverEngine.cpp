@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cstdint>
+#include <cctype>
 #include <cstdio>
 #include <fstream>
 #include <regex>
@@ -295,6 +296,7 @@ const ExternalWaiver* WaiverEngine::matchExternalWaiver(const core::Violation& v
 std::vector<core::Violation> WaiverEngine::filter(const std::vector<core::Violation>& violations) {
     std::vector<core::Violation> active;
     waivedCount = 0;
+    regradedCount = 0;
     matchedFingerprints.clear();
     usedInline.clear();
     waivedByRule.clear();
@@ -308,6 +310,12 @@ std::vector<core::Violation> WaiverEngine::filter(const std::vector<core::Violat
         // Evaluate both, so a waiver shadowed by an inline comment still counts as used.
         const bool inlineWaived = hasInlineWaiver(v);
         const ExternalWaiver* external = matchExternalWaiver(v);
+        // A waiver with a severity keeps the finding, re-graded, unless a comment waives it.
+        const ExternalWaiver* regrade = nullptr;
+        if (external && external->severity && !inlineWaived) {
+            regrade = external;
+            external = nullptr;
+        }
         bool waived = inlineWaived || external;
         if (waived) {
             waivedByRule[v.ruleId]++;
@@ -325,6 +333,12 @@ std::vector<core::Violation> WaiverEngine::filter(const std::vector<core::Violat
         }
         if (waived) {
             waivedCount++;
+        } else if (regrade) {
+            core::Violation kept = v;
+            kept.severity = *regrade->severity;
+            kept.message += " [re-graded by " + regrade->label + "]";
+            regradedCount++;
+            active.push_back(std::move(kept));
         } else {
             active.push_back(v);
         }
@@ -408,6 +422,17 @@ bool WaiverEngine::loadWaivers(const std::string& waiverFilePath) {
         w.reason = str(obj, "reason");
         w.owner = str(obj, "owner");
         w.messagePattern = str(obj, "message");
+        if (const auto* s = obj.find("severity"); s && !s->isNull()) {
+            std::string sev = s->isString() ? s->asString() : "";
+            for (char& ch : sev) ch = static_cast<char>(std::tolower(static_cast<unsigned char>(ch)));
+            if (sev == "error") w.severity = core::Severity::Error;
+            else if (sev == "warning") w.severity = core::Severity::Warning;
+            else if (sev == "info") w.severity = core::Severity::Info;
+            else {
+                lastError = waiverFilePath + ": waiver for " + w.ruleId + ": severity must be error, warning or info";
+                return false;
+            }
+        }
         w.group = groupMatches.size();
         w.label = fs::path(waiverFilePath).filename().string() + " #" + std::to_string(externalWaivers.size() + 1) +
                   " (" + w.ruleId + (w.pathPattern.empty() ? "" : " in " + w.pathPattern) + ")";

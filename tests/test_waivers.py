@@ -170,6 +170,38 @@ def main():
         check(rc == 2 and "waivers.json" in out and "invalid message regex" in out,
               "invalid message regex in a waiver file names that file", out)
 
+        print("Severity re-grade")
+        (scoped / "user_tb.sv").write_text(
+            "module user_tb;\n  int a, b;\n  initial begin\n"
+            "    if (a == a) $display(\"one\");\n"
+            "    if (b == b) $display(\"two\");\n"
+            "  end\nendmodule\n")
+        (scoped / "config.py").write_text(
+            "from uvmcheck.config import ProjectConfig, Waiver, Severity\n"
+            "class Project(ProjectConfig):\n"
+            "    waivers = [Waiver('SV-COR-008', reason='tracked', message=\"expression 'b'\", severity=Severity.Info)]\n")
+        rc, out = run(binary, scoped, "--config", "config.py", "--rule", "SV-COR-008", "--json", "out.json")
+        found = [v for v in json.loads((scoped / "out.json").read_text())["violations"] if v["ruleId"] == "SV-COR-008"]
+        sev = {v["line"]: v["severity"] for v in found}
+        check(sev == {4: "ERROR", 5: "INFO"}, f"severity waiver keeps the finding at INFO, got {sev}", out)
+        check(any("[re-graded by" in v["message"] for v in found), "re-graded finding says so")
+        check("re-graded by waivers" in out, "run summary counts re-graded findings", out)
+
+        (scoped / "waivers.json").write_text(
+            '{"waivers":[{"rule":"SV-COR-008","reason":"r","severity":"warning"}]}')
+        rc, out = run(binary, scoped, "--no-config", "--waivers", "waivers.json", "--rule", "SV-COR-008",
+                      "--json", "out.json")
+        found = [v for v in json.loads((scoped / "out.json").read_text())["violations"] if v["ruleId"] == "SV-COR-008"]
+        check(len(found) == 2 and all(v["severity"] == "WARNING" for v in found),
+              "waiver file severity re-grades", out)
+
+        (scoped / "config.py").write_text(
+            "from uvmcheck.config import ProjectConfig, Waiver\n"
+            "class Project(ProjectConfig):\n"
+            "    waivers = [Waiver('SV-COR-008', reason='x', severity='fatal')]\n")
+        rc, out = run(binary, scoped, "--config", "config.py")
+        check(rc == 2 and "unknown severity" in out, "an unknown waiver severity is a config error", out)
+
     if failures:
         print(f"\n{len(failures)} failure(s)")
         sys.exit(1)

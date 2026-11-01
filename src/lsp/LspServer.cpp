@@ -346,6 +346,10 @@ std::map<std::string, std::vector<LspDiagnostic>> LspServer::lintOpenDocuments()
         w.line = cw.line;
         w.reason = cw.reason;
         w.glob = cw.path;
+        w.label = cw.label;
+        w.group = cw.group;
+        w.messagePattern = cw.messagePattern; // the editor honours message-scoped waivers too
+        w.severity = cw.severity;
         waiverEngine.addWaiver(std::move(w));
     }
     std::error_code ec;

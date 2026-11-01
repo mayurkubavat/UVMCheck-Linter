@@ -337,6 +337,12 @@ bool ConfigManager::applyWaivers(const json::Value& list, const fs::path& baseDi
                 return error("waiver " + label + ": invalid message regex '" + message + "': " + e.what());
             }
         }
+        std::optional<Severity> regrade;
+        if (const auto* s = w.find("severity"); s && !s->isNull()) {
+            if (!s->isString() || !(regrade = parseSeverity(s->asString()))) {
+                return error("waiver " + label + ": severity must be error, warning or info");
+            }
+        }
 
         std::vector<std::optional<PathPattern>> globs;
         for (const auto& p : paths) {
@@ -362,6 +368,7 @@ bool ConfigManager::applyWaivers(const json::Value& list, const fs::path& baseDi
                 cw.label = label;
                 cw.group = group;
                 cw.messagePattern = message;
+                cw.severity = regrade;
                 waivers.push_back(std::move(cw));
             }
         }
