@@ -47,6 +47,7 @@ private:
     std::optional<std::string> cacheDirArg;
     std::vector<std::string> commandArgs;
     std::optional<std::string> changedSince;
+    std::optional<bool> strictNewFiles;
     std::optional<std::string> mapOutputPath;
     std::optional<std::string> explainRule;
     std::optional<bool> waiverReport;

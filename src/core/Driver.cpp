@@ -77,6 +77,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--explain", explainRule, "Explain a rule (ID or name): what it checks, the guidelines it enforces, its options, and a flagged and a fixed example", "<rule>");
     slangDriver.cmdLine.add("--map", mapOutputPath, "Write the testbench map: component tree, TLM connections and config_db flows with findings attached (HTML, or JSON for a .json path)", "<file>");
     slangDriver.cmdLine.add("--changed-since", changedSince, "Report only findings on lines added or changed since this git revision (and in untracked files): a new-code-is-clean gate without a baseline", "<git-ref>");
+    slangDriver.cmdLine.add("--strict-new-files", strictNewFiles, "With --changed-since, exit 1 when a file that did not exist at that revision has any finding");
     slangDriver.cmdLine.add("--experimental", includeExperimental, "Also run experimental rules (new rules still being measured)");
     slangDriver.cmdLine.add("--no-config", noConfig, "Do not look for a project configuration (tests, one-off checks)");
     slangDriver.cmdLine.add("--no-cache", noCache, "Do not read or write the incremental result cache");
@@ -439,6 +440,7 @@ int LinterDriver::run() {
     double elaborateSeconds = 0;
     bool hygieneFailed = false;
     bool replayed = false;
+    bool strictNewFailed = false;
     if (cacheWanted) {
         if (auto hit = cache::loadComplete(cacheReq)) {
             diags.getViolations() = std::move(hit->violations);
@@ -731,6 +733,10 @@ int LinterDriver::run() {
                 "run with --update-baseline to drop them\n";
     }
 
+    if (strictNewFiles.value_or(false) && !changedSince.has_value()) {
+        std::cerr << "Error: --strict-new-files requires --changed-since <git-ref>\n";
+        return 2;
+    }
     if (changedSince.has_value()) {
         ChangedLines changed;
         if (!changed.load(*changedSince, projectRoot)) {
@@ -744,6 +750,17 @@ int LinterDriver::run() {
         info << "[uvmcheck] --changed-since " << *changedSince << ": " << activeViolations.size()
              << " finding(s) on changed lines in " << changed.fileCount() << " changed file(s); "
              << before - activeViolations.size() << " elsewhere not shown\n";
+        if (strictNewFiles.value_or(false)) {
+            size_t inNew = 0;
+            for (const auto& v : activeViolations) {
+                if (changed.isNewFile(v.filePath)) inNew++;
+            }
+            if (inNew > 0) {
+                strictNewFailed = true;
+                info << "[uvmcheck] --strict-new-files: " << inNew
+                     << " finding(s) in files that did not exist at " << *changedSince << "\n";
+            }
+        }
     }
 
     // Replace violations with active ones
@@ -1011,7 +1028,7 @@ int LinterDriver::run() {
                   << " violation(s) suppressed by inline waivers or baseline.\033[0m\n";
     }
 
-    if (diags.errorCount() > 0) return 1;
+    if (diags.errorCount() > 0 || strictNewFailed) return 1;
     return strictWaivers.value_or(false) && hygieneFailed ? 4 : 0;
 }
 

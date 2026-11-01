@@ -75,6 +75,48 @@ def main():
         rc, found, out = lint(binary, tmp, "tb.sv", "--changed-since", "HEAD")
         check(rc == 2 and "not inside a git repository" in out, "outside git is an error", out)
 
+    # A warning on a new line of an existing file does not fail --strict-new-files.
+    # The same warning in a file that did not exist at the ref does.
+    old_delay = "module gate;\n  initial begin\n    #0;\n  end\nendmodule\n"
+    new_delay = "module gate;\n  initial begin\n    #0;\n    #0;\n  end\nendmodule\n"
+    fresh = "module fresh;\n  initial #0;\nendmodule\n"
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "gate.sv").write_text(old_delay)
+        git(root, "init", "-q")
+        git(root, "add", "gate.sv")
+        git(root, "commit", "-q", "-m", "base")
+        (root / "gate.sv").write_text(new_delay)
+        (root / "fresh.sv").write_text(fresh)
+
+        def lint_delay(*args):
+            res = subprocess.run([binary, "--no-config", "--rule", "SV-PRF-004", *args],
+                                 cwd=root, capture_output=True, text=True)
+            out = re.sub(r"\x1b\[[0-9;]*m", "", res.stdout + res.stderr)
+            found = re.findall(r"^(\S+?):(\d+):\d+: \[\w+\] (SV-PRF-004)", out, re.M)
+            return res.returncode, [(Path(f).name, int(l)) for f, l, _ in found], out
+
+        rc, found, out = lint_delay("gate.sv", "--changed-since", "HEAD", "--strict-new-files")
+        check(sorted(found) == [("gate.sv", 4)] and rc == 0,
+              "a warning on a changed line of an existing file does not fail the strict gate", out)
+
+        rc, found, out = lint_delay("gate.sv", "fresh.sv", "--changed-since", "HEAD")
+        check(sorted(found) == [("fresh.sv", 2), ("gate.sv", 4)] and rc == 0,
+              "without the strict flag a new file is reported and does not fail", out)
+
+        rc, found, out = lint_delay("gate.sv", "fresh.sv", "--changed-since", "HEAD", "--strict-new-files")
+        check(sorted(found) == [("fresh.sv", 2), ("gate.sv", 4)] and rc == 1 and "strict-new-files" in out,
+              "a finding in a new file fails --strict-new-files", out)
+
+        (root / "added.sv").write_text(fresh.replace("fresh", "added"))
+        git(root, "add", "added.sv")
+        rc, found, out = lint_delay("added.sv", "--changed-since", "HEAD", "--strict-new-files")
+        check(found == [("added.sv", 2)] and rc == 1,
+              "a file added since the ref is strict even after git add", out)
+
+        rc, _, out = lint_delay("gate.sv", "--strict-new-files")
+        check(rc == 2 and "requires --changed-since" in out, "--strict-new-files alone is an error", out)
+
     if failures:
         print(f"\n{len(failures)} failure(s)")
         sys.exit(1)

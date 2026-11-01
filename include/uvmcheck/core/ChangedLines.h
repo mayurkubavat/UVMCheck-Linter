@@ -18,6 +18,8 @@ public:
     bool load(const std::string& ref, const std::filesystem::path& dir);
 
     bool contains(const std::string& filePath, size_t line) const;
+    /// A file that does not exist at the ref: added in the diff, or untracked.
+    bool isNewFile(const std::string& filePath) const;
     const std::string& error() const { return lastError; }
     size_t fileCount() const { return ranges.size() + wholeFiles.size(); }
 
@@ -27,6 +29,7 @@ public:
 private:
     std::unordered_map<std::string, std::vector<std::pair<size_t, size_t>>> ranges; // [first, last]
     std::unordered_set<std::string> wholeFiles;
+    std::unordered_set<std::string> newFiles;
     std::string lastError;
 };
 

@@ -27,16 +27,22 @@ std::string trimEol(std::string s) {
 void ChangedLines::parseDiff(const std::string& diff, const fs::path& root) {
     std::istringstream in(diff);
     std::string line, current;
+    bool addedFile = false;
     while (std::getline(in, line)) {
-        if (line.rfind("+++ ", 0) == 0) {
+        if (line.rfind("--- ", 0) == 0) {
+            addedFile = line.substr(4) == "/dev/null";
+        } else if (line.rfind("+++ ", 0) == 0) {
             std::string path = line.substr(4);
             if (path == "/dev/null") {
                 current.clear();
+                addedFile = false;
                 continue;
             }
             if (path.rfind("b/", 0) == 0) path = path.substr(2);
             current = canonicalStr(root / path);
             ranges[current]; // a touched file, even if only lines were removed
+            if (addedFile) newFiles.insert(current);
+            addedFile = false;
         } else if (line.rfind("@@ ", 0) == 0 && !current.empty()) {
             // @@ -a[,b] +c[,d] @@
             size_t plus = line.find(" +");
@@ -77,10 +83,18 @@ bool ChangedLines::load(const std::string& ref, const fs::path& dir) {
                    {}, out) == 0) {
         std::istringstream in(out);
         for (std::string f; std::getline(in, f);) {
-            if (!f.empty()) wholeFiles.insert(canonicalStr(root / f));
+            if (!f.empty()) {
+                std::string path = canonicalStr(root / f);
+                wholeFiles.insert(path);
+                newFiles.insert(path);
+            }
         }
     }
     return true;
+}
+
+bool ChangedLines::isNewFile(const std::string& filePath) const {
+    return newFiles.count(canonicalStr(filePath)) != 0;
 }
 
 bool ChangedLines::contains(const std::string& filePath, size_t line) const {

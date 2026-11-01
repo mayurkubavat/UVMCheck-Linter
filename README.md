@@ -360,10 +360,14 @@ Run with waivers automatically discovered:
 
 ### New code is clean, without a baseline
 `--changed-since <git-ref>` reports only findings on lines added or changed since that
-revision, plus everything in untracked files. In a pull request job:
+revision (the hunks of `git diff -U0`, not every line of a touched file), plus everything
+in untracked files. `--strict-new-files` keeps that filter and exits 1 when a file that
+did not exist at the revision — added in the diff, or untracked — has any finding.
+Warnings on edited lines of a file that already existed stay warnings and do not fail
+the run. In a pull request job:
 
 ```bash
-./build/uvmcheck --changed-since origin/main
+./build/uvmcheck --changed-since origin/main --strict-new-files
 ```
 
 ### Keeping suppressions honest
