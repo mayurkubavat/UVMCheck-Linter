@@ -44,6 +44,30 @@ endmodule : fix_helper
 """
 
 
+UVM_TOP = """`include "uvm_mock.svh"
+class fx_item extends uvm_sequence_item;
+    rand int a;
+    function new(string name = "fx_item");
+        super.new(name);
+    endfunction
+endclass : fx_item
+
+class fx_env extends uvm_component;
+    `uvm_component_utils(fx_env)
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
+    endfunction
+    function void build_phase(uvm_phase phase);
+        string name = "x";
+        $display("building %s", get_full_name());
+        if (phase == null) $display("no phase");
+        else $display("ok");
+        $display(name);
+    endfunction
+endclass : fx_env
+"""
+
+
 def check(cond, msg, detail=""):
     print(f"  [{'PASS' if cond else 'FAIL'}] {msg}")
     if not cond:
@@ -165,6 +189,28 @@ def main():
         run(binary, ob, "--fix", "--fix-rule", "SV-STY-005")
         text = (ob / "top.sv").read_text()
         check("endfunction : go\n" in text, "end label fix uses the method name", text)
+
+        # UVM fixes: factory registration, super.<phase>(), $display to `uvm_info. All unsafe.
+        uv = Path(tmp, "uvm")
+        uv.mkdir()
+        common = str(Path(__file__).resolve().parent / "common")
+        (uv / "top.sv").write_text(UVM_TOP)
+        uvm_rules = "UVM-FAC-003,UVM-PHS-001,UVM-LOG-002"
+        res = run(binary, uv, "-I", common, "--fix", "--fix-rule", uvm_rules)
+        check((uv / "top.sv").read_text() == UVM_TOP, "UVM fixes are unsafe: plain --fix skips them", res.stdout)
+        res = run(binary, uv, "-I", common, "--fix", "--unsafe-fixes", "--fix-rule", uvm_rules)
+        text = (uv / "top.sv").read_text()
+        check("class fx_item extends uvm_sequence_item;\n    `uvm_object_utils(fx_item)\n" in text,
+              "missing `uvm_object_utils is added after the class header", text)
+        check('string name = "x";\n        super.build_phase(phase);\n' in text,
+              "super.build_phase(phase) becomes the first statement, after the declarations", text)
+        check('`uvm_info(get_type_name(), $sformatf("building %s", get_full_name()), UVM_LOW)\n' in text and
+              'else `uvm_info(get_type_name(), $sformatf("ok"), UVM_LOW)\n' in text,
+              "$display statements become `uvm_info, also as an if/else branch", text)
+        check("$display(name)" in text, "a $display without a format string is left alone", text)
+        res = run(binary, uv, "-I", common, "--rule", "UVM-PHS-001")
+        check("Build succeeded: 0 errors" in res.stdout and "UVM-PHS-001" not in res.stdout,
+              "fixed file compiles and the finding is gone", res.stdout)
 
     if failures:
         print(f"{len(failures)} check(s) failed")
