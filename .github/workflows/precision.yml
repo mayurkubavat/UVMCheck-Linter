@@ -1,0 +1,56 @@
+name: Precision
+
+# Nightly: lint real UVM code with every rule and compare each rule's finding
+# count with the previous night. A rule whose count jumps, drops to zero, or
+# that is new and noisy is flagged in the job summary before it ships.
+on:
+  schedule:
+    - cron: "17 3 * * *"
+  workflow_dispatch:
+
+env:
+  UVM_CORE_REF: 2020.3.1
+
+jobs:
+  precision:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install build tools
+        run: sudo apt-get update && sudo apt-get install -y ninja-build
+
+      - name: Build
+        run: cmake --preset default && cmake --build build -j 4
+
+      - name: Fetch uvm-core
+        run: git clone --depth 1 --branch "$UVM_CORE_REF" https://github.com/accellera-official/uvm-core.git uvm-core
+
+      - name: Restore previous result
+        uses: actions/cache/restore@v4
+        with:
+          path: precision-previous.json
+          key: precision-${{ github.run_id }}
+          restore-keys: precision-
+
+      - name: Measure
+        env:
+          UVM_HOME: ${{ github.workspace }}/uvm-core
+        run: |
+          python3 scripts/precision.py --binary build/uvmcheck --out precision.json \
+            --previous precision-previous.json --summary precision.md
+          cp precision.json precision-previous.json
+
+      - name: Save result for the next run
+        uses: actions/cache/save@v4
+        with:
+          path: precision-previous.json
+          key: precision-${{ github.run_id }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: precision
+          path: |
+            precision.json
+            precision.md
+          retention-days: 30

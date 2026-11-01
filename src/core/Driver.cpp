@@ -74,6 +74,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--explain", explainRule, "Explain a rule (ID or name): what it checks, the guidelines it enforces, its options, and a flagged and a fixed example", "<rule>");
     slangDriver.cmdLine.add("--map", mapOutputPath, "Write the testbench map: component tree, TLM connections and config_db flows with findings attached (HTML, or JSON for a .json path)", "<file>");
     slangDriver.cmdLine.add("--changed-since", changedSince, "Report only findings on lines added or changed since this git revision (and in untracked files): a new-code-is-clean gate without a baseline", "<git-ref>");
+    slangDriver.cmdLine.add("--experimental", includeExperimental, "Also run experimental rules (new rules still being measured)");
     slangDriver.cmdLine.add("--no-config", noConfig, "Do not look for a project configuration (tests, one-off checks)");
     slangDriver.cmdLine.add("--init", initProject, "Set up this folder: find the sources and UVM, learn the naming conventions the code already follows, and write .uvmcheck/config.py and a first baseline");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
@@ -116,6 +117,7 @@ int LinterDriver::explain(const std::string& query) const {
     std::cout << (tty ? "\033[1m" : "") << id << "  " << (sub ? sub->name : std::string(rule->getName()))
               << (tty ? "\033[0m" : "") << "  ["
               << rule->getCategory() << ", " << severityToString(sub ? sub->severity : rule->getDefaultSeverity())
+              << (rule->getMaturity() == rules::RuleMaturity::Experimental ? ", experimental: runs with --experimental" : "")
               << "]\n\n" << (sub ? sub->description : std::string(rule->getDescription())) << "\n";
     if (sub) std::cout << "\nReported by " << rule->getId() << " (" << rule->getName() << ").\n";
 
@@ -473,6 +475,10 @@ int LinterDriver::run() {
             }
         }
         if (!projectConfig.isRuleEnabled(rule->getId(), rule->getName())) {
+            continue;
+        }
+        if (!ruleFilter.has_value() && !includeExperimental.value_or(false) &&
+            rule->getMaturity() == rules::RuleMaturity::Experimental) {
             continue;
         }
         // A rule named with --rule runs whatever its profile.

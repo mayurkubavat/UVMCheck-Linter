@@ -149,6 +149,7 @@ static void writeCatalog(std::ostream& os, const std::vector<std::unique_ptr<rul
     struct Entry {
         std::string id, name, category, severity, description, parent;
         std::vector<std::string_view> profiles, guidelines;
+        bool experimental = false;
     };
     std::vector<Entry> entries;
     for (const auto& r : rules) {
@@ -157,11 +158,13 @@ static void writeCatalog(std::ostream& os, const std::vector<std::unique_ptr<rul
         entries.push_back({std::string(r->getId()), std::string(r->getName()),
                            std::string(r->getCategory()),
                            std::string(core::severityToString(r->getDefaultSeverity())),
-                           std::string(r->getDescription()), "", profiles, guidelines});
+                           std::string(r->getDescription()), "", profiles, guidelines,
+                           r->getMaturity() == rules::RuleMaturity::Experimental});
         for (const auto& sub : r->getSubRules()) {
             entries.push_back({sub.id, sub.name, std::string(r->getCategory()),
                                std::string(core::severityToString(sub.severity)), sub.description,
-                               std::string(r->getId()), profiles, rules::guidelinesForRule(sub.id)});
+                               std::string(r->getId()), profiles, rules::guidelinesForRule(sub.id),
+                               r->getMaturity() == rules::RuleMaturity::Experimental});
         }
     }
     std::sort(entries.begin(), entries.end(), [](const Entry& a, const Entry& b) { return a.id < b.id; });
@@ -175,6 +178,7 @@ static void writeCatalog(std::ostream& os, const std::vector<std::unique_ptr<rul
            << escapeJson(e.severity) << "\", \"profiles\": " << jsonList(e.profiles)
            << ", \"guidelines\": " << jsonList(e.guidelines);
         if (!e.parent.empty()) os << ", \"reportedBy\": \"" << escapeJson(e.parent) << "\"";
+        if (e.experimental) os << ", \"maturity\": \"experimental\"";
         os << ",\n     \"description\": \"" << escapeJson(e.description) << "\"}"
            << (i + 1 < entries.size() ? "," : "") << "\n";
     }

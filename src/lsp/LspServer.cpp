@@ -325,6 +325,7 @@ std::map<std::string, std::vector<LspDiagnostic>> LspServer::lintOpenDocuments()
     std::vector<rules::Rule*> rules;
     for (const auto& rule : rules::RuleRegistry::instance().getRules()) {
         if ((rule->getProfiles() & ~advisory) == 0) continue;
+        if (rule->getMaturity() == rules::RuleMaturity::Experimental) continue;
         if (!projectConfig.isRuleEnabled(rule->getId(), rule->getName())) continue;
         rules.push_back(rule.get());
     }

@@ -24,6 +24,10 @@ enum class RuleProfile : uint32_t {
     All         = 0xFFFFFFFF
 };
 
+/// Experimental rules are new or still being measured on real code (see
+/// scripts/precision.py). They run only with --experimental or --rule.
+enum class RuleMaturity { Stable, Experimental };
+
 inline uint32_t operator|(RuleProfile a, RuleProfile b) {
     return static_cast<uint32_t>(a) | static_cast<uint32_t>(b);
 }
@@ -71,6 +75,9 @@ public:
 
     /// Default severity (Error, Warning, Info)
     virtual core::Severity getDefaultSeverity() const = 0;
+
+    /// Stable, or experimental (off unless --experimental or --rule).
+    virtual RuleMaturity getMaturity() const { return RuleMaturity::Stable; }
 
     /// Other finding IDs this rule reports (see SubRule).
     virtual std::vector<SubRule> getSubRules() const { return {}; }

@@ -77,6 +77,8 @@ def render_markdown(catalog):
             desc = r["description"].replace("|", "\\|").replace("\n", " ")
             if r.get("reportedBy"):
                 desc += f" (reported by `{r['reportedBy']}`)"
+            if r.get("maturity") == "experimental":
+                desc = "**Experimental** (runs with `--experimental`). " + desc
             lines.append(f"| {rid} | {r['name']} | {r['severity']} | {', '.join(r['profiles'])} | "
                          f"{', '.join(r['guidelines'])} | {desc} |")
     return "\n".join(lines) + "\n"

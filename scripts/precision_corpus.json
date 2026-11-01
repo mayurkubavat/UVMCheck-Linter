@@ -1,0 +1,7 @@
+[
+  {
+    "name": "uvm-core",
+    "args": ["${UVM_HOME}/src/uvm_pkg.sv", "-I", "${UVM_HOME}/src"],
+    "count": ["${UVM_HOME}/src"]
+  }
+]

@@ -101,7 +101,8 @@ class Linter:
         if rule_id:
             cmd += ["--rule", rule_id]
         else:
-            cmd += ["--preset", "all"]  # all-rules mode includes the opt-in Advisory rules
+            # all-rules mode includes the opt-in Advisory and experimental rules
+            cmd += ["--preset", "all", "--experimental"]
         # Rule tests must not pick up the repository's own .uvmcheck/ configuration.
         cmd += ["--no-config", "--json", json_path, "--diag-json", diag_path]
 
