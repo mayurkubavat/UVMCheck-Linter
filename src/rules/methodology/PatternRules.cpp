@@ -10,6 +10,7 @@
 #include "slang/ast/expressions/MiscExpressions.h"
 #include "slang/ast/statements/MiscStatements.h"
 #include "slang/ast/symbols/ParameterSymbols.h"
+#include "slang/ast/symbols/VariableSymbols.h"
 
 #include <cctype>
 
@@ -284,6 +285,58 @@ public:
     }
 };
 
+// UVM-PAT-002 ------------------------------------------------------------------------------
+
+/// A static variable whose type is the class that declares it: the instance
+/// every caller shares. Arrays and queues of the class are not that instance.
+bool isOwnStaticInstance(const ClassType& cls, const VariableSymbol& var) {
+    if (var.lifetime != VariableLifetime::Static) return false;
+    if (var.flags.has(VariableFlags::Const) || var.flags.has(VariableFlags::CompilerGenerated))
+        return false;
+    const ClassType* held = swe::asClass(var.getType());
+    return held && &held->getCanonicalType() == &cls.getCanonicalType();
+}
+
+class HandRolledSingleton : public Rule {
+public:
+    std::string_view getId() const override { return "UVM-PAT-002"; }
+    std::string_view getName() const override { return "HandRolledSingleton"; }
+    std::string_view getDescription() const override {
+        return "Flags a class that keeps a static variable of its own type, the usual hand-rolled "
+               "singleton. Every env and test in the run shares that one object, and a test cannot "
+               "replace it. Pass the object through uvm_config_db or the resource database (MG-5.3).";
+    }
+    std::string_view getCategory() const override { return "UVM"; }
+    core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
+
+    void run(Compilation&, const uvm::UvmModel& model, core::DiagnosticEngine& diags) override {
+        for (const auto* cls : swe::userClasses(model)) {
+            for (const auto& member : cls->members()) {
+                if (member.kind == SymbolKind::ClassProperty) {
+                    consider(*cls, member.as<ClassPropertySymbol>(), diags);
+                } else if (member.kind == SymbolKind::Subroutine) {
+                    for (const auto& local : member.as<SubroutineSymbol>().members()) {
+                        if (local.kind == SymbolKind::Variable)
+                            consider(*cls, local.as<VariableSymbol>(), diags);
+                    }
+                }
+            }
+        }
+    }
+
+private:
+    static void consider(const ClassType& cls, const VariableSymbol& var, core::DiagnosticEngine& diags) {
+        if (!isOwnStaticInstance(cls, var)) return;
+        diags.addViolation(
+            "UVM-PAT-002", "HandRolledSingleton",
+            "Class '" + std::string(cls.name) + "' keeps a static instance of itself in '" +
+                std::string(var.name) + "'. Every env and test shares that one object, and a test "
+                "cannot substitute another. Create it in the test or env and pass it through "
+                "uvm_config_db or the resource database.",
+            core::Severity::Warning, var.location);
+    }
+};
+
 } // namespace uvmcheck::rules::methodology
 
 namespace uvmcheck::rules {
@@ -291,9 +344,11 @@ std::unique_ptr<Rule> createCallbackNotRegistered() { return std::make_unique<me
 std::unique_ptr<Rule> createIncompleteRegAdapter() { return std::make_unique<methodology::IncompleteRegAdapter>(); }
 std::unique_ptr<Rule> createCheckFailureAsWarning() { return std::make_unique<methodology::CheckFailureAsWarning>(); }
 std::unique_ptr<Rule> createFatalInCheckerPath() { return std::make_unique<methodology::FatalInCheckerPath>(); }
+std::unique_ptr<Rule> createHandRolledSingleton() { return std::make_unique<methodology::HandRolledSingleton>(); }
 }
 
 UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCallbackNotRegistered)
 UVMCHECK_REGISTER_RULE(uvmcheck::rules::createIncompleteRegAdapter)
 UVMCHECK_REGISTER_RULE(uvmcheck::rules::createCheckFailureAsWarning)
 UVMCHECK_REGISTER_RULE(uvmcheck::rules::createFatalInCheckerPath)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createHandRolledSingleton)

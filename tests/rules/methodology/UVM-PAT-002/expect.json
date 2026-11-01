@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "UVM-PAT-002",
+      "line": 5
+    },
+    {
+      "rule": "UVM-PAT-002",
+      "line": 14
+    }
+  ]
+}

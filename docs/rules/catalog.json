@@ -635,6 +635,8 @@
      "description": "Analysis write() implementations (uvm_subscriber::write and the write<SFX> methods behind uvm_analysis_imp<SFX>) must be functions that finish in zero time. Flags a write declared as a task, and a write that forks a thread per transaction."},
     {"id": "UVM-PAT-001", "name": "CallbackNotRegistered", "category": "UVM", "severity": "WARNING", "profiles": ["methodology"], "guidelines": ["MG-5.1"],
      "description": "Flags `uvm_do_callbacks(T, CB, ...) in classes where no `uvm_register_cb(T, CB) registers that pair for T or a base of T. UVM then refuses to add callbacks of that type at run time, so the hook never fires (MG-5.1)."},
+    {"id": "UVM-PAT-002", "name": "HandRolledSingleton", "category": "UVM", "severity": "WARNING", "profiles": ["methodology"], "guidelines": ["MG-5.3"],
+     "description": "Flags a class that keeps a static variable of its own type, the usual hand-rolled singleton. Every env and test in the run shares that one object, and a test cannot replace it. Pass the object through uvm_config_db or the resource database (MG-5.3)."},
     {"id": "UVM-PHS-001", "name": "UvmMissingSuperPhase", "category": "UVM", "severity": "WARNING", "profiles": ["methodology"], "guidelines": [],
      "description": "Overridden standard UVM phases (e.g., build_phase, connect_phase) in uvm_component must call super.<phase_name>(phase) to ensure proper base-class configuration."},
     {"id": "UVM-PHS-002", "name": "UvmTimeInFunctionPhase", "category": "UVM", "severity": "ERROR", "profiles": ["methodology"], "guidelines": [],

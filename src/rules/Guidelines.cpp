@@ -109,7 +109,7 @@ const std::vector<Entry>& entries() {
           "SV-OOP-009", "SV-OOP-015", "SV-LSP-001", "SV-RDB-004"}},
         {{"MG-5.3", "MG-5", kPatterns, L::Should,
           "No hand-rolled singletons; shared services go through the config or resource database."},
-         {}},
+         {"UVM-PAT-002"}},
 
         // MG-6 Construct usage
         {{"MG-6.1", "MG-6", kConstructs, L::Shall,

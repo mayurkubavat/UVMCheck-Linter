@@ -42,4 +42,26 @@ Enforced by: `SV-DSN-001`, `SV-DSN-009`, `SV-OCP-001`, `SV-DSN-006`, `SV-DSN-007
 
 A hand-rolled singleton is a global variable with extra steps: hidden, shared by every env instance and hard to replace in a test.
 
-Enforced by: review only (no rule yet).
+The check is a class that declares a static variable of its own type, including a static variable inside one of its functions. A static counter, a static handle of some other type, and an object received from `uvm_config_db` are not that pattern. A singleton assembled in another package, with no static of its own type in the class, is not visible here.
+
+Instead of:
+
+```systemverilog
+class report_svc;
+  static report_svc inst;
+  static function report_svc get();
+    if (inst == null) inst = new();
+    return inst;
+  endfunction
+endclass
+```
+
+Write:
+
+```systemverilog
+// The test or env creates the object and passes it through uvm_config_db.
+if (!uvm_config_db#(report_svc)::get(this, "", "report_svc", svc))
+  `uvm_fatal("CFG", "report_svc not set")
+```
+
+Enforced by: `UVM-PAT-002`
