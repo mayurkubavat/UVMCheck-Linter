@@ -16,6 +16,7 @@ namespace uvmcheck::compat {
 
 std::unique_ptr<Override> createVendorSystemTasks();
 std::unique_ptr<Override> createErrorTaint();
+std::unique_ptr<Override> createErrorAnchor();
 
 std::string VendorArgs::firstSeen() const {
     if (!includeDirs.empty()) return "-i";
@@ -158,6 +159,7 @@ std::vector<std::unique_ptr<Override>> makeAll() {
     v.push_back(createVendorSystemTasks());
     v.push_back(std::make_unique<SlangCompatVcs>());
     v.push_back(createErrorTaint());
+    v.push_back(createErrorAnchor());
     return v;
 }
 
@@ -169,9 +171,10 @@ struct Profile {
 const std::vector<Profile>& profiles() {
     static const std::vector<Profile> p = {
         {"none", {}},
-        {"questa", {"filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks"}},
-        {"xcelium", {"filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks"}},
-        {"vcs", {"filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "slang-compat-vcs"}},
+        {"questa", {"filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "anchor-to-user-code"}},
+        {"xcelium", {"filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "anchor-to-user-code"}},
+        {"vcs",
+         {"filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "anchor-to-user-code", "slang-compat-vcs"}},
     };
     return p;
 }

@@ -14,6 +14,8 @@ The slang overlay (src/compat/, docs/compat.md):
 - error-taint downgrades findings inside a task or function that does not
   compile to Info, keeps the ones on the error's own line, and leaves other
   subroutines alone;
+- anchor-to-user-code reports an error slang raises inside a library template
+  at the user's macro line, where the library policy would otherwise drop it;
 - the config's compat section turns overrides on, the command line can turn
   one back off, and the JSON report lists the ones that were active.
 """
@@ -70,7 +72,7 @@ def main():
         print("Registry")
         rc, out, err = run(binary, root, "--list-overrides")
         for oid in ("filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "slang-compat-vcs",
-                    "error-taint"):
+                    "error-taint", "anchor-to-user-code"):
             check(rc == 0 and oid in out, f"--list-overrides names {oid}", out + err)
         check("questa" in out and "xcelium" in out and "vcs" in out, "--list-overrides names the profiles", out)
         # An override whose fix the linked slang already has must be deleted, not kept around.
@@ -162,12 +164,43 @@ def main():
         check(any(v["ruleId"] == "SV-CMP-001" and v["line"] == 3 and v["severity"] == "ERROR"
                   for v in rep["violations"]), "the compile error itself stays an error", str(rep["violations"]))
 
+        print("anchor-to-user-code")
+        lib = root / "lib"
+        lib.mkdir()
+        (lib / "registry.svh").write_text(
+            "class registry #(type T = int);\n"
+            "  static function T create();\n"
+            "    T obj = new(\"obj\");\n"
+            "    return obj;\n"
+            "  endfunction\n"
+            "endclass\n"
+            "`define my_utils(T) typedef registry#(T) type_id;\n")
+        (root / "user.sv").write_text(
+            '`include "lib/registry.svh"\n'
+            "class comp;\n"
+            "  function new(string name, int parent);\n"
+            "  endfunction\n"
+            "  `my_utils(comp)\n"
+            "endclass\n")
+        args = ("--no-config", "user.sv", "--library", "lib/**", "--rule", "SV-CMP-001")
+        rc, rep, err = report(binary, root, *args)
+        check(rep is not None and rep["compileErrors"] > 0 and not compile_messages(rep),
+              "without the override the template error is dropped with the library", err or str(rep))
+        rc, rep, err = report(binary, root, *args, "--override", "anchor-to-user-code")
+        errs = [v for v in (rep or {}).get("violations", []) if v["ruleId"] == "SV-CMP-001"]
+        check(len(errs) == 1 and errs[0]["file"].endswith("user.sv") and errs[0]["line"] == 5,
+              "the error is reported once, at the user's macro line", str(errs))
+        check(bool(errs) and any(r["file"].endswith("registry.svh") and r["line"] == 3
+                                 for r in errs[0].get("related", [])),
+              "the library line is kept as a note", str(errs))
+
         print("Config")
         (tb / "cfg.json").write_text(json.dumps({
             "compat": {"profile": "questa", "uvm_home": str(root / "uvm-core")}}))
         rc, rep, err = report(binary, tb, "--config", "cfg.json", "test.sv")
         check(rep is not None and not compile_messages(rep) and
-              rep.get("compatOverrides") == ["filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks"],
+              rep.get("compatOverrides") == ["filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks",
+                                             "anchor-to-user-code"],
               "the config's compat profile and uvm_home apply", err + str(rep and rep.get("compatOverrides")))
         rc, rep, err = report(binary, tb, "--config", "cfg.json", "test.sv", "--override", "-uvm-library")
         check(rep is not None and "uvm-library" not in rep.get("compatOverrides", []) and
