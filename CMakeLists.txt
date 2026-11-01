@@ -52,6 +52,7 @@ file(GLOB_RECURSE UVMCHECK_SOURCES
     src/style/*.cpp
     src/plugins/*.cpp
     src/lsp/*.cpp
+    src/compat/*.cpp
 )
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
@@ -143,6 +144,11 @@ endif()
 add_test(
     NAME project_config_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_config.py --binary $<TARGET_FILE:uvmcheck>
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME slang_overlay_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_compat.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(

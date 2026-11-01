@@ -27,6 +27,7 @@
 #include <iomanip>
 #include <fstream>
 #include <cstdio>
+#include <cstdlib>
 #include <unistd.h>
 #include <set>
 #include <unordered_set>
@@ -85,6 +86,16 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--cache-dir", cacheDirArg, "Directory for the incremental result cache (default: .uvmcheck_cache)", "<dir>");
     slangDriver.cmdLine.add("--clear-cache", clearCache, "Delete the result cache, then run");
     slangDriver.cmdLine.add("--init", initProject, "Set up this folder: find the sources and UVM, learn the naming conventions the code already follows, and write .uvmcheck/config.py and a first baseline");
+    slangDriver.cmdLine.add("--compat-profile", compatProfile, "Apply a slang overlay profile for this simulator's code and file lists: questa, xcelium, vcs or none (see --list-overrides)", "<name>");
+    slangDriver.cmdLine.add("--override", overrideArgs, "Turn a slang overlay override on (id or +id) or off (-id); repeatable, applied after the profile", "<id>");
+    slangDriver.cmdLine.add("--list-overrides", listOverrides, "List the slang overlay overrides and compat profiles and exit");
+    // Simulator file-list options slang does not know. They are collected here and
+    // need the filelist-dialect override (compat/Overlay.h) to take effect. Slang
+    // accepts long names with one dash too, as simulators spell them (-uvm).
+    slangDriver.cmdLine.add("-i", vendorArgs.includeDirs, "Simulator include directory (needs override filelist-dialect)", "<dir>", slang::CommandLineFlags::FilePath);
+    slangDriver.cmdLine.add("--uvm", vendorArgs.uvm, "Xcelium: use the simulator's UVM (needs override filelist-dialect)");
+    slangDriver.cmdLine.add("--uvmhome", vendorArgs.uvmHome, "Xcelium: UVM library location (needs override filelist-dialect)", "<dir>", slang::CommandLineFlags::FilePath);
+    slangDriver.cmdLine.add("--ntb_opts", vendorArgs.ntbOpts, "VCS: testbench options, e.g. uvm (needs override filelist-dialect)", "<opt>");
     slangDriver.cmdLine.add("--lsp", runLsp, "Launch Language Server Protocol (LSP) daemon for IDE integration");
 }
 
@@ -254,6 +265,14 @@ int LinterDriver::run() {
         return explain(*explainRule);
     }
 
+    if (listOverrides.value_or(false)) {
+        compat::Overlay::list(std::cout);
+        std::cout << "Profiles:";
+        for (auto p : compat::Overlay::profileNames()) std::cout << " " << p;
+        std::cout << "\n";
+        return 0;
+    }
+
     if (listRules.value_or(false)) {
         if (jsonOutputPath.has_value()) {
             if (!reporting::JsonReporter::writeRuleCatalog(*jsonOutputPath,
@@ -347,6 +366,32 @@ int LinterDriver::run() {
         if (!applyBuildSettings(slangDriver, build, useConfigSources)) return 2;
     }
 
+    {
+        // The slang overlay: the config's compat section, then the command line.
+        auto& project = ConfigManager::instance().getProjectConfig();
+        core::CompatSettings settings = project.compat();
+        if (compatProfile.has_value()) settings.profile = *compatProfile;
+        for (const auto& o : overrideArgs) settings.overrides.push_back(o);
+        std::string error;
+        if (!overlay.select(settings, error)) {
+            std::cerr << "Error: " << error << "\n";
+            return 2;
+        }
+        const std::string vendorOption = vendorArgs.firstSeen();
+        if (!vendorOption.empty() && !overlay.isActive("filelist-dialect")) {
+            std::cerr << "Error: '" << vendorOption << "' is a simulator option slang does not know; turn on "
+                      << "--override filelist-dialect or a --compat-profile (questa, xcelium, vcs) to accept it\n";
+            return 2;
+        }
+        std::string uvmHome = settings.uvmHome;
+        if (uvmHome.empty() && vendorArgs.uvmHome.has_value()) uvmHome = *vendorArgs.uvmHome;
+        if (uvmHome.empty()) {
+            if (const char* env = std::getenv("UVM_HOME")) uvmHome = env;
+        }
+        compat::DriverContext ctx{slangDriver, project, vendorArgs, uvmHome, std::cerr};
+        if (!overlay.configureDriver(ctx)) return 2;
+    }
+
     if (!slangDriver.processOptions()) {
         return 2;
     }
@@ -424,6 +469,7 @@ int LinterDriver::run() {
               << "\nengine=" << engineMode.value_or("");
         for (const auto& g : libraryPathArgs) flags << "\nlib=" << g;
         for (const auto& g : excludePathArgs) flags << "\nex=" << g;
+        for (const auto& o : overlay.activeIds()) flags << "\noverride=" << o;
         env.flags = flags.str();
         cacheReq.envKey = cache::environmentKey(env);
         std::set<std::string> primarySet;
@@ -465,6 +511,7 @@ int LinterDriver::run() {
     using Clock = std::chrono::steady_clock;
     auto elaborateStart = Clock::now();
     compilation = slangDriver.createCompilation();
+    overlay.configureCompilation(*compilation);
 
     // Fully elaborate up front. Rules then only read the AST, which is what
     // makes it safe to run them in parallel (same protocol as slang's own
@@ -977,7 +1024,8 @@ int LinterDriver::run() {
     if (jsonOutputPath.has_value()) {
         // Fingerprints let report tools match findings across runs (see A3).
         if (!reporting::JsonReporter::writeJson(*jsonOutputPath, diags.getViolations(), compileErrors, waivedCount,
-                                                   conformance, waiverEngine.fingerprints(diags.getViolations()))) {
+                                                   conformance, waiverEngine.fingerprints(diags.getViolations()),
+                                                   overlay.activeIds())) {
             std::cerr << "Error: Failed to write JSON report to: " << *jsonOutputPath << "\n";
         } else if (!jsonToStdout) {
             info << "[uvmcheck] JSON report written to: " << *jsonOutputPath << "\n";

@@ -224,6 +224,26 @@ bool ConfigManager::readBuildList(const json::Value& v, std::string_view key, co
     return true;
 }
 
+bool ConfigManager::applyCompat(const json::Value& block, const fs::path& baseDir) {
+    if (!block.isObject()) return error("'compat' must be an object");
+    auto& compat = projectConfig.compat();
+    for (const auto& [key, value] : block.asObject()) {
+        if (key == "profile") {
+            if (!value.isString()) return error("compat.profile must be a string");
+            compat.profile = value.asString();
+        } else if (key == "overrides") {
+            if (!readBuildList(value, "compat.overrides", baseDir, false, compat.overrides)) return false;
+        } else if (key == "uvm_home") {
+            std::vector<std::string> home;
+            if (!readBuildList(value, "compat.uvm_home", baseDir, true, home)) return false;
+            if (!home.empty()) compat.uvmHome = home.back();
+        } else {
+            warn("unknown key 'compat." + key + "' ignored");
+        }
+    }
+    return true;
+}
+
 bool ConfigManager::applyRules(const json::Value& rulesBlock, const fs::path& baseDir) {
     if (!rulesBlock.isObject()) return error("'rules' must be an object keyed by rule ID or name");
 
@@ -382,7 +402,7 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
     static const std::unordered_set<std::string_view> knownKeys = {
         "version", "source", "warnings", "library_paths", "exclude_paths",
         "report_library_macro_expansions", "rules", "waivers", "style", "naming",
-        "sources", "filelists", "include_dirs", "defines", "expired_waivers", "layers"};
+        "sources", "filelists", "include_dirs", "defines", "expired_waivers", "layers", "compat"};
     for (const auto& [key, _] : root.asObject()) {
         if (!knownKeys.count(key)) warn("unknown top-level key '" + key + "' ignored");
     }
@@ -405,6 +425,9 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
     }
     if (const auto* v = root.find("defines")) {
         if (!readBuildList(*v, "defines", baseDir, false, build.defines)) return false;
+    }
+    if (const auto* v = root.find("compat")) {
+        if (!applyCompat(*v, baseDir)) return false;
     }
     if (const auto* v = root.find("report_library_macro_expansions")) {
         if (!v->isBool()) return error("report_library_macro_expansions must be true or false");
@@ -557,6 +580,14 @@ class Project(ProjectConfig):
     exclude_paths = [
         # "**/generated/**",
     ]
+
+    # Slang overlay (docs/compat.md): opt-in fixes for simulator file lists,
+    # built-in UVM and vendor system tasks. uvmcheck --list-overrides shows them.
+    compat = {
+        # "profile": "questa",          # questa, xcelium, vcs or none
+        # "overrides": ["-auto-uvm"],   # "id" turns one on, "-id" off
+        # "uvm_home": "$UVM_HOME",
+    }
 
     # Per-rule settings. Name the class after the rule (ID via `rule = ...`).
     # Any extra attribute is passed to the rule as an option.

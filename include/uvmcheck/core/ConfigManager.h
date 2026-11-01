@@ -96,6 +96,7 @@ private:
     void applyNaming(const json::Value& naming);
     bool applyWaivers(const json::Value& list, const std::filesystem::path& baseDir);
     bool applyRules(const json::Value& rules, const std::filesystem::path& baseDir);
+    bool applyCompat(const json::Value& compat, const std::filesystem::path& baseDir);
     bool readBuildList(const json::Value& v, std::string_view key, const std::filesystem::path& baseDir,
                        bool isPath, std::vector<std::string>& out);
     bool readPathList(const json::Value& v, std::string_view key, const std::filesystem::path& baseDir,

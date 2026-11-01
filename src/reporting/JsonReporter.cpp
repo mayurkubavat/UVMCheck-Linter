@@ -44,7 +44,8 @@ static void writeReport(std::ostream& os,
                         size_t compileErrors,
                         size_t waivedCount,
                         const std::vector<GuidelineResult>& conformance,
-                        const std::vector<std::string>& fingerprints) {
+                        const std::vector<std::string>& fingerprints,
+                        const std::vector<std::string>& overrides) {
     // Category of each rule ID; sub-rules take their reporting rule's category.
     std::unordered_map<std::string, std::string> categories;
     for (const auto& r : rules::RuleRegistry::instance().getRules()) {
@@ -55,8 +56,15 @@ static void writeReport(std::ostream& os,
        << "  \"tool\": \"uvmcheck\",\n"
        << "  \"version\": \"0.1.0\",\n"
        << "  \"compileErrors\": " << compileErrors << ",\n"
-       << "  \"waived\": " << waivedCount << ",\n"
-       << "  \"violations\": [";
+       << "  \"waived\": " << waivedCount << ",\n";
+    if (!overrides.empty()) {
+        // Slang overlay overrides that shaped this run (compat/Overlay.h).
+        os << "  \"compatOverrides\": [";
+        for (size_t i = 0; i < overrides.size(); ++i)
+            os << (i ? ", " : "") << "\"" << escapeJson(overrides[i]) << "\"";
+        os << "],\n";
+    }
+    os << "  \"violations\": [";
 
     for (size_t i = 0; i < violations.size(); ++i) {
         const auto& v = violations[i];
@@ -217,15 +225,16 @@ bool JsonReporter::writeJson(const std::string& outputPath,
                              size_t compileErrors,
                              size_t waivedCount,
                              const std::vector<GuidelineResult>& conformance,
-                             const std::vector<std::string>& fingerprints) {
+                             const std::vector<std::string>& fingerprints,
+                             const std::vector<std::string>& overrides) {
     if (outputPath == "-") {
-        writeReport(std::cout, violations, compileErrors, waivedCount, conformance, fingerprints);
+        writeReport(std::cout, violations, compileErrors, waivedCount, conformance, fingerprints, overrides);
         return true;
     }
 
     std::ofstream file(outputPath);
     if (!file.is_open()) return false;
-    writeReport(file, violations, compileErrors, waivedCount, conformance, fingerprints);
+    writeReport(file, violations, compileErrors, waivedCount, conformance, fingerprints, overrides);
     return true;
 }
 

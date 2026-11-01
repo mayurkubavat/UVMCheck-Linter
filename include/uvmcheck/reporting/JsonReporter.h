@@ -16,13 +16,14 @@ class JsonReporter {
 public:
     /// Writes the report to outputPath, or to stdout when outputPath is "-". Each finding
     /// lists the methodology guidelines its rule enforces; `conformance` adds a per-guideline
-    /// pass/fail section.
+    /// pass/fail section; `overrides` lists the slang overlay overrides that were active.
     static bool writeJson(const std::string& outputPath,
                           const std::vector<core::Violation>& violations,
                           size_t compileErrors,
                           size_t waivedCount,
                           const std::vector<GuidelineResult>& conformance = {},
-                          const std::vector<std::string>& fingerprints = {});
+                          const std::vector<std::string>& fingerprints = {},
+                          const std::vector<std::string>& overrides = {});
 
     /// The guide itself: every guideline with its level, statement and rules.
     static bool writeGuidelines(const std::string& outputPath);
