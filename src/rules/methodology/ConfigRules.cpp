@@ -344,14 +344,106 @@ public:
     }
 };
 
+// UVM-CFG-010 / UVM-CFG-011 ---------------------------------------------------------------
+// Field-name pairing across the compilation. A partial run that only sets or only
+// gets is left alone: the other half may be in a file that was not passed in.
+
+struct ConfigFieldUse {
+    std::string field;
+    slang::SourceLocation loc;
+};
+
+class ConfigFieldRules : public Rule {
+public:
+    std::string_view getCategory() const override { return "UVM"; }
+    core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
+    RuleMaturity getMaturity() const override { return RuleMaturity::Experimental; }
+
+protected:
+    static void collect(const uvm::UvmModel& model, std::vector<ConfigFieldUse>& sets,
+                        std::vector<ConfigFieldUse>& gets) {
+        for (const auto* cls : swe::userClasses(model)) {
+            for (const auto* m : swe::classMethods(*cls)) {
+                swe::forEachCall(m->getBody(), [&](const CallExpression& call) {
+                    bool isSet = meth::isConfigDbCall(call, "set");
+                    bool isGet = meth::isConfigDbCall(call, "get");
+                    if ((!isSet && !isGet) || call.arguments().size() < 3) return;
+                    if (!meth::isStringLiteral(*call.arguments()[2])) return;
+                    std::string field = meth::literalValue(*call.arguments()[2]);
+                    if (field.empty() || field == "*") return;
+                    (isSet ? sets : gets).push_back({std::move(field), swe::locOf(call)});
+                });
+            }
+        }
+    }
+};
+
+class ConfigDbGetWithoutSet : public ConfigFieldRules {
+public:
+    std::string_view getId() const override { return "UVM-CFG-010"; }
+    std::string_view getName() const override { return "ConfigDbGetWithoutSet"; }
+    std::string_view getDescription() const override {
+        return "Flags a uvm_config_db::get whose string field name has no set in this compilation, "
+               "when the compilation contains both sets and gets. Experimental: a set in a file that "
+               "was not linted, or a field name built at run time, is invisible here.";
+    }
+    void run(Compilation&, const uvm::UvmModel& model, core::DiagnosticEngine& diags) override {
+        std::vector<ConfigFieldUse> sets, gets;
+        collect(model, sets, gets);
+        if (sets.empty() || gets.empty()) return;
+        std::unordered_set<std::string> setNames;
+        for (const auto& s : sets) setNames.insert(s.field);
+        for (const auto& g : gets) {
+            if (setNames.count(g.field)) continue;
+            diags.addViolation(
+                "UVM-CFG-010", "ConfigDbGetWithoutSet",
+                "uvm_config_db::get of '" + g.field + "' has no uvm_config_db::set of that field name "
+                "in this run. The get returns false and the target stays at its default. Set the "
+                "field from the test or env, with the same type parameter.",
+                core::Severity::Warning, g.loc);
+        }
+    }
+};
+
+class ConfigDbSetNeverGot : public ConfigFieldRules {
+public:
+    std::string_view getId() const override { return "UVM-CFG-011"; }
+    std::string_view getName() const override { return "ConfigDbSetNeverGot"; }
+    std::string_view getDescription() const override {
+        return "Flags a uvm_config_db::set whose string field name has no get in this compilation, "
+               "when the compilation contains both sets and gets. Experimental: a get in a file that "
+               "was not linted, or a field name built at run time, is invisible here.";
+    }
+    void run(Compilation&, const uvm::UvmModel& model, core::DiagnosticEngine& diags) override {
+        std::vector<ConfigFieldUse> sets, gets;
+        collect(model, sets, gets);
+        if (sets.empty() || gets.empty()) return;
+        std::unordered_set<std::string> getNames;
+        for (const auto& g : gets) getNames.insert(g.field);
+        for (const auto& s : sets) {
+            if (getNames.count(s.field)) continue;
+            diags.addViolation(
+                "UVM-CFG-011", "ConfigDbSetNeverGot",
+                "uvm_config_db::set of '" + s.field + "' has no uvm_config_db::get of that field name "
+                "in this run. The value is stored and never read. Remove the set, or get it where "
+                "the component is built.",
+                core::Severity::Warning, s.loc);
+        }
+    }
+};
+
 } // namespace uvmcheck::rules::methodology
 
 namespace uvmcheck::rules {
 std::unique_ptr<Rule> createConfigDbAsRuntimeChannel() { return std::make_unique<methodology::ConfigDbAsRuntimeChannel>(); }
 std::unique_ptr<Rule> createScatteredConfigKeyLiteral() { return std::make_unique<methodology::ScatteredConfigKeyLiteral>(); }
 std::unique_ptr<Rule> createSharedConfigMutatedAtRuntime() { return std::make_unique<methodology::SharedConfigMutatedAtRuntime>(); }
+std::unique_ptr<Rule> createConfigDbGetWithoutSet() { return std::make_unique<methodology::ConfigDbGetWithoutSet>(); }
+std::unique_ptr<Rule> createConfigDbSetNeverGot() { return std::make_unique<methodology::ConfigDbSetNeverGot>(); }
 }
 
 UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConfigDbAsRuntimeChannel)
 UVMCHECK_REGISTER_RULE(uvmcheck::rules::createScatteredConfigKeyLiteral)
 UVMCHECK_REGISTER_RULE(uvmcheck::rules::createSharedConfigMutatedAtRuntime)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConfigDbGetWithoutSet)
+UVMCHECK_REGISTER_RULE(uvmcheck::rules::createConfigDbSetNeverGot)

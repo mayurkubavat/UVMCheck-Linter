@@ -3363,6 +3363,9 @@
     "SV-STY-104@25",
     "SV-STY-104@30",
     "SV-STY-104@31",
+    "UVM-CFG-010@10",
+    "UVM-CFG-010@28",
+    "UVM-CFG-011@16",
     "UVM-PHS-001@9",
     "UVM-PHS-001@15"
   ],
@@ -3391,6 +3394,9 @@
     "SV-STY-104@35",
     "SV-STY-104@36",
     "SV-TIM-002@34",
+    "UVM-CFG-010@18",
+    "UVM-CFG-010@33",
+    "UVM-CFG-011@20",
     "UVM-PHS-001@17"
   ],
   "methodology/UVM-CFG-008/bad.sv": [
@@ -3486,6 +3492,7 @@
     "SV-STY-104@51",
     "SV-STY-104@54",
     "SV-STY-104@55",
+    "UVM-CFG-010@38",
     "UVM-PHS-001@17",
     "UVM-PHS-001@21",
     "UVM-PHS-001@32",
@@ -4261,6 +4268,8 @@
     "SV-STY-104@13",
     "SV-STY-104@14",
     "UVM-CFG-002@11",
+    "UVM-CFG-010@11",
+    "UVM-CFG-011@12",
     "UVM-DAG-001@12"
   ],
   "methodology/UVM-RUS-004/good.sv": [
@@ -4283,6 +4292,9 @@
     "SV-STY-104@25",
     "SV-STY-104@26",
     "UVM-CFG-002@24",
+    "UVM-CFG-010@11",
+    "UVM-CFG-011@12",
+    "UVM-CFG-011@24",
     "UVM-DAG-001@12",
     "UVM-DAG-001@24"
   ],

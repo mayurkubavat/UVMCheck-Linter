@@ -61,7 +61,8 @@ const std::vector<Entry>& entries() {
         {{"MG-2.4", "MG-2", kCoupling, L::Should,
           "Names and positions that tie code together (config keys, value types, argument order) "
           "match on both sides and are checked, not left to convention."},
-         {"UVM-CFG-001", "UVM-DAG-001", "SV-RDB-001", "SV-BUG-007", "UVM-CFG-008", "SV-CPL-001"}},
+         {"UVM-CFG-001", "UVM-CFG-010", "UVM-CFG-011", "UVM-DAG-001", "SV-RDB-001", "SV-BUG-007",
+          "UVM-CFG-008", "SV-CPL-001"}},
 
         // MG-3 Cohesion and component roles
         {{"MG-3.1", "MG-3", kRoles, L::Shall,

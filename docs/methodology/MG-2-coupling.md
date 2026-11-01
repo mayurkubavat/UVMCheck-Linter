@@ -100,4 +100,4 @@ localparam string BUS_CFG_KEY = "bus_cfg";   // in bus_pkg, used on both sides
 seq.do_op(OP_WRITE);                          // enum argument
 ```
 
-Enforced by: `UVM-CFG-001`, `UVM-DAG-001`, `SV-RDB-001`, `SV-BUG-007`, `UVM-CFG-008`, `SV-CPL-001`
+Enforced by: `UVM-CFG-001`, `UVM-CFG-010`, `UVM-CFG-011`, `UVM-DAG-001`, `SV-RDB-001`, `SV-BUG-007`, `UVM-CFG-008`, `SV-CPL-001`
