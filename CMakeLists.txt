@@ -232,7 +232,7 @@ add_test(
 )
 add_test(
     NAME lsp_integration_test
-    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lsp.py
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_lsp.py $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
