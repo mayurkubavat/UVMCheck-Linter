@@ -30,4 +30,4 @@ Enforced by: `UVM-REP-007`, `UVM-REP-008`, `SV-ERR-001`, `SV-ERR-002`, `SV-ERR-0
 
 An interface that carries its own assertions checks the protocol in every testbench that uses it, including ones written later.
 
-Enforced by: review only (no rule yet).
+Enforced by: `SV-DBC-001`

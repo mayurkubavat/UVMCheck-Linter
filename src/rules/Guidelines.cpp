@@ -68,7 +68,7 @@ const std::vector<Entry>& entries() {
           "Each UVM role does one job: sequences generate, drivers drive, monitors observe, "
           "scoreboards check, subscribers cover."},
          {"UVM-ROL-001", "UVM-ROL-002", "UVM-ROL-005", "UVM-SEQ-001", "UVM-VIF-DIR", "UVM-OBS-001",
-          "UVM-TLM-005", "UVM-ALS-001", "SV-DSN-002", "SV-DSN-003", "SV-MET-006"}},
+          "UVM-TLM-005", "UVM-ALS-001", "SV-DSN-002", "SV-DSN-003", "SV-MET-006", "SV-DSN-011"}},
         {{"MG-3.2", "MG-3", kRoles, L::Should,
           "Agents carry protocol knowledge only; DUT-specific checking lives in the env."},
          {"UVM-ROL-003"}},
@@ -106,7 +106,7 @@ const std::vector<Entry>& entries() {
           "Behaviour varies through overrides, hooks and callbacks, not type switches or edits to "
           "the base class; overrides keep the base contract."},
          {"SV-DSN-001", "SV-DSN-009", "SV-OCP-001", "SV-DSN-006", "SV-DSN-007", "SV-OOP-001",
-          "SV-OOP-009", "SV-OOP-015", "SV-LSP-001", "SV-RDB-004"}},
+          "SV-OOP-009", "SV-OOP-015", "SV-LSP-001", "SV-RDB-004", "UVM-PAT-003"}},
         {{"MG-5.3", "MG-5", kPatterns, L::Should,
           "No hand-rolled singletons; shared services go through the config or resource database."},
          {"UVM-PAT-002"}},
@@ -144,7 +144,7 @@ const std::vector<Entry>& entries() {
           "UVM-SEQ-006", "UVM-TLM-002", "SV-IPC-001", "SV-SYS-001", "SVA-ACT-001", "UVM-LOG-002"}},
         {{"MG-8.2", "MG-8", kContracts, L::Should,
           "Reusable interfaces carry their own protocol assertions."},
-         {}},
+         {"SV-DBC-001"}},
 
         // MG-9 Evolvability
         {{"MG-9.1", "MG-9", kEvolvability, L::Should,
