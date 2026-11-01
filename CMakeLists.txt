@@ -30,21 +30,16 @@ set(SLANG_INCLUDE_DOCS OFF CACHE BOOL "" FORCE)
 set(SLANG_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
 set(SLANG_INCLUDE_INSTALL OFF CACHE BOOL "" FORCE)
 
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/references/code/slang/CMakeLists.txt")
-    message(STATUS "Using local Slang clone in references/code/slang")
-    add_subdirectory(references/code/slang EXCLUDE_FROM_ALL)
-else()
-    message(STATUS "Fetching Slang from GitHub")
-    include(FetchContent)
-    FetchContent_Declare(
-        slang
-        GIT_REPOSITORY https://github.com/MikePopoloski/slang.git
-        # Pinned: rule findings and the test baselines depend on slang's elaboration and
-        # diagnostics, which change between releases. Bump deliberately and refresh baselines.
-        GIT_TAG v12.1
-        GIT_SHALLOW ON)
-    FetchContent_MakeAvailable(slang)
-endif()
+message(STATUS "Fetching Slang from GitHub")
+include(FetchContent)
+FetchContent_Declare(
+    slang
+    GIT_REPOSITORY https://github.com/MikePopoloski/slang.git
+    # Pinned: rule findings and the test baselines depend on slang's elaboration and
+    # diagnostics, which change between releases. Bump deliberately and refresh baselines.
+    GIT_TAG v12.1
+    GIT_SHALLOW ON)
+FetchContent_MakeAvailable(slang)
 
 # Core library sources
 file(GLOB_RECURSE UVMCHECK_SOURCES
