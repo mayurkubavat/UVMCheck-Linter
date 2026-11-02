@@ -8,6 +8,19 @@
 
 namespace uvmcheck::rules::uvm {
 
+/// True when `macro (with its backtick) is defined somewhere in the compiled sources, so
+/// inserting a call to it compiles (a testbench with its own stand-in classes may not have it).
+static bool macroDefined(const slang::ast::Compilation& compilation, std::string_view macro) {
+    if (macro.starts_with('`')) macro.remove_prefix(1);
+    for (const auto& tree : compilation.getSyntaxTrees()) {
+        for (const auto* def : tree->getDefinedMacros()) {
+            if (def && def->name.valueText() == macro) return true;
+        }
+    }
+    return false;
+}
+
+
 class UvmFactoryMissingUtils : public Rule {
 public:
     std::string_view getId() const override { return "UVM-FAC-003"; }
@@ -79,7 +92,8 @@ public:
                 // the *_param_utils form with their parameters, so they get no fix.
                 std::vector<core::FixItHint> fixes;
                 const auto* sm = compilation.getSourceManager();
-                if (sm && syntax->kind == slang::syntax::SyntaxKind::ClassDeclaration) {
+                if (sm && syntax->kind == slang::syntax::SyntaxKind::ClassDeclaration &&
+                    macroDefined(compilation, recommendedMacro)) {
                     const auto& decl = syntax->as<slang::syntax::ClassDeclarationSyntax>();
                     const auto semi = decl.semi.location();
                     if (!decl.parameters && semi.valid() && !sm->isMacroLoc(semi)) {

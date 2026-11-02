@@ -3,6 +3,7 @@
 #include "slang/ast/ASTVisitor.h"
 #include "slang/ast/expressions/CallExpression.h"
 #include "slang/ast/symbols/SubroutineSymbols.h"
+#include "slang/ast/types/AllTypes.h"
 #include "slang/syntax/AllSyntax.h"
 #include "slang/text/SourceManager.h"
 
@@ -39,10 +40,23 @@ std::string lineIndent(const slang::SourceManager& sm, slang::SourceLocation loc
     return std::string(text.substr(start, end - start));
 }
 
+/// True when a base class of `cls` declares a method called `name`, so super.<name>() compiles.
+bool baseHasMethod(const slang::ast::ClassType& cls, std::string_view name) {
+    const slang::ast::Type* base = cls.getBaseClass();
+    for (int guard = 0; base && base->isClass() && guard < 64; ++guard) {
+        const auto& bc = base->getCanonicalType().as<slang::ast::ClassType>();
+        if (const auto* m = bc.find(name); m && m->kind == slang::ast::SymbolKind::Subroutine) return true;
+        base = bc.getBaseClass();
+    }
+    return false;
+}
+
 /// Inserts `super.<phase>(<arg>);` as the first statement of the phase.
-std::vector<core::FixItHint> superCallFix(const slang::SourceManager* sm, const slang::ast::SubroutineSymbol& sub) {
+std::vector<core::FixItHint> superCallFix(const slang::SourceManager* sm, const slang::ast::ClassType& cls,
+                                          const slang::ast::SubroutineSymbol& sub) {
     using namespace slang::syntax;
     std::vector<core::FixItHint> fixes;
+    if (!baseHasMethod(cls, sub.name)) return fixes;
     const auto* syn = sub.getSyntax();
     if (!sm || !syn || (syn->kind != SyntaxKind::FunctionDeclaration && syn->kind != SyntaxKind::TaskDeclaration))
         return fixes;
@@ -106,7 +120,7 @@ public:
                             sub.location,
                             // Unsafe: the base phase then runs (in build_phase, automatic
                             // configuration from uvm_config_db), which changes behaviour.
-                            superCallFix(compilation.getSourceManager(), sub)
+                            superCallFix(compilation.getSourceManager(), *classType, sub)
                         );
                     }
                 }
