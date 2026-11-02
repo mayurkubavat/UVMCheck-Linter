@@ -12,6 +12,17 @@ class ExplicitLiteralWidthVisitor : public engine::AstVisitor<ExplicitLiteralWid
 public:
     explicit ExplicitLiteralWidthVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
+    // 'hFF and 32'hFF are the same value with the same signedness, so writing the width the
+    // literal already has is safe. Not for x/z digits: an unsized 'x fills any width it is
+    // assigned to, a sized one only its own bits.
+    static std::vector<core::FixItHint> widthFix(const slang::ast::IntegerLiteral& lit, const std::string& text) {
+        if (text.find_first_of("xXzZ?", 2) != std::string::npos || !lit.type) return {};
+        const auto width = lit.type->getBitWidth();
+        if (width == 0) return {};
+        return {{lit.sourceRange, std::to_string(width) + text,
+                 "Write the width: " + std::to_string(width) + text}};
+    }
+
     void handle(const slang::ast::IntegerLiteral& lit) {
         if (lit.isDeclaredUnsized && lit.syntax) {
             std::string text = lit.syntax->toString();
@@ -28,7 +39,8 @@ public:
                     "Numeric literal '" + text + "' is missing an explicit bit-width specification. "
                     "By convention, all numeric literals must declare explicit width (e.g. 8'hFF instead of 'hFF) to avoid 32-bit truncation and sign extension traps.",
                     core::Severity::Warning,
-                    lit.sourceRange.start()
+                    lit.sourceRange.start(),
+                    widthFix(lit, text)
                 );
             } else if (text.find('\'') == std::string::npos) {
                 // Plain decimal number without base specifier (e.g. 1024)

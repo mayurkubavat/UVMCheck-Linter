@@ -24,7 +24,9 @@ public:
                     "' keyword and opening parenthesis '('. "
                     "Common SystemVerilog formatting requires a space (e.g. '" + kwText + " (...)').",
                     core::Severity::Info,
-                    keyword.location()
+                    keyword.location(),
+                    std::vector<core::FixItHint>{{slang::SourceRange(openParen.location(), openParen.location()), " ",
+                                                  "Insert a space before '('"}}
                 );
             }
         }
