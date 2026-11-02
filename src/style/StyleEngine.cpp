@@ -142,6 +142,13 @@ public:
                           core::DiagnosticEngine& diags)
         : config(config), sm(sm), diags(diags) {}
 
+    // Same edit as SV-STY-005 makes (the end keyword rewritten with its label), so when both
+    // rules fire the two fixes are identical and applied once.
+    static std::vector<core::FixItHint> endLabelFix(slang::parsing::Token end, const std::string& name) {
+        if (name.empty() || !end.range().start().valid()) return {};
+        return {{end.range(), std::string(end.valueText()) + " : " + name, "Add matching end label"}};
+    }
+
     void handle(const slang::syntax::ClassDeclarationSyntax& cls) {
         if (config.mandatoryMatchingEndLabel) {
             if (!cls.endBlockName) {
@@ -151,7 +158,8 @@ public:
                     "Class '" + std::string(cls.name.valueText()) + "' definition lacks matching end label (expected 'endclass : " +
                     std::string(cls.name.valueText()) + "').",
                     core::Severity::Warning,
-                    cls.endClass.location()
+                    cls.endClass.location(),
+                    endLabelFix(cls.endClass, std::string(cls.name.valueText()))
                 );
             }
         }
@@ -193,7 +201,8 @@ public:
                     "MandatoryMatchingEndLabel",
                     kindStr + " '" + routineName + "' lacks matching end label (expected '" + kw + " : " + routineName + "').",
                     core::Severity::Warning,
-                    func.end.location()
+                    func.end.location(),
+                    endLabelFix(func.end, routineName)
                 );
             }
         }
@@ -209,7 +218,8 @@ public:
                     "MandatoryMatchingEndLabel",
                     "Interface '" + ifName + "' lacks matching end label (expected 'endinterface : " + ifName + "').",
                     core::Severity::Warning,
-                    mod.endmodule.location()
+                    mod.endmodule.location(),
+                    endLabelFix(mod.endmodule, ifName)
                 );
             }
         }

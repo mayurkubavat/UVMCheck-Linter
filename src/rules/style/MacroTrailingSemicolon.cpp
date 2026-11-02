@@ -62,7 +62,11 @@ public:
                         "Unnecessary semicolon ';' following macro '`" + std::string(macroName) +
                         "'. In declarative and block scopes, trailing semicolons create empty statements.",
                         core::Severity::Warning,
-                        semiLoc
+                        semiLoc,
+                        // The macros expand to complete statements or declarations, so the
+                        // ';' is an empty item and deleting it changes nothing.
+                        std::vector<core::FixItHint>{{slang::SourceRange(semiLoc, semiLoc + 1), "",
+                                                      "Remove the semicolon after the macro call"}}
                     );
                 }
             }

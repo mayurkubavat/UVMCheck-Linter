@@ -37,13 +37,16 @@ module fix_demo;
     end
 endmodule : fix_demo
 """
-HELPER = """module fix_helper;
+HELPER = """`ifndef HELPERS_SVH
+`define HELPERS_SVH
+module fix_helper;
     logic b, z;
     always_comb begin
         if (b != 1'bz) z = 0;
         else z = 1;
     end
 endmodule : fix_helper
+`endif
 """
 
 
@@ -112,6 +115,25 @@ class osc_drv;
         vif.valid = 0;
     endfunction : reset_bus
 endclass : osc_drv
+"""
+
+STYLE_TOP = """`define uvm_note(M) begin $display(M); end
+module st_top;
+    logic [63:0] a;
+    logic [7:0] b;
+    initial begin
+        a = 'hFF;
+        b = 'bx;
+        if(a == 0) b = 1;
+        b = 2; a = 3; b = 4;
+        `uvm_note("hi");
+    end
+endmodule : st_top
+"""
+
+STYLE_HELPER = """class helper_c;
+    int v;
+endclass
 """
 
 
@@ -302,6 +324,31 @@ def main():
         res = run(binary, osc, "--fix", "--unsafe-fixes")
         check("undo each other" not in res.stderr and "vif.valid = 0;" in (osc / "top.sv").read_text(),
               "an interface drive in a function is not flipped back and forth", res.stdout + res.stderr)
+
+        # Style fixes: spacing, one statement per line, macro semicolons, literal widths,
+        # end labels, include guards. A plain --fix applies all but the include guard.
+        sf = Path(tmp, "style")
+        sf.mkdir()
+        (sf / "top.sv").write_text(STYLE_TOP)
+        (sf / "helper.svh").write_text(STYLE_HELPER)
+        style_rules = "SV-STY-002,SV-STY-010,SV-STY-011,SV-STY-012,SV-STY-013,SV-STY-104"
+        res = subprocess.run([binary, "top.sv", "helper.svh", "--no-config", "--preset", "all", "--fix",
+                              "--fix-rule", style_rules], cwd=sf, capture_output=True, text=True)
+        text = (sf / "top.sv").read_text()
+        check("        if (a == 0) b = 1;\n" in text, "a space is put between 'if' and '('", text)
+        check("        b = 2;\n        a = 3;\n        b = 4;\n" in text,
+              "statements sharing a line each get their own line, at the same indent", text)
+        check('`uvm_note("hi")\n' in text, "the semicolon after a `uvm_ macro call is removed", text)
+        check("a = 32'hFF;" in text and "b = 'bx;" in text,
+              "an unsized based literal gets its width, but not one with x/z digits", text)
+        check("`ifndef" not in (sf / "helper.svh").read_text(), "the include guard is unsafe: plain --fix skips it",
+              res.stdout)
+        subprocess.run([binary, "top.sv", "helper.svh", "--no-config", "--preset", "all", "--fix", "--unsafe-fixes",
+                        "--fix-rule", style_rules], cwd=sf, capture_output=True, text=True)
+        helper = (sf / "helper.svh").read_text()
+        check(helper.startswith("`ifndef HELPER_SVH\n`define HELPER_SVH\n") and
+              helper.rstrip().endswith("`endif // HELPER_SVH") and "endclass : helper_c" in helper,
+              "--unsafe-fixes wraps the header in a guard, and the end label fix also lands", helper)
 
     if failures:
         print(f"{len(failures)} check(s) failed")

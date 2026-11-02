@@ -7,6 +7,7 @@ a corrupt manifest falls back to a full run.
 
 import argparse
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -180,6 +181,22 @@ def main():
         check("served from cache" not in tight.stdout, "changing a rule option invalidates the cache", tight.stdout)
         ids = [v[0] for v in violations(d / "w3.json")]
         check("SV-STY-016" in ids, "the tightened option reports the long line", str(ids))
+
+    # A rebuilt binary has the same version string but may have different rules or fix
+    # text, so it must not reuse the old build's findings. A copy of the binary whose
+    # modification time moves stands in for a rebuild.
+    with tempfile.TemporaryDirectory() as tmp:
+        d = Path(tmp)
+        (d / "plain.sv").write_text("module plain; endmodule\n")
+        exe = d / "uvmcheck_copy"
+        shutil.copy2(binary, exe)
+        run(str(exe), d, "plain.sv", "--no-config")
+        same = run(str(exe), d, "plain.sv", "--no-config")
+        check("served from cache" in same.stdout, "the same build is served from cache", same.stdout)
+        st = exe.stat()
+        os.utime(exe, ns=(st.st_atime_ns, st.st_mtime_ns + 10**9))
+        rebuilt = run(str(exe), d, "plain.sv", "--no-config")
+        check("served from cache" not in rebuilt.stdout, "a rebuilt binary misses the cache", rebuilt.stdout)
 
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
