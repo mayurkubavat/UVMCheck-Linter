@@ -14,8 +14,9 @@ The slang overlay (src/compat/, docs/compat.md):
 - error-taint downgrades findings inside a task or function that does not
   compile to Info, keeps the ones on the error's own line, and leaves other
   subroutines alone;
-- anchor-to-user-code reports an error slang raises inside a library template
-  at the user's macro line, where the library policy would otherwise drop it;
+- anchor-to-user-code, the one override on by default, reports an error slang
+  raises inside a library template at the user's macro line, where the library
+  policy would otherwise drop it;
 - the config's compat section turns overrides on, the command line can turn
   one back off, and the JSON report lists the ones that were active.
 """
@@ -83,7 +84,10 @@ def main():
         rc, _, err = run(binary, root, "--no-config", "empty.sv", "--override", "nope")
         check(rc == 2 and "unknown override 'nope'" in err, "unknown override is an error", err)
         rc, rep, err = report(binary, root, "--no-config", "empty.sv")
-        check(rep is not None and "compatOverrides" not in rep, "nothing is on by default", err)
+        check(rep is not None and rep.get("compatOverrides") == ["anchor-to-user-code"],
+              "only anchor-to-user-code is on by default", err or str(rep and rep.get("compatOverrides")))
+        rc, rep, err = report(binary, root, "--no-config", "empty.sv", "--override", "-anchor-to-user-code")
+        check(rep is not None and "compatOverrides" not in rep, "-anchor-to-user-code turns it off", err)
 
         print("filelist-dialect")
         (root / "inc").mkdir()
@@ -108,7 +112,7 @@ def main():
         msgs = compile_messages(rep)
         check(not any("unknown system name" in m for m in msgs), "vendor tasks are known with the override", str(msgs))
         check(any("'nosuch'" in m for m in msgs), "an unresolved name passed to one is still reported", str(msgs))
-        check(rep is not None and rep.get("compatOverrides") == ["vendor-systasks"],
+        check(rep is not None and rep.get("compatOverrides") == ["vendor-systasks", "anchor-to-user-code"],
               "the JSON report lists the active override", str(rep and rep.get("compatOverrides")))
 
         print("auto-uvm and uvm-library")
@@ -183,13 +187,13 @@ def main():
             "  `my_utils(comp)\n"
             "endclass\n")
         args = ("--no-config", "user.sv", "--library", "lib/**", "--rule", "SV-CMP-001")
-        rc, rep, err = report(binary, root, *args)
+        rc, rep, err = report(binary, root, *args, "--override", "-anchor-to-user-code")
         check(rep is not None and rep["compileErrors"] > 0 and not compile_messages(rep),
               "without the override the template error is dropped with the library", err or str(rep))
-        rc, rep, err = report(binary, root, *args, "--override", "anchor-to-user-code")
+        rc, rep, err = report(binary, root, *args)
         errs = [v for v in (rep or {}).get("violations", []) if v["ruleId"] == "SV-CMP-001"]
         check(len(errs) == 1 and errs[0]["file"].endswith("user.sv") and errs[0]["line"] == 5,
-              "the error is reported once, at the user's macro line", str(errs))
+              "by default the error is reported once, at the user's macro line", str(errs))
         check(bool(errs) and any(r["file"].endswith("registry.svh") and r["line"] == 3
                                  for r in errs[0].get("related", [])),
               "the library line is kept as a note", str(errs))

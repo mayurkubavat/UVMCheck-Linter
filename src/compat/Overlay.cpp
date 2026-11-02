@@ -215,6 +215,9 @@ bool Overlay::select(const core::CompatSettings& settings, std::string& error) {
     auto add = [&](Override* o) {
         if (std::find(picked.begin(), picked.end(), o) == picked.end()) picked.push_back(o);
     };
+    for (const auto& o : all()) {
+        if (o->onByDefault()) add(o.get());
+    }
     if (!settings.profile.empty()) {
         const auto names = profileNames();
         if (std::find(names.begin(), names.end(), settings.profile) == names.end()) {
@@ -272,9 +275,11 @@ void Overlay::reviewFindings(slang::ast::Compilation& compilation, std::vector<c
 }
 
 void Overlay::list(std::ostream& os) {
-    os << "Slang overlay overrides (off unless a compat profile or --override turns them on):\n";
+    os << "Slang overlay overrides (off unless a compat profile or --override turns them on; those marked\n"
+          "[on by default] apply unless --override -<id> turns them off):\n";
     for (const auto& o : all()) {
         os << "  " << o->id();
+        if (o->onByDefault()) os << "  [on by default]";
         if (isRetired(*o)) os << "  [retired: slang " << slang::VersionInfo::getMajor() << " has the fix]";
         os << "\n      " << o->summary() << "\n";
         std::string in;

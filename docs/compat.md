@@ -5,7 +5,9 @@ Slang follows IEEE 1800 closely and elaborates the Accellera UVM library cleanly
 but real projects are written for a simulator: their file lists use simulator
 options, they expect the simulator to supply UVM, and they call the simulator's
 waveform tasks. The overlay is a set of small overrides that bridge those gaps
-without forking or patching slang. Every override is off until you turn it on.
+without forking or patching slang. Every override is off until you turn it on,
+except `anchor-to-user-code`, which fixes errors being hidden and is on unless
+`--override -anchor-to-user-code` (or `"-anchor-to-user-code"` in `overrides`) turns it off.
 
 ```
 uvmcheck --list-overrides
@@ -43,7 +45,7 @@ result-cache key.
 | `auto-uvm` | questa, xcelium, vcs | When the sources mention `uvm_pkg` or `uvm_macros.svh` (or a file list asks for UVM, including `-L uvm`) but no `uvm_pkg.sv` is compiled, compiles it from `compat.uvm_home`, `-uvmhome` or `$UVM_HOME`, and adds its include directory. |
 | `uvm-library` | questa, xcelium, vcs | Treats the folder of every compiled `uvm_pkg.sv` as a library path, so warnings and findings inside UVM are not reported. |
 | `vendor-systasks` | questa, xcelium, vcs | Knows `$fsdb*` (Verdi), `$vcdplus*` (VCS), `$shm_*` and `$record*` (Xcelium) and `$wlfdumpvars` (Questa). Their arguments may name instances, as with `$dumpvars`; a name that does not resolve is still an error. PORT-PRP-001 still reports unguarded calls. |
-| `anchor-to-user-code` | questa, xcelium, vcs | An error slang raises while elaborating a library template for your class, such as a wrong constructor signature reported at `uvm_registry.svh:201`, is reported at your `` `uvm_*_utils `` line (or class) with the library line as a note; an error inside a library macro's expansion is reported at the macro call. Without it such errors point into UVM, and when UVM is a library path (or `report_library_macro_expansions` is off) they are dropped, hiding a real compile error. |
+| `anchor-to-user-code` | on by default | An error slang raises while elaborating a library template for your class, such as a wrong constructor signature reported at `uvm_registry.svh:201`, is reported at your `` `uvm_*_utils `` line (or class) with the library line as a note; an error inside a library macro's expansion is reported at the macro call. Without it such errors point into UVM, and when UVM is a library path (or `report_library_macro_expansions` is off) they are dropped, hiding a real compile error. |
 | `slang-compat-vcs` | vcs | Turns on slang's own `--compat vcs`. |
 | `error-taint` | none | When a task or function has a compile error, slang keeps what it can of the body, and which parts survive changes between slang releases; rules reading that body can report things that are not there. Findings inside such a subroutine become Info with a note naming the error line. Findings on the error's own line keep their severity, since those rules point at the illegal construct. The cost: a real finding in a broken subroutine is downgraded too until the error is fixed. |
 
