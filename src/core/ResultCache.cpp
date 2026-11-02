@@ -1,4 +1,5 @@
 #include "uvmcheck/core/ResultCache.h"
+#include "uvmcheck/core/Process.h"
 
 #include "uvmcheck/core/Json.h"
 #include "uvmcheck/rules/Rule.h"
@@ -572,9 +573,27 @@ bool isWholeProgramRule(std::string_view ruleId) {
     return wholeProgramIds().count(ruleId) != 0;
 }
 
+std::string buildIdentity() {
+    // The version string does not change between builds, so a rebuilt binary (new or
+    // changed rules, different fix text) must not reuse findings from the old one. The
+    // executable's size and modification time change on every relink.
+    static const std::string id = [] {
+        const std::string exe = selfExecutablePath("");
+        std::error_code ec;
+        if (exe.empty() || !std::filesystem::is_regular_file(exe, ec)) return std::string("unknown");
+        const auto size = std::filesystem::file_size(exe, ec);
+        if (ec) return std::string("unknown");
+        const auto mtime = std::filesystem::last_write_time(exe, ec);
+        if (ec) return std::string("unknown");
+        return std::to_string(size) + "-" + std::to_string(static_cast<long long>(mtime.time_since_epoch().count()));
+    }();
+    return id;
+}
+
 std::string environmentKey(const EnvInput& in) {
     Hasher h;
     h.add(kToolVersion);
+    h.add(buildIdentity());
     h.add(std::to_string(kFormatVersion));
     h.add(in.languageVersion);
     h.add(in.disableLocalIncludes ? "1" : "0");

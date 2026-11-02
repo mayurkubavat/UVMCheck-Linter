@@ -8,7 +8,7 @@ The cache is on by default because a hit is taken only when every recorded depen
 
 A compilation unit is one primary file, a file named on the command line or in a file list, not a file pulled in by `` `include ``. Its key is a hash of:
 
-- the tool version and the cache format version
+- the tool version, the cache format version, and the linter build (the executable's size and modification time, so a rebuilt or upgraded binary never reuses old findings or fix text)
 - the registered rule set (id, severity, and whether the rule is whole-program)
 - preset, `--rule`, `--guideline`, `--experimental`, and `--engine`
 - defines, include directories, and the bytes of the project config, waiver file, baseline, command files, and Python rule sources

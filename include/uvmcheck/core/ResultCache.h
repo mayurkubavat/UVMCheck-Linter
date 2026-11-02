@@ -45,7 +45,11 @@ struct EnvInput {
     std::string flags;
 };
 
-/// Stable hash of everything in `in` plus the registered rule ids.
+/// Identifies the running binary's build (size and modification time of the executable),
+/// so a rebuilt linter never reuses another build's findings. "unknown" if it cannot tell.
+std::string buildIdentity();
+
+/// Stable hash of everything in `in` plus the registered rule ids and the build identity.
 std::string environmentKey(const EnvInput& in);
 
 struct Request {
