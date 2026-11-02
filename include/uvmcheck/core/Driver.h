@@ -7,6 +7,7 @@
 #include "slang/driver/Driver.h"
 #include "uvmcheck/core/Diagnostic.h"
 #include "uvmcheck/uvm/UvmModel.h"
+#include "uvmcheck/compat/Overlay.h"
 
 namespace uvmcheck::core {
 
@@ -61,6 +62,11 @@ private:
     std::optional<std::string> guidelineSelector;
     std::optional<bool> listGuidelines;
     std::optional<bool> showConformance;
+    std::optional<std::string> compatProfile;
+    std::vector<std::string> overrideArgs;
+    std::optional<bool> listOverrides;
+    compat::VendorArgs vendorArgs;
+    compat::Overlay overlay;
 
     /// Loads the explicit or auto-discovered project config and CLI path
     /// filters. Returns false (after printing why) if the config is broken.

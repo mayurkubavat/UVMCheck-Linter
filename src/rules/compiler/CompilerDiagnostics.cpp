@@ -4,6 +4,9 @@
 
 #include <atomic>
 #include <optional>
+#include <set>
+#include <string>
+#include <tuple>
 
 #include "slang/diagnostics/DiagnosticEngine.h"
 #include "slang/text/SourceManager.h"
@@ -12,10 +15,15 @@ namespace uvmcheck::rules {
 
 namespace {
 std::atomic<const slang::DiagnosticEngine*> compilerEngine{nullptr};
+std::atomic<CompilerErrorAnchor> errorAnchor{nullptr};
 } // namespace
 
 void setCompilerDiagnosticEngine(const slang::DiagnosticEngine* engine) {
     compilerEngine.store(engine);
+}
+
+void setCompilerErrorAnchor(CompilerErrorAnchor anchor) {
+    errorAnchor.store(anchor);
 }
 
 namespace compiler {
@@ -51,6 +59,7 @@ public:
         const slang::DiagnosticEngine* engine = compilerEngine.load();
         if (!engine) engine = &fallback.emplace(*sm);
         const auto& classifier = *engine;
+        std::set<std::tuple<std::string, size_t, std::string>> anchoredSeen;
 
         for (const auto& diag : compilation.getAllDiagnostics()) {
             // Design-wide diagnostics (e.g. no top module) have no file to point at.
@@ -76,10 +85,26 @@ public:
             if (auto option = classifier.getOptionName(diag.code); !option.empty())
                 message += " [-W" + std::string(option) + "]";
 
-            auto* v = diags.addViolation(id, name, message, sev, diag.location);
+            // An error slang raised inside a library template can be moved to the
+            // user code that instantiated it; the original place becomes a note.
+            std::optional<slang::SourceLocation> anchored;
+            if (auto anchor = errorAnchor.load(); anchor && sev == core::Severity::Error) anchored = anchor(diag);
+            // One template error is often raised at several library lines; report it once per user line.
+            if (anchored && !anchoredSeen
+                                 .emplace(std::string(sm->getFileName(*anchored)), sm->getLineNumber(*anchored), message)
+                                 .second)
+                continue;
+
+            auto* v = diags.addViolation(id, name, message, sev, anchored.value_or(diag.location));
             if (!v) continue;
+            if (anchored) {
+                auto original = sm->getFullyOriginalLoc(diag.location);
+                diags.addRelated(v, diag.location,
+                                 "raised here, in " + std::string(sm->getFileName(original)) + ":" +
+                                     std::to_string(sm->getLineNumber(original)));
+            }
             for (const auto& range : diag.ranges) {
-                if (range.start() == diag.location) {
+                if (!anchored && range.start() == diag.location) {
                     diags.setRange(v, range);
                     break;
                 }

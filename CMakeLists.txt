@@ -37,8 +37,11 @@ FetchContent_Declare(
     GIT_REPOSITORY https://github.com/MikePopoloski/slang.git
     # Pinned: rule findings and the test baselines depend on slang's elaboration and
     # diagnostics, which change between releases. Bump deliberately and refresh baselines.
-    GIT_TAG v12.1
-    GIT_SHALLOW ON)
+    # A master commit after v12.1: it has the randomize/constraint scoping fixes and the
+    # macro location API. Move back to a release tag once one includes them.
+    GIT_TAG 00b7cbfeaa67b0969890040801925f5646c56b3f # master, 2026-11-01
+    # A commit hash cannot be fetched shallowly.
+    GIT_SHALLOW OFF)
 FetchContent_MakeAvailable(slang)
 
 # Core library sources
@@ -52,6 +55,7 @@ file(GLOB_RECURSE UVMCHECK_SOURCES
     src/style/*.cpp
     src/plugins/*.cpp
     src/lsp/*.cpp
+    src/compat/*.cpp
 )
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
@@ -143,6 +147,11 @@ endif()
 add_test(
     NAME project_config_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_config.py --binary $<TARGET_FILE:uvmcheck>
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME slang_overlay_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_compat.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(

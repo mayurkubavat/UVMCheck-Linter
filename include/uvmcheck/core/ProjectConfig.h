@@ -76,6 +76,14 @@ struct BuildSettings {
     bool empty() const { return !hasSources() && includeDirs.empty() && defines.empty(); }
 };
 
+/// The "compat" section: which slang overlay overrides to apply (compat/Overlay.h).
+/// Command-line --compat-profile and --override entries are appended after these.
+struct CompatSettings {
+    std::string profile;                // vcs, questa, xcelium, none, or empty
+    std::vector<std::string> overrides; // "id" or "+id" adds, "-id" removes
+    std::string uvmHome;                // uvm-core checkout (or its src/), for auto-uvm
+};
+
 /// Per-rule overrides from the "rules" section of the project config.
 struct RuleSettings {
     std::optional<bool> enabled;
@@ -133,6 +141,9 @@ public:
     BuildSettings& build() { return buildSettings; }
     const BuildSettings& build() const { return buildSettings; }
 
+    CompatSettings& compat() { return compatSettings; }
+    const CompatSettings& compat() const { return compatSettings; }
+
     bool hasPathFilters() const { return !library.empty() || !exclude.empty() || anyRuleExcludes; }
     void noteRuleExcludes() { anyRuleExcludes = true; }
 
@@ -147,6 +158,7 @@ private:
     bool anyRuleExcludes = false;
     bool reportLibraryMacros = false;
     BuildSettings buildSettings;
+    CompatSettings compatSettings;
 
     const json::Value* findOption(std::string_view ruleId, std::string_view key) const;
 };

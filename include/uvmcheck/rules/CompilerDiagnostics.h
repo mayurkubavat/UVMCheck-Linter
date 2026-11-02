@@ -1,9 +1,12 @@
 #pragma once
 
+#include <optional>
 #include <string_view>
 
 namespace slang {
+class Diagnostic;
 class DiagnosticEngine;
+struct SourceLocation;
 }
 
 namespace uvmcheck::rules {
@@ -24,6 +27,13 @@ public:
     CompilerDiagnosticEngineScope(const CompilerDiagnosticEngineScope&) = delete;
     CompilerDiagnosticEngineScope& operator=(const CompilerDiagnosticEngineScope&) = delete;
 };
+
+/// Picks where a compiler error is reported instead of where slang raised it,
+/// e.g. the user's `uvm_component_utils line for an error inside
+/// uvm_registry.svh. Returns nothing to keep slang's location. Set by the
+/// anchor-to-user-code override (compat/Overlay.h); null by default.
+using CompilerErrorAnchor = std::optional<slang::SourceLocation> (*)(const slang::Diagnostic&);
+void setCompilerErrorAnchor(CompilerErrorAnchor anchor);
 
 /// True when a finding with this rule id is one of the compiler's own diagnostics.
 inline bool isCompilerDiagnosticRule(std::string_view id) {

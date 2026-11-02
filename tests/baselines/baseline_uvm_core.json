@@ -979,7 +979,6 @@
   ],
   "correctness/SV-COR-005/bad.sv": [
     "COMPILE:TypoIdentifier@8",
-    "SV-DED-013@8",
     "SV-STY-005@14",
     "SV-STY-005@15",
     "SV-STY-009@8",
@@ -2433,7 +2432,8 @@
     "SV-STY-104@53",
     "SV-STY-104@53",
     "SV-STY-104@57",
-    "SV-STY-104@58"
+    "SV-STY-104@58",
+    "UVM-SEQ-014@25"
   ],
   "design/UVM-ARC-002/bad.sv": [
     "SV-INT-001@49",
@@ -2578,7 +2578,8 @@
     "SV-STY-104@63",
     "SV-STY-104@64",
     "UVM-PHS-001@55",
-    "UVM-PHS-001@60"
+    "UVM-PHS-001@60",
+    "UVM-SEQ-014@40"
   ],
   "design/UVM-ARC-003/good.sv": [
     "SV-STY-005@9",
@@ -4313,6 +4314,9 @@
     "SV-STY-104@25",
     "SV-STY-104@30",
     "SV-STY-104@31",
+    "UVM-CFG-010@10",
+    "UVM-CFG-010@28",
+    "UVM-CFG-011@16",
     "UVM-PHS-001@9",
     "UVM-PHS-001@15"
   ],
@@ -4362,6 +4366,9 @@
     "SV-STY-104@35",
     "SV-STY-104@36",
     "SV-TIM-002@34",
+    "UVM-CFG-010@18",
+    "UVM-CFG-010@33",
+    "UVM-CFG-011@20",
     "UVM-PHS-001@17"
   ],
   "methodology/UVM-CFG-008/bad.sv": [
@@ -4509,11 +4516,68 @@
     "SV-STY-104@51",
     "SV-STY-104@54",
     "SV-STY-104@55",
+    "UVM-CFG-010@38",
     "UVM-PHS-001@17",
     "UVM-PHS-001@21",
     "UVM-PHS-001@32",
     "UVM-PHS-001@49",
     "UVM-PHS-001@52"
+  ],
+  "methodology/UVM-CFG-010/bad.sv": [
+    "SV-OOP-001@5",
+    "SV-OOP-001@5",
+    "SV-OOP-001@16",
+    "SV-OOP-001@16",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@16",
+    "SV-STY-005@16",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@16",
+    "SV-STY-104@16"
+  ],
+  "methodology/UVM-CFG-010/good.sv": [
+    "SV-OOP-001@5",
+    "SV-OOP-001@5",
+    "SV-OOP-001@16",
+    "SV-OOP-001@16",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@16",
+    "SV-STY-005@16",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@16",
+    "SV-STY-104@16"
+  ],
+  "methodology/UVM-CFG-011/bad.sv": [
+    "SV-OOP-001@5",
+    "SV-OOP-001@5",
+    "SV-OOP-001@17",
+    "SV-OOP-001@17",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@17",
+    "SV-STY-005@17",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@17",
+    "SV-STY-104@17"
+  ],
+  "methodology/UVM-CFG-011/good.sv": [
+    "SV-OOP-001@5",
+    "SV-OOP-001@5",
+    "SV-OOP-001@16",
+    "SV-OOP-001@16",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@16",
+    "SV-STY-005@16",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@16",
+    "SV-STY-104@16"
   ],
   "methodology/UVM-CPL-002/bad.sv": [
     "SV-NAM-005@11",
@@ -5827,6 +5891,8 @@
     "SV-STY-104@13",
     "SV-STY-104@14",
     "UVM-CFG-002@11",
+    "UVM-CFG-010@11",
+    "UVM-CFG-011@12",
     "UVM-DAG-001@12"
   ],
   "methodology/UVM-RUS-004/good.sv": [
@@ -5861,6 +5927,9 @@
     "SV-STY-104@25",
     "SV-STY-104@26",
     "UVM-CFG-002@24",
+    "UVM-CFG-010@11",
+    "UVM-CFG-011@12",
+    "UVM-CFG-011@24",
     "UVM-DAG-001@12",
     "UVM-DAG-001@24"
   ],
@@ -6478,6 +6547,26 @@
     "SV-STY-104@47",
     "SV-STY-104@48",
     "UVM-FAC-003@4"
+  ],
+  "metrics/SV-MET-008/bad.sv": [
+    "SV-OOP-001@5",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-011@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5"
+  ],
+  "metrics/SV-MET-008/good.sv": [
+    "SV-OOP-001@5",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-011@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5"
   ],
   "naming/SV-NAM-001/bad.sv": [
     "SV-NAM-005@8",
@@ -7319,6 +7408,12 @@
     "SV-STY-104@9",
     "UVM-FAC-003@5"
   ],
+  "performance/SV-PRF-013/bad.sv": [
+    "COMPILE:MissingTimeScale:uvm_pkg.sv@54"
+  ],
+  "performance/SV-PRF-013/good.sv": [
+    "COMPILE:MissingTimeScale:uvm_pkg.sv@54"
+  ],
   "portability/PORT-PRP-001/bad.sv": [
     "COMPILE:UnknownSystemName@10"
   ],
@@ -7699,7 +7794,8 @@
     "SV-STY-104@17",
     "SV-STY-104@18",
     "UVM-FAC-003@4",
-    "UVM-FAC-003@13"
+    "UVM-FAC-003@13",
+    "UVM-SEQ-014@4"
   ],
   "readability/SV-API-001/bad.sv": [
     "SV-ASC-001@9",
@@ -8567,7 +8663,6 @@
   "types/SV-TYP-010/bad.sv": [
     "COMPILE:BadAssignment@11",
     "COMPILE:TaskReturnType@9",
-    "SV-STY-010@10",
     "SV-TIM-002@10"
   ],
   "types/SV-TYP-010/good.sv": [
@@ -8720,7 +8815,6 @@
     "SV-DED-005@27",
     "SV-DED-005@36",
     "SV-DED-011@22",
-    "SV-DED-013@8",
     "SV-NAM-111@15",
     "SV-STY-005@11",
     "SV-STY-005@12",
@@ -8734,7 +8828,6 @@
     "SV-STY-005@47",
     "SV-STY-005@48",
     "SV-STY-009@42",
-    "SV-STY-010@46",
     "SV-STY-104@11",
     "SV-STY-104@12",
     "SV-STY-104@18",
@@ -9384,7 +9477,8 @@
     "SV-STY-104@33",
     "SV-STY-104@34",
     "UVM-RUS-005@21",
-    "UVM-RUS-005@32"
+    "UVM-RUS-005@32",
+    "UVM-SEQ-015@9"
   ],
   "uvm/UVM-LOG-002/bad.sv": [
     "SV-NAM-001@7",
@@ -9913,6 +10007,7 @@
     "SV-STY-104@16",
     "SV-STY-104@17",
     "SV-TIM-002@15",
+    "UVM-PHS-001@12",
     "UVM-PHS-002@15"
   ],
   "uvm/UVM-PHS-008/good.sv": [
@@ -10388,6 +10483,7 @@
     "UVM-FAC-003@22",
     "UVM-NAM-105@4",
     "UVM-NAM-105@9",
+    "UVM-PHS-001@39",
     "UVM-TLM-001@15",
     "UVM-TLM-001@23",
     "UVM-TLM-004@15"
@@ -10441,6 +10537,72 @@
     "UVM-NAM-105@4",
     "UVM-TLM-001@10",
     "UVM-TLM-001@18"
+  ],
+  "uvm/UVM-SEQ-014/bad.sv": [
+    "SV-OOP-001@5",
+    "SV-OOP-001@5",
+    "SV-OOP-001@16",
+    "SV-OOP-001@16",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@16",
+    "SV-STY-005@16",
+    "SV-STY-011@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@16",
+    "SV-STY-104@16"
+  ],
+  "uvm/UVM-SEQ-014/good.sv": [
+    "SV-OOP-001@5",
+    "SV-OOP-001@5",
+    "SV-OOP-001@16",
+    "SV-OOP-001@16",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@16",
+    "SV-STY-005@16",
+    "SV-STY-011@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@16",
+    "SV-STY-104@16"
+  ],
+  "uvm/UVM-SEQ-015/bad.sv": [
+    "SV-OOP-001@5",
+    "SV-OOP-001@12",
+    "SV-OOP-001@12",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@12",
+    "SV-STY-005@12",
+    "SV-STY-011@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@12",
+    "SV-STY-104@12"
+  ],
+  "uvm/UVM-SEQ-015/good.sv": [
+    "SV-OOP-001@5",
+    "SV-OOP-001@12",
+    "SV-OOP-001@12",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@5",
+    "SV-STY-005@12",
+    "SV-STY-005@12",
+    "SV-STY-011@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@5",
+    "SV-STY-104@12",
+    "SV-STY-104@12"
   ],
   "uvm/UVM-STR-005/bad.sv": [
     "SV-DED-005@16",

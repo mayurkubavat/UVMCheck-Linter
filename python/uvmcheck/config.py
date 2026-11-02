@@ -256,6 +256,9 @@ class ProjectConfig:
                    `uvm_object_utils in your class, counts as library code.
     waivers        List of Waiver objects or Waiver subclasses.
     style, naming  Optional dicts with the same keys as the JSON config.
+    compat         Opt-in slang overlay (docs/compat.md), e.g.
+                   {"profile": "questa", "overrides": ["-auto-uvm"],
+                    "uvm_home": "$UVM_HOME"}.
 
     Rule settings are RuleConfig subclasses defined in (or assigned to) the
     class body. Subclasses inherit them and may replace one by defining a
@@ -273,6 +276,7 @@ class ProjectConfig:
     waivers: List[Waiver] = []
     style: Dict[str, Any] = {}
     naming: Dict[str, Any] = {}
+    compat: Dict[str, Any] = {}
 
     def rule_configs(self) -> List[type]:
         """All RuleConfig classes visible on this config, most-derived wins per rule key."""
@@ -314,6 +318,8 @@ class ProjectConfig:
             out["style"] = dict(self.style)
         if self.naming:
             out["naming"] = dict(self.naming)
+        if self.compat:
+            out["compat"] = dict(self.compat)
         return out
 
 
