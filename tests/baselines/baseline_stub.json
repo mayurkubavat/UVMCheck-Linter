@@ -247,6 +247,7 @@
   "concurrency/SV-CON-014/bad.sv": [
     "SV-RDB-002@21",
     "SV-RDB-002@22",
+    "SV-RDB-010@4",
     "SV-STY-005@8",
     "SV-STY-005@12",
     "SV-STY-005@28",
@@ -267,6 +268,7 @@
   "concurrency/SV-CON-014/good.sv": [
     "SV-RDB-002@26",
     "SV-RDB-002@27",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-005@9",
     "SV-STY-005@29",
@@ -289,6 +291,7 @@
     "SV-DED-006@16",
     "SV-DRV-001@21",
     "SV-RDB-005@23",
+    "SV-RDB-010@14",
     "SV-STY-001@16",
     "SV-STY-005@19",
     "SV-STY-005@26",
@@ -307,6 +310,8 @@
     "SV-DED-006@43",
     "SV-DED-013@35",
     "SV-RDB-005@26",
+    "SV-RDB-010@13",
+    "SV-RDB-010@41",
     "SV-STY-001@15",
     "SV-STY-001@43",
     "SV-STY-005@18",
@@ -349,6 +354,7 @@
   "concurrency/SV-DLY-004/bad.sv": [
     "SV-DED-005@7",
     "SV-RDB-002@16",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-001@7",
     "SV-STY-009@13",
@@ -359,6 +365,7 @@
     "SV-CNC-004@18",
     "SV-DED-006@7",
     "SV-RDB-002@28",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-001@7",
     "SV-STY-009@17",
@@ -424,6 +431,8 @@
     "SV-CNC-003@29",
     "SV-DED-006@40",
     "SV-RDB-002@46",
+    "SV-RDB-010@12",
+    "SV-RDB-010@38",
     "SV-SML-002@48",
     "SV-STY-001@14",
     "SV-STY-005@9",
@@ -454,6 +463,7 @@
     "UVM-RUS-006@4"
   ],
   "concurrency/SV-RSC-001/good.sv": [
+    "SV-RDB-010@12",
     "SV-STY-001@14",
     "SV-STY-005@9",
     "SV-STY-005@10",
@@ -479,6 +489,7 @@
   ],
   "concurrency/SV-RSC-002/bad.sv": [
     "SV-DED-005@5",
+    "SV-RDB-010@4",
     "SV-STY-001@5",
     "SV-STY-005@8",
     "SV-STY-005@11",
@@ -491,6 +502,7 @@
     "UVM-PHS-001@9"
   ],
   "concurrency/SV-RSC-002/good.sv": [
+    "SV-RDB-010@4",
     "SV-STY-001@5",
     "SV-STY-005@8",
     "SV-STY-005@11",
@@ -606,6 +618,7 @@
     "SV-DED-005@8",
     "SV-FSM-001@14",
     "SV-MOD-001@4",
+    "SV-RDB-010@6",
     "SV-STY-001@8",
     "SV-STY-001@8",
     "SV-STY-005@11",
@@ -628,6 +641,7 @@
     "SV-FSM-001@14",
     "SV-MOD-001@4",
     "SV-RDB-002@23",
+    "SV-RDB-010@6",
     "SV-STY-001@8",
     "SV-STY-001@8",
     "SV-STY-005@11",
@@ -649,6 +663,7 @@
     "SV-CNS-006@4",
     "SV-DED-005@8",
     "SV-MOD-001@4",
+    "SV-RDB-010@6",
     "SV-STY-001@8",
     "SV-STY-001@8",
     "SV-STY-005@11",
@@ -667,6 +682,7 @@
     "SV-MOD-001@4",
     "SV-RDB-002@21",
     "SV-RDB-002@22",
+    "SV-RDB-010@6",
     "SV-RND-002@20",
     "SV-RND-002@21",
     "SV-STY-001@8",
@@ -1201,6 +1217,7 @@
   "coverage/SV-COV-009/bad.sv": [
     "SV-COV-001@9",
     "SV-NAM-105@9",
+    "SV-RDB-007@8",
     "SV-STY-005@18",
     "SV-STY-005@19",
     "SV-STY-010@11",
@@ -1302,6 +1319,7 @@
   "coverage/SV-COV-016/bad.sv": [
     "SV-COV-001@9",
     "SV-NAM-105@9",
+    "SV-RDB-007@8",
     "SV-STY-010@12",
     "SV-STY-010@12",
     "SV-STY-010@12"
@@ -1512,6 +1530,7 @@
     "SV-DED-005@5",
     "SV-DED-005@18",
     "SV-DLY-003@7",
+    "SV-RDB-010@17",
     "SV-STY-001@18",
     "SV-STY-005@8",
     "SV-STY-005@11",
@@ -1644,6 +1663,7 @@
   "design/SV-DSN-001/bad.sv": [
     "SV-DED-005@13",
     "SV-DED-005@13",
+    "SV-RDB-010@11",
     "SV-STY-001@13",
     "SV-STY-001@13",
     "SV-STY-005@8",
@@ -1661,6 +1681,7 @@
   "design/SV-DSN-001/good.sv": [
     "SV-DED-006@13",
     "SV-DED-006@13",
+    "SV-RDB-010@11",
     "SV-STY-001@13",
     "SV-STY-001@13",
     "SV-STY-005@7",
@@ -1788,6 +1809,18 @@
     "SV-STY-104@16"
   ],
   "design/SV-DSN-004/bad.sv": [
+    "SV-RDB-007@17",
+    "SV-RDB-007@18",
+    "SV-RDB-007@19",
+    "SV-RDB-007@20",
+    "SV-RDB-007@21",
+    "SV-RDB-007@22",
+    "SV-RDB-007@23",
+    "SV-RDB-007@24",
+    "SV-RDB-007@25",
+    "SV-RDB-007@26",
+    "SV-RDB-007@27",
+    "SV-RDB-010@15",
     "SV-STY-001@17",
     "SV-STY-001@18",
     "SV-STY-001@19",
@@ -1827,6 +1860,19 @@
     "SV-STY-104@31"
   ],
   "design/SV-DSN-004/good.sv": [
+    "SV-RDB-007@17",
+    "SV-RDB-007@18",
+    "SV-RDB-007@19",
+    "SV-RDB-007@20",
+    "SV-RDB-007@21",
+    "SV-RDB-007@22",
+    "SV-RDB-007@23",
+    "SV-RDB-007@24",
+    "SV-RDB-007@25",
+    "SV-RDB-007@26",
+    "SV-RDB-007@27",
+    "SV-RDB-010@15",
+    "SV-RDB-010@33",
     "SV-STY-001@17",
     "SV-STY-001@18",
     "SV-STY-001@19",
@@ -1873,6 +1919,11 @@
     "SV-STY-104@41"
   ],
   "design/SV-DSN-005/bad.sv": [
+    "SV-RDB-010@4",
+    "SV-RDB-010@9",
+    "SV-RDB-010@14",
+    "SV-RDB-010@19",
+    "SV-RDB-010@25",
     "SV-STY-005@7",
     "SV-STY-005@8",
     "SV-STY-005@12",
@@ -1900,6 +1951,10 @@
     "UVM-FAC-003@25"
   ],
   "design/SV-DSN-005/good.sv": [
+    "SV-RDB-010@4",
+    "SV-RDB-010@9",
+    "SV-RDB-010@14",
+    "SV-RDB-010@19",
     "SV-STY-005@7",
     "SV-STY-005@8",
     "SV-STY-005@12",
@@ -1922,6 +1977,7 @@
     "UVM-FAC-003@19"
   ],
   "design/SV-DSN-006/bad.sv": [
+    "SV-RDB-010@4",
     "SV-STY-005@7",
     "SV-STY-005@10",
     "SV-STY-005@15",
@@ -1937,6 +1993,7 @@
     "SV-RDB-002@6",
     "SV-RDB-002@12",
     "SV-RDB-004@5",
+    "SV-RDB-010@16",
     "SV-STY-001@17",
     "SV-STY-005@7",
     "SV-STY-005@8",
@@ -2063,6 +2120,10 @@
   "design/UVM-ARC-001/bad.sv": [
     "SV-DED-006@43",
     "SV-DED-013@17",
+    "SV-RDB-010@11",
+    "SV-RDB-010@24",
+    "SV-RDB-010@32",
+    "SV-RDB-010@41",
     "SV-STY-001@13",
     "SV-STY-001@26",
     "SV-STY-001@34",
@@ -2095,6 +2156,11 @@
     "UVM-CPL-002@26"
   ],
   "design/UVM-ARC-001/good.sv": [
+    "SV-RDB-010@18",
+    "SV-RDB-010@25",
+    "SV-RDB-010@34",
+    "SV-RDB-010@43",
+    "SV-RDB-010@52",
     "SV-STY-001@36",
     "SV-STY-001@37",
     "SV-STY-001@45",
@@ -2133,6 +2199,11 @@
   "design/UVM-ARC-002/bad.sv": [
     "SV-INT-001@49",
     "SV-NAM-005@16",
+    "SV-RDB-010@8",
+    "SV-RDB-010@16",
+    "SV-RDB-010@23",
+    "SV-RDB-010@33",
+    "SV-RDB-010@41",
     "SV-STY-001@10",
     "SV-STY-001@25",
     "SV-STY-001@26",
@@ -2168,6 +2239,12 @@
     "SV-DED-005@50",
     "SV-DED-006@49",
     "SV-NAM-005@16",
+    "SV-RDB-010@8",
+    "SV-RDB-010@16",
+    "SV-RDB-010@23",
+    "SV-RDB-010@32",
+    "SV-RDB-010@40",
+    "SV-RDB-010@47",
     "SV-STY-001@10",
     "SV-STY-001@25",
     "SV-STY-001@26",
@@ -2214,6 +2291,8 @@
   "design/UVM-ARC-004/bad.sv": [
     "SV-DED-005@13",
     "SV-DED-006@14",
+    "SV-RDB-010@4",
+    "SV-RDB-010@11",
     "SV-STY-001@13",
     "SV-STY-001@14",
     "SV-STY-005@8",
@@ -2232,6 +2311,8 @@
   "design/UVM-ARC-004/good.sv": [
     "SV-DED-005@6",
     "SV-DED-005@17",
+    "SV-RDB-010@4",
+    "SV-RDB-010@15",
     "SV-STY-001@6",
     "SV-STY-001@17",
     "SV-STY-005@9",
@@ -2283,6 +2364,7 @@
     "UVM-FAC-003@5"
   ],
   "errors/SV-ERR-001/bad.sv": [
+    "SV-RDB-010@12",
     "SV-RND-015@6",
     "SV-RND-024@25",
     "SV-STY-005@9",
@@ -2305,6 +2387,7 @@
   "errors/SV-ERR-001/good.sv": [
     "SV-DED-005@14",
     "SV-RDB-002@24",
+    "SV-RDB-010@12",
     "SV-RND-015@6",
     "SV-RND-024@27",
     "SV-STY-005@9",
@@ -2330,6 +2413,7 @@
     "SV-DED-006@18",
     "SV-DED-006@19",
     "SV-INT-001@29",
+    "SV-RDB-010@16",
     "SV-STY-001@18",
     "SV-STY-001@19",
     "SV-STY-001@20",
@@ -2351,6 +2435,7 @@
   "errors/SV-ERR-002/good.sv": [
     "SV-DED-006@18",
     "SV-INT-001@29",
+    "SV-RDB-010@16",
     "SV-STY-001@18",
     "SV-STY-001@19",
     "SV-STY-001@20",
@@ -2376,6 +2461,7 @@
   ],
   "errors/SV-ERR-003/bad.sv": [
     "SV-RDB-002@13",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-005@9",
     "SV-STY-005@14",
@@ -2387,6 +2473,7 @@
   ],
   "errors/SV-ERR-003/good.sv": [
     "SV-RDB-002@13",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-005@9",
     "SV-STY-005@14",
@@ -2400,6 +2487,7 @@
     "SV-TIM-002@19"
   ],
   "errors/UVM-REP-006/bad.sv": [
+    "SV-RDB-010@16",
     "SV-STY-005@7",
     "SV-STY-005@13",
     "SV-STY-005@14",
@@ -2415,6 +2503,7 @@
     "UVM-FAC-003@4"
   ],
   "errors/UVM-REP-006/good.sv": [
+    "SV-RDB-010@16",
     "SV-STY-005@7",
     "SV-STY-005@13",
     "SV-STY-005@14",
@@ -2431,6 +2520,7 @@
   ],
   "errors/UVM-TST-001/bad.sv": [
     "SV-DED-006@13",
+    "SV-RDB-010@11",
     "SV-STY-001@13",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -2448,6 +2538,9 @@
   "errors/UVM-TST-001/good.sv": [
     "SV-DED-006@23",
     "SV-DED-013@27",
+    "SV-RDB-010@11",
+    "SV-RDB-010@21",
+    "SV-RDB-010@32",
     "SV-STY-001@23",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -2477,6 +2570,7 @@
     "UVM-SCB-002@23"
   ],
   "errors/UVM-TST-002/bad.sv": [
+    "SV-RDB-010@4",
     "SV-STY-005@8",
     "SV-STY-005@15",
     "SV-STY-005@20",
@@ -2499,6 +2593,7 @@
   ],
   "errors/UVM-TST-002/good.sv": [
     "SV-DED-006@6",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-005@9",
     "SV-STY-005@16",
@@ -2572,6 +2667,7 @@
   ],
   "methodology/SV-CNS-002/bad.sv": [
     "SV-DED-006@16",
+    "SV-RDB-010@13",
     "SV-STY-001@15",
     "SV-STY-001@16",
     "SV-STY-005@11",
@@ -2589,6 +2685,7 @@
     "UVM-PHS-001@20"
   ],
   "methodology/SV-CNS-002/good.sv": [
+    "SV-RDB-010@25",
     "SV-STY-005@22",
     "SV-STY-005@23",
     "SV-STY-005@29",
@@ -2611,6 +2708,7 @@
     "UVM-RUS-006@17"
   ],
   "methodology/SV-CNS-003/bad.sv": [
+    "SV-RDB-010@3",
     "SV-STY-005@10",
     "SV-STY-005@17",
     "SV-STY-005@18",
@@ -2624,6 +2722,7 @@
   ],
   "methodology/SV-CNS-003/good.sv": [
     "SV-DED-006@20",
+    "SV-RDB-010@18",
     "SV-STY-001@20",
     "SV-STY-005@15",
     "SV-STY-005@16",
@@ -2642,6 +2741,7 @@
   "methodology/SV-CNS-004/bad.sv": [
     "SV-COR-006@11",
     "SV-DED-006@5",
+    "SV-RDB-010@3",
     "SV-STY-001@5",
     "SV-STY-005@8",
     "SV-STY-005@23",
@@ -2669,6 +2769,7 @@
     "SV-DED-006@16",
     "SV-DED-006@17",
     "SV-MOD-001@3",
+    "SV-RDB-010@12",
     "SV-STY-001@14",
     "SV-STY-001@15",
     "SV-STY-001@16",
@@ -2715,6 +2816,7 @@
     "SV-RDB-002@15",
     "SV-RDB-002@15",
     "SV-RDB-002@16",
+    "SV-RDB-010@3",
     "SV-STY-001@5",
     "SV-STY-001@6",
     "SV-STY-001@6",
@@ -2744,6 +2846,7 @@
     "SV-RDB-002@17",
     "SV-RDB-002@18",
     "SV-RDB-002@19",
+    "SV-RDB-010@5",
     "SV-STY-001@7",
     "SV-STY-001@8",
     "SV-STY-001@9",
@@ -2778,6 +2881,7 @@
     "SV-DED-001@10",
     "SV-DED-006@5",
     "SV-DED-013@9",
+    "SV-RDB-010@3",
     "SV-STY-001@5",
     "SV-STY-005@8",
     "SV-STY-005@12",
@@ -2788,6 +2892,7 @@
     "UVM-TST-001@3"
   ],
   "methodology/SV-CNS-007/good.sv": [
+    "SV-RDB-010@3",
     "SV-STY-001@5",
     "SV-STY-001@6",
     "SV-STY-005@9",
@@ -2798,6 +2903,7 @@
   ],
   "methodology/SV-CNS-008/bad.sv": [
     "SV-RDB-002@9",
+    "SV-RDB-010@3",
     "SV-STY-005@7",
     "SV-STY-005@10",
     "SV-STY-005@14",
@@ -2812,6 +2918,8 @@
     "SV-DED-006@12",
     "SV-RDB-002@17",
     "SV-RDB-004@7",
+    "SV-RDB-010@3",
+    "SV-RDB-010@10",
     "SV-STY-001@12",
     "SV-STY-005@6",
     "SV-STY-005@8",
@@ -2837,6 +2945,7 @@
     "SV-COR-006@13",
     "SV-DED-013@12",
     "SV-MOD-001@20",
+    "SV-RDB-010@3",
     "SV-SML-002@14",
     "SV-SML-002@15",
     "SV-STY-005@7",
@@ -2861,6 +2970,8 @@
     "SV-MOD-001@3",
     "SV-OOP-009@10",
     "SV-RDB-004@10",
+    "SV-RDB-010@5",
+    "SV-RDB-010@14",
     "SV-STY-005@9",
     "SV-STY-005@11",
     "SV-STY-005@12",
@@ -2924,6 +3035,8 @@
     "SV-DED-006@12",
     "SV-DED-006@13",
     "SV-RDB-002@7",
+    "SV-RDB-007@22",
+    "SV-RDB-010@28",
     "SV-RND-015@22",
     "SV-RND-015@22",
     "SV-RND-015@22",
@@ -2971,6 +3084,7 @@
     "SV-RDB-002@35",
     "SV-RDB-002@35",
     "SV-RDB-002@37",
+    "SV-RDB-010@14",
     "SV-RND-015@6",
     "SV-RND-015@7",
     "SV-STY-001@16",
@@ -3032,6 +3146,7 @@
     "SV-RDB-002@55",
     "SV-RDB-002@56",
     "SV-RDB-002@57",
+    "SV-RDB-010@16",
     "SV-RND-015@8",
     "SV-RND-015@9",
     "SV-STY-001@18",
@@ -3130,6 +3245,7 @@
   ],
   "methodology/SV-DUP-004/bad.sv": [
     "SV-DED-006@6",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-005@9",
     "SV-STY-005@13",
@@ -3152,6 +3268,7 @@
   "methodology/SV-DUP-004/good.sv": [
     "SV-DED-006@7",
     "SV-RDB-002@34",
+    "SV-RDB-010@4",
     "SV-STY-001@7",
     "SV-STY-001@8",
     "SV-STY-005@11",
@@ -3200,6 +3317,12 @@
     "SV-DUP-001@89",
     "SV-RDB-002@42",
     "SV-RDB-002@82",
+    "SV-RDB-010@28",
+    "SV-RDB-010@37",
+    "SV-RDB-010@46",
+    "SV-RDB-010@68",
+    "SV-RDB-010@77",
+    "SV-RDB-010@86",
     "SV-STY-001@29",
     "SV-STY-001@38",
     "SV-STY-001@47",
@@ -3285,6 +3408,12 @@
     "SV-DUP-001@88",
     "SV-RDB-002@42",
     "SV-RDB-002@73",
+    "SV-RDB-010@28",
+    "SV-RDB-010@37",
+    "SV-RDB-010@46",
+    "SV-RDB-010@69",
+    "SV-RDB-010@78",
+    "SV-RDB-010@85",
     "SV-STY-001@29",
     "SV-STY-001@38",
     "SV-STY-001@47",
@@ -3383,6 +3512,11 @@
     "SV-STY-104@21"
   ],
   "methodology/SV-PKG-004/bad.sv": [
+    "SV-RDB-007@39",
+    "SV-RDB-010@17",
+    "SV-RDB-010@23",
+    "SV-RDB-010@30",
+    "SV-RDB-010@38",
     "SV-STY-001@31",
     "SV-STY-001@39",
     "SV-STY-005@6",
@@ -3410,6 +3544,9 @@
     "UVM-FAC-003@38"
   ],
   "methodology/SV-PKG-004/good.sv": [
+    "SV-RDB-010@26",
+    "SV-RDB-010@34",
+    "SV-RDB-010@42",
     "SV-STY-001@27",
     "SV-STY-001@35",
     "SV-STY-001@43",
@@ -3442,6 +3579,8 @@
     "SV-DED-006@5",
     "SV-DED-006@22",
     "SV-RDB-002@27",
+    "SV-RDB-010@3",
+    "SV-RDB-010@20",
     "SV-STY-001@5",
     "SV-STY-005@8",
     "SV-STY-005@14",
@@ -3470,6 +3609,9 @@
     "SV-DED-006@12",
     "SV-DED-006@13",
     "SV-DED-006@28",
+    "SV-RDB-010@3",
+    "SV-RDB-010@10",
+    "SV-RDB-010@26",
     "SV-SML-002@34",
     "SV-STY-001@12",
     "SV-STY-001@13",
@@ -3499,6 +3641,7 @@
   "methodology/UVM-CFG-008/bad.sv": [
     "SV-DED-006@6",
     "SV-RDB-002@11",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-005@9",
     "SV-STY-005@14",
@@ -3514,6 +3657,7 @@
   "methodology/UVM-CFG-008/good.sv": [
     "SV-DED-006@6",
     "SV-RDB-002@11",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-005@9",
     "SV-STY-005@14",
@@ -3529,6 +3673,7 @@
   "methodology/UVM-CFG-009/bad.sv": [
     "SV-DED-006@14",
     "SV-RDB-002@20",
+    "SV-RDB-010@12",
     "SV-STY-001@14",
     "SV-STY-005@9",
     "SV-STY-005@10",
@@ -3555,6 +3700,10 @@
     "SV-DED-006@44",
     "SV-RDB-002@22",
     "SV-RDB-002@37",
+    "SV-RDB-007@45",
+    "SV-RDB-010@11",
+    "SV-RDB-010@26",
+    "SV-RDB-010@42",
     "SV-STY-001@13",
     "SV-STY-001@28",
     "SV-STY-001@44",
@@ -3596,8 +3745,25 @@
     "UVM-PHS-001@49",
     "UVM-PHS-001@52"
   ],
+  "methodology/UVM-CFG-010/bad.sv": [
+    "SV-RDB-010@4",
+    "SV-RDB-010@15"
+  ],
+  "methodology/UVM-CFG-010/good.sv": [
+    "SV-RDB-010@4",
+    "SV-RDB-010@15"
+  ],
+  "methodology/UVM-CFG-011/bad.sv": [
+    "SV-RDB-010@4",
+    "SV-RDB-010@16"
+  ],
+  "methodology/UVM-CFG-011/good.sv": [
+    "SV-RDB-010@4",
+    "SV-RDB-010@15"
+  ],
   "methodology/UVM-CPL-002/bad.sv": [
     "SV-NAM-005@11",
+    "SV-RDB-010@3",
     "SV-STY-001@5",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -3613,6 +3779,8 @@
   ],
   "methodology/UVM-CPL-002/good.sv": [
     "SV-NAM-005@19",
+    "SV-RDB-010@3",
+    "SV-RDB-010@28",
     "SV-STY-001@5",
     "SV-STY-001@30",
     "SV-STY-005@8",
@@ -3636,6 +3804,9 @@
   ],
   "methodology/UVM-CPL-003/bad.sv": [
     "SV-RDB-002@30",
+    "SV-RDB-010@3",
+    "SV-RDB-010@12",
+    "SV-RDB-010@20",
     "SV-STY-001@5",
     "SV-STY-001@6",
     "SV-STY-001@14",
@@ -3663,6 +3834,9 @@
   "methodology/UVM-CPL-003/good.sv": [
     "SV-DED-005@22",
     "SV-RDB-002@33",
+    "SV-RDB-010@3",
+    "SV-RDB-010@12",
+    "SV-RDB-010@20",
     "SV-STY-001@5",
     "SV-STY-001@6",
     "SV-STY-001@14",
@@ -3689,6 +3863,7 @@
   ],
   "methodology/UVM-CPL-004/bad.sv": [
     "SV-RDB-002@10",
+    "SV-RDB-010@3",
     "SV-STY-005@7",
     "SV-STY-005@12",
     "SV-STY-005@13",
@@ -3702,6 +3877,7 @@
   ],
   "methodology/UVM-CPL-004/good.sv": [
     "SV-DED-006@9",
+    "SV-RDB-010@7",
     "SV-STY-001@9",
     "SV-STY-005@12",
     "SV-STY-005@15",
@@ -3716,6 +3892,7 @@
   "methodology/UVM-PAT-001/bad.sv": [
     "SV-OOP-009@7",
     "SV-RDB-004@7",
+    "SV-RDB-010@11",
     "SV-STY-005@6",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -3737,6 +3914,8 @@
     "SV-OOP-007@13",
     "SV-OOP-009@7",
     "SV-RDB-004@7",
+    "SV-RDB-010@11",
+    "SV-RDB-010@23",
     "SV-STY-005@6",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -3793,6 +3972,7 @@
     "SV-RDB-002@48",
     "SV-RDB-002@49",
     "SV-RDB-002@50",
+    "SV-RDB-010@13",
     "SV-RND-015@8",
     "SV-STY-001@15",
     "SV-STY-001@16",
@@ -3870,6 +4050,8 @@
     "SV-RDB-002@52",
     "SV-RDB-002@53",
     "SV-RDB-002@54",
+    "SV-RDB-010@13",
+    "SV-RDB-010@59",
     "SV-RND-015@8",
     "SV-STY-001@15",
     "SV-STY-001@16",
@@ -3929,6 +4111,7 @@
   "methodology/UVM-REP-007/bad.sv": [
     "SV-DED-006@13",
     "SV-ERR-001@19",
+    "SV-RDB-010@11",
     "SV-STY-001@13",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -3949,6 +4132,7 @@
   ],
   "methodology/UVM-REP-007/good.sv": [
     "SV-DED-006@13",
+    "SV-RDB-010@11",
     "SV-STY-001@13",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -3969,6 +4153,7 @@
   ],
   "methodology/UVM-REP-008/bad.sv": [
     "SV-DED-006@13",
+    "SV-RDB-010@11",
     "SV-STY-001@13",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -3986,6 +4171,7 @@
   ],
   "methodology/UVM-REP-008/good.sv": [
     "SV-DED-006@13",
+    "SV-RDB-010@11",
     "SV-STY-001@13",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -4004,15 +4190,19 @@
     "UVM-SCB-002@13"
   ],
   "methodology/UVM-REP-009/bad.sv": [
+    "SV-RDB-010@4",
     "SV-STY-010@10",
     "UVM-PHS-001@9"
   ],
   "methodology/UVM-REP-009/good.sv": [
+    "SV-RDB-010@4",
     "SV-STY-010@10",
     "UVM-PHS-001@9"
   ],
   "methodology/UVM-ROL-001/bad.sv": [
     "SV-DED-006@20",
+    "SV-RDB-010@11",
+    "SV-RDB-010@18",
     "SV-RND-015@5",
     "SV-STY-001@20",
     "SV-STY-005@8",
@@ -4035,6 +4225,8 @@
     "UVM-RUS-006@3"
   ],
   "methodology/UVM-ROL-001/good.sv": [
+    "SV-RDB-010@11",
+    "SV-RDB-010@18",
     "SV-RND-015@5",
     "SV-RND-015@20",
     "SV-STY-001@20",
@@ -4060,6 +4252,7 @@
   "methodology/UVM-ROL-002/bad.sv": [
     "SV-COV-001@14",
     "SV-COV-012@15",
+    "SV-RDB-010@11",
     "SV-RND-015@5",
     "SV-STY-001@13",
     "SV-STY-005@8",
@@ -4075,6 +4268,7 @@
   "methodology/UVM-ROL-002/good.sv": [
     "SV-COV-001@14",
     "SV-COV-012@15",
+    "SV-RDB-010@11",
     "SV-RND-015@5",
     "SV-STY-001@13",
     "SV-STY-005@8",
@@ -4088,6 +4282,9 @@
     "UVM-RUS-006@3"
   ],
   "methodology/UVM-ROL-003/bad.sv": [
+    "SV-RDB-010@3",
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
     "SV-STY-001@19",
     "SV-STY-001@20",
     "SV-STY-005@7",
@@ -4106,6 +4303,10 @@
     "UVM-TST-001@3"
   ],
   "methodology/UVM-ROL-003/good.sv": [
+    "SV-RDB-010@3",
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
+    "SV-RDB-010@25",
     "SV-STY-001@19",
     "SV-STY-001@27",
     "SV-STY-001@28",
@@ -4130,6 +4331,9 @@
   "methodology/UVM-ROL-004/bad.sv": [
     "SV-DED-005@19",
     "SV-DED-005@20",
+    "SV-RDB-010@3",
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
     "SV-STY-001@19",
     "SV-STY-001@20",
     "SV-STY-005@7",
@@ -4152,6 +4356,10 @@
     "SV-DED-005@19",
     "SV-DED-005@20",
     "SV-DED-005@33",
+    "SV-RDB-010@3",
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
+    "SV-RDB-010@31",
     "SV-STY-001@19",
     "SV-STY-001@20",
     "SV-STY-001@33",
@@ -4178,6 +4386,8 @@
     "UVM-TST-001@10"
   ],
   "methodology/UVM-ROL-005/bad.sv": [
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
     "SV-STY-001@19",
     "SV-STY-001@20",
     "SV-STY-005@7",
@@ -4194,6 +4404,8 @@
     "SV-STY-104@24"
   ],
   "methodology/UVM-ROL-005/good.sv": [
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
     "SV-STY-001@19",
     "SV-STY-001@20",
     "SV-STY-005@7",
@@ -4214,6 +4426,8 @@
   "methodology/UVM-ROL-006/bad.sv": [
     "SV-DED-006@11",
     "SV-DED-011@26",
+    "SV-RDB-010@9",
+    "SV-RDB-010@20",
     "SV-STY-001@11",
     "SV-STY-001@22",
     "SV-STY-005@14",
@@ -4236,6 +4450,8 @@
   "methodology/UVM-ROL-006/good.sv": [
     "SV-DED-005@18",
     "SV-NAM-001@8",
+    "SV-RDB-010@8",
+    "SV-RDB-010@16",
     "SV-STY-001@10",
     "SV-STY-001@18",
     "SV-STY-005@13",
@@ -4257,6 +4473,9 @@
     "SV-DED-005@29",
     "SV-MOD-001@24",
     "SV-NAM-111@24",
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
+    "SV-RDB-010@25",
     "SV-STY-001@27",
     "SV-STY-001@28",
     "SV-STY-001@29",
@@ -4289,6 +4508,10 @@
     "SV-NAM-001@44",
     "SV-NAM-005@44",
     "SV-NAM-111@24",
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
+    "SV-RDB-010@25",
+    "SV-RDB-010@44",
     "SV-STY-001@27",
     "SV-STY-001@28",
     "SV-STY-001@29",
@@ -4325,6 +4548,7 @@
     "SV-DED-006@6",
     "SV-DED-006@7",
     "SV-DED-006@8",
+    "SV-RDB-010@3",
     "SV-STY-001@5",
     "SV-STY-001@6",
     "SV-STY-001@7",
@@ -4340,6 +4564,7 @@
   "methodology/UVM-RUS-002/good.sv": [
     "SV-DED-006@16",
     "SV-DED-006@17",
+    "SV-RDB-010@14",
     "SV-STY-001@16",
     "SV-STY-001@17",
     "SV-STY-005@11",
@@ -4356,6 +4581,8 @@
   "methodology/UVM-RUS-003/bad.sv": [
     "SV-DED-006@12",
     "SV-RDB-002@18",
+    "SV-RDB-010@3",
+    "SV-RDB-010@10",
     "SV-STY-001@12",
     "SV-STY-005@7",
     "SV-STY-005@8",
@@ -4373,6 +4600,8 @@
   "methodology/UVM-RUS-003/good.sv": [
     "SV-DED-006@20",
     "SV-DED-006@21",
+    "SV-RDB-010@3",
+    "SV-RDB-010@18",
     "SV-STY-001@20",
     "SV-STY-001@21",
     "SV-STY-005@7",
@@ -4396,6 +4625,7 @@
   "methodology/UVM-RUS-004/bad.sv": [
     "SV-DED-006@5",
     "SV-RDB-002@12",
+    "SV-RDB-010@3",
     "SV-STY-001@5",
     "SV-STY-005@8",
     "SV-STY-005@13",
@@ -4413,6 +4643,7 @@
     "SV-DED-006@5",
     "SV-RDB-002@12",
     "SV-RDB-002@24",
+    "SV-RDB-010@3",
     "SV-STY-001@5",
     "SV-STY-005@8",
     "SV-STY-005@13",
@@ -4436,6 +4667,9 @@
     "UVM-DAG-001@24"
   ],
   "methodology/UVM-RUS-005/bad.sv": [
+    "SV-RDB-010@3",
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
     "SV-STY-005@7",
     "SV-STY-005@8",
     "SV-STY-005@14",
@@ -4454,6 +4688,9 @@
   ],
   "methodology/UVM-RUS-005/good.sv": [
     "SV-DED-006@19",
+    "SV-RDB-010@3",
+    "SV-RDB-010@10",
+    "SV-RDB-010@17",
     "SV-STY-001@19",
     "SV-STY-005@7",
     "SV-STY-005@8",
@@ -4517,6 +4754,7 @@
     "SV-DLY-003@24",
     "SV-MET-004@20",
     "SV-RDB-002@24",
+    "SV-RDB-010@4",
     "SV-SML-004@12",
     "SV-STY-001@6",
     "SV-STY-001@6",
@@ -4541,6 +4779,7 @@
     "SV-DED-006@6",
     "SV-DED-006@7",
     "SV-DLY-004@13",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-001@6",
     "SV-STY-001@6",
@@ -4780,6 +5019,8 @@
     "SV-OOP-009@12",
     "SV-OOP-009@23",
     "SV-RDB-004@12",
+    "SV-RDB-010@6",
+    "SV-RDB-010@17",
     "SV-STY-005@10",
     "SV-STY-005@14",
     "SV-STY-005@15",
@@ -4795,6 +5036,7 @@
   ],
   "metrics/SV-MET-003/good.sv": [
     "SV-OOP-009@16",
+    "SV-RDB-010@11",
     "SV-STY-005@8",
     "SV-STY-005@9",
     "SV-STY-005@15",
@@ -4854,6 +5096,7 @@
     "SV-STY-104@10"
   ],
   "metrics/SV-MET-006/bad.sv": [
+    "SV-RDB-010@4",
     "SV-STY-001@5",
     "SV-STY-001@6",
     "SV-STY-001@7",
@@ -4908,6 +5151,7 @@
     "UVM-FAC-003@4"
   ],
   "metrics/SV-MET-009/good.sv": [
+    "SV-RDB-007@25",
     "SV-SML-001@25",
     "SV-SML-001@25",
     "SV-SML-001@25",
@@ -5059,6 +5303,7 @@
     "SV-DED-011@28",
     "SV-DED-011@32",
     "SV-PRF-001@28",
+    "SV-RDB-010@18",
     "SV-STY-005@11",
     "SV-STY-005@15",
     "SV-STY-005@16",
@@ -5090,6 +5335,7 @@
     "SV-DED-005@21",
     "SV-DED-006@22",
     "SV-ERR-001@41",
+    "SV-RDB-010@19",
     "SV-STY-001@20",
     "SV-STY-001@21",
     "SV-STY-001@22",
@@ -5346,6 +5592,7 @@
   ],
   "oop/UVM-OBS-001/bad.sv": [
     "SV-RDB-002@19",
+    "SV-RDB-010@11",
     "SV-STY-005@8",
     "SV-STY-005@15",
     "SV-STY-005@20",
@@ -5371,6 +5618,7 @@
   "oop/UVM-RAL-001/bad.sv": [
     "SV-DED-005@18",
     "SV-RDB-002@27",
+    "SV-RDB-010@16",
     "SV-STY-005@13",
     "SV-STY-005@14",
     "SV-STY-005@23",
@@ -5390,6 +5638,7 @@
     "UVM-FAC-003@5"
   ],
   "oop/UVM-SEQ-002/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@16",
     "SV-STY-005@20",
@@ -5410,6 +5659,7 @@
     "UVM-FAC-003@5"
   ],
   "oop/UVM-SEQ-003/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-005@14",
     "SV-STY-005@18",
     "SV-STY-005@19",
@@ -5449,6 +5699,7 @@
     "SV-DED-011@27",
     "SV-DED-011@31",
     "SV-OOP-001@23",
+    "SV-RDB-010@17",
     "SV-STY-005@10",
     "SV-STY-005@14",
     "SV-STY-005@15",
@@ -5521,6 +5772,7 @@
     "UVM-FAC-003@5"
   ],
   "performance/SV-PRF-005/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@15",
     "SV-STY-005@16",
@@ -5576,6 +5828,7 @@
   ],
   "performance/SV-PRF-009/bad.sv": [
     "SV-DED-006@9",
+    "SV-RDB-010@7",
     "SV-STY-005@12",
     "SV-STY-005@16",
     "SV-STY-005@17",
@@ -5948,6 +6201,7 @@
   ],
   "random/SV-RND-024/bad.sv": [
     "SV-RDB-002@21",
+    "SV-RDB-010@12",
     "SV-RND-015@5",
     "SV-RND-015@6",
     "SV-STY-005@9",
@@ -5972,6 +6226,7 @@
   ],
   "random/SV-RND-024/good.sv": [
     "SV-RDB-002@22",
+    "SV-RDB-010@11",
     "SV-RND-015@5",
     "SV-STY-005@8",
     "SV-STY-005@9",
@@ -6062,6 +6317,7 @@
   "random/SV-RND-027/bad.sv": [
     "SV-NAM-005@4",
     "SV-RDB-002@28",
+    "SV-RDB-010@22",
     "SV-RND-015@6",
     "SV-STY-005@10",
     "SV-STY-005@11",
@@ -6092,6 +6348,7 @@
   "random/SV-RND-027/good.sv": [
     "SV-NAM-005@4",
     "SV-RDB-002@27",
+    "SV-RDB-010@21",
     "SV-STY-005@11",
     "SV-STY-005@12",
     "SV-STY-005@18",
@@ -6120,6 +6377,7 @@
   ],
   "random/SV-TST-001/bad.sv": [
     "SV-RDB-002@8",
+    "SV-RDB-010@4",
     "SV-RND-015@5",
     "SV-STY-005@9",
     "SV-STY-005@10",
@@ -6131,6 +6389,8 @@
   "random/SV-TST-001/good.sv": [
     "SV-DED-006@6",
     "SV-RDB-002@16",
+    "SV-RDB-010@4",
+    "SV-RDB-010@13",
     "SV-RND-015@5",
     "SV-STY-005@10",
     "SV-STY-005@11",
@@ -6224,6 +6484,7 @@
     "SV-STY-104@10"
   ],
   "readability/SV-RDB-002/good.sv": [
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-005@9",
     "SV-STY-005@14",
@@ -6298,6 +6559,143 @@
     "SV-STY-104@14",
     "SV-STY-104@15"
   ],
+  "readability/SV-RDB-006/bad.sv": [
+    "SV-DED-005@14",
+    "SV-DED-006@13",
+    "SV-STY-005@9",
+    "SV-STY-005@10",
+    "SV-STY-005@19",
+    "SV-STY-005@20",
+    "SV-STY-104@9",
+    "SV-STY-104@10",
+    "SV-STY-104@19",
+    "SV-STY-104@20",
+    "UVM-FAC-003@4"
+  ],
+  "readability/SV-RDB-006/good.sv": [
+    "SV-DED-006@14",
+    "SV-STY-005@10",
+    "SV-STY-005@11",
+    "SV-STY-005@19",
+    "SV-STY-005@20",
+    "SV-STY-104@10",
+    "SV-STY-104@11",
+    "SV-STY-104@19",
+    "SV-STY-104@20",
+    "UVM-FAC-003@4"
+  ],
+  "readability/SV-RDB-007/bad.sv": [
+    "SV-RDB-002@11",
+    "SV-RDB-002@15",
+    "SV-RDB-002@16",
+    "SV-RDB-002@17",
+    "SV-SML-001@5",
+    "SV-STY-005@19",
+    "SV-STY-005@20",
+    "SV-STY-009@7",
+    "SV-STY-010@11",
+    "SV-STY-010@14",
+    "SV-STY-010@15",
+    "SV-STY-010@16",
+    "SV-STY-010@17",
+    "SV-STY-104@19",
+    "SV-STY-104@20"
+  ],
+  "readability/SV-RDB-007/good.sv": [
+    "SV-DED-004@14",
+    "SV-DED-004@15",
+    "SV-DED-004@16",
+    "SV-DED-004@17",
+    "SV-DED-004@18",
+    "SV-DED-004@19",
+    "SV-DED-004@20",
+    "SV-RDB-002@9",
+    "SV-RDB-002@13",
+    "SV-RDB-002@16",
+    "SV-RDB-002@17",
+    "SV-RDB-002@19",
+    "SV-RDB-002@20",
+    "SV-RDB-002@21",
+    "SV-STY-005@11",
+    "SV-STY-005@23",
+    "SV-STY-005@24",
+    "SV-STY-009@12",
+    "SV-STY-010@9",
+    "SV-STY-010@13",
+    "SV-STY-010@16",
+    "SV-STY-010@17",
+    "SV-STY-010@18",
+    "SV-STY-010@19",
+    "SV-STY-010@20",
+    "SV-STY-010@21",
+    "SV-STY-104@11",
+    "SV-STY-104@23",
+    "SV-STY-104@24"
+  ],
+  "readability/SV-RDB-008/bad.sv": [
+    "SV-DED-011@6",
+    "SV-STY-005@7",
+    "SV-STY-005@8",
+    "SV-STY-104@7",
+    "SV-STY-104@8"
+  ],
+  "readability/SV-RDB-008/good.sv": [
+    "SV-DED-011@9",
+    "SV-STY-005@10",
+    "SV-STY-005@11",
+    "SV-STY-104@10",
+    "SV-STY-104@11"
+  ],
+  "readability/SV-RDB-009/bad.sv": [
+    "SV-DED-011@6",
+    "SV-DED-011@7",
+    "SV-STY-005@6",
+    "SV-STY-005@7",
+    "SV-STY-005@13",
+    "SV-STY-005@14",
+    "SV-STY-009@8",
+    "SV-STY-104@6",
+    "SV-STY-104@7",
+    "SV-STY-104@13",
+    "SV-STY-104@14"
+  ],
+  "readability/SV-RDB-009/good.sv": [
+    "SV-DED-005@5",
+    "SV-DED-011@6",
+    "SV-STY-005@6",
+    "SV-STY-005@12",
+    "SV-STY-005@13",
+    "SV-STY-009@7",
+    "SV-STY-104@6",
+    "SV-STY-104@12",
+    "SV-STY-104@13"
+  ],
+  "readability/SV-RDB-010/bad.sv": [
+    "SV-STY-005@9",
+    "SV-STY-005@10",
+    "SV-STY-005@15",
+    "SV-STY-005@16",
+    "SV-STY-104@9",
+    "SV-STY-104@10",
+    "SV-STY-104@15",
+    "SV-STY-104@16",
+    "UVM-FAC-003@12",
+    "UVM-TST-001@5"
+  ],
+  "readability/SV-RDB-010/good.sv": [
+    "SV-STY-005@10",
+    "SV-STY-005@11",
+    "SV-STY-005@18",
+    "SV-STY-005@19",
+    "SV-STY-005@22",
+    "SV-STY-104@10",
+    "SV-STY-104@11",
+    "SV-STY-104@18",
+    "SV-STY-104@19",
+    "SV-STY-104@22",
+    "UVM-FAC-003@15",
+    "UVM-TST-001@6"
+  ],
   "rtl_tb_bridge/SV-CB-001/bad.sv": [
     "COMPILE:ClockVarOutputRead@19",
     "SV-DBC-001@6",
@@ -6321,6 +6719,7 @@
     "SV-NAM-001@12",
     "SV-NAM-003@7",
     "SV-NAM-102@7",
+    "SV-RDB-010@12",
     "SV-STY-001@14",
     "SV-STY-005@18",
     "SV-STY-005@23",
@@ -6356,6 +6755,7 @@
     "UVM-FAC-003@5"
   ],
   "safety/SV-RND-001/bad.sv": [
+    "SV-RDB-010@11",
     "SV-RND-015@7",
     "SV-STY-005@8",
     "SV-STY-005@15",
@@ -6430,6 +6830,7 @@
   ],
   "security/SEC-LOG-001/bad.sv": [
     "SV-DED-006@11",
+    "SV-RDB-010@9",
     "SV-STY-001@11",
     "SV-STY-005@15",
     "SV-STY-005@21",
@@ -6462,6 +6863,7 @@
   ],
   "smells/SV-SML-001/bad.sv": [
     "SV-RDB-002@15",
+    "SV-RDB-010@7",
     "SV-STY-001@10",
     "SV-STY-005@13",
     "SV-STY-005@18",
@@ -6480,6 +6882,7 @@
     "UVM-FAC-003@5"
   ],
   "smells/SV-SML-002/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@15",
     "SV-STY-005@16",
@@ -6498,6 +6901,7 @@
     "UVM-FAC-003@5"
   ],
   "smells/SV-SML-003/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@15",
     "SV-STY-005@16",
@@ -6647,6 +7051,7 @@
     "UVM-FAC-003@5"
   ],
   "style/SV-STY-016/bad.sv": [
+    "SV-RDB-007@9",
     "SV-STY-005@10",
     "SV-STY-104@10"
   ],
@@ -6692,6 +7097,7 @@
   ],
   "style/UVM-TLM-003/bad.sv": [
     "COMPILE:UndeclaredIdentifier@10",
+    "SV-RDB-010@7",
     "SV-STY-001@10",
     "SV-STY-005@13",
     "SV-STY-005@14",
@@ -6759,6 +7165,13 @@
     "SV-STY-104@8",
     "SV-STY-104@9",
     "UVM-FAC-003@5"
+  ],
+  "sva/SV-SVA-006/bad.sv": [
+    "SVA-ACT-001@3"
+  ],
+  "sva/SV-SVA-006/good.sv": [
+    "SVA-ACT-001@6",
+    "SVA-ACT-001@7"
   ],
   "sva/SVA-ACT-001/bad.sv": [
     "SV-SVA-001@9"
@@ -6929,6 +7342,7 @@
     "SV-DED-011@8",
     "SV-NAM-005@11",
     "SV-RDB-002@17",
+    "SV-RDB-010@11",
     "UVM-NAM-104@11",
     "UVM-SEQ-010@15"
   ],
@@ -6952,12 +7366,14 @@
   "uvm/RAL-BLK-001/bad.sv": [
     "RAL-MAP-001@25",
     "SV-DED-005@21",
+    "SV-RDB-010@30",
     "SV-STY-001@32",
     "UVM-PHS-001@36"
   ],
   "uvm/RAL-BLK-001/good.sv": [
     "RAL-MAP-001@25",
     "SV-DED-005@21",
+    "SV-RDB-010@30",
     "SV-STY-001@32",
     "UVM-PHS-001@36"
   ],
@@ -7078,6 +7494,7 @@
   "uvm/RAL-WIRE-001/bad.sv": [
     "SV-DED-006@7",
     "SV-DED-006@9",
+    "SV-RDB-010@4",
     "SV-STY-001@7",
     "SV-STY-001@8",
     "SV-STY-001@9",
@@ -7091,6 +7508,7 @@
   "uvm/RAL-WIRE-001/good.sv": [
     "SV-DED-006@7",
     "SV-DED-006@9",
+    "SV-RDB-010@4",
     "SV-STY-001@7",
     "SV-STY-001@8",
     "SV-STY-001@9",
@@ -7105,6 +7523,7 @@
     "SV-DED-006@14",
     "SV-RDB-002@21",
     "SV-RDB-002@24",
+    "SV-RDB-010@12",
     "SV-STY-001@14",
     "SV-STY-005@10",
     "SV-STY-005@17",
@@ -7151,6 +7570,7 @@
     "SV-DED-006@22",
     "SV-ERR-001@41",
     "SV-OOP-002@38",
+    "SV-RDB-010@19",
     "SV-STY-001@20",
     "SV-STY-001@21",
     "SV-STY-001@22",
@@ -7187,6 +7607,7 @@
     "SV-NAM-001@7",
     "SV-NAM-005@7",
     "SV-RDB-002@15",
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@16",
     "SV-STY-005@17",
@@ -7206,6 +7627,7 @@
   ],
   "uvm/UVM-CFG-004/bad.sv": [
     "SV-DED-006@9",
+    "SV-RDB-010@7",
     "SV-STY-005@12",
     "SV-STY-005@17",
     "SV-STY-005@18",
@@ -7223,6 +7645,8 @@
   "uvm/UVM-CFG-005/bad.sv": [
     "SV-DED-005@22",
     "SV-DED-006@7",
+    "SV-RDB-010@5",
+    "SV-RDB-010@20",
     "SV-STY-001@7",
     "SV-STY-001@22",
     "SV-STY-005@11",
@@ -7244,6 +7668,8 @@
   "uvm/UVM-CFG-005/good.sv": [
     "SV-DED-005@21",
     "SV-DED-006@7",
+    "SV-RDB-010@5",
+    "SV-RDB-010@19",
     "SV-STY-001@7",
     "SV-STY-001@21",
     "SV-STY-005@11",
@@ -7264,6 +7690,7 @@
   "uvm/UVM-CFG-006/bad.sv": [
     "SV-DED-005@6",
     "SV-DED-005@7",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-001@7",
     "SV-STY-005@10",
@@ -7277,6 +7704,7 @@
   "uvm/UVM-CFG-006/good.sv": [
     "SV-DED-005@18",
     "SV-DED-006@6",
+    "SV-RDB-010@15",
     "SV-STY-001@17",
     "SV-STY-001@18",
     "SV-STY-005@9",
@@ -7311,6 +7739,8 @@
   ],
   "uvm/UVM-FAC-001/bad.sv": [
     "SV-DED-005@11",
+    "SV-RDB-010@4",
+    "SV-RDB-010@10",
     "SV-STY-001@11",
     "SV-STY-005@7",
     "SV-STY-005@8",
@@ -7327,6 +7757,8 @@
   ],
   "uvm/UVM-FAC-001/good.sv": [
     "SV-DED-005@14",
+    "SV-RDB-010@4",
+    "SV-RDB-010@12",
     "SV-STY-001@14",
     "SV-STY-005@9",
     "SV-STY-005@10",
@@ -7379,6 +7811,9 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-FAC-005/bad.sv": [
+    "SV-RDB-010@14",
+    "SV-RDB-010@26",
+    "SV-RDB-010@36",
     "SV-STY-005@6",
     "SV-STY-005@7",
     "SV-STY-005@11",
@@ -7409,6 +7844,7 @@
     "UVM-RUS-005@43"
   ],
   "uvm/UVM-FAC-005/good.sv": [
+    "SV-RDB-010@15",
     "SV-STY-005@6",
     "SV-STY-005@7",
     "SV-STY-005@11",
@@ -7435,6 +7871,7 @@
   ],
   "uvm/UVM-LOG-002/bad.sv": [
     "SV-NAM-001@7",
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@15",
     "SV-STY-005@16",
@@ -7452,6 +7889,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-OBJ-001/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@18",
     "SV-STY-005@19",
@@ -7500,6 +7938,8 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-OBJ-003/bad.sv": [
+    "SV-RDB-010@5",
+    "SV-RDB-010@26",
     "SV-SML-003@17",
     "SV-STY-005@10",
     "SV-STY-005@23",
@@ -7528,6 +7968,8 @@
     "UVM-TST-002@34"
   ],
   "uvm/UVM-OBJ-003/good.sv": [
+    "SV-RDB-010@5",
+    "SV-RDB-010@27",
     "SV-SML-003@17",
     "SV-STY-005@10",
     "SV-STY-005@24",
@@ -7556,6 +7998,7 @@
   ],
   "uvm/UVM-OBJ-004/bad.sv": [
     "SV-DED-006@7",
+    "SV-RDB-010@4",
     "SV-SML-002@18",
     "SV-STY-005@11",
     "SV-STY-005@21",
@@ -7573,6 +8016,7 @@
   ],
   "uvm/UVM-OBJ-004/good.sv": [
     "SV-DED-006@7",
+    "SV-RDB-010@4",
     "SV-SML-002@18",
     "SV-STY-005@11",
     "SV-STY-005@22",
@@ -7588,6 +8032,7 @@
     "UVM-TST-002@18"
   ],
   "uvm/UVM-OBJ-005/bad.sv": [
+    "SV-RDB-010@4",
     "SV-STY-005@8",
     "SV-STY-005@14",
     "SV-STY-005@15",
@@ -7601,6 +8046,7 @@
   ],
   "uvm/UVM-OBJ-005/good.sv": [
     "SV-DED-011@20",
+    "SV-RDB-010@4",
     "SV-STY-005@8",
     "SV-STY-005@15",
     "SV-STY-005@16",
@@ -7662,6 +8108,8 @@
     "SV-DED-013@38",
     "SV-DED-013@38",
     "SV-DED-013@41",
+    "SV-RDB-010@10",
+    "SV-RDB-010@21",
     "SV-STY-001@12",
     "SV-STY-001@23",
     "SV-STY-001@24",
@@ -7706,6 +8154,7 @@
     "SV-DED-006@22",
     "SV-ERR-001@41",
     "SV-OOP-002@38",
+    "SV-RDB-010@19",
     "SV-STY-001@20",
     "SV-STY-001@21",
     "SV-STY-001@22",
@@ -7744,6 +8193,7 @@
     "SV-DED-006@22",
     "SV-ERR-001@41",
     "SV-OOP-002@38",
+    "SV-RDB-010@19",
     "SV-STY-001@20",
     "SV-STY-001@21",
     "SV-STY-001@22",
@@ -7803,6 +8253,7 @@
     "SV-DED-005@9",
     "SV-NAM-001@7",
     "SV-RDB-002@15",
+    "SV-RDB-010@7",
     "SV-STY-001@9",
     "SV-STY-005@12",
     "SV-STY-005@17",
@@ -7821,6 +8272,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-PHS-006/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@16",
     "SV-STY-005@17",
@@ -7843,6 +8295,7 @@
   ],
   "uvm/UVM-PHS-007/bad.sv": [
     "COMPILE:UnknownMember@14",
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@15",
     "SV-STY-005@16",
@@ -7860,6 +8313,7 @@
   ],
   "uvm/UVM-PHS-008/bad.sv": [
     "COMPILE:TimingInFuncNotAllowed@15",
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@16",
     "SV-STY-005@17",
@@ -7878,6 +8332,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-PHS-009/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@16",
     "SV-STY-005@17",
@@ -7898,6 +8353,8 @@
   ],
   "uvm/UVM-PHS-010/bad.sv": [
     "SV-DED-006@22",
+    "SV-RDB-010@8",
+    "SV-RDB-010@20",
     "SV-STY-001@10",
     "SV-STY-001@22",
     "SV-STY-005@6",
@@ -7920,6 +8377,8 @@
   "uvm/UVM-PHS-010/good.sv": [
     "SV-DED-006@22",
     "SV-DED-006@23",
+    "SV-RDB-010@8",
+    "SV-RDB-010@20",
     "SV-STY-001@10",
     "SV-STY-001@22",
     "SV-STY-001@23",
@@ -7943,6 +8402,7 @@
     "UVM-FAC-003@4"
   ],
   "uvm/UVM-PHS-011/bad.sv": [
+    "SV-RDB-010@4",
     "SV-STY-005@8",
     "SV-STY-005@11",
     "SV-STY-005@14",
@@ -7964,6 +8424,8 @@
   "uvm/UVM-PHS-011/good.sv": [
     "SV-DED-011@29",
     "SV-DED-011@30",
+    "SV-RDB-010@4",
+    "SV-RDB-010@14",
     "SV-STY-005@8",
     "SV-STY-005@11",
     "SV-STY-005@12",
@@ -7993,6 +8455,7 @@
     "UVM-PHS-001@22"
   ],
   "uvm/UVM-REP-005/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-010@14"
   ],
   "uvm/UVM-REP-005/good.sv": [
@@ -8043,6 +8506,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-SEQ-001/bad.sv": [
+    "SV-RDB-010@18",
     "SV-STY-001@20",
     "SV-STY-005@11",
     "SV-STY-005@15",
@@ -8062,6 +8526,7 @@
     "UVM-FAC-003@5"
   ],
   "uvm/UVM-SEQ-005/bad.sv": [
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@14",
     "SV-STY-005@15",
@@ -8080,6 +8545,7 @@
   "uvm/UVM-SEQ-006/bad.sv": [
     "COMPILE:UndeclaredIdentifier@15",
     "SV-DED-001@13",
+    "SV-RDB-010@7",
     "SV-STY-005@11",
     "SV-STY-005@16",
     "SV-STY-005@17",
@@ -8098,6 +8564,7 @@
   "uvm/UVM-SEQ-007/bad.sv": [
     "SV-NAM-005@7",
     "SV-RDB-002@12",
+    "SV-RDB-010@7",
     "SV-STY-005@13",
     "SV-STY-005@14",
     "SV-STY-010@12",
@@ -8130,6 +8597,7 @@
     "COMPILE:UndeclaredIdentifier@10",
     "COMPILE:UndeclaredIdentifier@12",
     "SV-DED-001@10",
+    "SV-RDB-010@7",
     "SV-STY-005@13",
     "SV-STY-005@14",
     "SV-STY-104@13",
@@ -8147,6 +8615,7 @@
   "uvm/UVM-SEQ-010/bad.sv": [
     "COMPILE:UndeclaredIdentifier@10",
     "SV-DED-001@10",
+    "SV-RDB-010@7",
     "SV-STY-005@13",
     "SV-STY-005@14",
     "SV-STY-104@13",
@@ -8164,6 +8633,8 @@
     "SV-DED-006@16",
     "SV-NAM-005@14",
     "SV-OOP-002@19",
+    "SV-RDB-010@7",
+    "SV-RDB-010@14",
     "UVM-NAM-104@14",
     "UVM-SEQ-003@16"
   ],
@@ -8177,6 +8648,7 @@
   "uvm/UVM-SEQ-012/bad.sv": [
     "COMPILE:NewVirtualClass@13",
     "SV-OOP-013@13",
+    "SV-RDB-010@7",
     "UVM-PHS-001@12"
   ],
   "uvm/UVM-SEQ-012/good.sv": [
@@ -8193,6 +8665,9 @@
     "SV-DED-006@33",
     "SV-NAM-005@4",
     "SV-NAM-005@9",
+    "SV-RDB-010@14",
+    "SV-RDB-010@22",
+    "SV-RDB-010@30",
     "SV-STY-001@15",
     "SV-STY-001@23",
     "SV-STY-001@32",
@@ -8232,6 +8707,9 @@
     "SV-DED-006@27",
     "SV-DED-006@28",
     "SV-NAM-005@4",
+    "SV-RDB-010@9",
+    "SV-RDB-010@17",
+    "SV-RDB-010@25",
     "SV-STY-001@10",
     "SV-STY-001@18",
     "SV-STY-001@27",
@@ -8260,8 +8738,24 @@
     "UVM-TLM-001@10",
     "UVM-TLM-001@18"
   ],
+  "uvm/UVM-SEQ-014/bad.sv": [
+    "SV-RDB-010@4",
+    "SV-RDB-010@15"
+  ],
+  "uvm/UVM-SEQ-014/good.sv": [
+    "SV-RDB-010@4",
+    "SV-RDB-010@15"
+  ],
+  "uvm/UVM-SEQ-015/bad.sv": [
+    "SV-RDB-010@11"
+  ],
+  "uvm/UVM-SEQ-015/good.sv": [
+    "SV-RDB-010@11"
+  ],
   "uvm/UVM-SEQ-016/bad.sv": [
     "SV-DED-006@12",
+    "SV-RDB-010@4",
+    "SV-RDB-010@11",
     "SV-STY-005@8",
     "SV-STY-005@9",
     "SV-STY-005@15",
@@ -8277,6 +8771,7 @@
   ],
   "uvm/UVM-SEQ-016/good.sv": [
     "SV-DED-006@12",
+    "SV-RDB-010@11",
     "SV-STY-005@8",
     "SV-STY-005@9",
     "SV-STY-005@15",
@@ -8293,6 +8788,8 @@
   ],
   "uvm/UVM-STR-005/bad.sv": [
     "SV-DED-005@16",
+    "SV-RDB-010@7",
+    "SV-RDB-010@14",
     "SV-STY-001@16"
   ],
   "uvm/UVM-STR-005/good.sv": [
@@ -8305,6 +8802,7 @@
   "uvm/UVM-STY-003/bad.sv": [
     "SV-DED-013@10",
     "SV-NAM-001@7",
+    "SV-RDB-010@7",
     "SV-STY-005@12",
     "SV-STY-005@13",
     "SV-STY-104@12",
@@ -8335,6 +8833,7 @@
   "uvm/UVM-TLM-002/bad.sv": [
     "SV-DED-006@9",
     "SV-IPC-001@16",
+    "SV-RDB-010@7",
     "SV-STY-001@9",
     "SV-STY-005@12",
     "SV-STY-005@17",
@@ -8356,6 +8855,8 @@
     "SV-DED-005@24",
     "SV-DSN-006@35",
     "SV-NAM-005@5",
+    "SV-RDB-010@12",
+    "SV-RDB-010@22",
     "SV-STY-001@14",
     "SV-STY-001@24",
     "SV-STY-005@9",
@@ -8381,6 +8882,9 @@
     "SV-DED-005@14",
     "SV-DED-005@24",
     "SV-NAM-005@5",
+    "SV-RDB-010@12",
+    "SV-RDB-010@22",
+    "SV-RDB-010@32",
     "SV-STY-001@14",
     "SV-STY-001@24",
     "SV-STY-001@34",
@@ -8412,6 +8916,7 @@
   "uvm/UVM-TLM-005/bad.sv": [
     "SV-NAM-005@4",
     "SV-RDB-002@22",
+    "SV-RDB-010@13",
     "SV-STY-005@10",
     "SV-STY-005@11",
     "SV-STY-005@18",
@@ -8429,6 +8934,7 @@
   ],
   "uvm/UVM-TLM-005/good.sv": [
     "SV-NAM-005@4",
+    "SV-RDB-010@13",
     "SV-STY-005@10",
     "SV-STY-005@11",
     "SV-STY-005@18",
@@ -8449,6 +8955,9 @@
     "SV-DED-005@20",
     "SV-DED-006@35",
     "SV-DED-006@36",
+    "SV-RDB-010@9",
+    "SV-RDB-010@18",
+    "SV-RDB-010@33",
     "SV-STY-001@11",
     "SV-STY-001@20",
     "SV-STY-001@35",
@@ -8486,6 +8995,9 @@
     "SV-DED-006@36",
     "SV-DED-006@37",
     "SV-IPC-001@30",
+    "SV-RDB-010@9",
+    "SV-RDB-010@18",
+    "SV-RDB-010@34",
     "SV-STY-001@11",
     "SV-STY-001@20",
     "SV-STY-001@36",
@@ -8518,6 +9030,7 @@
   ],
   "uvm/UVM-VIF-DIR/bad.sv": [
     "SV-INT-001@14",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-005@10",
     "SV-STY-005@15",
@@ -8530,6 +9043,7 @@
   "uvm/UVM-VIF-DIR/good.sv": [
     "SV-DED-005@7",
     "SV-DED-006@6",
+    "SV-RDB-010@4",
     "SV-STY-001@6",
     "SV-STY-001@7",
     "SV-STY-005@11",
@@ -8544,6 +9058,9 @@
     "SV-DED-006@26",
     "SV-NAM-005@4",
     "SV-NAM-005@11",
+    "SV-RDB-010@4",
+    "SV-RDB-010@11",
+    "SV-RDB-010@22",
     "SV-STY-001@14",
     "SV-STY-001@15",
     "SV-STY-001@25",
@@ -8569,6 +9086,9 @@
     "SV-DED-006@27",
     "SV-NAM-005@4",
     "SV-NAM-005@11",
+    "SV-RDB-010@4",
+    "SV-RDB-010@11",
+    "SV-RDB-010@22",
     "SV-STY-001@14",
     "SV-STY-001@15",
     "SV-STY-001@25",
