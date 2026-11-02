@@ -84,8 +84,9 @@ class RuleConfig:
     enabled: bool = True
     severity: Optional[Severity] = None
     exclude_paths: List[str] = []
+    only_paths: List[str] = []
 
-    _RESERVED = ("rule", "enabled", "severity", "exclude_paths")
+    _RESERVED = ("rule", "enabled", "severity", "exclude_paths", "only_paths")
 
     @classmethod
     def rule_key(cls) -> str:
@@ -118,6 +119,9 @@ class RuleConfig:
         paths = _path_list(cls.__qualname__, "exclude_paths", cls.exclude_paths)
         if paths:
             out["exclude_paths"] = paths
+        only = _path_list(cls.__qualname__, "only_paths", cls.only_paths)
+        if only:
+            out["only_paths"] = only
         opts = cls.options()
         if opts:
             out["options"] = opts
@@ -375,9 +379,11 @@ def _anchored_class(cls: type, root: str) -> type:
         waivers.append(w)
     attrs["waivers"] = waivers
     for rc in cls().rule_configs():
-        if rc.exclude_paths:
+        if rc.exclude_paths or rc.only_paths:
             attrs[rc.__name__] = type(rc.__name__, (rc,), {
-                "rule": rc.rule_key(), "exclude_paths": [_anchor(p, root) for p in rc.exclude_paths]})
+                "rule": rc.rule_key(),
+                "exclude_paths": [_anchor(p, root) for p in rc.exclude_paths],
+                "only_paths": [_anchor(p, root) for p in rc.only_paths]})
     return type(cls.__name__, (cls,), attrs)
 
 

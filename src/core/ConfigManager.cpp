@@ -273,6 +273,9 @@ bool ConfigManager::applyRules(const json::Value& rulesBlock, const fs::path& ba
                 } else if (field == "exclude_paths") {
                     if (!readPathList(val, where + ".exclude_paths", baseDir, rs.excludePaths)) return false;
                     if (!rs.excludePaths.empty()) projectConfig.noteRuleExcludes();
+                } else if (field == "only_paths") {
+                    if (!readPathList(val, where + ".only_paths", baseDir, rs.onlyPaths)) return false;
+                    if (!rs.onlyPaths.empty()) projectConfig.noteRuleExcludes();
                 } else if (field == "options") {
                     if (!val.isObject()) return error(where + ".options must be an object");
                     rs.options = val;

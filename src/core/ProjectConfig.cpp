@@ -210,7 +210,9 @@ SuppressionReason ProjectConfig::classifyPath(std::string_view normalizedPath) c
 bool ProjectConfig::isExcludedForRule(std::string_view ruleId, std::string_view normalizedPath) const {
     if (!anyRuleExcludes) return false;
     const auto* rs = findRule(ruleId);
-    return rs && rs->excludePaths.matches(normalizedPath);
+    if (!rs) return false;
+    if (!rs->onlyPaths.empty() && !rs->onlyPaths.matches(normalizedPath)) return true;
+    return rs->excludePaths.matches(normalizedPath);
 }
 
 void ProjectConfig::resolveRuleNames(const std::unordered_map<std::string, std::string>& nameToId) {

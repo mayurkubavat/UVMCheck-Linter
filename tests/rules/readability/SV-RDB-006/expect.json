@@ -1,0 +1,16 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SV-RDB-006",
+      "line": 16
+    },
+    {
+      "rule": "SV-RDB-006",
+      "line": 17
+    },
+    {
+      "rule": "SV-RDB-006",
+      "line": 18
+    }
+  ]
+}

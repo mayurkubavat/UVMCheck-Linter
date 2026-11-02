@@ -24,7 +24,8 @@ Some rules compare the whole design. A finding they report in one file can chang
 
 | Rule | Why it is whole-program |
 | :--- | :--- |
-| `SV-DUP-001` … `SV-DUP-005` | Clone detection across classes and packages |
+| `SV-DUP-001` … `SV-DUP-006` | Clone detection and repeated argument groups across classes and packages |
+| `SV-DED-015` | A class parameter set by a specialization in another file |
 | `SV-PKG-004`, `SV-PKG-005` | The package dependency graph |
 | `SV-EVO-001`, `SV-EVO-002` | Git history across the tree (`--history` does not use the cache) |
 | `UVM-ARC-001`, `UVM-ARC-003` | Layer order, and one file included into several packages |

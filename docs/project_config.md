@@ -142,6 +142,7 @@ Running from `blocks/dma/` prints the layers that were loaded.
 | `RuleConfig.enabled` | `False` skips the rule entirely (also for Python plugin rules). |
 | `RuleConfig.severity` | `Severity.Error`, `Severity.Warning` or `Severity.Info`. |
 | `RuleConfig.exclude_paths` | Globs where only this rule is silenced. |
+| `RuleConfig.only_paths` | Globs where this rule reports; elsewhere it is silent. For example strict naming only under `env/**`, or a rule kept out of generated code without listing every other folder. `exclude_paths` still applies inside them. |
 | any other attribute | A rule option, e.g. `max_columns` (SV-STY-016), `max_complexity` / `warning_complexity` (SV-SML-004). |
 
 Unknown rule names produce a warning so typos do not go unnoticed.

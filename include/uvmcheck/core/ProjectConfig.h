@@ -89,6 +89,7 @@ struct RuleSettings {
     std::optional<bool> enabled;
     std::optional<Severity> severity;
     PathSet excludePaths;
+    PathSet onlyPaths; // non-empty: the rule reports only in these files
     json::Value options; // object, or null when absent
 };
 
@@ -97,7 +98,7 @@ enum class SuppressionReason {
     None,
     LibraryPath,   // file matches "library_paths"
     ExcludedPath,  // file matches "exclude_paths"
-    RuleExcluded,  // file matches the rule's own "exclude_paths"
+    RuleExcluded,  // file matches the rule's own "exclude_paths", or misses its "only_paths"
 };
 
 /// Project-level linting policy: which files are third-party libraries or
