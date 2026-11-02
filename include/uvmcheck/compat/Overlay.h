@@ -59,6 +59,9 @@ public:
     virtual std::string_view upstream() const { return {}; }
     /// The first slang major version that no longer needs this override; 0 = never.
     virtual int retireAtMajor() const { return 0; }
+    /// True for the few overrides that fix a defect rather than adapt to a tool;
+    /// they apply unless a "-id" entry turns them off.
+    virtual bool onByDefault() const { return false; }
 
     /// After the command line and project config are read, before slang
     /// processes its options and loads sources. Returns false to stop the run.
@@ -80,8 +83,8 @@ public:
     /// True when the linked slang already has the fix the override stands in for.
     static bool isRetired(const Override& o);
 
-    /// Chooses the active overrides: the profile's, then each "+id" / "id"
-    /// added and each "-id" removed. Returns false with `error` set for an
+    /// Chooses the active overrides: those on by default and the profile's, then
+    /// each "+id" / "id" added and each "-id" removed. Returns false with `error` set for an
     /// unknown profile or id.
     bool select(const core::CompatSettings& settings, std::string& error);
 

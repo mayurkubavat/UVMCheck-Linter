@@ -78,6 +78,8 @@ public:
         return "Report compile errors raised inside a library template (uvm_registry.svh, ...) at the user class "
                "or `uvm_*_utils line that instantiated it";
     }
+    // Without it a testbench that does not compile can lint clean, so it is not opt-in.
+    bool onByDefault() const override { return true; }
 
     void configureCompilation(Compilation& compilation) override {
         sourceManager = compilation.getSourceManager();
