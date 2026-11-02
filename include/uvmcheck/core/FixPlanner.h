@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace uvmcheck::fix {
@@ -27,6 +28,10 @@ struct FilePlan {
 /// one; an edit that overlaps one already taken (in file order) is skipped,
 /// so a second --fix run can pick it up against the rewritten text.
 /// `displayPath` names the file in the diff headers.
+/// True when `text[start, end)` calls a macro (`name) that `replacement` no longer
+/// calls: the fix was built from the macro's expansion and would inline it.
+bool dropsMacroCall(std::string_view text, size_t start, size_t end, const std::string& replacement);
+
 FilePlan planEdits(const std::string& original, std::vector<TextEdit> edits, const std::string& displayPath);
 
 } // namespace uvmcheck::fix

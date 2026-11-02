@@ -1,5 +1,6 @@
 #include <cctype>
 #include "uvmcheck/core/Diagnostic.h"
+#include "uvmcheck/core/FixPlanner.h"
 #include "uvmcheck/core/ProjectConfig.h"
 
 namespace uvmcheck::core {
@@ -57,6 +58,14 @@ void DiagnosticEngine::noteFixLocations(std::vector<FixItHint>& fixes) const {
         auto s = f.range.start(), e = f.range.end();
         if (!s.valid() || !e.valid()) continue;
         if (sourceManager.isMacroLoc(s) || sourceManager.isMacroLoc(e)) continue;
+        // Rewriting written text around a macro call with text from its expansion would
+        // inline the macro; show such a fix but never apply it.
+        if (f.safety != FixSafety::DisplayOnly && s.buffer() == e.buffer() &&
+            fix::dropsMacroCall(sourceManager.getSourceText(s.buffer()), s.offset(), e.offset(),
+                                f.replacementText)) {
+            f.safety = FixSafety::DisplayOnly;
+            f.description += " (not applied: it would remove a macro call)";
+        }
         f.startLine = sourceManager.getLineNumber(s);
         f.startColumn = sourceManager.getColumnNumber(s);
         f.endLine = sourceManager.getLineNumber(e);

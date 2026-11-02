@@ -1,10 +1,16 @@
 #include "uvmcheck/core/Process.h"
 
 #include <cerrno>
+#include <filesystem>
+#include <climits>
 #include <spawn.h>
 #include <string_view>
 #include <sys/wait.h>
 #include <unistd.h>
+
+#ifdef __APPLE__
+#include <mach-o/dyld.h>
+#endif
 
 extern char** environ;
 
@@ -51,6 +57,19 @@ int runCapture(const std::vector<std::string>& argv, const std::vector<std::stri
     int status = 0;
     while (waitpid(pid, &status, 0) < 0 && errno == EINTR) {}
     return WIFEXITED(status) ? WEXITSTATUS(status) : -1;
+}
+
+std::string selfExecutablePath(const std::string& fallback) {
+#ifdef __APPLE__
+    char buf[PATH_MAX];
+    uint32_t size = sizeof(buf);
+    if (_NSGetExecutablePath(buf, &size) == 0) return buf;
+#else
+    std::error_code ec;
+    auto exe = std::filesystem::read_symlink("/proc/self/exe", ec);
+    if (!ec) return exe.string();
+#endif
+    return fallback;
 }
 
 } // namespace uvmcheck::core

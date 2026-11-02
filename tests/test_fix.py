@@ -5,6 +5,9 @@ change X/Z matching, so they are skipped until --unsafe-fixes. A display-only
 suggestion (at_least) is never written. The dry run prints a unified diff and
 changes nothing; the diff applies cleanly and gives the same text as --fix;
 fixes in an included file land in that file; a second --fix finds nothing to do.
+One --fix repeats passes until the text stops changing, so the final report is of the
+fixed text. A fix that would drop a macro call is shown but not applied; a file with
+compile errors is never rewritten; fixes that would undo each other do not ping-pong.
 """
 
 import argparse
@@ -65,6 +68,50 @@ class fx_env extends uvm_component;
         $display(name);
     endfunction
 endclass : fx_env
+"""
+
+MULTIPASS = """class mp_box;
+    rand int len;
+    constraint len_c {
+        len > 0;
+        len < 256;
+        len > 0;
+    }
+endclass : mp_box
+"""
+
+MACRO_TOP = """`define MSB 0
+module mc_top;
+    logic [7:0] d;
+    logic y;
+    assign y = d[1+`MSB:7];
+endmodule : mc_top
+"""
+
+BROKEN_TOP = """module br_top;
+    logic a, y;
+    always_comb begin
+        if (a == 1'bx) y = 0;
+        else y = 1;
+    end
+endmodule : br_top
+
+module br_other;
+    logic z;
+    assign z = undeclared_signal;
+endmodule : br_other
+"""
+
+OSCILLATE_TOP = """interface osc_if;
+    logic valid;
+endinterface : osc_if
+
+class osc_drv;
+    virtual osc_if vif;
+    function void reset_bus();
+        vif.valid = 0;
+    endfunction : reset_bus
+endclass : osc_drv
 """
 
 
@@ -211,6 +258,50 @@ def main():
         res = run(binary, uv, "-I", common, "--rule", "UVM-PHS-001")
         check("Build succeeded: 0 errors" in res.stdout and "UVM-PHS-001" not in res.stdout,
               "fixed file compiles and the finding is gone", res.stdout)
+
+        # One --fix keeps going until nothing changes: deleting the duplicate constraint
+        # leaves an indented blank line, whose whitespace fix only shows up on pass two.
+        mp = Path(tmp, "multipass")
+        mp.mkdir()
+        (mp / "top.sv").write_text(MULTIPASS)
+        res = run(binary, mp, "--fix", "--fix-rule", "SV-RND-011,SV-STY-015,SV-STY-102")
+        applied = [l for l in res.stdout.splitlines() if l.startswith("[uvmcheck] Applied ")]
+        check(len(applied) == 2, "a fix that uncovers another finding gets a second pass", res.stdout)
+        res = run(binary, mp, "--fix", "--fix-rule", "SV-RND-011,SV-STY-015,SV-STY-102")
+        check("fix-it" not in res.stdout, "after one --fix run there is nothing left to fix", res.stdout)
+        res = run(binary, mp, "--fix-rule", "SV-RND-011", "--rule", "SV-RND-011")
+        check("SV-RND-011" not in res.stdout, "the final report is of the fixed text", res.stdout)
+
+        # A rewrite of written text around a macro call, built from the expansion, would
+        # inline the macro (`MSB disappears). It is shown, never applied.
+        mc = Path(tmp, "macro")
+        mc.mkdir()
+        (mc / "top.sv").write_text(MACRO_TOP)
+        report = mc / "r.json"
+        res = run(binary, mc, "--fix", "--unsafe-fixes", "--json", str(report))
+        check((mc / "top.sv").read_text() == MACRO_TOP, "a fix that would drop a macro call is not applied",
+              res.stdout)
+        found = [f for v in json.loads(report.read_text())["violations"] if v["ruleId"] == "SV-LANG-004"
+                 for f in v.get("fixes", [])]
+        check(found and found[0]["safety"] == "display-only" and "macro call" in found[0]["description"],
+              "the report shows it as display-only, saying why", found)
+
+        # A file slang could not compile is never rewritten.
+        br = Path(tmp, "broken")
+        br.mkdir()
+        (br / "top.sv").write_text(BROKEN_TOP)
+        res = run(binary, br, "--fix", "--unsafe-fixes")
+        check((br / "top.sv").read_text() == BROKEN_TOP and "in files with compile errors not applied" in res.stdout,
+              "fixes in a file with compile errors are not applied", res.stdout)
+
+        # Two rules that undo each other's fix (SV-INT-001 '=' -> '<=', SV-LANG-005 '<=' in a
+        # function -> '='): inside a function the interface-drive fix is only shown.
+        osc = Path(tmp, "oscillate")
+        osc.mkdir()
+        (osc / "top.sv").write_text(OSCILLATE_TOP)
+        res = run(binary, osc, "--fix", "--unsafe-fixes")
+        check("undo each other" not in res.stderr and "vif.valid = 0;" in (osc / "top.sv").read_text(),
+              "an interface drive in a function is not flipped back and forth", res.stdout + res.stderr)
 
     if failures:
         print(f"{len(failures)} check(s) failed")

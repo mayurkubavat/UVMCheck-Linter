@@ -10,6 +10,14 @@ class BlockingIntfDriveVisitor : public engine::SyntaxVisitor<BlockingIntfDriveV
 public:
     explicit BlockingIntfDriveVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
+    static bool insideFunction(const slang::syntax::SyntaxNode& node) {
+        for (const auto* p = node.parent.get(); p; p = p->parent.get()) {
+            if (p->kind == slang::syntax::SyntaxKind::FunctionDeclaration) return true;
+            if (p->kind == slang::syntax::SyntaxKind::TaskDeclaration) return false;
+        }
+        return false;
+    }
+
     void handle(const slang::syntax::BinaryExpressionSyntax& expr) {
         if (expr.kind == slang::syntax::SyntaxKind::AssignmentExpression &&
             expr.operatorToken.kind == slang::parsing::TokenKind::Equals) {
@@ -23,11 +31,15 @@ public:
                 lhs.find("vif.") != std::string::npos || lhs.find("_vif.") != std::string::npos) {
                 std::vector<core::FixItHint> fixIts;
                 if (expr.operatorToken.range().start().valid()) {
+                    // A function may not hold '<=' cleanly either (SV-LANG-005 would undo the
+                    // fix), so there the rewrite is only shown: the drive belongs in a task.
+                    const bool inFunction = insideFunction(expr);
                     fixIts.push_back({
                         expr.operatorToken.range(),
                         "<=",
-                        "Replace blocking assignment '=' with non-blocking clocking drive '<='",
-                        core::FixSafety::Unsafe
+                        inFunction ? "Move the drive into a task and use non-blocking '<='"
+                                   : "Replace blocking assignment '=' with non-blocking clocking drive '<='",
+                        inFunction ? core::FixSafety::DisplayOnly : core::FixSafety::Unsafe
                     });
                 }
 

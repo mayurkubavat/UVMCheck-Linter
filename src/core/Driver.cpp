@@ -23,6 +23,7 @@
 #include "uvmcheck/style/NamingEngine.h"
 #include "uvmcheck/engine/RuleEngine.h"
 #include "slang/diagnostics/TextDiagnosticClient.h"
+#include <functional>
 #include <iostream>
 #include <iomanip>
 #include <fstream>
@@ -913,6 +914,16 @@ int LinterDriver::run() {
         std::map<std::string, std::pair<slang::BufferID, std::vector<fix::TextEdit>>> fileEdits;
         size_t macroFixes = 0;
         size_t unsafeSkipped = 0;
+        // Like a compiler, never rewrite a file it could not parse cleanly: rules see a
+        // repaired tree there, so a fix can be wrong or keep coming back.
+        std::set<slang::BufferID> brokenFiles;
+        size_t brokenFixes = 0;
+        if (compilation) {
+            for (const auto& d : compilation->getAllDiagnostics()) {
+                if (!d.isError() || !d.location.valid()) continue;
+                brokenFiles.insert(sm.getFullyOriginalLoc(d.location).buffer());
+            }
+        }
         std::set<std::string> onlyRules;
         if (autoFixRules.has_value()) {
             std::stringstream list(*autoFixRules);
@@ -934,6 +945,10 @@ int LinterDriver::run() {
                 if (!start.valid() || !end.valid()) continue;
                 if (!sm.isFileLoc(start) || !sm.isFileLoc(end) || start.buffer() != end.buffer()) {
                     ++macroFixes;
+                    continue;
+                }
+                if (brokenFiles.count(start.buffer())) {
+                    ++brokenFixes;
                     continue;
                 }
                 const std::string path = std::string(sm.getFullPath(start.buffer()).string());
@@ -990,20 +1005,28 @@ int LinterDriver::run() {
             if (ec) {
                 std::cerr << "Warning: --fix: cannot replace " << display << ": " << ec.message() << "\n";
                 fs::remove(tmp, ec);
+                continue;
             }
+            fixPass.written.emplace_back(path, std::hash<std::string>{}(plan.updated));
         }
+        fixPass.applied = applied;
+        fixPass.changedFiles = fixPass.written.size();
 
-        if (applied > 0 || skipped > 0 || macroFixes > 0 || unsafeSkipped > 0) {
+        if (applied > 0 || skipped > 0 || macroFixes > 0 || unsafeSkipped > 0 || brokenFixes > 0) {
+            std::ostringstream line;
             if (unsafeSkipped > 0) {
-                info << "[uvmcheck] " << applied << (fixDryRun ? " fixes would be applied, " : " fixes applied, ")
+                line << "[uvmcheck] " << applied << (fixDryRun ? " fixes would be applied, " : " fixes applied, ")
                      << unsafeSkipped << " unsafe fixes skipped (use --unsafe-fixes)";
             } else {
-                info << "[uvmcheck] " << (fixDryRun ? "Would apply " : "Applied ") << applied << " fix-it(s) in "
+                line << "[uvmcheck] " << (fixDryRun ? "Would apply " : "Applied ") << applied << " fix-it(s) in "
                      << changedFiles << " file(s)";
             }
-            if (skipped) info << "; " << skipped << " overlapping fix-it(s) left for another --fix run";
-            if (macroFixes) info << "; " << macroFixes << " inside macro expansions not applied";
-            info << ".\n";
+            if (skipped) line << "; " << skipped << " overlapping fix-it(s) " << (fixDryRun ? "left for another --fix run" : "deferred to the next pass");
+            if (macroFixes) line << "; " << macroFixes << " inside macro expansions not applied";
+            if (brokenFixes) line << "; " << brokenFixes << " in files with compile errors not applied";
+            line << ".\n";
+            fixPass.summary = line.str();
+            info << fixPass.summary;
         }
     }
 

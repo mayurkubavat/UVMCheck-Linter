@@ -89,6 +89,7 @@ jobs:
           python3 tests/test_waivers.py --binary build/uvmcheck
           python3 tests/test_changed.py --binary build/uvmcheck
           python3 tests/test_fix.py --binary build/uvmcheck
+          python3 tests/test_fix_invariants.py --binary build/uvmcheck
           python3 tests/test_report.py --binary build/uvmcheck
           python3 tests/test_precision.py --binary build/uvmcheck
           python3 tests/test_map.py --binary build/uvmcheck
