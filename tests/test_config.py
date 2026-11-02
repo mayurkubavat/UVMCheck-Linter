@@ -170,6 +170,20 @@ def main():
     check("rule exclude drops only that rule", files_with(found, "SV-STY-016") == [] and
           files_with(found, "SV-COR-008") == ["user_tb.sv"], out)
 
+    # 4b. only_paths keeps a rule to some files; other rules still report everywhere.
+    t, rc, found, out, err = case(binary, "rule only_paths", "uvmcheck_config.py", """\
+        from uvmcheck.config import ProjectConfig, RuleConfig
+        class Project(ProjectConfig):
+            class SelfComparison(RuleConfig):
+                only_paths = ["lib/**"]
+        """)
+    check("only_paths keeps the rule to the listed files",
+          files_with(found, "SV-COR-008") == ["vendor_vip.sv"], out + err)
+    t, rc, found, out, err = case(binary, "JSON rule only_paths", ".uvmcheck.json",
+                                  '{ "rules": { "SV-COR-008": { "only_paths": ["src/**"] } } }')
+    check("JSON only_paths keeps the rule to the listed files",
+          files_with(found, "SV-COR-008") == ["user_tb.sv"], out + err)
+
     # 5. Per-rule enable / severity / options, OOP inheritance from a shared base file.
     base = textwrap.dedent("""\
         from uvmcheck.config import ProjectConfig, RuleConfig, Severity
