@@ -1,0 +1,12 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SV-DSN-012",
+      "line": 5
+    },
+    {
+      "rule": "SV-DSN-012",
+      "line": 6
+    }
+  ]
+}
