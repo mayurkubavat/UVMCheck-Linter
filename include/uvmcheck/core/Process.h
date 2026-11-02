@@ -11,4 +11,8 @@ namespace uvmcheck::core {
 int runCapture(const std::vector<std::string>& argv, const std::vector<std::string>& extraEnv,
                std::string& stdoutText);
 
+/// Absolute path of the running uvmcheck binary, or `fallback` (argv[0]) when the
+/// platform cannot tell.
+std::string selfExecutablePath(const std::string& fallback);
+
 } // namespace uvmcheck::core

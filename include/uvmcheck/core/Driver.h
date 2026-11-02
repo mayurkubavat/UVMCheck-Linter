@@ -11,12 +11,25 @@
 
 namespace uvmcheck::core {
 
+/// What one --fix pass wrote, so main() can run another pass on the rewritten files.
+struct FixPassResult {
+    size_t applied = 0;
+    size_t changedFiles = 0;
+    /// Each rewritten file with a hash of its new text, to notice fixes that undo each other.
+    std::vector<std::pair<std::string, size_t>> written;
+    std::string summary; ///< the "[uvmcheck] Applied ..." line
+};
+
 class LinterDriver {
 public:
     LinterDriver();
 
     bool parseCommandLine(int argc, char** argv);
     int run();
+
+    /// True for --fix (not --fix-dry-run): the run rewrites source files.
+    bool rewritesFiles() const { return autoFix.value_or(false) && !autoFixDryRun.value_or(false); }
+    const FixPassResult& fixResult() const { return fixPass; }
 
 private:
     int explain(const std::string& rule) const;
@@ -67,6 +80,7 @@ private:
     std::optional<bool> listOverrides;
     compat::VendorArgs vendorArgs;
     compat::Overlay overlay;
+    FixPassResult fixPass;
 
     /// Loads the explicit or auto-discovered project config and CLI path
     /// filters. Returns false (after printing why) if the config is broken.

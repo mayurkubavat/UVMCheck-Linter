@@ -1,5 +1,7 @@
 #include "uvmcheck/core/FixPlanner.h"
 
+#include <cctype>
+
 #include <algorithm>
 #include <sstream>
 
@@ -160,6 +162,20 @@ FilePlan planEdits(const std::string& original, std::vector<TextEdit> edits, con
 
     if (plan.updated != original && !oldLines.empty()) plan.diff = renderDiff(oldLines, changes, displayPath);
     return plan;
+}
+
+bool dropsMacroCall(std::string_view text, size_t start, size_t end, const std::string& replacement) {
+    if (start >= end || end > text.size()) return false;
+    const std::string_view span = text.substr(start, end - start);
+    for (size_t pos = span.find('`'); pos != std::string_view::npos; pos = span.find('`', pos + 1)) {
+        size_t stop = pos + 1;
+        while (stop < span.size() && (std::isalnum(static_cast<unsigned char>(span[stop])) || span[stop] == '_')) {
+            ++stop;
+        }
+        if (stop == pos + 1) continue; // `` or `" inside a macro body
+        if (replacement.find(span.substr(pos, stop - pos)) == std::string::npos) return true;
+    }
+    return false;
 }
 
 } // namespace uvmcheck::fix
