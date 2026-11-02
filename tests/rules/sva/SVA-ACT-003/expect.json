@@ -1,0 +1,20 @@
+{
+  "bad.sv": [
+    {
+      "rule": "SVA-ACT-003",
+      "line": 19
+    },
+    {
+      "rule": "SVA-ACT-003",
+      "line": 20
+    },
+    {
+      "rule": "SVA-ACT-003",
+      "line": 8
+    },
+    {
+      "rule": "SVA-ACT-003",
+      "line": 9
+    }
+  ]
+}

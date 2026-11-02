@@ -25,7 +25,7 @@ public:
                     "UncheckedRandomize",
                     "Return value of 'randomize()' is discarded or cast to void. If constraint solving fails, "
                     "simulation proceeds silently with corrupt, unconstrained, or stale transaction data. "
-                    "Check the return value with 'if (!obj.randomize())' or 'assert(obj.randomize())'.",
+                    "Check the return value with 'if (!obj.randomize()) `uvm_fatal(...)'. Avoid 'assert(obj.randomize())': turning assertions off skips the call (SV-RND-024).",
                     core::Severity::Error,
                     call.sourceRange.start()
                 );
