@@ -7732,6 +7732,52 @@
     "SV-STY-104@9",
     "UVM-FAC-003@5"
   ],
+  "uvm/UVM-API-001/bad.sv": [
+    "SV-RDB-010@4",
+    "SV-STY-005@7",
+    "SV-STY-005@10",
+    "SV-STY-005@11",
+    "SV-STY-104@7",
+    "SV-STY-104@10",
+    "SV-STY-104@11",
+    "UVM-FAC-003@4",
+    "UVM-PHS-001@8"
+  ],
+  "uvm/UVM-API-001/good.sv": [
+    "SV-DSN-006@8",
+    "SV-RDB-010@4",
+    "SV-STY-005@7",
+    "SV-STY-005@10",
+    "SV-STY-005@11",
+    "SV-STY-104@7",
+    "SV-STY-104@10",
+    "SV-STY-104@11",
+    "UVM-FAC-003@4"
+  ],
+  "uvm/UVM-API-002/bad.sv": [
+    "SV-RDB-010@4",
+    "SV-STY-005@8",
+    "SV-STY-005@11",
+    "SV-STY-005@12",
+    "SV-STY-104@8",
+    "SV-STY-104@11",
+    "SV-STY-104@12",
+    "UVM-BAN-002@10",
+    "UVM-FAC-003@4",
+    "UVM-SEQ-005@9"
+  ],
+  "uvm/UVM-API-002/good.sv": [
+    "SV-RDB-010@4",
+    "SV-STY-005@8",
+    "SV-STY-005@11",
+    "SV-STY-005@12",
+    "SV-STY-104@8",
+    "SV-STY-104@11",
+    "SV-STY-104@12",
+    "UVM-BAN-002@10",
+    "UVM-FAC-003@4",
+    "UVM-SEQ-005@9"
+  ],
   "uvm/UVM-CFG-001/bad.sv": [
     "SV-RDB-002@17",
     "SV-STY-005@11",

@@ -39,7 +39,7 @@ FetchContent_Declare(
     # diagnostics, which change between releases. Bump deliberately and refresh baselines.
     # A master commit after v12.1: it has the randomize/constraint scoping fixes and the
     # macro location API. Move back to a release tag once one includes them.
-    GIT_TAG 00b7cbfeaa67b0969890040801925f5646c56b3f # master, 2026-11-01
+    GIT_TAG d02b7cda02d3183f35c6c4d4db2b2fc03f19f4ae # master, 2026-11-02
     # A commit hash cannot be fetched shallowly.
     GIT_SHALLOW OFF)
 FetchContent_MakeAvailable(slang)
@@ -74,7 +74,19 @@ add_custom_command(
     COMMENT "Generating rule examples for --explain"
     VERBATIM)
 
-add_library(libuvmcheck STATIC ${UVMCHECK_SOURCES} ${UVMCHECK_RULE_EXTRAS})
+# UVM API packs (data/uvm-api/<version>.json, made by scripts/gen_uvm_api_pack.py from a
+# uvm-core checkout), compiled into the binary for uvm::ApiPack.
+file(GLOB UVMCHECK_UVM_API_PACKS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/data/uvm-api/*.json)
+set(UVMCHECK_UVM_API_PACKS_CPP ${CMAKE_CURRENT_BINARY_DIR}/generated/UvmApiPacks.cpp)
+add_custom_command(
+    OUTPUT ${UVMCHECK_UVM_API_PACKS_CPP}
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/embed_uvm_api_packs.py
+            --packs ${CMAKE_CURRENT_SOURCE_DIR}/data/uvm-api --out ${UVMCHECK_UVM_API_PACKS_CPP}
+    DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/scripts/embed_uvm_api_packs.py ${UVMCHECK_UVM_API_PACKS}
+    COMMENT "Embedding UVM API packs"
+    VERBATIM)
+
+add_library(libuvmcheck STATIC ${UVMCHECK_SOURCES} ${UVMCHECK_RULE_EXTRAS} ${UVMCHECK_UVM_API_PACKS_CPP})
 target_include_directories(libuvmcheck PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
@@ -152,6 +164,23 @@ add_test(
 add_test(
     NAME slang_overlay_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_compat.py --binary $<TARGET_FILE:uvmcheck>
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME lrm_conformance_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_conformance.py --binary $<TARGET_FILE:uvmcheck>
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME ast_coverage_floor_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/ast_coverage.py
+            --slang-include ${slang_SOURCE_DIR}/include
+            --floor ${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/ast_coverage_floor.json
+    WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+)
+add_test(
+    NAME config_sweep_test
+    COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_config_sweep.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(

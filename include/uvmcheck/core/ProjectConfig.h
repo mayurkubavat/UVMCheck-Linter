@@ -82,6 +82,8 @@ struct CompatSettings {
     std::string profile;                // vcs, questa, xcelium, none, or empty
     std::vector<std::string> overrides; // "id" or "+id" adds, "-id" removes
     std::string uvmHome;                // uvm-core checkout (or its src/), for auto-uvm
+    std::vector<std::string> ipStubs;   // stub files or folders for encrypted IP, for opaque-ip
+    std::vector<std::string> systemTasks; // extra simulator tasks, for vendor-systasks
 };
 
 /// Per-rule overrides from the "rules" section of the project config.

@@ -1,5 +1,7 @@
 #include "uvmcheck/compat/Overlay.h"
 
+#include "uvmcheck/core/ProjectConfig.h"
+
 #include "slang/ast/ASTContext.h"
 #include "slang/ast/Compilation.h"
 #include "slang/ast/SystemSubroutine.h"
@@ -46,7 +48,13 @@ public:
     std::string_view id() const override { return "vendor-systasks"; }
     std::string_view summary() const override {
         return "Know the waveform and recording tasks of Verdi ($fsdb*), VCS ($vcdplus*), Xcelium ($shm_*, "
-               "$recordvars) and Questa ($wlf*), instead of reporting them as unknown";
+               "$recordvars) and Questa ($wlf*), plus any listed in compat.system_tasks, instead of reporting "
+               "them as unknown";
+    }
+
+    bool configureDriver(DriverContext& ctx) override {
+        extra = ctx.project.compat().systemTasks;
+        return true;
     }
 
     void configureCompilation(Compilation& compilation) override {
@@ -68,7 +76,14 @@ public:
             if (!compilation.getSystemSubroutine(name))
                 compilation.addSystemSubroutine(std::make_shared<VendorTask>(std::string(name)));
         }
+        for (const auto& name : extra) {
+            if (!compilation.getSystemSubroutine(name))
+                compilation.addSystemSubroutine(std::make_shared<VendorTask>(name));
+        }
     }
+
+private:
+    std::vector<std::string> extra;
 };
 
 } // namespace

@@ -14,7 +14,14 @@ The slang overlay (src/compat/, docs/compat.md):
 - error-taint downgrades findings inside a task or function that does not
   compile to Info, keeps the ones on the error's own line, and leaves other
   subroutines alone;
-- anchor-to-user-code, the one override on by default, reports an error slang
+- opaque-ip folds the "unknown" errors for names an encrypted envelope defines
+  into one Info finding, and compiles compat.ip_stubs as library code;
+- global-clock (jasper profile) accepts $global_clock without global clocking;
+- compat.system_tasks adds simulator tasks to vendor-systasks;
+- crash-guard, on by default, turns a slang crash into one finding;
+- lang-std, on by default, compiles as IEEE 1800-2023 unless --std chose a
+  version, so 2023 constructs are not errors; -lang-std restores slang's 1800-2017;
+- anchor-to-user-code, also on by default, reports an error slang
   raises inside a library template at the user's macro line, where the library
   policy would otherwise drop it;
 - the config's compat section turns overrides on, the command line can turn
@@ -71,11 +78,14 @@ def main():
         root = Path(tmp)
 
         print("Registry")
-        rc, out, err = run(binary, root, "--list-overrides")
-        for oid in ("filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "slang-compat-vcs",
-                    "error-taint", "anchor-to-user-code"):
-            check(rc == 0 and oid in out, f"--list-overrides names {oid}", out + err)
-        check("questa" in out and "xcelium" in out and "vcs" in out, "--list-overrides names the profiles", out)
+        rc, out, err = run(binary, root, "--list-addons")
+        for oid in ("lang-std", "crash-guard", "filelist-dialect", "auto-uvm", "uvm-library", "opaque-ip",
+                    "global-clock", "vendor-systasks", "slang-compat-vcs", "error-taint", "anchor-to-user-code"):
+            check(rc == 0 and oid in out, f"--list-addons names {oid}", out + err)
+        check(all(p in out for p in ("questa", "xcelium", "vcs", "jasper")), "--list-addons names the profiles", out)
+        check("2020.3.1" in out, "--list-addons names the UVM API packs", out)
+        rc, out2, _ = run(binary, root, "--list-overrides")
+        check(rc == 0 and out2 == out, "--list-overrides is an alias of --list-addons")
         # An override whose fix the linked slang already has must be deleted, not kept around.
         check("[retired" not in out, "no override has outlived the slang bug it covers", out)
         (root / "empty.sv").write_text("module empty; endmodule\n")
@@ -84,10 +94,118 @@ def main():
         rc, _, err = run(binary, root, "--no-config", "empty.sv", "--override", "nope")
         check(rc == 2 and "unknown override 'nope'" in err, "unknown override is an error", err)
         rc, rep, err = report(binary, root, "--no-config", "empty.sv")
-        check(rep is not None and rep.get("compatOverrides") == ["anchor-to-user-code"],
-              "only anchor-to-user-code is on by default", err or str(rep and rep.get("compatOverrides")))
+        check(rep is not None and rep.get("compatOverrides") == ["lang-std", "crash-guard", "anchor-to-user-code"],
+              "only lang-std, crash-guard and anchor-to-user-code are on by default", err or str(rep and rep.get("compatOverrides")))
         rc, rep, err = report(binary, root, "--no-config", "empty.sv", "--override", "-anchor-to-user-code")
-        check(rep is not None and "compatOverrides" not in rep, "-anchor-to-user-code turns it off", err)
+        check(rep is not None and rep.get("compatOverrides") == ["lang-std", "crash-guard"], "-anchor-to-user-code turns it off",
+              err or str(rep and rep.get("compatOverrides")))
+
+        print("lang-std")
+        (root / "ieee2023.sv").write_text(
+            "package p2023;\n"
+            "  class base;\n"
+            "    rand int x; rand real r;\n"
+            "    constraint c_r { r > 1.5; r < 9.0; }\n"
+            "    constraint c_d { x dist {0 := 1, [1:9] :/ 3, default :/ 1}; }\n"
+            "    virtual function :initial void f(); endfunction\n"
+            "  endclass\n"
+            "  class :final derived extends base;\n"
+            "    constraint :extends c_r { r < 5.0; }\n"
+            "    virtual function :extends :final void f(); endfunction\n"
+            "  endclass\n"
+            "  function automatic void g();\n"
+            "    int a[] = '{1, 2, 3}; int b[];\n"
+            "    string s = \"\"\"two\nlines\"\"\";\n"
+            "    b = a.map(e) with (e * 2);\n"
+            "    $display(\"%s %0d\", s, b.size());\n"
+            "  endfunction\n"
+            "endpackage\n")
+        rc, rep, err = report(binary, root, "--no-config", "ieee2023.sv", "--rule", "SV-CMP-001")
+        check(rep is not None and not compile_messages(rep), "1800-2023 constructs compile by default",
+              err or str(compile_messages(rep)))
+        rc, rep, err = report(binary, root, "--no-config", "ieee2023.sv", "--rule", "SV-CMP-001",
+                              "--override", "-lang-std")
+        check(any("1800-2017" in m for m in compile_messages(rep)), "-lang-std falls back to slang's 1800-2017",
+              err or str(compile_messages(rep)))
+        rc, rep, err = report(binary, root, "--no-config", "ieee2023.sv", "--rule", "SV-CMP-001",
+                              "--std", "1800-2017")
+        check(any("1800-2017" in m for m in compile_messages(rep)), "an explicit --std wins over lang-std",
+              err or str(compile_messages(rep)))
+
+        print("crash-guard")
+        # Both still crash slang on the pinned commit. When one stops crashing (the
+        # canary says so), its check below fails and the pattern can be retired.
+        crashes = {
+            "2066": "class c #(type T = enum {A, B});\n  T x;\nendclass\nmodule top; c #() o; endmodule\n",
+            "2074": "interface ifc #(type T = virtual ifc);\n  T vif;\nendinterface\nmodule top; ifc i(); endmodule\n",
+        }
+        for issue, text in crashes.items():
+            (root / f"crash{issue}.sv").write_text(text)
+            rc, rep, err = report(binary, root, "--no-config", f"crash{issue}.sv")
+            msgs = compile_messages(rep)
+            check(rc == 1 and len(msgs) == 1 and f"#{issue}" in msgs[0] and "signal" in msgs[0],
+                  f"slang #{issue} crash becomes one finding naming the issue", f"rc={rc} {err} {msgs}")
+            rc, _, _ = run(binary, root, "--no-config", f"crash{issue}.sv", "--override", "-crash-guard")
+            check(rc < 0 or rc > 128, f"-crash-guard lets slang #{issue} crash through", f"rc={rc}")
+        rc, rep, err = report(binary, root, "--no-config", "ieee2023.sv")
+        check(rep is not None and not any("crash-guard" in m for m in compile_messages(rep)),
+              "crash-guard is transparent when slang does not crash", err)
+
+        print("opaque-ip")
+        ipdir = root / "ip"
+        (ipdir / "stubs").mkdir(parents=True)
+        (ipdir / "vip_enc.svp").write_text(
+            "`pragma protect begin_protected\n"
+            "`pragma protect encoding=(enctype=\"base64\", line_length=64, bytes=48)\n"
+            "`pragma protect data_block\n"
+            "aGVsbG8gd29ybGQgaGVsbG8gd29ybGQgaGVsbG8gd29ybGQgaGVsbG8gd29y\n"
+            "`pragma protect end_protected\n")
+        (ipdir / "tb.sv").write_text(
+            "import vip_pkg::*;\nmodule tb;\n  logic clk;\n  vip_bfm bfm(.clk(clk));\n"
+            "  initial begin vip_cfg c = new(); c.speed = 3; end\nendmodule\n")
+        (ipdir / "stubs" / "vip_stubs.sv").write_text(
+            "package vip_pkg;\n  class vip_cfg;\n    int speed;\n  endclass\nendpackage\n")
+        files = ["vip_enc.svp", "tb.sv"]
+        rc, rep, err = report(binary, ipdir, "--no-config", *files)
+        check(any("unknown package 'vip_pkg'" in m for m in compile_messages(rep)),
+              "without opaque-ip, names defined in the envelope are errors", str(compile_messages(rep)))
+        rc, rep, err = report(binary, ipdir, "--no-config", *files, "--override", "opaque-ip")
+        errs = [v for v in (rep or {}).get("violations", []) if v["ruleId"] == "SV-CMP-001"]
+        folded = [v for v in (rep or {}).get("violations", []) if "[opaque-ip]" in v["message"]]
+        check(not errs and len(folded) == 1 and folded[0]["severity"].lower() == "info" and
+              "vip_pkg" in folded[0]["message"] and "vip_bfm" in folded[0]["message"],
+              "opaque-ip folds them into one Info finding naming them", str(errs) + str(folded))
+        check(not any(v["file"].endswith("vip_enc.svp") for v in (rep or {}).get("violations", [])),
+              "the envelope's own warnings are dropped")
+        (ipdir / "cfg.json").write_text(json.dumps({"compat": {"overrides": ["opaque-ip"], "ip_stubs": ["stubs"]}}))
+        rc, rep, err = report(binary, ipdir, "--config", "cfg.json", *files)
+        folded = [v for v in (rep or {}).get("violations", []) if "[opaque-ip]" in v["message"]]
+        check(len(folded) == 1 and "vip_bfm" in folded[0]["message"] and "vip_pkg" not in folded[0]["message"] and
+              not any("stubs" in v["file"] for v in rep.get("violations", [])),
+              "compat.ip_stubs supplies vip_pkg as library code; only vip_bfm stays unknown", str(folded) + err)
+
+        print("global-clock")
+        (root / "gclk.sv").write_text("module gclk(input logic a);\n  assert property (@($global_clock) a);\n"
+                                      "  assert property (@($global_clock) !a);\nendmodule\n")
+        rc, rep, err = report(binary, root, "--no-config", "gclk.sv")
+        check(sum("no global clocking" in m for m in compile_messages(rep)) == 2,
+              "without global-clock, $global_clock with no global clocking is an error", str(compile_messages(rep)))
+        rc, rep, err = report(binary, root, "--no-config", "gclk.sv", "--compat-profile", "jasper")
+        folded = [v for v in (rep or {}).get("violations", []) if "[global-clock]" in v["message"]]
+        check(rep is not None and "global-clock" in rep.get("compatOverrides", []) and
+              not [m for m in compile_messages(rep) if "no global clocking" in m and "[global-clock]" not in m] and
+              len(folded) == 1 and folded[0]["message"].startswith("2 use"),
+              "the jasper profile folds them into one Info finding", str(compile_messages(rep)))
+
+        print("system_tasks")
+        (root / "systask.sv").write_text("module systask; initial $my_dump(systask); endmodule\n")
+        (root / "systask.json").write_text(json.dumps({"compat": {"overrides": ["vendor-systasks"],
+                                                                   "system_tasks": ["$my_dump"]}}))
+        rc, rep, err = report(binary, root, "--no-config", "systask.sv", "--override", "vendor-systasks")
+        check(any("my_dump" in m for m in compile_messages(rep)), "an unlisted task is unknown", str(compile_messages(rep)))
+        rc, rep, err = report(binary, root, "--config", "systask.json", "systask.sv")
+        check(rep is not None and not compile_messages(rep), "compat.system_tasks makes it known",
+              err + str(compile_messages(rep)))
 
         print("filelist-dialect")
         (root / "inc").mkdir()
@@ -112,7 +230,7 @@ def main():
         msgs = compile_messages(rep)
         check(not any("unknown system name" in m for m in msgs), "vendor tasks are known with the override", str(msgs))
         check(any("'nosuch'" in m for m in msgs), "an unresolved name passed to one is still reported", str(msgs))
-        check(rep is not None and rep.get("compatOverrides") == ["vendor-systasks", "anchor-to-user-code"],
+        check(rep is not None and rep.get("compatOverrides") == ["lang-std", "crash-guard", "vendor-systasks", "anchor-to-user-code"],
               "the JSON report lists the active override", str(rep and rep.get("compatOverrides")))
 
         print("auto-uvm and uvm-library")
@@ -203,7 +321,7 @@ def main():
             "compat": {"profile": "questa", "uvm_home": str(root / "uvm-core")}}))
         rc, rep, err = report(binary, tb, "--config", "cfg.json", "test.sv")
         check(rep is not None and not compile_messages(rep) and
-              rep.get("compatOverrides") == ["filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks",
+              rep.get("compatOverrides") == ["lang-std", "crash-guard", "filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks",
                                              "anchor-to-user-code"],
               "the config's compat profile and uvm_home apply", err + str(rep and rep.get("compatOverrides")))
         rc, rep, err = report(binary, tb, "--config", "cfg.json", "test.sv", "--override", "-uvm-library")

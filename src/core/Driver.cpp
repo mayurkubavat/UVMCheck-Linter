@@ -22,6 +22,8 @@
 #include "uvmcheck/rules/CodeMetrics.h"
 #include "uvmcheck/style/NamingEngine.h"
 #include "uvmcheck/engine/RuleEngine.h"
+#include "uvmcheck/compat/CrashGuard.h"
+#include "uvmcheck/uvm/ApiPack.h"
 #include "slang/diagnostics/TextDiagnosticClient.h"
 #include <functional>
 #include <iostream>
@@ -87,9 +89,9 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("--cache-dir", cacheDirArg, "Directory for the incremental result cache (default: .uvmcheck_cache)", "<dir>");
     slangDriver.cmdLine.add("--clear-cache", clearCache, "Delete the result cache, then run");
     slangDriver.cmdLine.add("--init", initProject, "Set up this folder: find the sources and UVM, learn the naming conventions the code already follows, and write .uvmcheck/config.py and a first baseline");
-    slangDriver.cmdLine.add("--compat-profile", compatProfile, "Apply a slang overlay profile for this simulator's code and file lists: questa, xcelium, vcs or none (see --list-overrides)", "<name>");
+    slangDriver.cmdLine.add("--compat-profile", compatProfile, "Apply a slang overlay profile for this simulator's code and file lists: questa, xcelium, vcs, jasper or none (see --list-addons)", "<name>");
     slangDriver.cmdLine.add("--override", overrideArgs, "Turn a slang overlay override on (id or +id) or off (-id); repeatable, applied after the profile", "<id>");
-    slangDriver.cmdLine.add("--list-overrides", listOverrides, "List the slang overlay overrides and compat profiles and exit");
+    slangDriver.cmdLine.add("--list-addons,--list-overrides", listOverrides, "List the add-ons that extend slang (overlay overrides, compat profiles, UVM API packs) and exit");
     // Simulator file-list options slang does not know. They are collected here and
     // need the filelist-dialect override (compat/Overlay.h) to take effect. Slang
     // accepts long names with one dash too, as simulators spell them (-uvm).
@@ -270,7 +272,10 @@ int LinterDriver::run() {
         compat::Overlay::list(std::cout);
         std::cout << "Profiles:";
         for (auto p : compat::Overlay::profileNames()) std::cout << " " << p;
-        std::cout << "\n";
+        std::cout << "\n\nUVM API packs (data/uvm-api; UVMCHECK_UVM_API_PACK=<file> replaces them):";
+        for (const auto& v : uvm::ApiPack::builtinVersions()) std::cout << " " << v;
+        std::cout << "\n\nScripts: scripts/config_sweep.py (lint under several `ifdef configurations), "
+                     "scripts/slang_canary.py (build and test against slang master)\n";
         return 0;
     }
 
@@ -500,10 +505,33 @@ int LinterDriver::run() {
         }
     }
 
+    // crash-guard: the work below runs in a child process. When it ends normally this
+    // process exits with its status; when it crashes, this process reports the crash.
+    if (!replayed && overlay.isActive("crash-guard")) {
+        auto outcome = compat::CrashGuard::run();
+        if (!outcome.child) {
+            if (!outcome.crashed) {
+                std::cout.flush();
+                std::_Exit(outcome.exitCode);
+            }
+            std::vector<core::Violation> known;
+            if (slangDriver.parseAllSources())
+                known = compat::CrashGuard::knownCrashPatterns(slangDriver.syntaxTrees, slangDriver.sourceManager);
+            std::string firstFile;
+            if (!slangDriver.sourceLoader.getFilePaths().empty())
+                firstFile = slangDriver.sourceLoader.getFilePaths().front().string();
+            diags.getViolations() = {compat::CrashGuard::crashFinding(outcome, std::move(known), firstFile)};
+            compileErrors = 1;
+            replayed = true;
+            std::cerr << "[uvmcheck] crash-guard: " << diags.getViolations().front().message << "\n";
+        }
+    }
+
     std::unique_ptr<slang::ast::Compilation> compilation;
     std::optional<uvm::UvmModel> uvmModel;
     std::vector<init::NamingChoice> learntNaming;
     if (!replayed) {
+    compat::CrashGuard::markStage("parse");
     if (!slangDriver.parseAllSources()) {
         (void)slangDriver.reportDiagnostics(false);
         return 3;
@@ -511,6 +539,7 @@ int LinterDriver::run() {
 
     using Clock = std::chrono::steady_clock;
     auto elaborateStart = Clock::now();
+    compat::CrashGuard::markStage("elaborate");
     compilation = slangDriver.createCompilation();
     overlay.configureCompilation(*compilation);
 
@@ -681,8 +710,10 @@ int LinterDriver::run() {
         });
     }
 
+    compat::CrashGuard::markStage("rules");
     ruleEngine.run(activeRules, diags);
     overlay.reviewFindings(*compilation, diags.getViolations());
+    compat::CrashGuard::markStage("report");
 
     if (engineOptions.profile) {
         std::cerr << "[profile] elaborate + UVM model: " << std::fixed << std::setprecision(3)

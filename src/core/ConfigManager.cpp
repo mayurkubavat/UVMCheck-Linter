@@ -237,6 +237,16 @@ bool ConfigManager::applyCompat(const json::Value& block, const fs::path& baseDi
             std::vector<std::string> home;
             if (!readBuildList(value, "compat.uvm_home", baseDir, true, home)) return false;
             if (!home.empty()) compat.uvmHome = home.back();
+        } else if (key == "ip_stubs") {
+            if (!readBuildList(value, "compat.ip_stubs", baseDir, true, compat.ipStubs)) return false;
+        } else if (key == "system_tasks") {
+            // Read verbatim: the names start with '$' and are not environment variables.
+            if (!value.isArray()) return error("compat.system_tasks must be a list of strings");
+            for (const auto& item : value.asArray()) {
+                if (!item.isString() || !item.asString().starts_with("$"))
+                    return error("compat.system_tasks entries are strings starting with '$'");
+                compat.systemTasks.push_back(item.asString());
+            }
         } else {
             warn("unknown key 'compat." + key + "' ignored");
         }
@@ -590,6 +600,8 @@ class Project(ProjectConfig):
         # "profile": "questa",          # questa, xcelium, vcs or none
         # "overrides": ["-auto-uvm"],   # "id" turns one on, "-id" off
         # "uvm_home": "$UVM_HOME",
+        # "ip_stubs": ["vip/stubs"],    # opaque-ip: stubs for encrypted VIP
+        # "system_tasks": ["$my_dump"], # vendor-systasks: more simulator tasks
     }
 
     # Per-rule settings. Name the class after the rule (ID via `rule = ...`).

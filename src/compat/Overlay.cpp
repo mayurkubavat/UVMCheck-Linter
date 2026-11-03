@@ -17,6 +17,9 @@ namespace uvmcheck::compat {
 std::unique_ptr<Override> createVendorSystemTasks();
 std::unique_ptr<Override> createErrorTaint();
 std::unique_ptr<Override> createErrorAnchor();
+std::unique_ptr<Override> createCrashGuard();
+std::unique_ptr<Override> createOpaqueIp();
+std::unique_ptr<Override> createGlobalClock();
 
 std::string VendorArgs::firstSeen() const {
     if (!includeDirs.empty()) return "-i";
@@ -150,12 +153,35 @@ public:
     }
 };
 
+/// Selects IEEE 1800-2023 unless --std chose a version. Slang defaults to
+/// 1800-2017, where 2023 constructs (final classes, :initial/:extends/:final
+/// specifiers, triple-quoted strings, real constraints, covergroup extends, ...)
+/// are errors. 2023 adds no keywords, so 2017 code compiles the same.
+class LangStd : public Override {
+public:
+    std::string_view id() const override { return "lang-std"; }
+    std::string_view summary() const override {
+        return "Compile as IEEE 1800-2023 unless --std names another version (slang's default is 1800-2017)";
+    }
+    bool onByDefault() const override { return true; }
+
+    bool configureDriver(DriverContext& ctx) override {
+        if (!ctx.driver.options.languageVersion.has_value()) ctx.driver.options.languageVersion = "1800-2023";
+        return true;
+    }
+};
+
 std::vector<std::unique_ptr<Override>> makeAll() {
     std::vector<std::unique_ptr<Override>> v;
+    v.push_back(std::make_unique<LangStd>());
+    v.push_back(createCrashGuard());
     v.push_back(std::make_unique<FilelistDialect>());
     // auto-uvm adds uvm_pkg.sv before uvm-library looks for it.
     v.push_back(std::make_unique<AutoUvm>());
     v.push_back(std::make_unique<UvmLibrary>());
+    // Before error-taint, so the errors it folds do not taint findings.
+    v.push_back(createOpaqueIp());
+    v.push_back(createGlobalClock());
     v.push_back(createVendorSystemTasks());
     v.push_back(std::make_unique<SlangCompatVcs>());
     v.push_back(createErrorTaint());
@@ -175,6 +201,7 @@ const std::vector<Profile>& profiles() {
         {"xcelium", {"filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "anchor-to-user-code"}},
         {"vcs",
          {"filelist-dialect", "auto-uvm", "uvm-library", "vendor-systasks", "anchor-to-user-code", "slang-compat-vcs"}},
+        {"jasper", {"filelist-dialect", "global-clock", "vendor-systasks", "anchor-to-user-code"}},
     };
     return p;
 }

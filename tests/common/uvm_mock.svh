@@ -10,6 +10,7 @@
 `define uvm_object_utils_begin(T) `uvm_object_utils(T)
 `define uvm_object_utils_end
 `define uvm_do(ITEM)
+`define uvm_do_with(ITEM, CONSTRAINTS)
 
 // Callback macros, expanded the way the real UVM library expands them
 `define uvm_register_cb(T,CB) \
@@ -189,6 +190,9 @@ virtual class uvm_component extends uvm_object;
     endfunction
 
     virtual function void final_phase(uvm_phase phase);
+    endfunction
+
+    function void print_config(bit recurse = 0, bit audit = 0);
     endfunction
 
     function void set_config_int(string inst_name, string field_name, int val);
