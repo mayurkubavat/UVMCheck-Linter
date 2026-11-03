@@ -1,0 +1,9 @@
+[package]
+name = "sv-lexer"
+description = "Lossless SystemVerilog lexer (IEEE 1800-2023): every byte of the input is in exactly one token"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]

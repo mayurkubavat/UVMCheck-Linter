@@ -69,3 +69,18 @@ d = Design.load(["-f", "files.f"])
 The plan named `cxx`. A plain C ABI does the same job for Rust with no code
 generation, and also serves Python (`ctypes`), C tools and any future language,
 which is the point of a central library. `cxx` can still be layered on later.
+
+## sv-lexer (R2, first piece of the native front end)
+
+A lossless SystemVerilog lexer in plain Rust, no Slang: every byte of the
+input is in exactly one token (trivia included), so the tokens give the
+file back byte for byte. Directives and macro punctuation are tokens; the
+preprocessor that expands them comes next.
+
+```
+cargo run --release -p sv-lexer --example lexstat -- <dir-or-file>...
+```
+
+Measured 2026-11-03: uvm-core + this repo's tests (952 files, 3.2 MB) and
+sv-tests (1,029 files) all round-trip; no Unknown tokens except one sv-tests
+case that is meant to fail (a macro splitting a string). About 110 MB/s.
