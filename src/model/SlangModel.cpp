@@ -26,6 +26,28 @@ Visibility toVisibility(sa::Visibility v) {
     }
 }
 
+TypeShape shapeOf(const sa::Type& t) {
+    switch (t.getCanonicalType().kind) {
+        case sa::SymbolKind::DynamicArrayType: return TypeShape::DynamicArray;
+        case sa::SymbolKind::QueueType: return TypeShape::Queue;
+        case sa::SymbolKind::AssociativeArrayType: return TypeShape::AssociativeArray;
+        case sa::SymbolKind::FixedSizeUnpackedArrayType: return TypeShape::FixedUnpackedArray;
+        case sa::SymbolKind::UnpackedStructType: return TypeShape::UnpackedStruct;
+        default: return TypeShape::Other;
+    }
+}
+
+bool isVif(const sa::Type& t) { return t.isVirtualInterfaceOrArray() || t.isVirtualInterface(); }
+
+Direction toDirection(sa::ArgumentDirection d) {
+    switch (d) {
+        case sa::ArgumentDirection::Out: return Direction::Out;
+        case sa::ArgumentDirection::InOut: return Direction::InOut;
+        case sa::ArgumentDirection::Ref: return Direction::Ref;
+        default: return Direction::In;
+    }
+}
+
 UvmKind classify(const uvm::UvmModel& uvm, const sa::Type& t) {
     // Component and sequence checks come first: a reduced UVM (a test mock)
     // need not derive them from uvm_object.
@@ -226,11 +248,26 @@ private:
                 prop.isStatic = p.lifetime == sa::VariableLifetime::Static;
                 prop.isConst = p.flags.has(sa::VariableFlags::Const);
                 prop.isRand = p.randMode != sa::RandMode::None;
+                prop.isVirtualInterface = isVif(p.getType());
                 prop.typeClass = idOf(p.getType());
                 c.properties.push_back(std::move(prop));
-            } else if (member.kind == sa::SymbolKind::Subroutine) {
-                const auto& s = member.as<sa::SubroutineSymbol>();
+            } else if (member.kind == sa::SymbolKind::Subroutine ||
+                       member.kind == sa::SymbolKind::MethodPrototype) {
+                // An extern method is a prototype here and a body outside the
+                // class; take the body, as Scope::find does. A prototype with
+                // no body at all is left out.
+                const sa::SubroutineSymbol* sp = nullptr;
+                bool isExtern = false;
+                if (member.kind == sa::SymbolKind::Subroutine) {
+                    sp = &member.as<sa::SubroutineSymbol>();
+                } else {
+                    sp = member.as<sa::MethodPrototypeSymbol>().getSubroutine();
+                    isExtern = true;
+                }
+                if (!sp) continue;
+                const auto& s = *sp;
                 Method m;
+                m.isExtern = isExtern;
                 m.name = std::string(s.name);
                 m.loc = loc(s.location);
                 m.visibility = toVisibility(s.visibility);
@@ -238,9 +275,35 @@ private:
                 m.isVirtual = s.isVirtual();
                 m.isPure = s.flags.has(sa::MethodFlags::Pure);
                 m.isStatic = s.flags.has(sa::MethodFlags::Static);
+                m.declaredVirtual = s.flags.has(sa::MethodFlags::Virtual);
+                m.isBuiltIn = s.flags.has(sa::MethodFlags::BuiltIn);
+                const auto& ret = s.getReturnType();
+                m.returnType = ret.toString();
+                m.returnsVoid = ret.isVoid();
+                for (const auto* arg : s.getArguments()) {
+                    Argument a;
+                    a.name = std::string(arg->name);
+                    a.type = arg->getType().toString();
+                    a.canonicalType = arg->getType().getCanonicalType().toString();
+                    a.loc = loc(arg->location);
+                    a.direction = toDirection(arg->direction);
+                    a.shape = shapeOf(arg->getType());
+                    a.typeClass = idOf(arg->getType());
+                    m.arguments.push_back(std::move(a));
+                }
+                for (const auto& local : s.members()) {
+                    if (local.kind != sa::SymbolKind::Variable) continue;
+                    const auto& var = local.as<sa::VariableSymbol>();
+                    // Declared locals only: not `this` or a function's implicit return variable.
+                    if (var.flags.has(sa::VariableFlags::CompilerGenerated)) continue;
+                    m.locals.push_back({std::string(var.name), var.getType().toString(), loc(var.location),
+                                        isVif(var.getType())});
+                }
                 if (uvm::UvmModel::isFunctionPhase(s.name)) m.phase = PhaseKind::Function;
                 else if (uvm::UvmModel::isTaskPhase(s.name)) m.phase = PhaseKind::Task;
                 c.methods.push_back(std::move(m));
+            } else if (member.kind == sa::SymbolKind::ConstraintBlock) {
+                c.constraints.push_back({std::string(member.name), loc(member.location)});
             }
         }
         return c;

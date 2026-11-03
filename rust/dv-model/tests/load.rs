@@ -1,5 +1,5 @@
 //! Loads the linter's own rule examples through the C ABI.
-use dv_model::{Design, PhaseKind, UvmKind};
+use dv_model::{Design, Direction, PhaseKind, TypeShape, UvmKind};
 use std::path::PathBuf;
 
 fn repo() -> PathBuf {
@@ -55,4 +55,28 @@ fn parameterized_bases_are_in_the_model() {
     assert!(d.derives_from(drv.id, "uvm_component"));
     // Specializations are not separate entries.
     assert_eq!(d.classes().iter().filter(|c| c.name == "uvm_driver").count(), 1);
+}
+
+#[test]
+fn reads_arguments_locals_constraints_and_extern_methods() {
+    let d = load("tests/model/facts.sv");
+    assert_eq!(d.compile_errors(), 0);
+    let c = d.find_class("facts_item").expect("class in model");
+    assert_eq!(c.uvm, UvmKind::SequenceItem);
+    assert_eq!(c.constraints.len(), 1);
+    assert_eq!(c.constraints[0].name, "addr_c");
+
+    let sum = c.methods.iter().find(|m| m.name == "sum").expect("extern method in model");
+    assert!(sum.is_extern && sum.declared_virtual && !sum.returns_void);
+    assert_eq!(sum.return_type, "int");
+    assert_eq!(sum.loc.line, 19); // the body, after the class
+    let q = &sum.arguments[0];
+    assert_eq!((q.name.as_str(), q.direction, q.shape), ("q", Direction::Ref, TypeShape::Queue));
+    assert_eq!(sum.arguments[1].direction, Direction::In);
+    let locals: Vec<_> = sum.locals.iter().map(|l| l.name.as_str()).collect();
+    assert_eq!(locals, ["total"]);
+
+    let probe = c.methods.iter().find(|m| m.name == "probe").unwrap();
+    assert!(probe.returns_void && probe.locals[0].is_virtual_interface);
+    assert!(c.methods.iter().any(|m| m.name == "randomize" && m.is_builtin));
 }

@@ -1,6 +1,7 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
 #include "uvmcheck/uvm/UvmModel.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::style {
 
@@ -15,12 +16,14 @@ public:
     std::string_view getCategory() const override { return "Naming"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* classType : uvmModel.getAllClasses()) {
-            if (!classType) continue;
-            std::string_view name = classType->name;
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            const std::string& name = cls.name;
             if (name.starts_with("uvm_") || name.empty()) continue;
 
             struct SuffixCheck {
@@ -38,17 +41,17 @@ public:
             };
 
             for (const auto& check : checks) {
-                if (uvmModel.isDerivedFrom(*classType, check.baseClass)) {
+                if (design.derivesFrom(design.idOf(cls), check.baseClass)) {
                     if (!name.ends_with(check.requiredSuffix)) {
                         diags.addViolation(
                             "SV-NAM-001",
                             "UvmComponentNamingConvention",
-                            "UVM " + std::string(check.role) + " class '" + std::string(name) +
+                            "UVM " + std::string(check.role) + " class '" + name +
                             "' derived from '" + std::string(check.baseClass) +
                             "' does not end with required suffix '" + std::string(check.requiredSuffix) +
                             "'. Following uniform naming conventions is essential for VIP maintainability and automated testbench reflection.",
                             core::Severity::Warning,
-                            classType->location
+                            model::toSlang(cls.loc)
                         );
                     }
                     break;

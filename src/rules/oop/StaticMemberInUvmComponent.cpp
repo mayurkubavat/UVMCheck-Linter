@@ -21,7 +21,7 @@ public:
              core::DiagnosticEngine& diags) override {
         const model::Model& design = uvmModel.facade();
         for (const model::Class& cls : design.classes()) {
-            if (!model::isComponent(cls.uvm)) continue;
+            if (cls.isParameterized || !model::isComponent(cls.uvm)) continue;
             for (const model::Property& prop : cls.properties) {
                 if (!prop.isStatic || prop.isConst) continue;
                 diags.addViolation(

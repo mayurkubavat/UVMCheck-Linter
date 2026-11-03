@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-#define UVMCHECK_MODEL_ABI_VERSION 2u
+#define UVMCHECK_MODEL_ABI_VERSION 3u
 #define UVMCHECK_NONE 0xFFFFFFFFu
 
 typedef struct uvmcheck_design uvmcheck_design;
@@ -45,7 +45,7 @@ typedef struct {
     uint8_t uvm;
     uint8_t is_virtual, is_parameterized, is_library;
     uvmcheck_loc loc;
-    uint32_t property_count, method_count;
+    uint32_t property_count, method_count, constraint_count;
 } uvmcheck_class;
 
 typedef struct {
@@ -53,7 +53,7 @@ typedef struct {
     const char* type;
     uint32_t type_class;
     uint8_t visibility; /* 0 public, 1 protected, 2 local */
-    uint8_t is_static, is_const, is_rand;
+    uint8_t is_static, is_const, is_rand, is_virtual_interface;
     uvmcheck_loc loc;
 } uvmcheck_property;
 
@@ -62,8 +62,42 @@ typedef struct {
     uint8_t visibility;
     uint8_t is_task, is_virtual, is_pure, is_static;
     uint8_t phase; /* 0 none, 1 function phase, 2 task phase */
+    uint8_t declared_virtual; /* has the `virtual` keyword itself */
+    uint8_t is_builtin;       /* made by the compiler (randomize and the like) */
+    uint8_t is_extern;        /* declared by a prototype; loc is the body outside the class */
+    uint8_t returns_void;
+    const char* return_type;
     uvmcheck_loc loc;
+    uint32_t argument_count, local_count;
 } uvmcheck_method;
+
+/* Values of uvmcheck_argument.direction and .shape. */
+enum { UVMCHECK_DIR_IN = 0, UVMCHECK_DIR_OUT, UVMCHECK_DIR_INOUT, UVMCHECK_DIR_REF };
+enum {
+    UVMCHECK_SHAPE_OTHER = 0, UVMCHECK_SHAPE_DYNAMIC_ARRAY, UVMCHECK_SHAPE_QUEUE,
+    UVMCHECK_SHAPE_ASSOCIATIVE_ARRAY, UVMCHECK_SHAPE_FIXED_UNPACKED_ARRAY, UVMCHECK_SHAPE_UNPACKED_STRUCT
+};
+
+typedef struct {
+    const char* name;
+    const char* type;
+    const char* canonical_type;
+    uint32_t type_class;
+    uint8_t direction, shape;
+    uvmcheck_loc loc;
+} uvmcheck_argument;
+
+typedef struct {
+    const char* name;
+    const char* type;
+    uint8_t is_virtual_interface;
+    uvmcheck_loc loc;
+} uvmcheck_local;
+
+typedef struct {
+    const char* name;
+    uvmcheck_loc loc;
+} uvmcheck_constraint;
 
 UVMCHECK_API uint32_t uvmcheck_model_abi_version(void);
 
@@ -87,6 +121,12 @@ UVMCHECK_API int uvmcheck_get_property(const uvmcheck_design* d, uint32_t cls, u
                                        uvmcheck_property* out);
 UVMCHECK_API int uvmcheck_get_method(const uvmcheck_design* d, uint32_t cls, uint32_t index,
                                      uvmcheck_method* out);
+UVMCHECK_API int uvmcheck_get_argument(const uvmcheck_design* d, uint32_t cls, uint32_t method,
+                                       uint32_t index, uvmcheck_argument* out);
+UVMCHECK_API int uvmcheck_get_local(const uvmcheck_design* d, uint32_t cls, uint32_t method,
+                                    uint32_t index, uvmcheck_local* out);
+UVMCHECK_API int uvmcheck_get_constraint(const uvmcheck_design* d, uint32_t cls, uint32_t index,
+                                         uvmcheck_constraint* out);
 
 /* The whole model as JSON (schema uvmcheck.model/1), made on first call. */
 UVMCHECK_API const char* uvmcheck_design_json(uvmcheck_design* d);

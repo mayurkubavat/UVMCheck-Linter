@@ -21,8 +21,9 @@ public:
              core::DiagnosticEngine& diags) override {
         const model::Model& design = uvmModel.facade();
         for (const model::Class& cls : design.classes()) {
-            if (cls.uvm != model::UvmKind::Sequence) continue;
+            if (cls.isParameterized || cls.uvm != model::UvmKind::Sequence) continue;
             for (const model::Method& m : cls.methods) {
+                if (m.isExtern) continue; // as before the port: in-class bodies only
                 if (m.name != "pre_body" && m.name != "post_body") continue;
                 diags.addViolation(
                     "UVM-SEQ-002",

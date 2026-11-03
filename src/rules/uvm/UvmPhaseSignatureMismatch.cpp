@@ -1,7 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
-#include "slang/ast/symbols/VariableSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::uvm {
 
@@ -16,89 +15,86 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation& /*compilation*/,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls || !uvmModel.isUvmComponent(*cls)) continue;
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized || !model::isComponent(cls.uvm)) continue;
 
-            for (const auto& member : cls->members()) {
-                if (member.kind != slang::ast::SymbolKind::Subroutine) continue;
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern) continue; // as before the port: in-class bodies only
+                if (sub.isBuiltIn) continue;
 
-                const auto& sub = member.as<slang::ast::SubroutineSymbol>();
-                if (sub.flags.has(slang::ast::MethodFlags::BuiltIn)) continue;
-
-                std::string subName = std::string(sub.name);
+                const std::string& subName = sub.name;
                 bool isFuncPhase = uvmcheck::uvm::UvmModel::isFunctionPhase(subName);
                 bool isTskPhase = uvmcheck::uvm::UvmModel::isTaskPhase(subName);
 
                 if (!isFuncPhase && !isTskPhase) continue;
+                const auto where = model::toSlang(sub.loc);
 
                 // Check Function Phase rules
                 if (isFuncPhase) {
-                    if (sub.subroutineKind != slang::ast::SubroutineKind::Function) {
+                    if (sub.isTask) {
                         diags.addViolation(
                             "UVM-PHS-003",
                             "UvmPhaseSignatureMismatch",
-                            "UVM phase '" + subName + "' in class '" + std::string(cls->name) +
+                            "UVM phase '" + subName + "' in class '" + cls.name +
                             "' is declared as a 'task'. Standard UVM function phases must be declared as 'function void'.",
                             core::Severity::Error,
-                            sub.location
+                            where
                         );
-                    } else if (!sub.getReturnType().isVoid()) {
+                    } else if (!sub.returnsVoid) {
                         diags.addViolation(
                             "UVM-PHS-003",
                             "UvmPhaseSignatureMismatch",
-                            "UVM phase '" + subName + "' in class '" + std::string(cls->name) +
-                            "' has return type '" + std::string(sub.getReturnType().toString()) +
+                            "UVM phase '" + subName + "' in class '" + cls.name +
+                            "' has return type '" + sub.returnType +
                             "'. Standard UVM phases must return 'void'.",
                             core::Severity::Error,
-                            sub.location
+                            where
                         );
                     }
                 }
 
                 // Check Task Phase rules
-                if (isTskPhase) {
-                    if (sub.subroutineKind != slang::ast::SubroutineKind::Task) {
-                        diags.addViolation(
-                            "UVM-PHS-003",
-                            "UvmPhaseSignatureMismatch",
-                            "UVM phase '" + subName + "' in class '" + std::string(cls->name) +
-                            "' is declared as a 'function'. Time-consuming UVM phases must be declared as 'task'.",
-                            core::Severity::Error,
-                            sub.location
-                        );
-                    }
-                }
-
-                // Check argument count and type
-                auto args = sub.getArguments();
-                if (args.size() != 1) {
+                if (isTskPhase && !sub.isTask) {
                     diags.addViolation(
                         "UVM-PHS-003",
                         "UvmPhaseSignatureMismatch",
-                        "UVM phase '" + subName + "' in class '" + std::string(cls->name) +
-                        "' declares " + std::to_string(args.size()) +
+                        "UVM phase '" + subName + "' in class '" + cls.name +
+                        "' is declared as a 'function'. Time-consuming UVM phases must be declared as 'task'.",
+                        core::Severity::Error,
+                        where
+                    );
+                }
+
+                // Check argument count and type
+                if (sub.arguments.size() != 1) {
+                    diags.addViolation(
+                        "UVM-PHS-003",
+                        "UvmPhaseSignatureMismatch",
+                        "UVM phase '" + subName + "' in class '" + cls.name +
+                        "' declares " + std::to_string(sub.arguments.size()) +
                         " argument(s), but standard UVM phases must declare exactly one argument of type 'uvm_phase'.",
                         core::Severity::Error,
-                        sub.location
+                        where
                     );
                 } else {
-                    const auto* arg = args[0];
-                    const auto& argType = arg->getType();
-                    bool isPhaseType = uvmModel.isDerivedFrom(argType, "uvm_phase") ||
-                                       argType.name == "uvm_phase" ||
-                                       argType.toString().find("uvm_phase") != std::string::npos;
+                    const model::Argument& arg = sub.arguments.front();
+                    bool isPhaseType = (arg.typeClass != model::NoClass &&
+                                        design.derivesFrom(arg.typeClass, "uvm_phase")) ||
+                                       arg.type.find("uvm_phase") != std::string::npos;
                     if (!isPhaseType) {
                         diags.addViolation(
                             "UVM-PHS-003",
                             "UvmPhaseSignatureMismatch",
-                            "Argument '" + std::string(arg->name) + "' of UVM phase '" + subName +
-                            "' in class '" + std::string(cls->name) + "' has type '" +
-                            std::string(argType.toString()) + "', but must be of type 'uvm_phase'.",
+                            "Argument '" + arg.name + "' of UVM phase '" + subName +
+                            "' in class '" + cls.name + "' has type '" +
+                            arg.type + "', but must be of type 'uvm_phase'.",
                             core::Severity::Error,
-                            arg->location
+                            model::toSlang(arg.loc)
                         );
                     }
                 }

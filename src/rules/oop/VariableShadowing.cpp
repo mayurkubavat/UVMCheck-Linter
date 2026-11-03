@@ -1,8 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/symbols/ClassSymbols.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
-#include "slang/ast/symbols/VariableSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::oop {
 
@@ -17,85 +15,72 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation& /*compilation*/,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls) continue;
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            const auto chain = design.ancestors(design.idOf(cls));
 
             // 1. Check derived class property shadowing base class property
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::ClassProperty) {
-                    const auto& prop = member.as<slang::ast::ClassPropertySymbol>();
+            for (const model::Property& prop : cls.properties) {
+                for (model::ClassId b : chain) {
+                    const model::Class& baseClass = design.cls(b);
+                    const model::Property* shadow = baseClass.findProperty(prop.name);
+                    if (!shadow) continue;
+                    auto* v = diags.addViolation(
+                        "SV-OOP-004",
+                        "VariableShadowing",
+                        "Class property '" + prop.name + "' in derived class '" +
+                        cls.name + "' shadows property of the same name in base class '" +
+                        baseClass.name + "'. Accessing through a base class handle will reference the base member.",
+                        core::Severity::Warning,
+                        model::toSlang(prop.loc)
+                    );
+                    diags.addRelated(v, model::toSlang(shadow->loc), "shadowed property in '" + baseClass.name + "'");
+                    break;
+                }
+            }
 
-                    const slang::ast::Type* base = cls->getBaseClass();
-                    while (base) {
-                        if (base->isClass()) {
-                            const auto& baseClass = base->as<slang::ast::ClassType>();
-                            const auto* shadow = baseClass.find(prop.name);
-                            if (shadow && shadow->kind == slang::ast::SymbolKind::ClassProperty) {
-                                auto* v = diags.addViolation(
-                                    "SV-OOP-004",
-                                    "VariableShadowing",
-                                    "Class property '" + std::string(prop.name) + "' in derived class '" +
-                                    std::string(cls->name) + "' shadows property of the same name in base class '" +
-                                    std::string(baseClass.name) + "'. Accessing through a base class handle will reference the base member.",
-                                    core::Severity::Warning,
-                                    prop.location
-                                );
-                                diags.addRelated(v, shadow->location, "shadowed property in '" +
-                                                 std::string(baseClass.name) + "'");
-                                break;
-                            }
-                            base = baseClass.getBaseClass();
-                        } else {
-                            break;
-                        }
+            // 2. Check method argument or local variable shadowing class property
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern) continue; // as before the port: in-class bodies only
+                if (sub.isBuiltIn) continue;
+
+                // Arguments (skip constructor arguments where names like name/parent are conventional)
+                if (sub.name != "new") {
+                    for (const model::Argument& arg : sub.arguments) {
+                        const model::Property* classProp = cls.findProperty(arg.name);
+                        if (!classProp) continue;
+                        auto* v = diags.addViolation(
+                            "SV-OOP-004",
+                            "VariableShadowing",
+                            "Method argument '" + arg.name + "' in method '" +
+                            sub.name + "' shadows class property '" +
+                            classProp->name + "'. Use 'this." + classProp->name +
+                            "' or rename the argument to prevent silent assignment bugs.",
+                            core::Severity::Warning,
+                            model::toSlang(arg.loc)
+                        );
+                        diags.addRelated(v, model::toSlang(classProp->loc), "class property");
                     }
                 }
-                // 2. Check method argument or local variable shadowing class property
-                else if (member.kind == slang::ast::SymbolKind::Subroutine) {
-                    const auto& sub = member.as<slang::ast::SubroutineSymbol>();
-                    if (sub.flags.has(slang::ast::MethodFlags::BuiltIn)) continue;
 
-                    // Arguments (skip constructor arguments where names like name/parent are conventional)
-                    if (sub.name != "new") {
-                        for (const auto* arg : sub.getArguments()) {
-                            const auto* classProp = cls->find(arg->name);
-                            if (classProp && classProp->kind == slang::ast::SymbolKind::ClassProperty) {
-                                auto* v = diags.addViolation(
-                                    "SV-OOP-004",
-                                    "VariableShadowing",
-                                    "Method argument '" + std::string(arg->name) + "' in method '" +
-                                    std::string(sub.name) + "' shadows class property '" +
-                                    std::string(classProp->name) + "'. Use 'this." + std::string(classProp->name) +
-                                    "' or rename the argument to prevent silent assignment bugs.",
-                                    core::Severity::Warning,
-                                    arg->location
-                                );
-                                diags.addRelated(v, classProp->location, "class property");
-                            }
-                        }
-                    }
-
-                    // Local variables inside method
-                    for (const auto& localMember : sub.members()) {
-                        if (localMember.kind == slang::ast::SymbolKind::Variable) {
-                            const auto& var = localMember.as<slang::ast::VariableSymbol>();
-                            const auto* classProp = cls->find(var.name);
-                            if (classProp && classProp->kind == slang::ast::SymbolKind::ClassProperty) {
-                                diags.addViolation(
-                                    "SV-OOP-004",
-                                    "VariableShadowing",
-                                    "Local variable '" + std::string(var.name) + "' in method '" +
-                                    std::string(sub.name) + "' shadows class property '" +
-                                    std::string(classProp->name) + "'. Rename the local variable to avoid confusion.",
-                                    core::Severity::Warning,
-                                    var.location
-                                );
-                            }
-                        }
-                    }
+                // Local variables inside method
+                for (const model::Local& var : sub.locals) {
+                    const model::Property* classProp = cls.findProperty(var.name);
+                    if (!classProp) continue;
+                    diags.addViolation(
+                        "SV-OOP-004",
+                        "VariableShadowing",
+                        "Local variable '" + var.name + "' in method '" +
+                        sub.name + "' shadows class property '" +
+                        classProp->name + "'. Rename the local variable to avoid confusion.",
+                        core::Severity::Warning,
+                        model::toSlang(var.loc)
+                    );
                 }
             }
         }

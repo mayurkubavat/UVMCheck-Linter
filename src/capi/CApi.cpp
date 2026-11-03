@@ -6,6 +6,11 @@
 
 #include "uvmcheck/model/Session.h"
 
+// The C enums mirror the C++ ones by value.
+static_assert(static_cast<int>(uvmcheck::model::Direction::Ref) == UVMCHECK_DIR_REF);
+static_assert(static_cast<int>(uvmcheck::model::TypeShape::UnpackedStruct) == UVMCHECK_SHAPE_UNPACKED_STRUCT);
+static_assert(static_cast<int>(uvmcheck::model::UvmKind::Subscriber) == UVMCHECK_UVM_SUBSCRIBER);
+
 using namespace uvmcheck::model;
 
 struct uvmcheck_design {
@@ -87,7 +92,8 @@ int uvmcheck_get_class(const uvmcheck_design* d, uint32_t cls, uvmcheck_class* o
     const Class& c = m->classes()[cls];
     *out = {c.name.c_str(), c.scope.c_str(), c.baseName.c_str(), c.base, static_cast<uint8_t>(c.uvm),
             c.isVirtual, c.isParameterized, c.isLibrary, toC(c.loc),
-            static_cast<uint32_t>(c.properties.size()), static_cast<uint32_t>(c.methods.size())};
+            static_cast<uint32_t>(c.properties.size()), static_cast<uint32_t>(c.methods.size()),
+            static_cast<uint32_t>(c.constraints.size())};
     return 1;
 }
 
@@ -98,7 +104,7 @@ int uvmcheck_get_property(const uvmcheck_design* d, uint32_t cls, uint32_t index
     if (index >= props.size()) return 0;
     const Property& p = props[index];
     *out = {p.name.c_str(), p.type.c_str(), p.typeClass, static_cast<uint8_t>(p.visibility),
-            p.isStatic, p.isConst, p.isRand, toC(p.loc)};
+            p.isStatic, p.isConst, p.isRand, p.isVirtualInterface, toC(p.loc)};
     return 1;
 }
 
@@ -109,7 +115,44 @@ int uvmcheck_get_method(const uvmcheck_design* d, uint32_t cls, uint32_t index, 
     if (index >= methods.size()) return 0;
     const Method& x = methods[index];
     *out = {x.name.c_str(), static_cast<uint8_t>(x.visibility), x.isTask, x.isVirtual, x.isPure,
-            x.isStatic, static_cast<uint8_t>(x.phase), toC(x.loc)};
+            x.isStatic, static_cast<uint8_t>(x.phase), x.declaredVirtual, x.isBuiltIn, x.isExtern,
+            x.returnsVoid, x.returnType.c_str(), toC(x.loc),
+            static_cast<uint32_t>(x.arguments.size()), static_cast<uint32_t>(x.locals.size())};
+    return 1;
+}
+
+static const Method* methodOf(const uvmcheck_design* d, uint32_t cls, uint32_t method) {
+    const Model* m = modelOf(d);
+    if (!m || cls >= m->classes().size()) return nullptr;
+    const auto& methods = m->classes()[cls].methods;
+    return method < methods.size() ? &methods[method] : nullptr;
+}
+
+int uvmcheck_get_argument(const uvmcheck_design* d, uint32_t cls, uint32_t method, uint32_t index,
+                          uvmcheck_argument* out) {
+    const Method* x = methodOf(d, cls, method);
+    if (!x || !out || index >= x->arguments.size()) return 0;
+    const Argument& a = x->arguments[index];
+    *out = {a.name.c_str(), a.type.c_str(), a.canonicalType.c_str(), a.typeClass,
+            static_cast<uint8_t>(a.direction), static_cast<uint8_t>(a.shape), toC(a.loc)};
+    return 1;
+}
+
+int uvmcheck_get_local(const uvmcheck_design* d, uint32_t cls, uint32_t method, uint32_t index,
+                       uvmcheck_local* out) {
+    const Method* x = methodOf(d, cls, method);
+    if (!x || !out || index >= x->locals.size()) return 0;
+    const Local& l = x->locals[index];
+    *out = {l.name.c_str(), l.type.c_str(), l.isVirtualInterface, toC(l.loc)};
+    return 1;
+}
+
+int uvmcheck_get_constraint(const uvmcheck_design* d, uint32_t cls, uint32_t index, uvmcheck_constraint* out) {
+    const Model* m = modelOf(d);
+    if (!m || !out || cls >= m->classes().size()) return 0;
+    const auto& cs = m->classes()[cls].constraints;
+    if (index >= cs.size()) return 0;
+    *out = {cs[index].name.c_str(), toC(cs[index].loc)};
     return 1;
 }
 

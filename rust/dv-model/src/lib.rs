@@ -90,6 +90,50 @@ pub enum PhaseKind {
     Task,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Direction {
+    In,
+    Out,
+    InOut,
+    Ref,
+}
+
+impl Direction {
+    fn from_c(v: u8) -> Self {
+        match v {
+            1 => Direction::Out,
+            2 => Direction::InOut,
+            3 => Direction::Ref,
+            _ => Direction::In,
+        }
+    }
+}
+
+/// The shape of a type, as far as rules care: aggregates that are costly to
+/// copy, and the rest.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum TypeShape {
+    Other,
+    DynamicArray,
+    Queue,
+    AssociativeArray,
+    FixedUnpackedArray,
+    UnpackedStruct,
+}
+
+impl TypeShape {
+    fn from_c(v: u8) -> Self {
+        match v {
+            1 => TypeShape::DynamicArray,
+            2 => TypeShape::Queue,
+            3 => TypeShape::AssociativeArray,
+            4 => TypeShape::FixedUnpackedArray,
+            5 => TypeShape::UnpackedStruct,
+            _ => TypeShape::Other,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Loc {
     /// Index into [`Design::files`]; 0 is "no file".
@@ -107,6 +151,7 @@ pub struct Property {
     pub is_static: bool,
     pub is_const: bool,
     pub is_rand: bool,
+    pub is_virtual_interface: bool,
     pub loc: Loc,
 }
 
@@ -119,6 +164,42 @@ pub struct Method {
     pub is_pure: bool,
     pub is_static: bool,
     pub phase: PhaseKind,
+    /// Has the `virtual` keyword itself (`is_virtual` also covers overrides).
+    pub declared_virtual: bool,
+    /// Made by the compiler (randomize, pre_randomize and the like).
+    pub is_builtin: bool,
+    /// Declared by a prototype in the class; `loc` is the body outside it.
+    pub is_extern: bool,
+    pub return_type: String,
+    pub returns_void: bool,
+    pub loc: Loc,
+    pub arguments: Vec<Argument>,
+    /// Declared locals only (not `this` or a function's return variable).
+    pub locals: Vec<Local>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Argument {
+    pub name: String,
+    pub ty: String,
+    pub canonical_type: String,
+    pub type_class: Option<ClassId>,
+    pub direction: Direction,
+    pub shape: TypeShape,
+    pub loc: Loc,
+}
+
+#[derive(Clone, Debug)]
+pub struct Local {
+    pub name: String,
+    pub ty: String,
+    pub is_virtual_interface: bool,
+    pub loc: Loc,
+}
+
+#[derive(Clone, Debug)]
+pub struct Constraint {
+    pub name: String,
     pub loc: Loc,
 }
 
@@ -136,6 +217,7 @@ pub struct Class {
     pub loc: Loc,
     pub properties: Vec<Property>,
     pub methods: Vec<Method>,
+    pub constraints: Vec<Constraint>,
 }
 
 /// Wall-clock cost of a load, by stage, in milliseconds.
@@ -244,6 +326,7 @@ impl Design {
                     is_static: p.is_static != 0,
                     is_const: p.is_const != 0,
                     is_rand: p.is_rand != 0,
+                    is_virtual_interface: p.is_virtual_interface != 0,
                     loc: loc(p.loc),
                 });
             }
@@ -254,6 +337,37 @@ impl Design {
                     return Err(Error(format!("method {i} of class {cid} missing")));
                 }
                 let m = unsafe { m.assume_init() };
+                let mut arguments = Vec::with_capacity(m.argument_count as usize);
+                for a in 0..m.argument_count {
+                    let mut x = std::mem::MaybeUninit::<ffi::uvmcheck_argument>::uninit();
+                    if unsafe { ffi::uvmcheck_get_argument(d, cid, i, a, x.as_mut_ptr()) } == 0 {
+                        return Err(Error(format!("argument {a} of method {i} of class {cid} missing")));
+                    }
+                    let x = unsafe { x.assume_init() };
+                    arguments.push(Argument {
+                        name: text(x.name),
+                        ty: text(x.type_),
+                        canonical_type: text(x.canonical_type),
+                        type_class: id(x.type_class),
+                        direction: Direction::from_c(x.direction),
+                        shape: TypeShape::from_c(x.shape),
+                        loc: loc(x.loc),
+                    });
+                }
+                let mut locals = Vec::with_capacity(m.local_count as usize);
+                for l in 0..m.local_count {
+                    let mut x = std::mem::MaybeUninit::<ffi::uvmcheck_local>::uninit();
+                    if unsafe { ffi::uvmcheck_get_local(d, cid, i, l, x.as_mut_ptr()) } == 0 {
+                        return Err(Error(format!("local {l} of method {i} of class {cid} missing")));
+                    }
+                    let x = unsafe { x.assume_init() };
+                    locals.push(Local {
+                        name: text(x.name),
+                        ty: text(x.type_),
+                        is_virtual_interface: x.is_virtual_interface != 0,
+                        loc: loc(x.loc),
+                    });
+                }
                 methods.push(Method {
                     name: text(m.name),
                     visibility: Visibility::from_c(m.visibility),
@@ -266,8 +380,24 @@ impl Design {
                         2 => PhaseKind::Task,
                         _ => PhaseKind::None,
                     },
+                    declared_virtual: m.declared_virtual != 0,
+                    is_builtin: m.is_builtin != 0,
+                    is_extern: m.is_extern != 0,
+                    return_type: text(m.return_type),
+                    returns_void: m.returns_void != 0,
                     loc: loc(m.loc),
+                    arguments,
+                    locals,
                 });
+            }
+            let mut constraints = Vec::with_capacity(c.constraint_count as usize);
+            for i in 0..c.constraint_count {
+                let mut x = std::mem::MaybeUninit::<ffi::uvmcheck_constraint>::uninit();
+                if unsafe { ffi::uvmcheck_get_constraint(d, cid, i, x.as_mut_ptr()) } == 0 {
+                    return Err(Error(format!("constraint {i} of class {cid} missing")));
+                }
+                let x = unsafe { x.assume_init() };
+                constraints.push(Constraint { name: text(x.name), loc: loc(x.loc) });
             }
             classes.push(Class {
                 id: cid,
@@ -282,6 +412,7 @@ impl Design {
                 loc: loc(c.loc),
                 properties,
                 methods,
+                constraints,
             });
         }
         let copy_ms = start.elapsed().as_secs_f64() * 1e3;

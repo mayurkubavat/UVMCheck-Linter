@@ -20,13 +20,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence
 
-ABI_VERSION = 2
+ABI_VERSION = 3
 NONE = 0xFFFFFFFF
 
 UVM_KINDS = ("none", "object", "sequence_item", "sequence", "component", "test", "env", "agent",
              "driver", "monitor", "sequencer", "scoreboard", "subscriber")
 VISIBILITY = ("public", "protected", "local")
 PHASES = ("none", "function", "task")
+DIRECTIONS = ("in", "out", "inout", "ref")
+SHAPES = ("other", "dynamic_array", "queue", "associative_array", "fixed_unpacked_array", "unpacked_struct")
 
 
 class _Loc(ctypes.Structure):
@@ -37,19 +39,37 @@ class _Class(ctypes.Structure):
     _fields_ = [("name", ctypes.c_char_p), ("scope", ctypes.c_char_p), ("base_name", ctypes.c_char_p),
                 ("base", ctypes.c_uint32), ("uvm", ctypes.c_uint8), ("is_virtual", ctypes.c_uint8),
                 ("is_parameterized", ctypes.c_uint8), ("is_library", ctypes.c_uint8), ("loc", _Loc),
-                ("property_count", ctypes.c_uint32), ("method_count", ctypes.c_uint32)]
+                ("property_count", ctypes.c_uint32), ("method_count", ctypes.c_uint32),
+                ("constraint_count", ctypes.c_uint32)]
 
 
 class _Property(ctypes.Structure):
     _fields_ = [("name", ctypes.c_char_p), ("type", ctypes.c_char_p), ("type_class", ctypes.c_uint32),
                 ("visibility", ctypes.c_uint8), ("is_static", ctypes.c_uint8), ("is_const", ctypes.c_uint8),
-                ("is_rand", ctypes.c_uint8), ("loc", _Loc)]
+                ("is_rand", ctypes.c_uint8), ("is_virtual_interface", ctypes.c_uint8), ("loc", _Loc)]
 
 
 class _Method(ctypes.Structure):
     _fields_ = [("name", ctypes.c_char_p), ("visibility", ctypes.c_uint8), ("is_task", ctypes.c_uint8),
                 ("is_virtual", ctypes.c_uint8), ("is_pure", ctypes.c_uint8), ("is_static", ctypes.c_uint8),
-                ("phase", ctypes.c_uint8), ("loc", _Loc)]
+                ("phase", ctypes.c_uint8), ("declared_virtual", ctypes.c_uint8), ("is_builtin", ctypes.c_uint8),
+                ("is_extern", ctypes.c_uint8), ("returns_void", ctypes.c_uint8), ("return_type", ctypes.c_char_p),
+                ("loc", _Loc), ("argument_count", ctypes.c_uint32), ("local_count", ctypes.c_uint32)]
+
+
+class _Argument(ctypes.Structure):
+    _fields_ = [("name", ctypes.c_char_p), ("type", ctypes.c_char_p), ("canonical_type", ctypes.c_char_p),
+                ("type_class", ctypes.c_uint32), ("direction", ctypes.c_uint8), ("shape", ctypes.c_uint8),
+                ("loc", _Loc)]
+
+
+class _Local(ctypes.Structure):
+    _fields_ = [("name", ctypes.c_char_p), ("type", ctypes.c_char_p), ("is_virtual_interface", ctypes.c_uint8),
+                ("loc", _Loc)]
+
+
+class _Constraint(ctypes.Structure):
+    _fields_ = [("name", ctypes.c_char_p), ("loc", _Loc)]
 
 
 class ModelError(RuntimeError):
@@ -90,6 +110,11 @@ def _load_library():
         "uvmcheck_get_class": ([p, ctypes.c_uint32, ctypes.POINTER(_Class)], ctypes.c_int),
         "uvmcheck_get_property": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(_Property)], ctypes.c_int),
         "uvmcheck_get_method": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(_Method)], ctypes.c_int),
+        "uvmcheck_get_argument": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                                   ctypes.POINTER(_Argument)], ctypes.c_int),
+        "uvmcheck_get_local": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                                ctypes.POINTER(_Local)], ctypes.c_int),
+        "uvmcheck_get_constraint": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(_Constraint)], ctypes.c_int),
     }
     for name, (args, res) in sigs.items():
         fn = getattr(lib, name)
@@ -125,6 +150,32 @@ class Property:
     is_static: bool
     is_const: bool
     is_rand: bool
+    is_virtual_interface: bool
+    loc: Loc
+
+
+@dataclass
+class Argument:
+    name: str
+    type: str
+    canonical_type: str
+    type_class: Optional[int]
+    direction: str
+    shape: str
+    loc: Loc
+
+
+@dataclass
+class Local:
+    name: str
+    type: str
+    is_virtual_interface: bool
+    loc: Loc
+
+
+@dataclass
+class Constraint:
+    name: str
     loc: Loc
 
 
@@ -137,7 +188,14 @@ class Method:
     is_pure: bool
     is_static: bool
     phase: str
+    declared_virtual: bool  # has the `virtual` keyword itself
+    is_builtin: bool        # made by the compiler (randomize and the like)
+    is_extern: bool         # declared by a prototype; loc is the body outside the class
+    return_type: str
+    returns_void: bool
     loc: Loc
+    arguments: List[Argument] = field(default_factory=list)
+    locals: List[Local] = field(default_factory=list)  # declared locals only
 
 
 @dataclass
@@ -154,6 +212,7 @@ class Class:
     loc: Loc
     properties: List[Property] = field(default_factory=list)
     methods: List[Method] = field(default_factory=list)
+    constraints: List[Constraint] = field(default_factory=list)
 
     @property
     def is_component(self) -> bool:
@@ -190,6 +249,7 @@ class Design:
             files = [_s(lib.uvmcheck_file_name(handle, i)) for i in range(lib.uvmcheck_file_count(handle))]
             classes = []
             c, p, m = _Class(), _Property(), _Method()
+            a, l, con = _Argument(), _Local(), _Constraint()
             for cid in range(lib.uvmcheck_class_count(handle)):
                 if not lib.uvmcheck_get_class(handle, cid, ctypes.byref(c)):
                     raise ModelError(f"class {cid} missing")
@@ -199,12 +259,27 @@ class Design:
                     lib.uvmcheck_get_property(handle, cid, i, ctypes.byref(p))
                     k.properties.append(Property(_s(p.name), _s(p.type), _id(p.type_class),
                                                  VISIBILITY[p.visibility], bool(p.is_static),
-                                                 bool(p.is_const), bool(p.is_rand), _loc(p.loc)))
+                                                 bool(p.is_const), bool(p.is_rand),
+                                                 bool(p.is_virtual_interface), _loc(p.loc)))
                 for i in range(c.method_count):
                     lib.uvmcheck_get_method(handle, cid, i, ctypes.byref(m))
-                    k.methods.append(Method(_s(m.name), VISIBILITY[m.visibility], bool(m.is_task),
-                                            bool(m.is_virtual), bool(m.is_pure), bool(m.is_static),
-                                            PHASES[m.phase], _loc(m.loc)))
+                    meth = Method(_s(m.name), VISIBILITY[m.visibility], bool(m.is_task),
+                                  bool(m.is_virtual), bool(m.is_pure), bool(m.is_static),
+                                  PHASES[m.phase], bool(m.declared_virtual), bool(m.is_builtin),
+                                  bool(m.is_extern), _s(m.return_type), bool(m.returns_void), _loc(m.loc))
+                    for j in range(m.argument_count):
+                        lib.uvmcheck_get_argument(handle, cid, i, j, ctypes.byref(a))
+                        meth.arguments.append(Argument(_s(a.name), _s(a.type), _s(a.canonical_type),
+                                                       _id(a.type_class), DIRECTIONS[a.direction],
+                                                       SHAPES[a.shape], _loc(a.loc)))
+                    for j in range(m.local_count):
+                        lib.uvmcheck_get_local(handle, cid, i, j, ctypes.byref(l))
+                        meth.locals.append(Local(_s(l.name), _s(l.type), bool(l.is_virtual_interface),
+                                                 _loc(l.loc)))
+                    k.methods.append(meth)
+                for i in range(c.constraint_count):
+                    lib.uvmcheck_get_constraint(handle, cid, i, ctypes.byref(con))
+                    k.constraints.append(Constraint(_s(con.name), _loc(con.loc)))
                 classes.append(k)
             timings = {"parse_ms": lib.uvmcheck_design_time_ms(handle, 0),
                        "elaborate_ms": lib.uvmcheck_design_time_ms(handle, 1),

@@ -52,6 +52,19 @@ enum class Visibility : uint8_t { Public, Protected, Local };
 
 enum class PhaseKind : uint8_t { None, Function, Task };
 
+enum class Direction : uint8_t { In, Out, InOut, Ref };
+
+/// The shape of a type, as far as rules care: aggregates that are costly to
+/// copy, and the rest.
+enum class TypeShape : uint8_t {
+    Other,
+    DynamicArray,
+    Queue,
+    AssociativeArray,
+    FixedUnpackedArray,
+    UnpackedStruct,
+};
+
 using ClassId = uint32_t;
 inline constexpr ClassId NoClass = UINT32_MAX;
 
@@ -63,8 +76,28 @@ struct Property {
     bool isStatic = false;
     bool isConst = false;
     bool isRand = false;
+    /// A virtual interface, or an array of them.
+    bool isVirtualInterface = false;
     /// The property's type, when it is a class in this model.
     ClassId typeClass = NoClass;
+};
+
+struct Argument {
+    std::string name;
+    std::string type;          ///< as declared
+    std::string canonicalType; ///< typedefs resolved
+    Loc loc;
+    Direction direction = Direction::In;
+    TypeShape shape = TypeShape::Other;
+    ClassId typeClass = NoClass;
+};
+
+/// A variable declared directly in a method's body.
+struct Local {
+    std::string name;
+    std::string type;
+    Loc loc;
+    bool isVirtualInterface = false;
 };
 
 struct Method {
@@ -72,10 +105,27 @@ struct Method {
     Loc loc;
     Visibility visibility = Visibility::Public;
     bool isTask = false;
+    /// Virtual, declared so or by overriding a virtual method.
     bool isVirtual = false;
+    /// Has the `virtual` keyword itself.
+    bool declaredVirtual = false;
     bool isPure = false;
     bool isStatic = false;
+    /// Made by the compiler (randomize, pre_randomize and the like).
+    bool isBuiltIn = false;
+    /// Declared by a prototype in the class (`extern`, or `pure virtual`);
+    /// the body, if any, is outside it. loc points at that body.
+    bool isExtern = false;
     PhaseKind phase = PhaseKind::None; ///< a standard UVM phase method
+    std::string returnType; ///< "void" for tasks
+    bool returnsVoid = true;
+    std::vector<Argument> arguments;
+    std::vector<Local> locals;
+};
+
+struct Constraint {
+    std::string name;
+    Loc loc;
 };
 
 struct Class {
@@ -94,6 +144,11 @@ struct Class {
     bool isLibrary = false;
     std::vector<Property> properties;
     std::vector<Method> methods;
+    std::vector<Constraint> constraints;
+
+    /// Members declared in this class itself (not inherited), by name.
+    const Property* findProperty(std::string_view n) const;
+    const Method* findMethod(std::string_view n) const;
 };
 
 class Model {
@@ -101,9 +156,14 @@ public:
     const std::vector<Class>& classes() const { return classes_; }
     const Class& cls(ClassId id) const { return classes_.at(id); }
     std::optional<ClassId> findClass(std::string_view name) const;
+    /// The id of a class taken from classes().
+    ClassId idOf(const Class& c) const { return static_cast<ClassId>(&c - classes_.data()); }
 
     const std::vector<std::string>& files() const { return files_; }
     std::string_view fileName(const Loc& loc) const { return files_.at(loc.file); }
+
+    /// The base chain of `id`, nearest first, as far as it is in the model.
+    std::vector<ClassId> ancestors(ClassId id) const;
 
     /// True when `id` is `ancestorName` or derives from it.
     bool derivesFrom(ClassId id, std::string_view ancestorName) const;

@@ -1,6 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/symbols/ClassSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::style {
 
@@ -15,21 +15,18 @@ public:
     std::string_view getCategory() const override { return "Style"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Info; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation& /*compilation*/,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls || !uvmModel.isUvmComponent(*cls)) continue;
+        for (const model::Class& cls : uvmModel.facade().classes()) {
+            if (cls.isParameterized || !model::isComponent(cls.uvm)) continue;
 
             // Skip internal UVM base classes
-            if (cls->name.starts_with("uvm_")) continue;
+            if (cls.name.starts_with("uvm_")) continue;
 
-            for (const auto& member : cls->members()) {
-                if (member.kind != slang::ast::SymbolKind::ClassProperty) continue;
-
-                const auto& prop = member.as<slang::ast::ClassPropertySymbol>();
-                if (prop.flags.has(slang::ast::VariableFlags::Const)) continue;
-                if (prop.lifetime == slang::ast::VariableLifetime::Static) continue;
+            for (const model::Property& prop : cls.properties) {
+                if (prop.isConst || prop.isStatic) continue;
 
                 // Built-in / macro injected properties
                 if (prop.name == "type_name" || prop.name == "type_id") continue;
@@ -38,11 +35,11 @@ public:
                     diags.addViolation(
                         "SV-STY-001",
                         "ClassMemberPrefix",
-                        "Member property '" + std::string(prop.name) + "' in class '" +
-                        std::string(cls->name) + "' should begin with 'm_' prefix (e.g. 'm_" +
-                        std::string(prop.name) + "') to distinguish internal state from local arguments.",
+                        "Member property '" + prop.name + "' in class '" +
+                        cls.name + "' should begin with 'm_' prefix (e.g. 'm_" +
+                        prop.name + "') to distinguish internal state from local arguments.",
                         core::Severity::Info,
-                        prop.location
+                        model::toSlang(prop.loc)
                     );
                 }
             }

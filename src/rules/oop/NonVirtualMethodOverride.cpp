@@ -1,7 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/symbols/ClassSymbols.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::oop {
 
@@ -16,43 +15,40 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* classType : uvmModel.getAllClasses()) {
-            const auto* base = classType->getBaseClass();
-            if (!base || !base->isClass()) continue;
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized || cls.base == model::NoClass) continue;
+            const auto chain = design.ancestors(design.idOf(cls));
 
-            for (const auto& sub : classType->membersOfType<slang::ast::SubroutineSymbol>()) {
-                if (sub.name == "new") continue;
-                if (sub.flags.has(slang::ast::MethodFlags::BuiltIn)) continue;
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern) continue; // as before the port: in-class bodies only
+                if (sub.name == "new" || sub.isBuiltIn) continue;
 
-                // Check ancestor classes
-                const slang::ast::Type* ancestor = base;
-                while (ancestor && ancestor->isClass()) {
-                    const auto& ancClass = ancestor->as<slang::ast::ClassType>();
-                    const auto* sym = ancClass.find(sub.name);
+                // The nearest ancestor that declares a method of this name
+                for (model::ClassId a : chain) {
+                    const model::Class& ancClass = design.cls(a);
+                    const model::Method* baseMethod = ancClass.findMethod(sub.name);
+                    if (!baseMethod) continue;
+                    if (baseMethod->isBuiltIn) break;
 
-                    if (sym && sym->kind == slang::ast::SymbolKind::Subroutine) {
-                        const auto& baseMethod = sym->as<slang::ast::SubroutineSymbol>();
-                        if (baseMethod.flags.has(slang::ast::MethodFlags::BuiltIn)) break;
-
-                        if (!baseMethod.isVirtual()) {
-                            auto* v = diags.addViolation(
-                                "SV-OOP-001",
-                                "NonVirtualMethodOverride",
-                                "Method '" + std::string(sub.name) + "' in class '" +
-                                std::string(classType->name) + "' overrides non-virtual method in base class '" +
-                                std::string(ancClass.name) + "'.",
-                                core::Severity::Warning,
-                                sub.location
-                            );
-                            diags.addRelated(v, baseMethod.location, "non-virtual method in '" +
-                                             std::string(ancClass.name) + "'");
-                        }
-                        break; // Stop after finding immediate ancestor definition
+                    if (!baseMethod->isVirtual) {
+                        auto* v = diags.addViolation(
+                            "SV-OOP-001",
+                            "NonVirtualMethodOverride",
+                            "Method '" + sub.name + "' in class '" +
+                            cls.name + "' overrides non-virtual method in base class '" +
+                            ancClass.name + "'.",
+                            core::Severity::Warning,
+                            model::toSlang(sub.loc)
+                        );
+                        diags.addRelated(v, model::toSlang(baseMethod->loc), "non-virtual method in '" +
+                                         ancClass.name + "'");
                     }
-                    ancestor = ancClass.getBaseClass();
+                    break; // Stop after finding immediate ancestor definition
                 }
             }
         }

@@ -318,6 +318,7 @@ if(UVMCHECK_BUILD_MODEL_LIB)
         NAME model_capi_test
         COMMAND model_capi_smoke ${CMAKE_CURRENT_SOURCE_DIR}/tests/common
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/rules/oop/SV-OOP-007/bad.sv
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/model/facts.sv
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
     # The Python binding (python/uvmcheck/model.py) over the same ABI.

@@ -1,6 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/symbols/ClassSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::uvm {
 
@@ -15,26 +15,24 @@ public:
     std::string_view getCategory() const override { return "Architecture"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls || !uvmModel.isUvmSequence(*cls)) continue;
-
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::ClassProperty && member.name == "p_sequencer") {
-                    diags.addViolation(
-                        "UVM-SEQ-003",
-                        "UvmPSequencerAbuse",
-                        "Sequence '" + std::string(cls->name) + "' declares 'p_sequencer' via `uvm_declare_p_sequencer. "
-                        "This violates the Law of Demeter and architectural layering by tightly binding sequence scenario generation "
-                        "to physical testbench agent/sequencer topology. If sequencer topology or naming changes, sequences break. "
-                        "Decouple sequences by passing configuration parameters down through sequence properties or uvm_config_db.",
-                        core::Severity::Warning,
-                        member.location
-                    );
-                }
-            }
+        for (const model::Class& cls : uvmModel.facade().classes()) {
+            if (cls.isParameterized || cls.uvm != model::UvmKind::Sequence) continue;
+            const model::Property* p = cls.findProperty("p_sequencer");
+            if (!p) continue;
+            diags.addViolation(
+                "UVM-SEQ-003",
+                "UvmPSequencerAbuse",
+                "Sequence '" + cls.name + "' declares 'p_sequencer' via `uvm_declare_p_sequencer. "
+                "This violates the Law of Demeter and architectural layering by tightly binding sequence scenario generation "
+                "to physical testbench agent/sequencer topology. If sequencer topology or naming changes, sequences break. "
+                "Decouple sequences by passing configuration parameters down through sequence properties or uvm_config_db.",
+                core::Severity::Warning,
+                model::toSlang(p->loc)
+            );
         }
     }
 };

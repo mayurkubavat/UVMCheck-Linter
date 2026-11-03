@@ -21,10 +21,30 @@ std::string_view toString(UvmKind kind) {
     return "none";
 }
 
+const Property* Class::findProperty(std::string_view n) const {
+    for (const auto& p : properties)
+        if (p.name == n) return &p;
+    return nullptr;
+}
+
+const Method* Class::findMethod(std::string_view n) const {
+    for (const auto& m : methods)
+        if (m.name == n) return &m;
+    return nullptr;
+}
+
 std::optional<ClassId> Model::findClass(std::string_view name) const {
     auto it = byName_.find(std::string(name));
     if (it == byName_.end()) return std::nullopt;
     return it->second;
+}
+
+std::vector<ClassId> Model::ancestors(ClassId id) const {
+    std::vector<ClassId> out;
+    for (ClassId b = classes_.at(id).base; b != NoClass && out.size() < classes_.size(); b = classes_.at(b).base) {
+        out.push_back(b);
+    }
+    return out;
 }
 
 bool Model::derivesFrom(ClassId id, std::string_view ancestorName) const {
@@ -84,6 +104,28 @@ const char* visibilityName(Visibility v) {
     return "public";
 }
 
+const char* directionName(Direction d) {
+    switch (d) {
+        case Direction::In: return "in";
+        case Direction::Out: return "out";
+        case Direction::InOut: return "inout";
+        case Direction::Ref: return "ref";
+    }
+    return "in";
+}
+
+const char* shapeName(TypeShape t) {
+    switch (t) {
+        case TypeShape::Other: return "other";
+        case TypeShape::DynamicArray: return "dynamic_array";
+        case TypeShape::Queue: return "queue";
+        case TypeShape::AssociativeArray: return "associative_array";
+        case TypeShape::FixedUnpackedArray: return "fixed_unpacked_array";
+        case TypeShape::UnpackedStruct: return "unpacked_struct";
+    }
+    return "other";
+}
+
 const char* phaseName(PhaseKind p) {
     switch (p) {
         case PhaseKind::None: return "none";
@@ -131,7 +173,8 @@ void Model::writeJson(std::ostream& out) const {
             writeString(out, p.type);
             out << ",\"visibility\":\"" << visibilityName(p.visibility) << "\",\"static\":"
                 << (p.isStatic ? "true" : "false") << ",\"const\":" << (p.isConst ? "true" : "false")
-                << ",\"rand\":" << (p.isRand ? "true" : "false") << ",\"type_class\":";
+                << ",\"rand\":" << (p.isRand ? "true" : "false")
+                << ",\"virtual_interface\":" << (p.isVirtualInterface ? "true" : "false") << ",\"type_class\":";
             if (p.typeClass == NoClass) out << "null"; else out << p.typeClass;
             out << ',';
             writeLoc(out, p.loc);
@@ -146,8 +189,51 @@ void Model::writeJson(std::ostream& out) const {
             out << ",\"visibility\":\"" << visibilityName(m.visibility) << "\",\"task\":"
                 << (m.isTask ? "true" : "false") << ",\"virtual\":" << (m.isVirtual ? "true" : "false")
                 << ",\"pure\":" << (m.isPure ? "true" : "false") << ",\"static\":"
-                << (m.isStatic ? "true" : "false") << ",\"phase\":\"" << phaseName(m.phase) << "\",";
+                << (m.isStatic ? "true" : "false") << ",\"declared_virtual\":"
+                << (m.declaredVirtual ? "true" : "false") << ",\"builtin\":" << (m.isBuiltIn ? "true" : "false")
+                << ",\"extern\":" << (m.isExtern ? "true" : "false")
+                << ",\"phase\":\"" << phaseName(m.phase) << "\",\"return_type\":";
+            writeString(out, m.returnType);
+            out << ",\"arguments\":[";
+            for (size_t k = 0; k < m.arguments.size(); ++k) {
+                const Argument& a = m.arguments[k];
+                if (k) out << ',';
+                out << "{\"name\":";
+                writeString(out, a.name);
+                out << ",\"type\":";
+                writeString(out, a.type);
+                out << ",\"canonical_type\":";
+                writeString(out, a.canonicalType);
+                out << ",\"direction\":\"" << directionName(a.direction) << "\",\"shape\":\"" << shapeName(a.shape)
+                    << "\",\"type_class\":";
+                if (a.typeClass == NoClass) out << "null"; else out << a.typeClass;
+                out << ',';
+                writeLoc(out, a.loc);
+                out << '}';
+            }
+            out << "],\"locals\":[";
+            for (size_t k = 0; k < m.locals.size(); ++k) {
+                const Local& l = m.locals[k];
+                if (k) out << ',';
+                out << "{\"name\":";
+                writeString(out, l.name);
+                out << ",\"type\":";
+                writeString(out, l.type);
+                out << ",\"virtual_interface\":" << (l.isVirtualInterface ? "true" : "false") << ',';
+                writeLoc(out, l.loc);
+                out << '}';
+            }
+            out << "],";
             writeLoc(out, m.loc);
+            out << '}';
+        }
+        out << "],\"constraints\":[";
+        for (size_t j = 0; j < c.constraints.size(); ++j) {
+            if (j) out << ',';
+            out << "{\"name\":";
+            writeString(out, c.constraints[j].name);
+            out << ',';
+            writeLoc(out, c.constraints[j].loc);
             out << '}';
         }
         out << "]}";

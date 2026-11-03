@@ -1,7 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/symbols/ClassSymbols.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 #include <string>
 
 namespace uvmcheck::rules::oop {
@@ -16,37 +15,36 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation& /*compilation*/,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* classType : uvmModel.getAllClasses()) {
-            const auto* base = classType->getBaseClass();
-            if (!base || !base->isClass()) continue;
-            const auto& baseClass = base->as<slang::ast::ClassType>();
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized || cls.base == model::NoClass) continue;
+            const model::Class& baseClass = design.cls(cls.base);
 
-            for (const auto& sub : classType->membersOfType<slang::ast::SubroutineSymbol>()) {
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern) continue; // as before the port: in-class bodies only
                 if (sub.name == "new") continue;
 
-                // Look for matching method in base class hierarchy
-                for (const auto& bs : baseClass.membersOfType<slang::ast::SubroutineSymbol>()) {
-                    if (bs.name == sub.name && bs.flags.has(slang::ast::MethodFlags::Virtual)) {
-                        size_t derivedArgs = sub.getArguments().size();
-                        size_t baseArgs = bs.getArguments().size();
-                        if (derivedArgs != baseArgs) {
-                            diags.addViolation(
-                                "SV-OOP-015",
-                                "VirtualMethodSignatureMismatch",
-                                "Method '" + std::string(sub.name) + "' in derived class '" + std::string(classType->name) +
-                                "' defines " + std::to_string(derivedArgs) + " parameter(s), but overrides virtual method in base class '" +
-                                std::string(base->name) + "' defined with " + std::to_string(baseArgs) + " parameter(s). In SystemVerilog OOP "
-                                "(IEEE 1800 § 8.20), virtual method overrides must match base signature parameter counts; "
-                                "mismatching arguments causes method hiding instead of polymorphic override.",
-                                core::Severity::Warning,
-                                sub.location
-                            );
-                        }
-                        break;
-                    }
+                // The base class's own method of that name, when declared virtual
+                const model::Method* bs = baseClass.findMethod(sub.name);
+                if (!bs || !bs->declaredVirtual) continue;
+                size_t derivedArgs = sub.arguments.size();
+                size_t baseArgs = bs->arguments.size();
+                if (derivedArgs != baseArgs) {
+                    diags.addViolation(
+                        "SV-OOP-015",
+                        "VirtualMethodSignatureMismatch",
+                        "Method '" + sub.name + "' in derived class '" + cls.name +
+                        "' defines " + std::to_string(derivedArgs) + " parameter(s), but overrides virtual method in base class '" +
+                        baseClass.name + "' defined with " + std::to_string(baseArgs) + " parameter(s). In SystemVerilog OOP "
+                        "(IEEE 1800 § 8.20), virtual method overrides must match base signature parameter counts; "
+                        "mismatching arguments causes method hiding instead of polymorphic override.",
+                        core::Severity::Warning,
+                        model::toSlang(sub.loc)
+                    );
                 }
             }
         }
