@@ -134,14 +134,23 @@ class Linter:
         keep_cmp = bool(rule_id) or sv_file.parent.name.startswith("SV-CMP-")
         report["violations"] = [v for v in report["violations"]
                                 if keep_cmp or not v["ruleId"].startswith("SV-CMP-")]
+        # Resolve each distinct path once: against real UVM a report has thousands of
+        # findings in a few dozen library files.
+        resolved = {}
+
+        def resolve(name):
+            if name not in resolved:
+                resolved[name] = (Path(self.workdir) / name).resolve()
+            return resolved[name]
+
         findings = [(v["ruleId"], v["line"]) for v in report["violations"]
-                    if v["file"] and (Path(self.workdir) / v["file"]).resolve() == sv_file]
+                    if v["file"] and resolve(v["file"]) == sv_file]
         # The rule's findings in helper files next to the test, as (rule, "file:line").
         helper_findings = []
         for v in report["violations"]:
             if not v["file"]:
                 continue
-            path = (Path(self.workdir) / v["file"]).resolve()
+            path = resolve(v["file"])
             if path.parent == sv_file.parent and path.name not in ("bad.sv", "good.sv"):
                 helper_findings.append((v["ruleId"], f"{path.name}:{v['line']}"))
 

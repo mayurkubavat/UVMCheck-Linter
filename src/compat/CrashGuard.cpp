@@ -15,6 +15,7 @@
 #include "slang/text/SourceManager.h"
 
 #ifndef _WIN32
+#include <fcntl.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
@@ -146,6 +147,8 @@ CrashGuard::Outcome CrashGuard::run() {
     }
     if (pid == 0) {
         close(fds[0]);
+        // Subprocesses the run starts must not hold the pipe open past the run's end.
+        fcntl(fds[1], F_SETFD, FD_CLOEXEC);
         stageFd = fds[1];
         outcome.child = true;
         return outcome;
