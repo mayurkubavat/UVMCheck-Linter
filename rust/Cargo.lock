@@ -44,3 +44,11 @@ version = "0.1.0"
 [[package]]
 name = "sv-source"
 version = "0.1.0"
+
+[[package]]
+name = "sv-syntax"
+version = "0.1.0"
+dependencies = [
+ "sv-lexer",
+ "sv-preproc",
+]

@@ -56,6 +56,8 @@ pub struct Diagnostic {
 pub struct Output {
     pub tokens: Vec<PpToken>,
     pub files: Vec<PathBuf>,
+    /// The text of each file in `files`, as read.
+    pub sources: Vec<Rc<str>>,
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -107,6 +109,7 @@ pub struct Preprocessor {
     frames: Vec<Frame>,
     conds: Vec<Cond>,
     out: Output,
+    paths: Vec<PathBuf>,
     sources: Vec<Rc<str>>,
 }
 
@@ -217,6 +220,7 @@ impl Preprocessor {
             frames: Vec::new(),
             conds: Vec::new(),
             out: Output::default(),
+            paths: Vec::new(),
             sources: Vec::new(),
         };
         if pp.opts.max_include_depth == 0 {
@@ -276,13 +280,16 @@ impl Preprocessor {
             self.diag(Origin { file: id, offset: src.len() as u32 }, "missing `endif".into());
             self.conds.clear();
         }
-        std::mem::take(&mut self.out)
+        let mut out = std::mem::take(&mut self.out);
+        out.files = self.paths.clone();
+        out.sources = self.sources.clone();
+        out
     }
 
     fn add_file(&mut self, path: PathBuf, src: &str) -> u32 {
-        self.out.files.push(path);
+        self.paths.push(path);
         self.sources.push(Rc::from(src));
-        (self.out.files.len() - 1) as u32
+        (self.paths.len() - 1) as u32
     }
 
     fn push_file(&mut self, id: u32) {
@@ -384,7 +391,7 @@ impl Preprocessor {
                 }
                 "include" => self.directive_include(&t),
                 "__FILE__" => {
-                    let file = self.current_file().map(|f| self.out.files[f as usize].to_string_lossy().into_owned());
+                    let file = self.current_file().map(|f| self.paths[f as usize].to_string_lossy().into_owned());
                     let text = format!("\"{}\"", file.unwrap_or_default());
                     return Some(T { kind: Kind::StringLiteral, text: Rc::from(text), from_macro: true, ..t });
                 }
@@ -661,7 +668,7 @@ impl Preprocessor {
         }
         if !angle {
             if let Some(f) = self.current_file() {
-                if let Some(dir) = self.out.files[f as usize].parent() {
+                if let Some(dir) = self.paths[f as usize].parent() {
                     let c = dir.join(p);
                     if c.is_file() {
                         return Some(c);

@@ -105,3 +105,30 @@ Parity with Slang is checked token for token by `tools/pp_parity.py`
 against the `uvmcheck_pp_dump` reference tool. Measured 2026-11-03:
 uvm-core's `uvm_pkg.sv` (278,335 tokens) is identical, and so are all 949
 sv-tests files that are meant to pass (79 skipped as should-fail).
+
+## sv-syntax (R2, lossless parser)
+
+A syntax tree over sv-preproc's tokens. Every token is a leaf exactly once;
+a token read from a file carries the source between it and the previous
+token of that file (whitespace, comments, directives, macro uses) as
+leading trivia, so `Tree::file_text` gives every file back byte for byte.
+Nodes are built from parser events, so a finished node can be wrapped
+later (for binary expressions).
+
+Slice 1 (2026-11-03) parses design units, packages, classes, methods
+(including extern and pure virtual prototypes and out-of-block bodies),
+typedefs, constraints, covergroups, generate constructs and statements at
+block level. Expressions, types, port lists and constraint bodies are
+balanced token runs inside their nodes for now.
+
+```
+cargo run --release -p sv-syntax --example outline -- --check +incdir+DIR FILE
+```
+
+`tools/cst_parity.py` compares the outline (design units, classes,
+functions, tasks, typedefs, constraints, covergroups, in order) with
+Slang's parser via `uvmcheck_cst_outline`, and checks the round trip.
+Measured on slice 1: uvm-core's `uvm_pkg.sv` (168 files, 5,402 entries)
+identical with no errors in about 100 ms including preprocessing; all 849
+sv-tests files Slang parses cleanly identical; all 772 of this repo's test
+inputs Slang parses cleanly identical.
