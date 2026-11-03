@@ -1,26 +1,8 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/ASTVisitor.h"
-#include "slang/ast/expressions/CallExpression.h"
-#include "slang/ast/symbols/ClassSymbols.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
-#include "slang/syntax/AllSyntax.h"
-#include <unordered_set>
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::uvm {
-
-class TlmConnectVisitor : public slang::ast::ASTVisitor<TlmConnectVisitor, slang::ast::VisitFlags::AllGood> {
-public:
-    void handle(const slang::ast::CallExpression& expr) {
-        if (expr.getSubroutineName() == "connect" && expr.syntax) {
-            std::string text(expr.syntax->toString());
-            connectedCallTexts.push_back(text);
-        }
-        visitDefault(expr);
-    }
-
-    std::vector<std::string> connectedCallTexts;
-};
 
 class UvmUnconnectedTlmPort : public Rule {
 public:
@@ -33,68 +15,47 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& /*compilation*/,
+    // Reads only uvmcheck::model, not slang's AST.
+    void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls || !uvmModel.isUvmComponent(*cls)) continue;
-
-            // Collect TLM port and export properties
-            std::vector<const slang::ast::ClassPropertySymbol*> tlmPorts;
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::ClassProperty) {
-                    const auto& prop = member.as<slang::ast::ClassPropertySymbol>();
-                    std::string typeStr(prop.getType().toString());
-
-                    bool isTlm = (typeStr.find("_port") != std::string::npos ||
-                                  typeStr.find("_export") != std::string::npos ||
-                                  typeStr.find("analysis_port") != std::string::npos ||
-                                  typeStr.find("analysis_export") != std::string::npos);
-
-                    if (isTlm) {
-                        tlmPorts.push_back(&prop);
-                    }
-                }
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            if (!model::isComponent(cls.uvm)) continue;
+            std::vector<const model::Property*> tlmPorts;
+            for (const model::Property& prop : cls.properties) {
+                if (prop.type.find("_port") != std::string::npos || prop.type.find("_export") != std::string::npos)
+                    tlmPorts.push_back(&prop);
             }
-
             if (tlmPorts.empty()) continue;
 
-            // Visit all subroutines in the class to collect connect() calls
-            TlmConnectVisitor visitor;
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::Subroutine) {
-                    const auto& sub = member.as<slang::ast::SubroutineSymbol>();
-                    if (!sub.flags.has(slang::ast::MethodFlags::BuiltIn)) {
-                        sub.getBody().visit(visitor);
-                    }
-                }
+            // Receivers of x.connect(...) calls: "ap", "m_mon.ap", ...
+            std::vector<std::string_view> connected;
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern || sub.isBuiltIn) continue;
+                for (const model::Call& call : sub.calls)
+                    if (call.name == "connect" && !call.receiver.empty()) connected.push_back(call.receiver);
             }
 
-            // Check if each port was connected
-            for (const auto* port : tlmPorts) {
-                std::string portName(port->name);
+            for (const model::Property* port : tlmPorts) {
                 bool wasConnected = false;
-
-                for (const auto& callText : visitor.connectedCallTexts) {
-                    // Check for portName.connect(...) or this.portName.connect(...)
-                    if (callText.find(portName + ".connect") != std::string::npos ||
-                        callText.find(portName + " .connect") != std::string::npos) {
+                for (std::string_view receiver : connected) {
+                    if (receiver.ends_with(port->name)) {
                         wasConnected = true;
                         break;
                     }
                 }
-
-                if (!wasConnected) {
-                    diags.addViolation(
-                        "UVM-TLM-001",
-                        "UvmUnconnectedTlmPort",
-                        "TLM port/export '" + portName + "' in component '" +
-                        std::string(cls->name) + "' is declared but never connected via .connect(...). "
-                        "Unconnected TLM ports can cause simulation fatal errors upon transaction transfer.",
-                        core::Severity::Warning,
-                        port->location
-                    );
-                }
+                if (wasConnected) continue;
+                diags.addViolation(
+                    "UVM-TLM-001",
+                    "UvmUnconnectedTlmPort",
+                    "TLM port/export '" + port->name + "' in component '" +
+                    cls.name + "' is declared but never connected via .connect(...). "
+                    "Unconnected TLM ports can cause simulation fatal errors upon transaction transfer.",
+                    core::Severity::Warning,
+                    model::toSlang(port->loc)
+                );
             }
         }
     }

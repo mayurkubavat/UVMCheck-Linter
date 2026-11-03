@@ -1,38 +1,8 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/ASTVisitor.h"
-#include "slang/ast/expressions/CallExpression.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::oop {
-
-class VirtualCallVisitor : public slang::ast::ASTVisitor<VirtualCallVisitor, slang::ast::VisitFlags::AllGood> {
-public:
-    explicit VirtualCallVisitor(core::DiagnosticEngine& diags, std::string_view className)
-        : diags(diags), className(className) {}
-
-    void handle(const slang::ast::CallExpression& call) {
-        if (call.subroutine.index() == 0) {
-            const auto* sub = std::get<0>(call.subroutine);
-            if (sub && sub->flags.has(slang::ast::MethodFlags::Virtual)) {
-                diags.addViolation(
-                    "SV-OOP-005",
-                    "VirtualCallInConstructor",
-                    "Virtual method '" + std::string(sub->name) + "' is invoked inside constructor 'new' of class '" +
-                    std::string(className) + "'. In SystemVerilog, base class constructors execute before derived class members are initialized. "
-                    "Calling virtual methods in constructors executes overridden child methods against uninitialized state.",
-                    core::Severity::Warning,
-                    call.sourceRange.start()
-                );
-            }
-        }
-        visitDefault(call);
-    }
-
-private:
-    core::DiagnosticEngine& diags;
-    std::string_view className;
-};
 
 class VirtualCallInConstructor : public Rule {
 public:
@@ -45,19 +15,26 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& /*compilation*/,
+    // Reads only uvmcheck::model, not slang's AST.
+    void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls) continue;
-
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::Subroutine) {
-                    const auto& sub = member.as<slang::ast::SubroutineSymbol>();
-                    if (sub.name == "new" && !sub.flags.has(slang::ast::MethodFlags::BuiltIn)) {
-                        VirtualCallVisitor visitor(diags, cls->name);
-                        sub.getBody().visit(visitor);
-                    }
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern || sub.name != "new" || sub.isBuiltIn) continue;
+                for (const model::Call& call : sub.calls) {
+                    if (call.isSystem || !call.calleeDeclaredVirtual) continue;
+                    diags.addViolation(
+                        "SV-OOP-005",
+                        "VirtualCallInConstructor",
+                        "Virtual method '" + call.name + "' is invoked inside constructor 'new' of class '" +
+                        cls.name + "'. In SystemVerilog, base class constructors execute before derived class members are initialized. "
+                        "Calling virtual methods in constructors executes overridden child methods against uninitialized state.",
+                        core::Severity::Warning,
+                        model::toSlang(call.loc)
+                    );
                 }
             }
         }

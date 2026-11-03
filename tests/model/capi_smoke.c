@@ -20,6 +20,7 @@ int main(int argc, char** argv) {
     if (sizeof(void*) == 8) {
         CHECK(sizeof(uvmcheck_class) == 56 && sizeof(uvmcheck_property) == 40);
         CHECK(sizeof(uvmcheck_method) == 56 && sizeof(uvmcheck_argument) == 48);
+        CHECK(sizeof(uvmcheck_call) == 56);
         CHECK(sizeof(uvmcheck_local) == 32 && sizeof(uvmcheck_constraint) == 24);
     }
 
@@ -97,7 +98,7 @@ int main(int argc, char** argv) {
         if (strcmp(m.name, "sum") == 0) {
             /* extern: the record points at the body after the class */
             CHECK(m.is_extern && m.declared_virtual && m.is_virtual && !m.returns_void);
-            CHECK(strcmp(m.return_type, "int") == 0 && m.loc.line == 19);
+            CHECK(strcmp(m.return_type, "int") == 0 && m.loc.line == 22);
             CHECK(m.argument_count == 2 && m.local_count == 1);
             uvmcheck_argument a;
             CHECK(uvmcheck_get_argument(d, found, i, 0, &a));
@@ -115,9 +116,22 @@ int main(int argc, char** argv) {
             uvmcheck_local l;
             CHECK(uvmcheck_get_local(d, found, i, 0, &l));
             CHECK(strcmp(l.name, "vif") == 0 && l.is_virtual_interface);
+            /* randomize, set, and $urandom nested in set's arguments */
+            CHECK(m.call_count == 3);
+            uvmcheck_call k0, k1, k2;
+            CHECK(uvmcheck_get_call(d, found, i, 0, &k0) && uvmcheck_get_call(d, found, i, 1, &k1) &&
+                  uvmcheck_get_call(d, found, i, 2, &k2) && !uvmcheck_get_call(d, found, i, 3, &k2));
+            CHECK(strcmp(k0.name, "randomize") == 0 && k0.is_system); /* built-in method */
+            CHECK(strcmp(k1.name, "set") == 0 && strcmp(k1.callee_scope, "uvm_config_db") == 0);
+            CHECK(k1.first_arg_is_null && k1.loc.line == 31 && strcmp(k1.receiver, "") == 0);
+            CHECK(strcmp(k2.name, "$urandom") == 0 && k2.is_system && strcmp(k2.callee_scope, "") == 0);
             sawProbe = 1;
         } else if (strcmp(m.name, "new") == 0) {
             CHECK(!m.is_extern && !m.is_builtin);
+        } else if (strcmp(m.name, "post_randomize") == 0) {
+            uvmcheck_call k;
+            CHECK(m.call_count == 1 && uvmcheck_get_call(d, found, i, 0, &k));
+            CHECK(k.via_super && strcmp(k.name, "post_randomize") == 0 && strcmp(k.receiver, "super") == 0);
         } else if (strcmp(m.name, "randomize") == 0) {
             CHECK(m.is_builtin);
         }

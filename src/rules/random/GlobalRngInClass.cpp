@@ -1,37 +1,8 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/ASTVisitor.h"
-#include "slang/ast/expressions/CallExpression.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::random {
-
-class GlobalRngVisitor : public slang::ast::ASTVisitor<GlobalRngVisitor, slang::ast::VisitFlags::AllGood> {
-public:
-    explicit GlobalRngVisitor(core::DiagnosticEngine& diags, std::string_view className)
-        : diags(diags), className(className) {}
-
-    void handle(const slang::ast::CallExpression& call) {
-        std::string_view name = call.getSubroutineName();
-        if (name == "$urandom" || name == "$urandom_range" || name == "$random") {
-            diags.addViolation(
-                "SV-RND-002",
-                "GlobalRngInClass",
-                "Invoking global pseudo-random system function '" + std::string(name) +
-                "' inside class '" + std::string(className) +
-                "'. Global RNG calls consume the process-level PRNG state instead of the object's hierarchical random stream, "
-                "destroying simulation seed repeatability and testbench reproducibility. Use 'std::randomize()' or class-scoped RNG.",
-                core::Severity::Warning,
-                call.sourceRange.start()
-            );
-        }
-        visitDefault(call);
-    }
-
-private:
-    core::DiagnosticEngine& diags;
-    std::string_view className;
-};
 
 class GlobalRngInClass : public Rule {
 public:
@@ -44,19 +15,27 @@ public:
     std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& /*compilation*/,
+    // Reads only uvmcheck::model, not slang's AST.
+    void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls) continue;
-
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::Subroutine) {
-                    const auto& sub = member.as<slang::ast::SubroutineSymbol>();
-                    if (!sub.flags.has(slang::ast::MethodFlags::BuiltIn)) {
-                        GlobalRngVisitor visitor(diags, cls->name);
-                        sub.getBody().visit(visitor);
-                    }
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern || sub.isBuiltIn) continue; // in-class bodies, as before the port
+                for (const model::Call& call : sub.calls) {
+                    if (call.name != "$urandom" && call.name != "$urandom_range" && call.name != "$random") continue;
+                    diags.addViolation(
+                        "SV-RND-002",
+                        "GlobalRngInClass",
+                        "Invoking global pseudo-random system function '" + call.name +
+                        "' inside class '" + cls.name +
+                        "'. Global RNG calls consume the process-level PRNG state instead of the object's hierarchical random stream, "
+                        "destroying simulation seed repeatability and testbench reproducibility. Use 'std::randomize()' or class-scoped RNG.",
+                        core::Severity::Warning,
+                        model::toSlang(call.loc)
+                    );
                 }
             }
         }

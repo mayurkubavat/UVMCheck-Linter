@@ -100,6 +100,28 @@ struct Local {
     bool isVirtualInterface = false;
 };
 
+/// A call made in a method body, in the order the body is walked; calls
+/// nested in arguments and in nested blocks are included.
+struct Call {
+    std::string name;      ///< as written: "randomize", "$urandom", "get"
+    Loc loc;
+    /// A system task or function, or a built-in method such as randomize().
+    bool isSystem = false;
+    /// For a call to a user method: the class (generic name, for a
+    /// specialization) or package that declares it; empty otherwise.
+    std::string calleeScope;
+    bool calleeDeclaredVirtual = false;
+    bool calleeBuiltIn = false;
+    /// The first argument is the `null` literal, and where it starts.
+    bool firstArgIsNull = false;
+    Loc firstArgLoc;
+    /// The object the method is called on, as written: "m_env.ap" for
+    /// m_env.ap.connect(x); empty for an unqualified or `::` call.
+    std::string receiver;
+    /// Written as super.name(...).
+    bool viaSuper = false;
+};
+
 struct Method {
     std::string name;
     Loc loc;
@@ -121,6 +143,9 @@ struct Method {
     bool returnsVoid = true;
     std::vector<Argument> arguments;
     std::vector<Local> locals;
+    std::vector<Call> calls;
+    /// Calls named `name`, in body order.
+    size_t countCalls(std::string_view name) const;
 };
 
 struct Constraint {

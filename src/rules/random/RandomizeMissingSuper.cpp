@@ -1,34 +1,8 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/ASTVisitor.h"
-#include "slang/ast/expressions/CallExpression.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
-#include "slang/syntax/AllSyntax.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::random {
-
-class SuperRandomizeVisitor : public slang::ast::ASTVisitor<SuperRandomizeVisitor, slang::ast::VisitFlags::AllGood> {
-public:
-    explicit SuperRandomizeVisitor(std::string_view expectedMethod) : expectedMethod(expectedMethod) {}
-
-    void handle(const slang::ast::CallExpression& call) {
-        if (call.subroutine.index() == 0) {
-            const auto* sub = std::get<0>(call.subroutine);
-            if (sub && sub->name == expectedMethod) {
-                if (call.syntax) {
-                    std::string text(call.syntax->toString());
-                    if (text.find("super.") != std::string::npos) {
-                        callsSuper = true;
-                    }
-                }
-            }
-        }
-        visitDefault(call);
-    }
-
-    bool callsSuper = false;
-    std::string_view expectedMethod;
-};
 
 class RandomizeMissingSuper : public Rule {
 public:
@@ -41,54 +15,43 @@ public:
     std::string_view getCategory() const override { return "Randomization"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& /*compilation*/,
+    // Reads only uvmcheck::model, not slang's AST.
+    void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls || !cls->getBaseClass()) continue;
-
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::Subroutine) {
-                    const auto& sub = member.as<slang::ast::SubroutineSymbol>();
-                    if (sub.name == "pre_randomize" || sub.name == "post_randomize") {
-                        if (!sub.flags.has(slang::ast::MethodFlags::BuiltIn) && hasUserCallbackAbove(*cls, sub.name)) {
-                            SuperRandomizeVisitor visitor(sub.name);
-                            sub.getBody().visit(visitor);
-
-                            if (!visitor.callsSuper) {
-                                diags.addViolation(
-                                    "SV-RND-003",
-                                    "RandomizeMissingSuper",
-                                    "Overridden randomization callback '" + std::string(sub.name) + "' in class '" +
-                                    std::string(cls->name) + "' does not invoke 'super." + std::string(sub.name) + "()'. "
-                                    "Unlike UVM phases, SV pre/post_randomize callbacks do not auto-chain up inheritance; "
-                                    "omitting super bypasses base-class payload, CRC, and sequence updates.",
-                                    core::Severity::Warning,
-                                    sub.location
-                                );
-                            }
-                        }
-                    }
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            if (cls.base == model::NoClass) continue;
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern || sub.isBuiltIn) continue;
+                if (sub.name != "pre_randomize" && sub.name != "post_randomize") continue;
+                if (!hasUserCallbackAbove(design, cls, sub.name)) continue;
+                bool callsSuper = false;
+                for (const model::Call& call : sub.calls) {
+                    if (!call.isSystem && call.name == sub.name && call.viaSuper)
+                        callsSuper = true;
                 }
+                if (callsSuper) continue;
+                diags.addViolation(
+                    "SV-RND-003",
+                    "RandomizeMissingSuper",
+                    "Overridden randomization callback '" + sub.name + "' in class '" +
+                    cls.name + "' does not invoke 'super." + sub.name + "()'. "
+                    "Unlike UVM phases, SV pre/post_randomize callbacks do not auto-chain up inheritance; "
+                    "omitting super bypasses base-class payload, CRC, and sequence updates.",
+                    core::Severity::Warning,
+                    model::toSlang(sub.loc)
+                );
             }
         }
     }
 
 private:
-    // True when an ancestor declares its own callback of this name. The built-in
-    // pre/post_randomize every class gets has nothing to chain to, so a class whose
-    // ancestors only have the built-in is defining the callback, not overriding it.
-    static bool hasUserCallbackAbove(const slang::ast::ClassType& cls, std::string_view name) {
-        const slang::ast::Type* base = cls.getBaseClass();
-        int guard = 0;
-        while (base && base->isClass() && guard++ < 64) {
-            const auto& baseClass = base->getCanonicalType().as<slang::ast::ClassType>();
-            const auto* found = baseClass.find(name);
-            if (found && found->kind == slang::ast::SymbolKind::Subroutine &&
-                !found->as<slang::ast::SubroutineSymbol>().flags.has(slang::ast::MethodFlags::BuiltIn)) {
-                return true;
-            }
-            base = baseClass.getBaseClass();
+    static bool hasUserCallbackAbove(const model::Model& design, const model::Class& cls, std::string_view name) {
+        for (model::ClassId a : design.ancestors(design.idOf(cls))) {
+            const model::Method* found = design.cls(a).findMethod(name);
+            if (found && !found->isBuiltIn) return true;
         }
         return false;
     }

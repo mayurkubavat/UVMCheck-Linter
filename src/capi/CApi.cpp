@@ -117,7 +117,8 @@ int uvmcheck_get_method(const uvmcheck_design* d, uint32_t cls, uint32_t index, 
     *out = {x.name.c_str(), static_cast<uint8_t>(x.visibility), x.isTask, x.isVirtual, x.isPure,
             x.isStatic, static_cast<uint8_t>(x.phase), x.declaredVirtual, x.isBuiltIn, x.isExtern,
             x.returnsVoid, x.returnType.c_str(), toC(x.loc),
-            static_cast<uint32_t>(x.arguments.size()), static_cast<uint32_t>(x.locals.size())};
+            static_cast<uint32_t>(x.arguments.size()), static_cast<uint32_t>(x.locals.size()),
+            static_cast<uint32_t>(x.calls.size())};
     return 1;
 }
 
@@ -144,6 +145,16 @@ int uvmcheck_get_local(const uvmcheck_design* d, uint32_t cls, uint32_t method, 
     if (!x || !out || index >= x->locals.size()) return 0;
     const Local& l = x->locals[index];
     *out = {l.name.c_str(), l.type.c_str(), l.isVirtualInterface, toC(l.loc)};
+    return 1;
+}
+
+int uvmcheck_get_call(const uvmcheck_design* d, uint32_t cls, uint32_t method, uint32_t index,
+                      uvmcheck_call* out) {
+    const Method* x = methodOf(d, cls, method);
+    if (!x || !out || index >= x->calls.size()) return 0;
+    const Call& c = x->calls[index];
+    *out = {c.name.c_str(), c.calleeScope.c_str(), c.receiver.c_str(), toC(c.loc), toC(c.firstArgLoc),
+            c.isSystem, c.calleeDeclaredVirtual, c.calleeBuiltIn, c.firstArgIsNull, c.viaSuper};
     return 1;
 }
 

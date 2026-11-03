@@ -4,7 +4,7 @@
 
 use std::os::raw::{c_char, c_int};
 
-pub const ABI_VERSION: u32 = 3;
+pub const ABI_VERSION: u32 = 4;
 pub const NONE: u32 = u32::MAX;
 
 #[repr(C)]
@@ -69,6 +69,7 @@ pub struct uvmcheck_method {
     pub loc: uvmcheck_loc,
     pub argument_count: u32,
     pub local_count: u32,
+    pub call_count: u32,
 }
 
 #[repr(C)]
@@ -90,6 +91,21 @@ pub struct uvmcheck_local {
     pub type_: *const c_char,
     pub is_virtual_interface: u8,
     pub loc: uvmcheck_loc,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct uvmcheck_call {
+    pub name: *const c_char,
+    pub callee_scope: *const c_char,
+    pub receiver: *const c_char,
+    pub loc: uvmcheck_loc,
+    pub first_arg_loc: uvmcheck_loc,
+    pub is_system: u8,
+    pub callee_declared_virtual: u8,
+    pub callee_builtin: u8,
+    pub first_arg_is_null: u8,
+    pub via_super: u8,
 }
 
 #[repr(C)]
@@ -136,6 +152,13 @@ extern "C" {
         index: u32,
         out: *mut uvmcheck_local,
     ) -> c_int;
+    pub fn uvmcheck_get_call(
+        d: *const uvmcheck_design,
+        cls: u32,
+        method: u32,
+        index: u32,
+        out: *mut uvmcheck_call,
+    ) -> c_int;
     pub fn uvmcheck_get_constraint(
         d: *const uvmcheck_design,
         cls: u32,
@@ -159,6 +182,7 @@ mod tests {
         assert_eq!(size_of::<super::uvmcheck_argument>(), 48);
         assert_eq!(size_of::<super::uvmcheck_local>(), 32);
         assert_eq!(size_of::<super::uvmcheck_constraint>(), 24);
+        assert_eq!(size_of::<super::uvmcheck_call>(), 56);
         assert_eq!(unsafe { super::uvmcheck_model_abi_version() }, super::ABI_VERSION);
     }
 }

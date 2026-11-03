@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence
 
-ABI_VERSION = 3
+ABI_VERSION = 4
 NONE = 0xFFFFFFFF
 
 UVM_KINDS = ("none", "object", "sequence_item", "sequence", "component", "test", "env", "agent",
@@ -54,7 +54,8 @@ class _Method(ctypes.Structure):
                 ("is_virtual", ctypes.c_uint8), ("is_pure", ctypes.c_uint8), ("is_static", ctypes.c_uint8),
                 ("phase", ctypes.c_uint8), ("declared_virtual", ctypes.c_uint8), ("is_builtin", ctypes.c_uint8),
                 ("is_extern", ctypes.c_uint8), ("returns_void", ctypes.c_uint8), ("return_type", ctypes.c_char_p),
-                ("loc", _Loc), ("argument_count", ctypes.c_uint32), ("local_count", ctypes.c_uint32)]
+                ("loc", _Loc), ("argument_count", ctypes.c_uint32), ("local_count", ctypes.c_uint32),
+                ("call_count", ctypes.c_uint32)]
 
 
 class _Argument(ctypes.Structure):
@@ -66,6 +67,13 @@ class _Argument(ctypes.Structure):
 class _Local(ctypes.Structure):
     _fields_ = [("name", ctypes.c_char_p), ("type", ctypes.c_char_p), ("is_virtual_interface", ctypes.c_uint8),
                 ("loc", _Loc)]
+
+
+class _Call(ctypes.Structure):
+    _fields_ = [("name", ctypes.c_char_p), ("callee_scope", ctypes.c_char_p), ("receiver", ctypes.c_char_p),
+                ("loc", _Loc), ("first_arg_loc", _Loc), ("is_system", ctypes.c_uint8),
+                ("callee_declared_virtual", ctypes.c_uint8), ("callee_builtin", ctypes.c_uint8),
+                ("first_arg_is_null", ctypes.c_uint8), ("via_super", ctypes.c_uint8)]
 
 
 class _Constraint(ctypes.Structure):
@@ -114,6 +122,8 @@ def _load_library():
                                    ctypes.POINTER(_Argument)], ctypes.c_int),
         "uvmcheck_get_local": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
                                 ctypes.POINTER(_Local)], ctypes.c_int),
+        "uvmcheck_get_call": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                               ctypes.POINTER(_Call)], ctypes.c_int),
         "uvmcheck_get_constraint": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(_Constraint)], ctypes.c_int),
     }
     for name, (args, res) in sigs.items():
@@ -174,6 +184,20 @@ class Local:
 
 
 @dataclass
+class Call:
+    name: str              # as written: "randomize", "$urandom", "get"
+    is_system: bool        # system task/function, or a built-in method such as randomize()
+    callee_scope: str      # class (generic name) or package declaring the callee; "" if none
+    callee_declared_virtual: bool
+    callee_builtin: bool
+    first_arg_is_null: bool
+    first_arg_loc: Loc
+    receiver: str          # object called on, as written ("m_env.ap"); "" if none
+    via_super: bool        # written as super.name(...)
+    loc: Loc
+
+
+@dataclass
 class Constraint:
     name: str
     loc: Loc
@@ -196,6 +220,7 @@ class Method:
     loc: Loc
     arguments: List[Argument] = field(default_factory=list)
     locals: List[Local] = field(default_factory=list)  # declared locals only
+    calls: List[Call] = field(default_factory=list)    # in walk order, nested calls included
 
 
 @dataclass
@@ -249,7 +274,7 @@ class Design:
             files = [_s(lib.uvmcheck_file_name(handle, i)) for i in range(lib.uvmcheck_file_count(handle))]
             classes = []
             c, p, m = _Class(), _Property(), _Method()
-            a, l, con = _Argument(), _Local(), _Constraint()
+            a, l, con, cl = _Argument(), _Local(), _Constraint(), _Call()
             for cid in range(lib.uvmcheck_class_count(handle)):
                 if not lib.uvmcheck_get_class(handle, cid, ctypes.byref(c)):
                     raise ModelError(f"class {cid} missing")
@@ -276,6 +301,12 @@ class Design:
                         lib.uvmcheck_get_local(handle, cid, i, j, ctypes.byref(l))
                         meth.locals.append(Local(_s(l.name), _s(l.type), bool(l.is_virtual_interface),
                                                  _loc(l.loc)))
+                    for j in range(m.call_count):
+                        lib.uvmcheck_get_call(handle, cid, i, j, ctypes.byref(cl))
+                        meth.calls.append(Call(_s(cl.name), bool(cl.is_system), _s(cl.callee_scope),
+                                               bool(cl.callee_declared_virtual), bool(cl.callee_builtin),
+                                               bool(cl.first_arg_is_null), _loc(cl.first_arg_loc),
+                                               _s(cl.receiver), bool(cl.via_super), _loc(cl.loc)))
                     k.methods.append(meth)
                 for i in range(c.constraint_count):
                     lib.uvmcheck_get_constraint(handle, cid, i, ctypes.byref(con))

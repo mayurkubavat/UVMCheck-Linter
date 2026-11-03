@@ -176,6 +176,27 @@ pub struct Method {
     pub arguments: Vec<Argument>,
     /// Declared locals only (not `this` or a function's return variable).
     pub locals: Vec<Local>,
+    /// Calls in the body, in walk order (nested calls included).
+    pub calls: Vec<Call>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Call {
+    /// As written: "randomize", "$urandom", "get".
+    pub name: String,
+    /// A system task or function, or a built-in method such as randomize().
+    pub is_system: bool,
+    /// Class (generic name) or package that declares the callee; empty if none.
+    pub callee_scope: String,
+    pub callee_declared_virtual: bool,
+    pub callee_builtin: bool,
+    pub first_arg_is_null: bool,
+    pub first_arg_loc: Loc,
+    /// The object called on, as written ("m_env.ap"); empty if none.
+    pub receiver: String,
+    /// Written as `super.name(...)`.
+    pub via_super: bool,
+    pub loc: Loc,
 }
 
 #[derive(Clone, Debug)]
@@ -368,6 +389,26 @@ impl Design {
                         loc: loc(x.loc),
                     });
                 }
+                let mut calls = Vec::with_capacity(m.call_count as usize);
+                for k in 0..m.call_count {
+                    let mut x = std::mem::MaybeUninit::<ffi::uvmcheck_call>::uninit();
+                    if unsafe { ffi::uvmcheck_get_call(d, cid, i, k, x.as_mut_ptr()) } == 0 {
+                        return Err(Error(format!("call {k} of method {i} of class {cid} missing")));
+                    }
+                    let x = unsafe { x.assume_init() };
+                    calls.push(Call {
+                        name: text(x.name),
+                        is_system: x.is_system != 0,
+                        callee_scope: text(x.callee_scope),
+                        callee_declared_virtual: x.callee_declared_virtual != 0,
+                        callee_builtin: x.callee_builtin != 0,
+                        first_arg_is_null: x.first_arg_is_null != 0,
+                        first_arg_loc: loc(x.first_arg_loc),
+                        receiver: text(x.receiver),
+                        via_super: x.via_super != 0,
+                        loc: loc(x.loc),
+                    });
+                }
                 methods.push(Method {
                     name: text(m.name),
                     visibility: Visibility::from_c(m.visibility),
@@ -388,6 +429,7 @@ impl Design {
                     loc: loc(m.loc),
                     arguments,
                     locals,
+                    calls,
                 });
             }
             let mut constraints = Vec::with_capacity(c.constraint_count as usize);

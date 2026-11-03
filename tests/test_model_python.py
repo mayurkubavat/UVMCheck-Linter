@@ -42,13 +42,15 @@ def main() -> int:
     check(item is not None and [k.name for k in item.constraints] == ["addr_c"], "constraints")
     s = next((m for m in item.methods if m.name == "sum"), None) if item else None
     check(s is not None and s.is_extern and s.declared_virtual and s.return_type == "int"
-          and s.loc.line == 19, "extern method sum, located at its body")
+          and s.loc.line == 22, "extern method sum, located at its body")
     check(s is not None and [(x.name, x.direction, x.shape) for x in s.arguments]
           == [("q", "ref", "queue"), ("scale", "in", "other")], "arguments")
     check(s is not None and [x.name for x in s.locals] == ["total"], "declared locals only")
     p = next((m for m in item.methods if m.name == "probe"), None) if item else None
     check(p is not None and p.returns_void and p.locals and p.locals[0].is_virtual_interface,
           "virtual interface local")
+    check(p is not None and [x.name for x in p.calls] == ["randomize", "set", "$urandom"]
+          and p.calls[1].first_arg_is_null and p.calls[1].callee_scope == "uvm_config_db", "calls")
 
     try:
         Design.load(["/no/such/file.sv"])

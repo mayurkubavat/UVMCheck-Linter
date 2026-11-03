@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-#define UVMCHECK_MODEL_ABI_VERSION 3u
+#define UVMCHECK_MODEL_ABI_VERSION 4u
 #define UVMCHECK_NONE 0xFFFFFFFFu
 
 typedef struct uvmcheck_design uvmcheck_design;
@@ -68,7 +68,7 @@ typedef struct {
     uint8_t returns_void;
     const char* return_type;
     uvmcheck_loc loc;
-    uint32_t argument_count, local_count;
+    uint32_t argument_count, local_count, call_count;
 } uvmcheck_method;
 
 /* Values of uvmcheck_argument.direction and .shape. */
@@ -99,6 +99,16 @@ typedef struct {
     uvmcheck_loc loc;
 } uvmcheck_constraint;
 
+/* A call in a method body, in walk order (nested calls included). */
+typedef struct {
+    const char* name;         /* as written: "randomize", "$urandom" */
+    const char* callee_scope; /* class (generic name) or package declaring the callee; "" if none */
+    const char* receiver;     /* object called on, as written ("m_env.ap"); "" if none */
+    uvmcheck_loc loc;
+    uvmcheck_loc first_arg_loc;
+    uint8_t is_system, callee_declared_virtual, callee_builtin, first_arg_is_null, via_super;
+} uvmcheck_call;
+
 UVMCHECK_API uint32_t uvmcheck_model_abi_version(void);
 
 /* argv: compile options as given to uvmcheck, without the program name.
@@ -125,6 +135,8 @@ UVMCHECK_API int uvmcheck_get_argument(const uvmcheck_design* d, uint32_t cls, u
                                        uint32_t index, uvmcheck_argument* out);
 UVMCHECK_API int uvmcheck_get_local(const uvmcheck_design* d, uint32_t cls, uint32_t method,
                                     uint32_t index, uvmcheck_local* out);
+UVMCHECK_API int uvmcheck_get_call(const uvmcheck_design* d, uint32_t cls, uint32_t method,
+                                   uint32_t index, uvmcheck_call* out);
 UVMCHECK_API int uvmcheck_get_constraint(const uvmcheck_design* d, uint32_t cls, uint32_t index,
                                          uvmcheck_constraint* out);
 

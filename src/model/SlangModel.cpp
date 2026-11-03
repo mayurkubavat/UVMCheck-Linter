@@ -2,7 +2,9 @@
 
 #include <unordered_map>
 
+#include "slang/ast/ASTVisitor.h"
 #include "slang/ast/Compilation.h"
+#include "slang/ast/expressions/CallExpression.h"
 #include "slang/ast/symbols/ClassSymbols.h"
 #include "slang/ast/symbols/CompilationUnitSymbols.h"
 #include "slang/syntax/AllSyntax.h"
@@ -190,6 +192,59 @@ private:
         return c;
     }
 
+    // Every call in the body, as the rules' AllGood visitors see them.
+    void collectCalls(const sa::SubroutineSymbol& sub, std::vector<Call>& out) {
+        struct V : sa::ASTVisitor<V, sa::VisitFlags::AllGood> {
+            Builder& b;
+            std::vector<Call>& out;
+            V(Builder& b, std::vector<Call>& out) : b(b), out(out) {}
+            void handle(const sa::CallExpression& call) {
+                Call c;
+                c.name = std::string(call.getSubroutineName());
+                c.loc = b.loc(call.sourceRange.start());
+                c.isSystem = call.subroutine.index() == 1;
+                if (!c.isSystem) {
+                    if (const auto* callee = std::get<0>(call.subroutine)) {
+                        c.calleeDeclaredVirtual = callee->flags.has(sa::MethodFlags::Virtual);
+                        c.calleeBuiltIn = callee->flags.has(sa::MethodFlags::BuiltIn);
+                        if (const auto* scope = callee->getParentScope()) {
+                            const auto& owner = scope->asSymbol();
+                            c.calleeScope = std::string(owner.name);
+                            if (owner.kind == sa::SymbolKind::ClassType) {
+                                const auto& ct = owner.as<sa::ClassType>();
+                                if (ct.genericClass) c.calleeScope = std::string(ct.genericClass->name);
+                            }
+                        }
+                    }
+                }
+                const auto args = call.arguments();
+                if (!args.empty()) {
+                    c.firstArgIsNull =
+                        args[0]->unwrapImplicitConversions().kind == sa::ExpressionKind::NullLiteral;
+                    c.firstArgLoc = b.loc(args[0]->sourceRange.start());
+                }
+                if (call.syntax) {
+                    // Cheap facts from the syntax; printing every call's text
+                    // costs ~10% of a uvm-core lint.
+                    c.viaSuper = call.syntax->getFirstToken().kind == slang::parsing::TokenKind::SuperKeyword;
+                    const slang::syntax::SyntaxNode* callee = call.syntax;
+                    if (callee->kind == slang::syntax::SyntaxKind::InvocationExpression)
+                        callee = callee->as<slang::syntax::InvocationExpressionSyntax>().left.get();
+                    if (callee->kind == slang::syntax::SyntaxKind::ScopedName) {
+                        const auto& scoped = callee->as<slang::syntax::ScopedNameSyntax>();
+                        if (scoped.separator.kind == slang::parsing::TokenKind::Dot) {
+                            c.receiver = scoped.left->toString();
+                            c.receiver.erase(0, c.receiver.find_first_not_of(" \t\r\n"));
+                        }
+                    }
+                }
+                out.push_back(std::move(c));
+                visitDefault(call);
+            }
+        } v(*this, out);
+        sub.getBody().visit(v);
+    }
+
     Loc loc(slang::SourceLocation l) {
         Loc out;
         if (!l.valid()) return out;
@@ -299,6 +354,7 @@ private:
                     m.locals.push_back({std::string(var.name), var.getType().toString(), loc(var.location),
                                         isVif(var.getType())});
                 }
+                collectCalls(s, m.calls);
                 if (uvm::UvmModel::isFunctionPhase(s.name)) m.phase = PhaseKind::Function;
                 else if (uvm::UvmModel::isTaskPhase(s.name)) m.phase = PhaseKind::Task;
                 c.methods.push_back(std::move(m));

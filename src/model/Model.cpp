@@ -27,6 +27,12 @@ const Property* Class::findProperty(std::string_view n) const {
     return nullptr;
 }
 
+size_t Method::countCalls(std::string_view n) const {
+    size_t k = 0;
+    for (const auto& c : calls) k += c.name == n;
+    return k;
+}
+
 const Method* Class::findMethod(std::string_view n) const {
     for (const auto& m : methods)
         if (m.name == n) return &m;
@@ -221,6 +227,23 @@ void Model::writeJson(std::ostream& out) const {
                 writeString(out, l.type);
                 out << ",\"virtual_interface\":" << (l.isVirtualInterface ? "true" : "false") << ',';
                 writeLoc(out, l.loc);
+                out << '}';
+            }
+            out << "],\"calls\":[";
+            for (size_t k = 0; k < m.calls.size(); ++k) {
+                const Call& x = m.calls[k];
+                if (k) out << ',';
+                out << "{\"name\":";
+                writeString(out, x.name);
+                out << ",\"system\":" << (x.isSystem ? "true" : "false") << ",\"callee_scope\":";
+                writeString(out, x.calleeScope);
+                out << ",\"callee_declared_virtual\":" << (x.calleeDeclaredVirtual ? "true" : "false")
+                    << ",\"callee_builtin\":" << (x.calleeBuiltIn ? "true" : "false")
+                    << ",\"first_arg_null\":" << (x.firstArgIsNull ? "true" : "false")
+                    << ",\"via_super\":" << (x.viaSuper ? "true" : "false") << ",\"receiver\":";
+                writeString(out, x.receiver);
+                out << ',';
+                writeLoc(out, x.loc);
                 out << '}';
             }
             out << "],";

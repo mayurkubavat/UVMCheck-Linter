@@ -69,7 +69,7 @@ fn reads_arguments_locals_constraints_and_extern_methods() {
     let sum = c.methods.iter().find(|m| m.name == "sum").expect("extern method in model");
     assert!(sum.is_extern && sum.declared_virtual && !sum.returns_void);
     assert_eq!(sum.return_type, "int");
-    assert_eq!(sum.loc.line, 19); // the body, after the class
+    assert_eq!(sum.loc.line, 22); // the body, after the class
     let q = &sum.arguments[0];
     assert_eq!((q.name.as_str(), q.direction, q.shape), ("q", Direction::Ref, TypeShape::Queue));
     assert_eq!(sum.arguments[1].direction, Direction::In);
@@ -78,5 +78,9 @@ fn reads_arguments_locals_constraints_and_extern_methods() {
 
     let probe = c.methods.iter().find(|m| m.name == "probe").unwrap();
     assert!(probe.returns_void && probe.locals[0].is_virtual_interface);
+    let calls: Vec<_> = probe.calls.iter().map(|c| c.name.as_str()).collect();
+    assert_eq!(calls, ["randomize", "set", "$urandom"]);
+    let set = &probe.calls[1];
+    assert!(set.first_arg_is_null && set.callee_scope == "uvm_config_db" && !set.is_system);
     assert!(c.methods.iter().any(|m| m.name == "randomize" && m.is_builtin));
 }
