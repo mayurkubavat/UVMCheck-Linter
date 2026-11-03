@@ -84,3 +84,24 @@ cargo run --release -p sv-lexer --example lexstat -- <dir-or-file>...
 Measured 2026-11-03: uvm-core + this repo's tests (952 files, 3.2 MB) and
 sv-tests (1,029 files) all round-trip; no Unknown tokens except one sv-tests
 case that is meant to fail (a macro splitting a string). About 110 MB/s.
+
+Punctuation follows Slang's token set (so `[*`, `[->` and `.*` are two
+tokens, and based literals are an `IntegerBase` plus digits), which keeps
+the preprocessor's output comparable token for token.
+
+## sv-preproc (R2)
+
+The SystemVerilog preprocessor on top of sv-lexer: `define with defaults,
+`undef/`undefineall, `ifdef/`ifndef/`elsif/`else/`endif (including the
+1800-2023 expression form), `include with include dirs, `__FILE__`/`__LINE__`,
+stringify (`"), paste (``) and escaped quotes. It follows Slang's macro
+semantics, including where whitespace lands inside stringified text.
+
+```
+cargo run --release -p sv-preproc --example ppdump -- +incdir+DIR... FILE
+```
+
+Parity with Slang is checked token for token by `tools/pp_parity.py`
+against the `uvmcheck_pp_dump` reference tool. Measured 2026-11-03:
+uvm-core's `uvm_pkg.sv` (278,335 tokens) is identical, and so are all 949
+sv-tests files that are meant to pass (79 skipped as should-fail).

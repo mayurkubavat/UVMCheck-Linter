@@ -43,8 +43,11 @@ pub enum Kind {
     // Literals
     /// Decimal digits; also the size in front of a based literal.
     IntegerLiteral,
-    /// `'h1F`, `'sb0101`, `'d 9`: base and digits (the size is the token before).
-    BasedLiteral,
+    /// `'h`, `'sb`: the base of a based literal (the size, if any, is the
+    /// token before; the digits are the next non-trivia token).
+    IntegerBase,
+    /// The digits after an `IntegerBase`: `1F`, `0101`, `x0_z?`.
+    VectorDigits,
     /// `'0`, `'1`, `'x`, `'z`.
     UnbasedUnsizedLiteral,
     RealLiteral,
@@ -84,7 +87,7 @@ impl Token {
 
 /// Lexes `src` completely; never fails. Inputs over 4 GiB are not supported.
 pub fn lex(src: &str) -> Vec<Token> {
-    let mut lx = Lexer { b: src.as_bytes(), pos: 0, out: Vec::with_capacity(src.len() / 4) };
+    let mut lx = Lexer { b: src.as_bytes(), pos: 0, out: Vec::with_capacity(src.len() / 4), pending_digits: false };
     while lx.pos < lx.b.len() {
         let start = lx.pos;
         let kind = lx.next_kind();
@@ -98,12 +101,12 @@ pub fn lex(src: &str) -> Vec<Token> {
 const PUNCT4: &[&[u8]] = &[b"<<<=", b">>>="];
 const PUNCT3: &[&[u8]] = &[
     b"<<<", b">>>", b"===", b"!==", b"==?", b"!=?", b"<<=", b">>=", b"->>", b"|->", b"|=>", b"#-#", b"#=#",
-    b"&&&", b"<->", b"[->",
+    b"&&&", b"<->", b"+/-", b"+%-",
 ];
 const PUNCT2: &[&[u8]] = &[
     b"==", b"!=", b"<=", b">=", b"&&", b"||", b"**", b"<<", b">>", b"->", b"++", b"--", b"+=", b"-=", b"*=",
     b"/=", b"%=", b"&=", b"|=", b"^=", b"~&", b"~|", b"~^", b"^~", b"::", b":=", b":/", b"##", b"@@", b"+:",
-    b"-:", b"'{", b".*", b"[*", b"[=",
+    b"-:", b"'{", b"*>", b"=>",
 ];
 const PUNCT1: &[u8] = b"()[]{};:,.?#@=+-*/%&|^~!<>$'";
 
@@ -111,6 +114,8 @@ struct Lexer<'a> {
     b: &'a [u8],
     pos: usize,
     out: Vec<Token>,
+    /// An `IntegerBase` was just lexed: its digits come next.
+    pending_digits: bool,
 }
 
 fn is_ident_start(c: u8) -> bool {
@@ -145,6 +150,14 @@ impl<'a> Lexer<'a> {
 
     fn next_kind(&mut self) -> Kind {
         let c = self.peek(0);
+        if self.pending_digits && is_based_digit(c) {
+            self.pending_digits = false;
+            self.eat_while(is_based_digit);
+            return Kind::VectorDigits;
+        }
+        if !matches!(c, b' ' | b'\t') {
+            self.pending_digits = false;
+        }
         match c {
             b' ' | b'\t' | 0x0B | 0x0C => {
                 self.eat_while(|c| matches!(c, b' ' | b'\t' | 0x0B | 0x0C));
@@ -290,9 +303,9 @@ impl<'a> Lexer<'a> {
                 j += 1;
             }
             if is_based_digit(self.peek(j)) {
-                self.pos += j;
-                self.eat_while(is_based_digit);
-                return Kind::BasedLiteral;
+                self.pos += k + 1;
+                self.pending_digits = true;
+                return Kind::IntegerBase;
             }
         }
         self.punct()
@@ -366,9 +379,12 @@ mod tests {
             kinds("8'hFF 'sb01 'd 9 '0 1.5e3 10ns 2.5ps 42 1_000"),
             [
                 (IntegerLiteral, "8"),
-                (BasedLiteral, "'hFF"),
-                (BasedLiteral, "'sb01"),
-                (BasedLiteral, "'d 9"),
+                (IntegerBase, "'h"),
+                (VectorDigits, "FF"),
+                (IntegerBase, "'sb"),
+                (VectorDigits, "01"),
+                (IntegerBase, "'d"),
+                (VectorDigits, "9"),
                 (UnbasedUnsizedLiteral, "'0"),
                 (RealLiteral, "1.5e3"),
                 (TimeLiteral, "10ns"),
@@ -413,7 +429,7 @@ mod tests {
     #[test]
     fn operators_longest_match() {
         let k: Vec<_> = kinds("a <<<= b; c |-> d; e[->1]; f '{1}; g ==? h").into_iter().map(|(_, t)| t).collect();
-        assert_eq!(k, ["a", "<<<=", "b", ";", "c", "|->", "d", ";", "e", "[->", "1", "]", ";", "f", "'{", "1", "}", ";", "g", "==?", "h"]);
+        assert_eq!(k, ["a", "<<<=", "b", ";", "c", "|->", "d", ";", "e", "[", "->", "1", "]", ";", "f", "'{", "1", "}", ";", "g", "==?", "h"]);
     }
 
     #[test]

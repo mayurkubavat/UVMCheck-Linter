@@ -31,6 +31,13 @@ name = "sv-lexer"
 version = "0.1.0"
 
 [[package]]
+name = "sv-preproc"
+version = "0.1.0"
+dependencies = [
+ "sv-lexer",
+]
+
+[[package]]
 name = "sv-slang"
 version = "0.1.0"
 

@@ -339,3 +339,7 @@ if(UVMCHECK_BUILD_MODEL_LIB)
         )
     endif()
 endif()
+
+# Reference dump of Slang's preprocessor, for checking rust/sv-preproc.
+add_executable(uvmcheck_pp_dump tools/pp_dump.cpp)
+target_link_libraries(uvmcheck_pp_dump PRIVATE slang::slang)
