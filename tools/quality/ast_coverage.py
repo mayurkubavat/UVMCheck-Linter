@@ -60,7 +60,7 @@ def main():
     if not inc:
         print("slang headers not found; build first or pass --slang-include")
         return 2
-    headers = "".join(p.read_text(errors="replace") for p in (inc / "slang" / "ast").rglob("*.h"))
+    headers = "".join(p.read_text(errors="replace") for p in sorted((inc / "slang" / "ast").rglob("*.h")))
     code = "".join(p.read_text(errors="replace")
                    for d in CODE_DIRS for p in (REPO / d).rglob("*") if p.suffix in (".cpp", ".h", ".py"))
 
