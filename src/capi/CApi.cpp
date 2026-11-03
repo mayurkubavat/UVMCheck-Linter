@@ -10,6 +10,7 @@
 static_assert(static_cast<int>(uvmcheck::model::Direction::Ref) == UVMCHECK_DIR_REF);
 static_assert(static_cast<int>(uvmcheck::model::TypeShape::UnpackedStruct) == UVMCHECK_SHAPE_UNPACKED_STRUCT);
 static_assert(static_cast<int>(uvmcheck::model::UvmKind::Subscriber) == UVMCHECK_UVM_SUBSCRIBER);
+static_assert(static_cast<int>(uvmcheck::model::RootKind::Property) == UVMCHECK_ROOT_PROPERTY);
 
 using namespace uvmcheck::model;
 
@@ -118,7 +119,9 @@ int uvmcheck_get_method(const uvmcheck_design* d, uint32_t cls, uint32_t index, 
             x.isStatic, static_cast<uint8_t>(x.phase), x.declaredVirtual, x.isBuiltIn, x.isExtern,
             x.returnsVoid, x.returnType.c_str(), toC(x.loc),
             static_cast<uint32_t>(x.arguments.size()), static_cast<uint32_t>(x.locals.size()),
-            static_cast<uint32_t>(x.calls.size())};
+            static_cast<uint32_t>(x.calls.size()), static_cast<uint32_t>(x.assignments.size()),
+            static_cast<uint32_t>(x.timingControls.size()), x.superNewIndex, toC(x.superNewLoc),
+            x.callsSuperNew};
     return 1;
 }
 
@@ -155,6 +158,24 @@ int uvmcheck_get_call(const uvmcheck_design* d, uint32_t cls, uint32_t method, u
     const Call& c = x->calls[index];
     *out = {c.name.c_str(), c.calleeScope.c_str(), c.receiver.c_str(), toC(c.loc), toC(c.firstArgLoc),
             c.isSystem, c.calleeDeclaredVirtual, c.calleeBuiltIn, c.firstArgIsNull, c.viaSuper};
+    return 1;
+}
+
+int uvmcheck_get_assignment(const uvmcheck_design* d, uint32_t cls, uint32_t method, uint32_t index,
+                            uvmcheck_assignment* out) {
+    const Method* x = methodOf(d, cls, method);
+    if (!x || !out || index >= x->assignments.size()) return 0;
+    const Assignment& a = x->assignments[index];
+    *out = {a.lhs.c_str(), a.rhs.c_str(), a.rootName.c_str(), toC(a.loc), a.isNonBlocking,
+            static_cast<uint8_t>(a.rootKind)};
+    return 1;
+}
+
+int uvmcheck_get_timing(const uvmcheck_design* d, uint32_t cls, uint32_t method, uint32_t index,
+                        uvmcheck_loc* out) {
+    const Method* x = methodOf(d, cls, method);
+    if (!x || !out || index >= x->timingControls.size()) return 0;
+    *out = toC(x->timingControls[index]);
     return 1;
 }
 

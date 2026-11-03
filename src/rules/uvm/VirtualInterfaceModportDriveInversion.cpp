@@ -1,11 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "uvmcheck/uvm/UvmModel.h"
-#include "slang/ast/ASTVisitor.h"
-#include "slang/ast/symbols/ClassSymbols.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
-#include "slang/ast/expressions/AssignmentExpressions.h"
-#include "slang/syntax/AllSyntax.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::uvm {
 
@@ -21,53 +16,32 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
-    void run(slang::ast::Compilation& compilation,
+    // Reads only uvmcheck::model, not slang's AST.
+    void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-
-        class MonitorDriveVisitor : public slang::ast::ASTVisitor<MonitorDriveVisitor, slang::ast::VisitFlags::AllGood> {
-        public:
-            core::DiagnosticEngine& diags;
-            std::string monitorClassName;
-
-            MonitorDriveVisitor(core::DiagnosticEngine& d, std::string_view name)
-                : diags(d), monitorClassName(name) {}
-
-            void handle(const slang::ast::AssignmentExpression& assign) {
-                if (assign.left().syntax) {
-                    std::string lhsText(assign.left().syntax->toString());
-                    // Check if assigning to vif.<signal> or intf.<signal>
-                    if (lhsText.find("vif.") != std::string::npos ||
-                        lhsText.find("intf.") != std::string::npos ||
-                        lhsText.find("_vif.") != std::string::npos) {
-                        
-                        diags.addViolation(
-                            "UVM-VIF-DIR",
-                            "VirtualInterfaceModportDriveInversion",
-                            "Passive uvm_monitor '" + monitorClassName + "' illegally drives virtual interface signal '" +
-                            lhsText + "'. Monitors must be strictly read-only observers. Driving signals from a monitor "
-                            "violates UVM passive component semantics and causes multi-driver contention.",
-                            core::Severity::Error,
-                            assign.sourceRange.start()
-                        );
-                    }
-                }
-                visitDefault(assign);
-            }
-        };
-
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls) continue;
-            std::string clsName(cls->name);
-            bool isMonitor = (clsName.find("monitor") != std::string::npos ||
-                              uvmModel.isDerivedFrom(*cls, "uvm_monitor"));
-
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            const bool isMonitor = cls.name.find("monitor") != std::string::npos ||
+                                   design.derivesFrom(design.idOf(cls), "uvm_monitor");
             if (!isMonitor) continue;
-
-            MonitorDriveVisitor visitor(diags, cls->name);
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::Subroutine) {
-                    member.as<slang::ast::SubroutineSymbol>().getBody().visit(visitor);
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern) continue; // in-class bodies, as before the port
+                for (const model::Assignment& assign : sub.assignments) {
+                    const std::string& lhs = assign.lhs;
+                    if (lhs.find("vif.") == std::string::npos && lhs.find("intf.") == std::string::npos &&
+                        lhs.find("_vif.") == std::string::npos)
+                        continue;
+                    diags.addViolation(
+                        "UVM-VIF-DIR",
+                        "VirtualInterfaceModportDriveInversion",
+                        "Passive uvm_monitor '" + cls.name + "' illegally drives virtual interface signal '" +
+                        lhs + "'. Monitors must be strictly read-only observers. Driving signals from a monitor "
+                        "violates UVM passive component semantics and causes multi-driver contention.",
+                        core::Severity::Error,
+                        model::toSlang(assign.loc)
+                    );
                 }
             }
         }

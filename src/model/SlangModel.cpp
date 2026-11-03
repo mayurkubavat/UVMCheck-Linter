@@ -4,7 +4,12 @@
 
 #include "slang/ast/ASTVisitor.h"
 #include "slang/ast/Compilation.h"
+#include "slang/ast/expressions/AssignmentExpressions.h"
 #include "slang/ast/expressions/CallExpression.h"
+#include "slang/ast/expressions/MiscExpressions.h"
+#include "slang/ast/expressions/SelectExpressions.h"
+#include "slang/ast/statements/MiscStatements.h"
+#include "slang/syntax/SyntaxVisitor.h"
 #include "slang/ast/symbols/ClassSymbols.h"
 #include "slang/ast/symbols/CompilationUnitSymbols.h"
 #include "slang/syntax/AllSyntax.h"
@@ -192,12 +197,51 @@ private:
         return c;
     }
 
-    // Every call in the body, as the rules' AllGood visitors see them.
-    void collectCalls(const sa::SubroutineSymbol& sub, std::vector<Call>& out) {
+    // Source text of a range as written, without leading comments; empty
+    // when it spans a macro expansion.
+    std::string textOf(slang::SourceRange r) const {
+        if (!sm || !r.start().valid() || r.start().buffer() != r.end().buffer() || sm->isMacroLoc(r.start()))
+            return {};
+        std::string_view all = sm->getSourceText(r.start().buffer());
+        if (r.end().offset() > all.size() || r.end().offset() < r.start().offset()) return {};
+        return std::string(all.substr(r.start().offset(), r.end().offset() - r.start().offset()));
+    }
+
+    static RootKind rootOf(const sa::Expression& e, std::string& name) {
+        const sa::Expression* cur = &e;
+        while (cur) {
+            switch (cur->kind) {
+                case sa::ExpressionKind::NamedValue: {
+                    const auto& sym = cur->as<sa::NamedValueExpression>().symbol;
+                    name = std::string(sym.name);
+                    if (sym.kind == sa::SymbolKind::FormalArgument) return RootKind::Argument;
+                    if (sym.kind == sa::SymbolKind::ClassProperty) return RootKind::Property;
+                    if (sym.kind == sa::SymbolKind::Variable) return RootKind::Local;
+                    return RootKind::Other;
+                }
+                case sa::ExpressionKind::MemberAccess:
+                    cur = &cur->as<sa::MemberAccessExpression>().value();
+                    break;
+                case sa::ExpressionKind::ElementSelect:
+                    cur = &cur->as<sa::ElementSelectExpression>().value();
+                    break;
+                case sa::ExpressionKind::RangeSelect:
+                    cur = &cur->as<sa::RangeSelectExpression>().value();
+                    break;
+                default:
+                    return RootKind::Other;
+            }
+        }
+        return RootKind::Other;
+    }
+
+    // Calls, assignments, timing controls and super.new in a body, as the
+    // rules' AllGood visitors see them.
+    void collectBody(const sa::SubroutineSymbol& sub, Method& m) {
         struct V : sa::ASTVisitor<V, sa::VisitFlags::AllGood> {
             Builder& b;
-            std::vector<Call>& out;
-            V(Builder& b, std::vector<Call>& out) : b(b), out(out) {}
+            Method& m;
+            V(Builder& b, Method& m) : b(b), m(m) {}
             void handle(const sa::CallExpression& call) {
                 Call c;
                 c.name = std::string(call.getSubroutineName());
@@ -238,11 +282,75 @@ private:
                         }
                     }
                 }
-                out.push_back(std::move(c));
+                m.calls.push_back(std::move(c));
                 visitDefault(call);
             }
-        } v(*this, out);
-        sub.getBody().visit(v);
+            void handle(const sa::AssignmentExpression& assign) {
+                Assignment a;
+                a.loc = b.loc(assign.sourceRange.start());
+                a.isNonBlocking = assign.isNonBlocking();
+                if (assign.syntax && slang::syntax::BinaryExpressionSyntax::isKind(assign.syntax->kind)) {
+                    const auto& bin = assign.syntax->as<slang::syntax::BinaryExpressionSyntax>();
+                    a.lhs = b.textOf(bin.left->sourceRange());
+                    a.rhs = b.textOf(bin.right->sourceRange());
+                } else {
+                    a.lhs = b.textOf(assign.left().sourceRange);
+                }
+                a.rootKind = rootOf(assign.left(), a.rootName);
+                m.assignments.push_back(std::move(a));
+                visitDefault(assign);
+            }
+            void handle(const sa::NewClassExpression& expr) {
+                if (expr.isSuperClass) m.callsSuperNew = true;
+                visitDefault(expr);
+            }
+            void handle(const sa::TimedStatement& stmt) {
+                m.timingControls.push_back(b.loc(stmt.sourceRange.start()));
+                visitDefault(stmt);
+            }
+            void handle(const sa::WaitStatement& stmt) {
+                m.timingControls.push_back(b.loc(stmt.sourceRange.start()));
+                visitDefault(stmt);
+            }
+        } v(*this, m);
+        const sa::Statement& body = sub.getBody();
+        body.visit(v);
+
+        // Some timing controls do not survive into the AST (an invalid body,
+        // say); find them in the syntax then.
+        if (m.timingControls.empty() && sub.getSyntax()) {
+            struct T : slang::syntax::SyntaxVisitor<T> {
+                Builder& b;
+                std::vector<Loc>& out;
+                T(Builder& b, std::vector<Loc>& out) : b(b), out(out) {}
+                void handle(const slang::syntax::TimingControlStatementSyntax& s) {
+                    out.push_back(b.loc(s.sourceRange().start()));
+                }
+                void handle(const slang::syntax::WaitStatementSyntax& s) {
+                    out.push_back(b.loc(s.sourceRange().start()));
+                }
+            } t(*this, m.timingControls);
+            sub.getSyntax()->visit(t);
+        }
+
+        // The top-level `super.new(...);` statement, if any.
+        const sa::Statement* top = &body;
+        if (top->kind == sa::StatementKind::Block) top = &top->as<sa::BlockStatement>().body;
+        if (top->kind == sa::StatementKind::List) {
+            int index = 0;
+            for (const auto* st : top->as<sa::StatementList>().list) {
+                if (!st || st->kind == sa::StatementKind::Empty) continue;
+                if (st->kind == sa::StatementKind::ExpressionStatement) {
+                    const auto& e = st->as<sa::ExpressionStatement>().expr;
+                    if (e.kind == sa::ExpressionKind::NewClass && e.as<sa::NewClassExpression>().isSuperClass) {
+                        m.superNewIndex = index;
+                        m.superNewLoc = loc(st->sourceRange.start());
+                        break;
+                    }
+                }
+                ++index;
+            }
+        }
     }
 
     Loc loc(slang::SourceLocation l) {
@@ -354,7 +462,7 @@ private:
                     m.locals.push_back({std::string(var.name), var.getType().toString(), loc(var.location),
                                         isVif(var.getType())});
                 }
-                collectCalls(s, m.calls);
+                collectBody(s, m);
                 if (uvm::UvmModel::isFunctionPhase(s.name)) m.phase = PhaseKind::Function;
                 else if (uvm::UvmModel::isTaskPhase(s.name)) m.phase = PhaseKind::Task;
                 c.methods.push_back(std::move(m));

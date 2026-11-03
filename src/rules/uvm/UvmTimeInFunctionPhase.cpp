@@ -1,34 +1,8 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/ASTVisitor.h"
-#include "slang/ast/statements/MiscStatements.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
-#include "slang/syntax/AllSyntax.h"
-#include "slang/syntax/SyntaxVisitor.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::uvm {
-
-class TimingControlVisitor : public slang::ast::ASTVisitor<TimingControlVisitor, slang::ast::VisitFlags::AllGood> {
-public:
-    void handle(const slang::ast::TimedStatement& stmt) {
-        hasTiming = true;
-        firstLoc = stmt.sourceRange.start();
-        visitDefault(stmt);
-    }
-
-    void handle(const slang::ast::WaitStatement& stmt) {
-        hasTiming = true;
-        firstLoc = stmt.sourceRange.start();
-        visitDefault(stmt);
-    }
-
-    bool foundTiming() const { return hasTiming; }
-    slang::SourceLocation getLocation() const { return firstLoc; }
-
-private:
-    bool hasTiming = false;
-    slang::SourceLocation firstLoc;
-};
 
 class UvmTimeInFunctionPhase : public Rule {
 public:
@@ -41,55 +15,24 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* classType : uvmModel.getAllClasses()) {
-            if (!uvmModel.isUvmComponent(*classType)) continue;
-
-            for (const auto& sub : classType->membersOfType<slang::ast::SubroutineSymbol>()) {
-                if (uvmModel.isFunctionPhase(sub.name)) {
-                    bool hasTiming = false;
-                    slang::SourceLocation timingLoc;
-
-                    const auto& body = sub.getBody();
-                    TimingControlVisitor visitor;
-                    body.visit(visitor);
-                    if (visitor.foundTiming()) {
-                        hasTiming = true;
-                        timingLoc = visitor.getLocation();
-                    } else if (sub.getSyntax()) {
-                        struct TimingSyntaxVisitor : public slang::syntax::SyntaxVisitor<TimingSyntaxVisitor> {
-                            bool found = false;
-                            slang::SourceLocation loc;
-                            void handle(const slang::syntax::TimingControlStatementSyntax& s) {
-                                found = true;
-                                loc = s.sourceRange().start();
-                            }
-                            void handle(const slang::syntax::WaitStatementSyntax& s) {
-                                found = true;
-                                loc = s.sourceRange().start();
-                            }
-                        } synVisitor;
-                        sub.getSyntax()->visit(synVisitor);
-                        if (synVisitor.found) {
-                            hasTiming = true;
-                            timingLoc = synVisitor.loc;
-                        }
-                    }
-
-                    if (hasTiming) {
-                        diags.addViolation(
-                            "UVM-PHS-002",
-                            "UvmTimeInFunctionPhase",
-                            "Time-consuming statement detected inside function phase '" +
-                            std::string(sub.name) + "' in class '" +
-                            std::string(classType->name) + "'.",
-                            core::Severity::Error,
-                            timingLoc
-                        );
-                    }
-                }
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            if (!model::isComponent(cls.uvm)) continue;
+            for (const model::Method& sub : cls.methods) {
+                if (sub.isExtern || sub.phase != model::PhaseKind::Function || sub.timingControls.empty()) continue;
+                diags.addViolation(
+                    "UVM-PHS-002",
+                    "UvmTimeInFunctionPhase",
+                    "Time-consuming statement detected inside function phase '" +
+                    sub.name + "' in class '" + cls.name + "'.",
+                    core::Severity::Error,
+                    model::toSlang(sub.timingControls.back()) // the last one, as before the port
+                );
             }
         }
     }

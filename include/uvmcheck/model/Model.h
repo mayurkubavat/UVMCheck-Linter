@@ -122,6 +122,19 @@ struct Call {
     bool viaSuper = false;
 };
 
+/// What the left side of an assignment is rooted in: `x`, `x.f`, `x[i]`.
+enum class RootKind : uint8_t { Other, Argument, Local, Property };
+
+/// An assignment in a method body (`=`, `<=`, `+=` and the like), in walk order.
+struct Assignment {
+    Loc loc;
+    bool isNonBlocking = false;
+    std::string lhs;  ///< source text of the left side, as written
+    std::string rhs;  ///< source text of the right side, as written
+    RootKind rootKind = RootKind::Other;
+    std::string rootName; ///< the argument, local or property assigned into
+};
+
 struct Method {
     std::string name;
     Loc loc;
@@ -144,6 +157,15 @@ struct Method {
     std::vector<Argument> arguments;
     std::vector<Local> locals;
     std::vector<Call> calls;
+    std::vector<Assignment> assignments;
+    /// Delays, event controls and waits in the body, in walk order.
+    std::vector<Loc> timingControls;
+    /// super.new(...) is called somewhere in the body.
+    bool callsSuperNew = false;
+    /// Position of the `super.new(...);` statement among the body's top-level
+    /// statements (empty statements not counted), or -1; and where it is.
+    int superNewIndex = -1;
+    Loc superNewLoc;
     /// Calls named `name`, in body order.
     size_t countCalls(std::string_view name) const;
 };

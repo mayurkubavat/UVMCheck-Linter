@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-#define UVMCHECK_MODEL_ABI_VERSION 4u
+#define UVMCHECK_MODEL_ABI_VERSION 5u
 #define UVMCHECK_NONE 0xFFFFFFFFu
 
 typedef struct uvmcheck_design uvmcheck_design;
@@ -68,7 +68,10 @@ typedef struct {
     uint8_t returns_void;
     const char* return_type;
     uvmcheck_loc loc;
-    uint32_t argument_count, local_count, call_count;
+    uint32_t argument_count, local_count, call_count, assignment_count, timing_count;
+    int32_t super_new_index;     /* top-level statement index of `super.new(...);`, or -1 */
+    uvmcheck_loc super_new_loc;
+    uint8_t calls_super_new;     /* super.new(...) anywhere in the body */
 } uvmcheck_method;
 
 /* Values of uvmcheck_argument.direction and .shape. */
@@ -98,6 +101,18 @@ typedef struct {
     const char* name;
     uvmcheck_loc loc;
 } uvmcheck_constraint;
+
+/* Values of uvmcheck_assignment.root_kind. */
+enum { UVMCHECK_ROOT_OTHER = 0, UVMCHECK_ROOT_ARGUMENT, UVMCHECK_ROOT_LOCAL, UVMCHECK_ROOT_PROPERTY };
+
+/* An assignment in a method body, in walk order. */
+typedef struct {
+    const char* lhs;       /* left side as written */
+    const char* rhs;       /* right side as written */
+    const char* root_name; /* argument, local or property the left side is rooted in */
+    uvmcheck_loc loc;
+    uint8_t is_non_blocking, root_kind;
+} uvmcheck_assignment;
 
 /* A call in a method body, in walk order (nested calls included). */
 typedef struct {
@@ -137,6 +152,11 @@ UVMCHECK_API int uvmcheck_get_local(const uvmcheck_design* d, uint32_t cls, uint
                                     uint32_t index, uvmcheck_local* out);
 UVMCHECK_API int uvmcheck_get_call(const uvmcheck_design* d, uint32_t cls, uint32_t method,
                                    uint32_t index, uvmcheck_call* out);
+UVMCHECK_API int uvmcheck_get_assignment(const uvmcheck_design* d, uint32_t cls, uint32_t method,
+                                         uint32_t index, uvmcheck_assignment* out);
+/* Delays, event controls and waits in a method body, in walk order. */
+UVMCHECK_API int uvmcheck_get_timing(const uvmcheck_design* d, uint32_t cls, uint32_t method,
+                                     uint32_t index, uvmcheck_loc* out);
 UVMCHECK_API int uvmcheck_get_constraint(const uvmcheck_design* d, uint32_t cls, uint32_t index,
                                          uvmcheck_constraint* out);
 

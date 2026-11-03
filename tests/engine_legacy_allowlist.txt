@@ -44,7 +44,6 @@ src/rules/uvm/BuildPhaseCrossComponentAccess.cpp
 src/rules/uvm/ComponentNameMismatch.cpp
 src/rules/uvm/EmptySequenceBody.cpp
 src/rules/uvm/ParameterizedClassFactoryRegistration.cpp
-src/rules/uvm/RalPredictorAdapterWiring.cpp
 src/rules/uvm/SequenceBodyWithoutStartItem.cpp
 src/rules/uvm/SequenceItemCreateWithoutType.cpp
 src/rules/uvm/SequenceItemDefaultNew.cpp
@@ -53,4 +52,3 @@ src/rules/uvm/UncheckedGetResponse.cpp
 src/rules/uvm/UvmFactoryMacroMismatch.cpp
 src/rules/uvm/UvmFactoryMissingUtils.cpp
 src/rules/uvm/UvmObjectionInLoop.cpp
-src/rules/uvm/VirtualSequencerWiringChecker.cpp

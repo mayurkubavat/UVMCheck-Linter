@@ -19,7 +19,8 @@ int main(int argc, char** argv) {
     /* rust/sv-slang asserts the same sizes for its copies of these structs */
     if (sizeof(void*) == 8) {
         CHECK(sizeof(uvmcheck_class) == 56 && sizeof(uvmcheck_property) == 40);
-        CHECK(sizeof(uvmcheck_method) == 56 && sizeof(uvmcheck_argument) == 48);
+        CHECK(sizeof(uvmcheck_method) == 88 && sizeof(uvmcheck_argument) == 48);
+        CHECK(sizeof(uvmcheck_assignment) == 40);
         CHECK(sizeof(uvmcheck_call) == 56);
         CHECK(sizeof(uvmcheck_local) == 32 && sizeof(uvmcheck_constraint) == 24);
     }
@@ -137,6 +138,38 @@ int main(int argc, char** argv) {
         }
     }
     CHECK(sawSum && sawProbe);
+
+    /* Assignments, timing controls and super.new (ABI v5). */
+    uint32_t sub = UVMCHECK_NONE;
+    for (uint32_t i = 0; i < uvmcheck_class_count(d); ++i) {
+        CHECK(uvmcheck_get_class(d, i, &c));
+        if (strcmp(c.name, "facts_sub") == 0) sub = i;
+    }
+    CHECK(sub != UVMCHECK_NONE && uvmcheck_get_class(d, sub, &c));
+    int sawCtor = 0, sawWrite = 0, sawWait = 0;
+    for (uint32_t i = 0; i < c.method_count; ++i) {
+        uvmcheck_method m;
+        CHECK(uvmcheck_get_method(d, sub, i, &m));
+        if (strcmp(m.name, "new") == 0) {
+            CHECK(m.calls_super_new && m.super_new_index == 0 && m.super_new_loc.line == 37);
+            sawCtor = 1;
+        } else if (strcmp(m.name, "write") == 0) {
+            uvmcheck_assignment a;
+            CHECK(m.assignment_count == 2 && uvmcheck_get_assignment(d, sub, i, 0, &a));
+            CHECK(strcmp(a.lhs, "t.addr") == 0 && strcmp(a.rhs, "0") == 0 && a.is_non_blocking);
+            CHECK(a.root_kind == UVMCHECK_ROOT_ARGUMENT && strcmp(a.root_name, "t") == 0);
+            CHECK(uvmcheck_get_assignment(d, sub, i, 1, &a));
+            CHECK(strcmp(a.lhs, "count") == 0 && strcmp(a.rhs, "t.addr") == 0 && !a.is_non_blocking);
+            CHECK(a.root_kind == UVMCHECK_ROOT_PROPERTY && !uvmcheck_get_assignment(d, sub, i, 2, &a));
+            CHECK(!m.calls_super_new && m.super_new_index == -1);
+            sawWrite = 1;
+        } else if (strcmp(m.name, "wait_a_bit") == 0) {
+            uvmcheck_loc t;
+            CHECK(m.timing_count == 1 && uvmcheck_get_timing(d, sub, i, 0, &t) && t.line == 45);
+            sawWait = 1;
+        }
+    }
+    CHECK(sawCtor && sawWrite && sawWait);
     CHECK(strstr(uvmcheck_design_json(d), "\"extern\":true") != NULL);
     uvmcheck_design_free(d);
 

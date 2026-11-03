@@ -51,6 +51,12 @@ def main() -> int:
           "virtual interface local")
     check(p is not None and [x.name for x in p.calls] == ["randomize", "set", "$urandom"]
           and p.calls[1].first_arg_is_null and p.calls[1].callee_scope == "uvm_config_db", "calls")
+    sub = f.find_class("facts_sub")
+    ms = {m.name: m for m in sub.methods} if sub else {}
+    check("new" in ms and ms["new"].calls_super_new and ms["new"].super_new_index == 0, "super.new")
+    check("write" in ms and [(x.lhs, x.root_kind) for x in ms["write"].assignments]
+          == [("t.addr", "argument"), ("count", "property")], "assignments")
+    check("wait_a_bit" in ms and [t.line for t in ms["wait_a_bit"].timing_controls] == [45], "timing controls")
 
     try:
         Design.load(["/no/such/file.sv"])

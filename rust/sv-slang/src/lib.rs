@@ -4,7 +4,7 @@
 
 use std::os::raw::{c_char, c_int};
 
-pub const ABI_VERSION: u32 = 4;
+pub const ABI_VERSION: u32 = 5;
 pub const NONE: u32 = u32::MAX;
 
 #[repr(C)]
@@ -70,6 +70,22 @@ pub struct uvmcheck_method {
     pub argument_count: u32,
     pub local_count: u32,
     pub call_count: u32,
+    pub assignment_count: u32,
+    pub timing_count: u32,
+    pub super_new_index: i32,
+    pub super_new_loc: uvmcheck_loc,
+    pub calls_super_new: u8,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct uvmcheck_assignment {
+    pub lhs: *const c_char,
+    pub rhs: *const c_char,
+    pub root_name: *const c_char,
+    pub loc: uvmcheck_loc,
+    pub is_non_blocking: u8,
+    pub root_kind: u8,
 }
 
 #[repr(C)]
@@ -159,6 +175,20 @@ extern "C" {
         index: u32,
         out: *mut uvmcheck_call,
     ) -> c_int;
+    pub fn uvmcheck_get_assignment(
+        d: *const uvmcheck_design,
+        cls: u32,
+        method: u32,
+        index: u32,
+        out: *mut uvmcheck_assignment,
+    ) -> c_int;
+    pub fn uvmcheck_get_timing(
+        d: *const uvmcheck_design,
+        cls: u32,
+        method: u32,
+        index: u32,
+        out: *mut uvmcheck_loc,
+    ) -> c_int;
     pub fn uvmcheck_get_constraint(
         d: *const uvmcheck_design,
         cls: u32,
@@ -178,7 +208,8 @@ mod tests {
         assert_eq!(size_of::<super::uvmcheck_class>(), 3 * 8 + 4 + 4 + 12 + 12);
         // Sizes with the padding a C compiler adds (8-byte pointers).
         assert_eq!(size_of::<super::uvmcheck_property>(), 40);
-        assert_eq!(size_of::<super::uvmcheck_method>(), 56);
+        assert_eq!(size_of::<super::uvmcheck_method>(), 88);
+        assert_eq!(size_of::<super::uvmcheck_assignment>(), 40);
         assert_eq!(size_of::<super::uvmcheck_argument>(), 48);
         assert_eq!(size_of::<super::uvmcheck_local>(), 32);
         assert_eq!(size_of::<super::uvmcheck_constraint>(), 24);

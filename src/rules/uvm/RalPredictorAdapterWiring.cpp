@@ -1,14 +1,19 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "uvmcheck/uvm/UvmModel.h"
-#include "slang/ast/ASTVisitor.h"
-#include "slang/ast/symbols/ClassSymbols.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
-#include "slang/ast/symbols/VariableSymbols.h"
-#include "slang/ast/expressions/AssignmentExpressions.h"
-#include "slang/syntax/AllSyntax.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::uvm {
+
+// Assignments made in any connect_phase, in any class (extern bodies and
+// parameterized classes included): "lhs = rhs" as written.
+inline std::vector<std::string> connectPhaseAssignments(const model::Model& design) {
+    std::vector<std::string> out;
+    for (const model::Class& cls : design.classes())
+        for (const model::Method& m : cls.methods)
+            if (m.name == "connect_phase")
+                for (const model::Assignment& a : m.assignments) out.push_back(a.lhs + " = " + a.rhs);
+    return out;
+}
 
 class RalPredictorAdapterWiring : public Rule {
 public:
@@ -22,97 +27,45 @@ public:
     std::string_view getCategory() const override { return "UVM"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
-    void run(slang::ast::Compilation& compilation,
+    // Reads only uvmcheck::model, not slang's AST.
+    void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-
+        const model::Model& design = uvmModel.facade();
         struct PredictorDecl {
-            std::string parentClassName;
-            std::string predictorName;
-            slang::SourceLocation location;
+            const model::Class* owner;
+            const model::Property* prop;
         };
-
         std::vector<PredictorDecl> predictors;
-
-        // Step 1: Discover all declared uvm_reg_predictor instances
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls || !uvmModel.isUvmComponent(*cls)) continue;
-
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::ClassProperty) {
-                    const auto& prop = member.as<slang::ast::ClassPropertySymbol>();
-                    std::string typeStr(prop.getType().toString());
-
-                    if (typeStr.find("uvm_reg_predictor") != std::string::npos ||
-                        typeStr.find("reg_predictor") != std::string::npos) {
-                        predictors.push_back({
-                            std::string(cls->name),
-                            std::string(prop.name),
-                            prop.location
-                        });
-                    }
-                }
-            }
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            if (!model::isComponent(cls.uvm)) continue;
+            for (const model::Property& prop : cls.properties)
+                if (prop.type.find("reg_predictor") != std::string::npos) predictors.push_back({&cls, &prop});
         }
-
         if (predictors.empty()) return;
 
-        // Step 2: Collect connect_phase statements
-        std::vector<std::string> connectStatements;
-
-        class ConnectVisitor : public slang::ast::ASTVisitor<ConnectVisitor, slang::ast::VisitFlags::AllGood> {
-        public:
-            std::vector<std::string>& stmts;
-            bool insideConnectPhase = false;
-
-            explicit ConnectVisitor(std::vector<std::string>& outStmts) : stmts(outStmts) {}
-
-            void handle(const slang::ast::SubroutineSymbol& sub) {
-                if (sub.name == "connect_phase") {
-                    bool prev = insideConnectPhase;
-                    insideConnectPhase = true;
-                    visitDefault(sub);
-                    insideConnectPhase = prev;
-                } else {
-                    visitDefault(sub);
-                }
-            }
-
-            void handle(const slang::ast::AssignmentExpression& assign) {
-                if (insideConnectPhase && assign.syntax) {
-                    stmts.push_back(std::string(assign.syntax->toString()));
-                }
-                visitDefault(assign);
-            }
-        };
-
-        ConnectVisitor visitor(connectStatements);
-        compilation.getRoot().visit(visitor);
-
-        // Step 3: Verify each predictor has its .map property bound
+        const auto assignments = connectPhaseAssignments(design);
         for (const auto& pred : predictors) {
-            std::string mapTarget = pred.predictorName + ".map";
+            const std::string mapTarget = pred.prop->name + ".map";
             bool mapBound = false;
-
-            for (const auto& stmt : connectStatements) {
+            for (const auto& stmt : assignments) {
                 if (stmt.find(mapTarget) != std::string::npos) {
                     mapBound = true;
                     break;
                 }
             }
-
-            if (!mapBound) {
-                diags.addViolation(
-                    "RAL-WIRE-001",
-                    "RalPredictorAdapterWiring",
-                    "Register predictor '" + pred.predictorName + "' in component '" + pred.parentClassName +
-                    "' is missing mandatory '.map' assignment in connect_phase (e.g. '" +
-                    pred.predictorName + ".map = reg_model.default_map;'). "
-                    "Without map assignment, register prediction will fail silently and mirror values will not update.",
-                    core::Severity::Warning,
-                    pred.location
-                );
-            }
+            if (mapBound) continue;
+            diags.addViolation(
+                "RAL-WIRE-001",
+                "RalPredictorAdapterWiring",
+                "Register predictor '" + pred.prop->name + "' in component '" + pred.owner->name +
+                "' is missing mandatory '.map' assignment in connect_phase (e.g. '" +
+                pred.prop->name + ".map = reg_model.default_map;'). "
+                "Without map assignment, register prediction will fail silently and mirror values will not update.",
+                core::Severity::Warning,
+                model::toSlang(pred.prop->loc)
+            );
         }
     }
 };

@@ -1,26 +1,8 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/ASTVisitor.h"
-#include "slang/ast/expressions/AssignmentExpressions.h"
-#include "slang/ast/symbols/ClassSymbols.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::oop {
-
-class SuperNewVisitor : public slang::ast::ASTVisitor<SuperNewVisitor, slang::ast::VisitFlags::AllGood> {
-public:
-    void handle(const slang::ast::NewClassExpression& expr) {
-        if (expr.isSuperClass) {
-            hasSuperNew = true;
-        }
-        visitDefault(expr);
-    }
-
-    bool foundSuperNew() const { return hasSuperNew; }
-
-private:
-    bool hasSuperNew = false;
-};
 
 class MissingSuperNew : public Rule {
 public:
@@ -33,30 +15,25 @@ public:
     std::string_view getCategory() const override { return "OOP"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* classType : uvmModel.getAllClasses()) {
-            const auto* base = classType->getBaseClass();
-            if (!base || !base->isClass()) continue;
-
-            const auto* ctor = classType->getConstructor();
-            if (!ctor || ctor->flags.has(slang::ast::MethodFlags::BuiltIn)) continue;
-
-            SuperNewVisitor visitor;
-            ctor->getBody().visit(visitor);
-
-            if (!visitor.foundSuperNew()) {
-                diags.addViolation(
-                    "SV-OOP-003",
-                    "MissingSuperNew",
-                    "Constructor 'new' in class '" + std::string(classType->name) +
-                    "' derives from '" + std::string(base->name) +
-                    "' but does not explicitly call super.new(...).",
-                    core::Severity::Warning,
-                    ctor->location
-                );
-            }
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.isParameterized) continue;
+            if (cls.base == model::NoClass) continue;
+            const model::Method* ctor = cls.findMethod("new");
+            if (!ctor || ctor->isBuiltIn || ctor->callsSuperNew) continue;
+            diags.addViolation(
+                "SV-OOP-003",
+                "MissingSuperNew",
+                "Constructor 'new' in class '" + cls.name +
+                "' derives from '" + design.cls(cls.base).name +
+                "' but does not explicitly call super.new(...).",
+                core::Severity::Warning,
+                model::toSlang(ctor->loc)
+            );
         }
     }
 };

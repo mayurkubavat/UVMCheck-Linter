@@ -30,3 +30,18 @@ function void facts_item::probe();
   void'(randomize());
   uvm_config_db#(int)::set(null, "*", "n", $urandom);
 endfunction
+
+class facts_sub extends facts_item;
+  int count;
+  function new(string name = "facts_sub");
+    super.new(name);
+    count = 1;
+  endfunction
+  function void write(facts_item t);
+    t.addr <= 0;
+    count += t.addr;
+  endfunction
+  task wait_a_bit();
+    #10;
+  endtask
+endclass

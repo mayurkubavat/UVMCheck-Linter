@@ -178,6 +178,36 @@ pub struct Method {
     pub locals: Vec<Local>,
     /// Calls in the body, in walk order (nested calls included).
     pub calls: Vec<Call>,
+    pub assignments: Vec<Assignment>,
+    /// Delays, event controls and waits in the body, in walk order.
+    pub timing_controls: Vec<Loc>,
+    /// `super.new(...)` is called somewhere in the body.
+    pub calls_super_new: bool,
+    /// Position of the `super.new(...);` statement among the top-level
+    /// statements, and where it is.
+    pub super_new: Option<(u32, Loc)>,
+}
+
+/// What the left side of an assignment is rooted in: `x`, `x.f`, `x[i]`.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum RootKind {
+    Other,
+    Argument,
+    Local,
+    Property,
+}
+
+#[derive(Clone, Debug)]
+pub struct Assignment {
+    /// Left side as written.
+    pub lhs: String,
+    /// Right side as written.
+    pub rhs: String,
+    pub is_non_blocking: bool,
+    pub root_kind: RootKind,
+    /// The argument, local or property assigned into.
+    pub root_name: String,
+    pub loc: Loc,
 }
 
 #[derive(Clone, Debug)]
@@ -409,6 +439,35 @@ impl Design {
                         loc: loc(x.loc),
                     });
                 }
+                let mut assignments = Vec::with_capacity(m.assignment_count as usize);
+                for k in 0..m.assignment_count {
+                    let mut x = std::mem::MaybeUninit::<ffi::uvmcheck_assignment>::uninit();
+                    if unsafe { ffi::uvmcheck_get_assignment(d, cid, i, k, x.as_mut_ptr()) } == 0 {
+                        return Err(Error(format!("assignment {k} of method {i} of class {cid} missing")));
+                    }
+                    let x = unsafe { x.assume_init() };
+                    assignments.push(Assignment {
+                        lhs: text(x.lhs),
+                        rhs: text(x.rhs),
+                        is_non_blocking: x.is_non_blocking != 0,
+                        root_kind: match x.root_kind {
+                            1 => RootKind::Argument,
+                            2 => RootKind::Local,
+                            3 => RootKind::Property,
+                            _ => RootKind::Other,
+                        },
+                        root_name: text(x.root_name),
+                        loc: loc(x.loc),
+                    });
+                }
+                let mut timing_controls = Vec::with_capacity(m.timing_count as usize);
+                for k in 0..m.timing_count {
+                    let mut x = ffi::uvmcheck_loc::default();
+                    if unsafe { ffi::uvmcheck_get_timing(d, cid, i, k, &mut x) } == 0 {
+                        return Err(Error(format!("timing control {k} of method {i} of class {cid} missing")));
+                    }
+                    timing_controls.push(loc(x));
+                }
                 methods.push(Method {
                     name: text(m.name),
                     visibility: Visibility::from_c(m.visibility),
@@ -430,6 +489,10 @@ impl Design {
                     arguments,
                     locals,
                     calls,
+                    assignments,
+                    timing_controls,
+                    calls_super_new: m.calls_super_new != 0,
+                    super_new: (m.super_new_index >= 0).then(|| (m.super_new_index as u32, loc(m.super_new_loc))),
                 });
             }
             let mut constraints = Vec::with_capacity(c.constraint_count as usize);

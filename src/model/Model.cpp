@@ -132,6 +132,16 @@ const char* shapeName(TypeShape t) {
     return "other";
 }
 
+const char* rootKindName(RootKind k) {
+    switch (k) {
+        case RootKind::Argument: return "argument";
+        case RootKind::Local: return "local";
+        case RootKind::Property: return "property";
+        case RootKind::Other: return "other";
+    }
+    return "other";
+}
+
 const char* phaseName(PhaseKind p) {
     switch (p) {
         case PhaseKind::None: return "none";
@@ -246,7 +256,30 @@ void Model::writeJson(std::ostream& out) const {
                 writeLoc(out, x.loc);
                 out << '}';
             }
-            out << "],";
+            out << "],\"assignments\":[";
+            for (size_t k = 0; k < m.assignments.size(); ++k) {
+                const Assignment& a = m.assignments[k];
+                if (k) out << ',';
+                out << "{\"lhs\":";
+                writeString(out, a.lhs);
+                out << ",\"rhs\":";
+                writeString(out, a.rhs);
+                out << ",\"non_blocking\":" << (a.isNonBlocking ? "true" : "false") << ",\"root_kind\":\""
+                    << rootKindName(a.rootKind) << "\",\"root_name\":";
+                writeString(out, a.rootName);
+                out << ',';
+                writeLoc(out, a.loc);
+                out << '}';
+            }
+            out << "],\"timing_controls\":[";
+            for (size_t k = 0; k < m.timingControls.size(); ++k) {
+                if (k) out << ',';
+                out << '{';
+                writeLoc(out, m.timingControls[k]);
+                out << '}';
+            }
+            out << "],\"calls_super_new\":" << (m.callsSuperNew ? "true" : "false")
+                << ",\"super_new_index\":" << m.superNewIndex << ',';
             writeLoc(out, m.loc);
             out << '}';
         }

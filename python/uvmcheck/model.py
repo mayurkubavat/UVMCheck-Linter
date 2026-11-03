@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence
 
-ABI_VERSION = 4
+ABI_VERSION = 5
 NONE = 0xFFFFFFFF
 
 UVM_KINDS = ("none", "object", "sequence_item", "sequence", "component", "test", "env", "agent",
@@ -28,6 +28,7 @@ UVM_KINDS = ("none", "object", "sequence_item", "sequence", "component", "test",
 VISIBILITY = ("public", "protected", "local")
 PHASES = ("none", "function", "task")
 DIRECTIONS = ("in", "out", "inout", "ref")
+ROOT_KINDS = ("other", "argument", "local", "property")
 SHAPES = ("other", "dynamic_array", "queue", "associative_array", "fixed_unpacked_array", "unpacked_struct")
 
 
@@ -55,7 +56,14 @@ class _Method(ctypes.Structure):
                 ("phase", ctypes.c_uint8), ("declared_virtual", ctypes.c_uint8), ("is_builtin", ctypes.c_uint8),
                 ("is_extern", ctypes.c_uint8), ("returns_void", ctypes.c_uint8), ("return_type", ctypes.c_char_p),
                 ("loc", _Loc), ("argument_count", ctypes.c_uint32), ("local_count", ctypes.c_uint32),
-                ("call_count", ctypes.c_uint32)]
+                ("call_count", ctypes.c_uint32), ("assignment_count", ctypes.c_uint32),
+                ("timing_count", ctypes.c_uint32), ("super_new_index", ctypes.c_int32), ("super_new_loc", _Loc),
+                ("calls_super_new", ctypes.c_uint8)]
+
+
+class _Assignment(ctypes.Structure):
+    _fields_ = [("lhs", ctypes.c_char_p), ("rhs", ctypes.c_char_p), ("root_name", ctypes.c_char_p),
+                ("loc", _Loc), ("is_non_blocking", ctypes.c_uint8), ("root_kind", ctypes.c_uint8)]
 
 
 class _Argument(ctypes.Structure):
@@ -124,6 +132,10 @@ def _load_library():
                                 ctypes.POINTER(_Local)], ctypes.c_int),
         "uvmcheck_get_call": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
                                ctypes.POINTER(_Call)], ctypes.c_int),
+        "uvmcheck_get_assignment": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                                     ctypes.POINTER(_Assignment)], ctypes.c_int),
+        "uvmcheck_get_timing": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.c_uint32,
+                                 ctypes.POINTER(_Loc)], ctypes.c_int),
         "uvmcheck_get_constraint": ([p, ctypes.c_uint32, ctypes.c_uint32, ctypes.POINTER(_Constraint)], ctypes.c_int),
     }
     for name, (args, res) in sigs.items():
@@ -198,6 +210,16 @@ class Call:
 
 
 @dataclass
+class Assignment:
+    lhs: str               # left side as written
+    rhs: str               # right side as written
+    is_non_blocking: bool
+    root_kind: str         # "argument", "local", "property" or "other"
+    root_name: str         # what the left side is rooted in
+    loc: Loc
+
+
+@dataclass
 class Constraint:
     name: str
     loc: Loc
@@ -221,6 +243,11 @@ class Method:
     arguments: List[Argument] = field(default_factory=list)
     locals: List[Local] = field(default_factory=list)  # declared locals only
     calls: List[Call] = field(default_factory=list)    # in walk order, nested calls included
+    assignments: List[Assignment] = field(default_factory=list)
+    timing_controls: List[Loc] = field(default_factory=list)  # delays, event controls, waits
+    calls_super_new: bool = False
+    super_new_index: Optional[int] = None  # top-level statement index of super.new(...);
+    super_new_loc: Optional[Loc] = None
 
 
 @dataclass
@@ -274,7 +301,7 @@ class Design:
             files = [_s(lib.uvmcheck_file_name(handle, i)) for i in range(lib.uvmcheck_file_count(handle))]
             classes = []
             c, p, m = _Class(), _Property(), _Method()
-            a, l, con, cl = _Argument(), _Local(), _Constraint(), _Call()
+            a, l, con, cl, asg, tl = _Argument(), _Local(), _Constraint(), _Call(), _Assignment(), _Loc()
             for cid in range(lib.uvmcheck_class_count(handle)):
                 if not lib.uvmcheck_get_class(handle, cid, ctypes.byref(c)):
                     raise ModelError(f"class {cid} missing")
@@ -307,6 +334,17 @@ class Design:
                                                bool(cl.callee_declared_virtual), bool(cl.callee_builtin),
                                                bool(cl.first_arg_is_null), _loc(cl.first_arg_loc),
                                                _s(cl.receiver), bool(cl.via_super), _loc(cl.loc)))
+                    for j in range(m.assignment_count):
+                        lib.uvmcheck_get_assignment(handle, cid, i, j, ctypes.byref(asg))
+                        meth.assignments.append(Assignment(_s(asg.lhs), _s(asg.rhs), bool(asg.is_non_blocking),
+                                                           ROOT_KINDS[asg.root_kind], _s(asg.root_name),
+                                                           _loc(asg.loc)))
+                    for j in range(m.timing_count):
+                        lib.uvmcheck_get_timing(handle, cid, i, j, ctypes.byref(tl))
+                        meth.timing_controls.append(_loc(tl))
+                    meth.calls_super_new = bool(m.calls_super_new)
+                    if m.super_new_index >= 0:
+                        meth.super_new_index, meth.super_new_loc = m.super_new_index, _loc(m.super_new_loc)
                     k.methods.append(meth)
                 for i in range(c.constraint_count):
                     lib.uvmcheck_get_constraint(handle, cid, i, ctypes.byref(con))

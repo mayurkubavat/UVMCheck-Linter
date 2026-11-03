@@ -1,5 +1,5 @@
 //! Loads the linter's own rule examples through the C ABI.
-use dv_model::{Design, Direction, PhaseKind, TypeShape, UvmKind};
+use dv_model::{Design, Direction, PhaseKind, RootKind, TypeShape, UvmKind};
 use std::path::PathBuf;
 
 fn repo() -> PathBuf {
@@ -82,5 +82,17 @@ fn reads_arguments_locals_constraints_and_extern_methods() {
     assert_eq!(calls, ["randomize", "set", "$urandom"]);
     let set = &probe.calls[1];
     assert!(set.first_arg_is_null && set.callee_scope == "uvm_config_db" && !set.is_system);
+
+    let sub = d.find_class("facts_sub").expect("derived class in model");
+    let ctor = sub.methods.iter().find(|m| m.name == "new").unwrap();
+    assert!(ctor.calls_super_new);
+    assert_eq!(ctor.super_new.map(|(i, l)| (i, l.line)), Some((0, 37)));
+    let write = sub.methods.iter().find(|m| m.name == "write").unwrap();
+    let a = &write.assignments[0];
+    assert_eq!((a.lhs.as_str(), a.rhs.as_str(), a.root_kind), ("t.addr", "0", RootKind::Argument));
+    assert!(a.is_non_blocking);
+    assert_eq!(write.assignments[1].root_kind, RootKind::Property);
+    let wait = sub.methods.iter().find(|m| m.name == "wait_a_bit").unwrap();
+    assert_eq!(wait.timing_controls.iter().map(|l| l.line).collect::<Vec<_>>(), [45]);
     assert!(c.methods.iter().any(|m| m.name == "randomize" && m.is_builtin));
 }
