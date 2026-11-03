@@ -320,6 +320,13 @@ if(UVMCHECK_BUILD_MODEL_LIB)
                 ${CMAKE_CURRENT_SOURCE_DIR}/tests/rules/oop/SV-OOP-007/bad.sv
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
+    # The Python binding (python/uvmcheck/model.py) over the same ABI.
+    add_test(
+        NAME model_python_test
+        COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/tests/test_model_python.py
+                --lib $<TARGET_FILE:uvmcheck_model>
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
     # The Rust crates (rust/) against this build's library, when cargo is around.
     find_program(CARGO_PROGRAM cargo)
     if(CARGO_PROGRAM)

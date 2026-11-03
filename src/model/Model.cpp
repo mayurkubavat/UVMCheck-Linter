@@ -118,7 +118,7 @@ void Model::writeJson(std::ostream& out) const {
         out << ",\"base\":";
         if (c.base == NoClass) out << "null"; else out << c.base;
         out << ",\"uvm\":\"" << toString(c.uvm) << "\",\"virtual\":" << (c.isVirtual ? "true" : "false")
-            << ",\"specialization\":" << (c.isSpecialization ? "true" : "false")
+            << ",\"parameterized\":" << (c.isParameterized ? "true" : "false")
             << ",\"library\":" << (c.isLibrary ? "true" : "false") << ',';
         writeLoc(out, c.loc);
         out << ",\"properties\":[";

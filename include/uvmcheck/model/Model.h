@@ -86,7 +86,10 @@ struct Class {
     ClassId base = NoClass;
     UvmKind uvm = UvmKind::None;
     bool isVirtual = false;
-    bool isSpecialization = false; ///< a parameterized class's specialization
+    /// A parameterized class: one entry for the definition, with members as
+    /// declared (types from one of its specializations, so parameter types
+    /// appear resolved). Specializations map to this entry.
+    bool isParameterized = false;
     /// True for classes from a library path (uvm-core and the like).
     bool isLibrary = false;
     std::vector<Property> properties;

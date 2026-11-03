@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-#define UVMCHECK_MODEL_ABI_VERSION 1u
+#define UVMCHECK_MODEL_ABI_VERSION 2u
 #define UVMCHECK_NONE 0xFFFFFFFFu
 
 typedef struct uvmcheck_design uvmcheck_design;
@@ -43,7 +43,7 @@ typedef struct {
     const char* base_name;
     uint32_t base;
     uint8_t uvm;
-    uint8_t is_virtual, is_specialization, is_library;
+    uint8_t is_virtual, is_parameterized, is_library;
     uvmcheck_loc loc;
     uint32_t property_count, method_count;
 } uvmcheck_class;

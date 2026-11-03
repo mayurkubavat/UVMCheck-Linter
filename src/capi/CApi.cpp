@@ -86,7 +86,7 @@ int uvmcheck_get_class(const uvmcheck_design* d, uint32_t cls, uvmcheck_class* o
     if (!m || !out || cls >= m->classes().size()) return 0;
     const Class& c = m->classes()[cls];
     *out = {c.name.c_str(), c.scope.c_str(), c.baseName.c_str(), c.base, static_cast<uint8_t>(c.uvm),
-            c.isVirtual, c.isSpecialization, c.isLibrary, toC(c.loc),
+            c.isVirtual, c.isParameterized, c.isLibrary, toC(c.loc),
             static_cast<uint32_t>(c.properties.size()), static_cast<uint32_t>(c.methods.size())};
     return 1;
 }

@@ -43,3 +43,16 @@ fn reports_unreadable_sources() {
     let err = Design::load(["/no/such/file.sv"]).unwrap_err();
     assert!(!err.0.is_empty());
 }
+
+#[test]
+fn parameterized_bases_are_in_the_model() {
+    let d = load("tests/map/map_tb.sv");
+    let drv = d.find_class("my_drv").expect("driver");
+    assert_eq!(drv.uvm, UvmKind::Driver);
+    let base = d.class(drv.base.expect("base resolved to the parameterized definition"));
+    assert_eq!(base.name, "uvm_driver");
+    assert!(base.is_parameterized);
+    assert!(d.derives_from(drv.id, "uvm_component"));
+    // Specializations are not separate entries.
+    assert_eq!(d.classes().iter().filter(|c| c.name == "uvm_driver").count(), 1);
+}

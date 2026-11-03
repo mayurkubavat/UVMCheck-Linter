@@ -1,0 +1,13 @@
+[package]
+name = "dv-filelist"
+description = "Normalizes VCS/Xcelium file lists and reports what is missing"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[dependencies]
+sv-source = { path = "../sv-source" }
+dv-model = { path = "../dv-model" }
+sv-slang = { path = "../sv-slang" }

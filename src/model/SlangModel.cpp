@@ -4,6 +4,8 @@
 
 #include "slang/ast/Compilation.h"
 #include "slang/ast/symbols/ClassSymbols.h"
+#include "slang/ast/symbols/CompilationUnitSymbols.h"
+#include "slang/syntax/AllSyntax.h"
 #include "slang/ast/symbols/SubroutineSymbols.h"
 #include "slang/ast/symbols/VariableSymbols.h"
 #include "slang/ast/types/Type.h"
@@ -52,26 +54,119 @@ UvmKind classify(const uvm::UvmModel& uvm, const sa::Type& t) {
 class Builder {
 public:
     Builder(const sa::Compilation& c, const uvm::UvmModel& u, const BuildOptions& o)
-        : sm(c.getSourceManager()), uvm(u), options(o) {}
+        : compilation(c), sm(c.getSourceManager()), uvm(u), options(o) {}
 
     Model run() {
-        const auto& all = uvm.getAllClasses();
-        // Pass 1: ids, so bases and property types can point at any class.
-        for (const auto* ct : all) {
+        // Ids first, so bases and property types can point at any class:
+        // the plain classes the UVM model found, then one entry per
+        // parameterized class definition (uvm_driver #(REQ, RSP) and the like).
+        for (const auto* ct : uvm.getAllClasses()) {
             if (ct) ids.try_emplace(ct, static_cast<ClassId>(ids.size()));
         }
-        for (const auto* ct : all) {
+        // getRoot() is not const in slang, but on an elaborated design it only
+        // returns the finished root.
+        collectGenerics(const_cast<sa::Compilation&>(compilation).getRoot());
+        const auto firstGeneric = static_cast<ClassId>(ids.size());
+        for (size_t i = 0; i < generics.size(); ++i)
+            genericIds.emplace(generics[i], static_cast<ClassId>(firstGeneric + i));
+
+        for (const auto* ct : uvm.getAllClasses()) {
             if (ct && ids.at(ct) == model.classes().size()) model.addClass(makeClass(*ct));
+        }
+        for (const auto* g : generics) model.addClass(makeGeneric(*g));
+
+        // A definition nothing specialized has no type to read its base from;
+        // its base was taken from the source text, so resolve it by name.
+        for (ClassId id = firstGeneric; id < model.classes().size(); ++id) {
+            Class& c = model.mutableClass(id);
+            if (c.base == NoClass && !c.baseName.empty()) {
+                if (auto b = model.findClass(c.baseName); b && *b != id) c.base = *b;
+            }
         }
         return std::move(model);
     }
 
 private:
+    const sa::Compilation& compilation;
     const slang::SourceManager* sm;
     const uvm::UvmModel& uvm;
     const BuildOptions& options;
     Model model;
     std::unordered_map<const sa::ClassType*, ClassId> ids;
+    std::vector<const sa::GenericClassDefSymbol*> generics;
+    std::unordered_map<const sa::GenericClassDefSymbol*, ClassId> genericIds;
+
+    // Same walk as UvmModel::indexScope: packages, $unit, nested classes.
+    void collectGenerics(const sa::Scope& scope) {
+        for (const auto& member : scope.members()) {
+            switch (member.kind) {
+                case sa::SymbolKind::GenericClassDef:
+                    generics.push_back(&member.as<sa::GenericClassDefSymbol>());
+                    break;
+                case sa::SymbolKind::ClassType:
+                    collectGenerics(member.as<sa::ClassType>());
+                    break;
+                case sa::SymbolKind::Package:
+                    collectGenerics(member.as<sa::PackageSymbol>());
+                    break;
+                case sa::SymbolKind::CompilationUnit:
+                    collectGenerics(member.as<sa::CompilationUnitSymbol>());
+                    break;
+                default:
+                    break;
+            }
+        }
+    }
+
+    /// One existing specialization to read members from, chosen by its
+    /// printed type so the choice does not depend on hash order. Never makes
+    /// a new specialization: the design is already elaborated and shared.
+    static const sa::ClassType* representative(const sa::GenericClassDefSymbol& g) {
+        const sa::ClassType* best = nullptr;
+        std::string bestName;
+        for (const auto& spec : g.specializations()) {
+            const auto& canon = spec.getCanonicalType();
+            if (!canon.isClass()) continue;
+            std::string name = canon.toString();
+            if (!best || name < bestName) {
+                best = &canon.as<sa::ClassType>();
+                bestName = std::move(name);
+            }
+        }
+        return best;
+    }
+
+    static std::string baseNameFromSyntax(const sa::GenericClassDefSymbol& g) {
+        const auto* syntax = g.getSyntax();
+        if (!syntax || syntax->kind != slang::syntax::SyntaxKind::ClassDeclaration) return {};
+        const auto& decl = syntax->as<slang::syntax::ClassDeclarationSyntax>();
+        if (!decl.extendsClause) return {};
+        std::string text = decl.extendsClause->baseName->toString();
+        if (auto hash = text.find('#'); hash != std::string::npos) text.erase(hash);
+        if (auto colon = text.rfind("::"); colon != std::string::npos) text.erase(0, colon + 2);
+        while (!text.empty() && (text.back() == ' ' || text.back() == '\n' || text.back() == '\t')) text.pop_back();
+        while (!text.empty() && (text.front() == ' ' || text.front() == '\n' || text.front() == '\t')) text.erase(0, 1);
+        return text;
+    }
+
+    Class makeGeneric(const sa::GenericClassDefSymbol& g) {
+        const sa::ClassType* rep = representative(g);
+        Class c = rep ? makeClass(*rep) : Class{};
+        c.name = std::string(g.name);
+        c.loc = loc(g.location);
+        c.scope.clear();
+        if (const auto* parent = g.getParentScope()) {
+            const auto& sym = parent->asSymbol();
+            if (sym.kind == sa::SymbolKind::Package || sym.kind == sa::SymbolKind::ClassType)
+                c.scope = std::string(sym.name);
+        }
+        c.isParameterized = true;
+        if (!rep) {
+            c.baseName = baseNameFromSyntax(g);
+            if (options.isLibraryFile) c.isLibrary = options.isLibraryFile(model.fileName(c.loc));
+        }
+        return c;
+    }
 
     Loc loc(slang::SourceLocation l) {
         Loc out;
@@ -90,8 +185,13 @@ private:
     ClassId idOf(const sa::Type& t) const {
         const auto& canon = t.getCanonicalType();
         if (!canon.isClass()) return NoClass;
-        auto it = ids.find(&canon.as<sa::ClassType>());
-        return it == ids.end() ? NoClass : it->second;
+        const auto& ct = canon.as<sa::ClassType>();
+        if (auto it = ids.find(&ct); it != ids.end()) return it->second;
+        // A specialization maps to its parameterized definition's entry.
+        if (ct.genericClass) {
+            if (auto it = genericIds.find(ct.genericClass); it != genericIds.end()) return it->second;
+        }
+        return NoClass;
     }
 
     Class makeClass(const sa::ClassType& ct) {
@@ -104,7 +204,6 @@ private:
                 c.scope = std::string(sym.name);
         }
         c.isVirtual = ct.isAbstract;
-        c.isSpecialization = ct.genericClass != nullptr;
         if (const auto* base = ct.getBaseClass(); base && !base->isError()) {
             const auto& canon = base->getCanonicalType();
             if (canon.isClass()) {

@@ -1,0 +1,7 @@
+[package]
+name = "sv-source"
+description = "Reads VCS and Xcelium style file lists into one normalized compile plan"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true

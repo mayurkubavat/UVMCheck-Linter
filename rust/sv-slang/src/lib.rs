@@ -4,7 +4,7 @@
 
 use std::os::raw::{c_char, c_int};
 
-pub const ABI_VERSION: u32 = 1;
+pub const ABI_VERSION: u32 = 2;
 pub const NONE: u32 = u32::MAX;
 
 #[repr(C)]
@@ -29,7 +29,7 @@ pub struct uvmcheck_class {
     pub base: u32,
     pub uvm: u8,
     pub is_virtual: u8,
-    pub is_specialization: u8,
+    pub is_parameterized: u8,
     pub is_library: u8,
     pub loc: uvmcheck_loc,
     pub property_count: u32,
