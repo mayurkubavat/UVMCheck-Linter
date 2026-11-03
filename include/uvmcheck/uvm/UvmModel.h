@@ -1,6 +1,8 @@
 #pragma once
 
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -10,6 +12,7 @@
 #include "slang/ast/Compilation.h"
 #include "slang/ast/symbols/ClassSymbols.h"
 #include "slang/ast/types/Type.h"
+#include "uvmcheck/model/Model.h"
 
 namespace uvmcheck::uvm {
 
@@ -67,6 +70,11 @@ public:
     /// Checks if a UVM glob string (e.g. "*.m_env.m_agent*") matches any discovered component path
     bool matchesAnyComponentPath(std::string_view globPattern) const;
 
+    /// The slang-free snapshot of this design (uvmcheck::model), built on
+    /// first use and shared by every reader. New rules should read this rather
+    /// than slang's AST, so they keep working when the front end changes.
+    const model::Model& facade() const;
+
     /// Dumps the UVM semantic model (classes, methods, config_db, TLM) as JSON for Python SDK
     void dumpSemanticJson(std::ostream& out) const;
 
@@ -75,6 +83,12 @@ private:
     slang::ast::Compilation& compilation;
     std::vector<const slang::ast::ClassType*> discoveredClasses;
     std::vector<std::string> componentPaths;
+
+    struct FacadeCache {
+        std::once_flag once;
+        std::unique_ptr<model::Model> model;
+    };
+    std::unique_ptr<FacadeCache> facadeCache = std::make_unique<FacadeCache>();
 
     void indexScope(const slang::ast::Scope& scope);
     void buildComponentDag();

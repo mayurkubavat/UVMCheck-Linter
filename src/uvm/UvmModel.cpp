@@ -2,6 +2,8 @@
 #include "uvmcheck/uvm/UvmModel.h"
 #include "slang/ast/symbols/CompilationUnitSymbols.h"
 #include "slang/ast/symbols/VariableSymbols.h"
+#include "uvmcheck/core/ConfigManager.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::uvm {
 
@@ -121,6 +123,21 @@ void UvmModel::buildComponentDag() {
             }
         }
     }
+}
+
+const model::Model& UvmModel::facade() const {
+    std::call_once(facadeCache->once, [this] {
+        model::BuildOptions options;
+        const auto& project = core::ConfigManager::instance().getProjectConfig();
+        if (!project.libraryPaths().empty()) {
+            options.isLibraryFile = [&project](std::string_view file) {
+                return project.classifyPath(core::normalizePathForMatching(file)) ==
+                       core::SuppressionReason::LibraryPath;
+            };
+        }
+        facadeCache->model = std::make_unique<model::Model>(model::buildFromSlang(compilation, *this, options));
+    });
+    return *facadeCache->model;
 }
 
 bool UvmModel::matchesAnyComponentPath(std::string_view globPattern) const {

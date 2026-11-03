@@ -28,6 +28,18 @@
         "UVMCHECK_ENABLE_UNITY_BUILD": "ON",
         "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
+    },
+    {
+      "name": "model",
+      "displayName": "Release + shared model library (Rust/Python)",
+      "description": "Builds libuvmcheck_model.so with its C ABI for rust/ and other tools; position independent, no mimalloc",
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build-model",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "UVMCHECK_BUILD_MODEL_LIB": "ON"
+      }
     }
   ],
   "buildPresets": [
@@ -38,6 +50,10 @@
     {
       "name": "fast-dev",
       "configurePreset": "fast-dev"
+    },
+    {
+      "name": "model",
+      "configurePreset": "model"
     }
   ]
 }

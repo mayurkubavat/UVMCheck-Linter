@@ -1,0 +1,9 @@
+[package]
+name = "sv-slang"
+description = "Raw FFI to libuvmcheck_model, the slang-backed design model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+links = "uvmcheck_model"
+build = "build.rs"

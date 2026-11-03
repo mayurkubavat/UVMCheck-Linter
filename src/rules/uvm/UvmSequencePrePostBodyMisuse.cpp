@@ -1,7 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
-#include "slang/ast/symbols/ClassSymbols.h"
-#include "slang/ast/symbols/SubroutineSymbols.h"
+#include "uvmcheck/model/SlangModel.h"
 
 namespace uvmcheck::rules::uvm {
 
@@ -16,28 +15,25 @@ public:
     std::string_view getCategory() const override { return "Architecture"; }
     core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
+    // Reads only uvmcheck::model, not slang's AST.
     void run(slang::ast::Compilation&,
              const uvmcheck::uvm::UvmModel& uvmModel,
              core::DiagnosticEngine& diags) override {
-        for (const auto* cls : uvmModel.getAllClasses()) {
-            if (!cls || !uvmModel.isUvmSequence(*cls)) continue;
-
-            for (const auto& member : cls->members()) {
-                if (member.kind == slang::ast::SymbolKind::Subroutine) {
-                    const auto& sub = member.as<slang::ast::SubroutineSymbol>();
-                    if (sub.name == "pre_body" || sub.name == "post_body") {
-                        diags.addViolation(
-                            "UVM-SEQ-002",
-                            "UvmSequencePrePostBodyMisuse",
-                            "Sequence '" + std::string(cls->name) + "' overrides lifecycle callback '" + std::string(sub.name) + "()'. "
-                            "In UVM sequence architecture, pre_body() and post_body() are explicitly skipped when a sequence is executed as a child sequence "
-                            "via `uvm_do or `uvm_do_with. Critical setup or cleanup logic will silently fail to execute when nested. "
-                            "Migrate logic to pre_start() / post_start() (which execute in all modes) or body().",
-                            core::Severity::Warning,
-                            sub.location
-                        );
-                    }
-                }
+        const model::Model& design = uvmModel.facade();
+        for (const model::Class& cls : design.classes()) {
+            if (cls.uvm != model::UvmKind::Sequence) continue;
+            for (const model::Method& m : cls.methods) {
+                if (m.name != "pre_body" && m.name != "post_body") continue;
+                diags.addViolation(
+                    "UVM-SEQ-002",
+                    "UvmSequencePrePostBodyMisuse",
+                    "Sequence '" + cls.name + "' overrides lifecycle callback '" + m.name + "()'. "
+                    "In UVM sequence architecture, pre_body() and post_body() are explicitly skipped when a sequence is executed as a child sequence "
+                    "via `uvm_do or `uvm_do_with. Critical setup or cleanup logic will silently fail to execute when nested. "
+                    "Migrate logic to pre_start() / post_start() (which execute in all modes) or body().",
+                    core::Severity::Warning,
+                    model::toSlang(m.loc)
+                );
             }
         }
     }

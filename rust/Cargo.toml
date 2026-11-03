@@ -1,0 +1,15 @@
+# The Rust side of the DV front end (plan: R0 spike). Tools depend on dv-model
+# only; sv-slang is the raw binding to libuvmcheck_model (slang behind a C ABI)
+# and is the one crate that changes when the front end does.
+[workspace]
+resolver = "2"
+members = ["sv-slang", "dv-model", "dv-map"]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+rust-version = "1.75"
+
+[profile.release]
+debug = 1

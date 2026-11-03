@@ -1,0 +1,12 @@
+[package]
+name = "dv-map"
+description = "Prints a UVM testbench's component tree, from dv-model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[dependencies]
+dv-model = { path = "../dv-model" }
+sv-slang = { path = "../sv-slang" }

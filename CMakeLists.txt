@@ -5,6 +5,19 @@ set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
+# The model facade is also built as a shared library (libuvmcheck_model) that
+# Rust and other tools load through its C ABI. Everything it links, slang
+# included, must then be position independent.
+# mimalloc is off in that build: slang links it statically, and a shared
+# library loaded into a host (Rust, Python) must not mix two allocators
+# (slang's own Python bindings turn it off for the same reason). The linter
+# CLI keeps both, so the default build leaves this OFF; use the "model" preset.
+option(UVMCHECK_BUILD_MODEL_LIB "Build the shared model library with a C ABI" OFF)
+if(UVMCHECK_BUILD_MODEL_LIB)
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+    set(SLANG_USE_MIMALLOC OFF CACHE BOOL "" FORCE)
+endif()
+
 # Enable compiler cache (ccache) if available to accelerate rebuilds
 find_program(CCACHE_PROGRAM ccache)
 if(CCACHE_PROGRAM)
@@ -20,7 +33,7 @@ set(CMAKE_JOB_POOL_LINK link_job_pool)
 
 # Compile options
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang|GNU")
-    add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter -fvisibility-inlines-hidden)
+    add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter $<$<COMPILE_LANGUAGE:CXX>:-fvisibility-inlines-hidden>)
 endif()
 
 # Disable unneeded slang targets to keep build fast
@@ -56,6 +69,7 @@ file(GLOB_RECURSE UVMCHECK_SOURCES
     src/plugins/*.cpp
     src/lsp/*.cpp
     src/compat/*.cpp
+    src/model/*.cpp
 )
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
@@ -128,6 +142,20 @@ add_executable(uvmcheck src/main.cpp)
 # library is linked in; otherwise the linker drops rule objects nothing references.
 target_link_libraries(uvmcheck PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,libuvmcheck>" slang::slang)
 set_target_properties(uvmcheck PROPERTIES OUTPUT_NAME "uvmcheck")
+
+# libuvmcheck_model: the slang-free design model (uvmcheck::model) behind a C
+# ABI, for Rust (rust/), Python and other DV tools. Only the C API is exported.
+if(UVMCHECK_BUILD_MODEL_LIB)
+    add_library(uvmcheck_model SHARED src/capi/CApi.cpp)
+    target_link_libraries(uvmcheck_model PRIVATE libuvmcheck slang::slang)
+    set_target_properties(uvmcheck_model PROPERTIES
+        CXX_VISIBILITY_PRESET hidden
+        VISIBILITY_INLINES_HIDDEN ON)
+    if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
+        # Keep slang's and the linter's symbols private to the library.
+        target_link_options(uvmcheck_model PRIVATE "LINKER:--exclude-libs,ALL")
+    endif()
+endif()
 
 # CTest Integration
 enable_testing()
@@ -279,3 +307,27 @@ add_test(
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 
+
+if(UVMCHECK_BUILD_MODEL_LIB)
+    # The model's C ABI, exercised from a C program.
+    enable_language(C)
+    add_executable(model_capi_smoke tests/model/capi_smoke.c)
+    target_include_directories(model_capi_smoke PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/include)
+    target_link_libraries(model_capi_smoke PRIVATE uvmcheck_model)
+    add_test(
+        NAME model_capi_test
+        COMMAND model_capi_smoke ${CMAKE_CURRENT_SOURCE_DIR}/tests/common
+                ${CMAKE_CURRENT_SOURCE_DIR}/tests/rules/oop/SV-OOP-007/bad.sv
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
+    )
+    # The Rust crates (rust/) against this build's library, when cargo is around.
+    find_program(CARGO_PROGRAM cargo)
+    if(CARGO_PROGRAM)
+        add_test(
+            NAME rust_model_test
+            COMMAND ${CMAKE_COMMAND} -E env UVMCHECK_BUILD_DIR=${CMAKE_CURRENT_BINARY_DIR}
+                    ${CARGO_PROGRAM} test --quiet --manifest-path ${CMAKE_CURRENT_SOURCE_DIR}/rust/Cargo.toml
+            WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/rust
+        )
+    endif()
+endif()

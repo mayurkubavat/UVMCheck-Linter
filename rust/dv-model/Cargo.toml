@@ -1,0 +1,11 @@
+[package]
+name = "dv-model"
+description = "Safe, owned model of a SystemVerilog/UVM design for DV tools"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[dependencies]
+sv-slang = { path = "../sv-slang" }
