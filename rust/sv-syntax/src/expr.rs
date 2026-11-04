@@ -105,6 +105,9 @@ pub(crate) fn expr_bp(p: &mut Parser, min_bp: u8, flags: Flags) -> Option<Comple
             lhs = m.complete(p, MatchExpr);
             continue;
         }
+        if crate::misc::ends_attribute(p) {
+            break;
+        }
         let Some((l, r)) = infix(op) else { break };
         if l < min_bp || (flags.no_implication && op == "->") {
             break;
@@ -356,6 +359,20 @@ fn postfix(p: &mut Parser, mut lhs: Completed) -> Completed {
                 p.expect("]");
                 lhs = m.complete(p, SelectExpr);
             }
+            "(" if p.nth(1) == "*" && p.joined(1) && p.nth(2) != ")" => {
+                // `f (* attr *) (args)`: attributes on a call.
+                let mut i = 2;
+                while !p.nth(i).is_empty() && !(p.nth(i) == "*" && p.nth(i + 1) == ")" && p.joined(i + 1)) {
+                    i += 1;
+                }
+                if p.nth(i + 2) != "(" {
+                    return lhs;
+                }
+                let m = lhs.precede(p);
+                attributes(p);
+                arg_list(p);
+                lhs = m.complete(p, CallExpr);
+            }
             "(" => {
                 let m = lhs.precede(p);
                 arg_list(p);
@@ -441,13 +458,13 @@ pub(crate) fn arg_list(p: &mut Parser) {
             if p.at("(") {
                 p.bump();
                 if !p.at(")") {
-                    type_or_expr(p);
+                    arg_value(p);
                 }
                 p.expect(")");
             }
         } else {
             let before = p.pos();
-            type_or_expr(p);
+            arg_value(p);
             if p.pos() == before {
                 a.complete(p, Arg);
                 // Recover: skip to the next separator.
@@ -464,6 +481,14 @@ pub(crate) fn arg_list(p: &mut Parser) {
     }
     p.expect(")");
     m.complete(p, ArgList);
+}
+
+/// An argument; checker and sequence actuals may be edge events.
+fn arg_value(p: &mut Parser) {
+    if p.at_any(&["posedge", "negedge", "edge"]) {
+        p.bump();
+    }
+    type_or_expr(p);
 }
 
 /// `#( values )` on a class or module name.

@@ -2,9 +2,8 @@
 // file (with what it includes), one per line, in a canonical form: each
 // binary, unary, conditional and inside expression is written in prefix
 // form, `(+ a (* b c))`, and everything else as its tokens without trivia.
-// "Top-level" means no operator expression above it. Regions the Rust
-// parser keeps as written (specify, UDPs, config, checkers, attributes,
-// randsequence, ...) are skipped. The reference for tools/cst_parity.py
+// "Top-level" means no operator expression above it. Attributes inside
+// an expression are left out. The reference for tools/cst_parity.py
 // --exprs.
 //
 //   uvmcheck_cst_exprs [+incdir+DIR]... [+define+NAME[=VALUE]]... FILE
@@ -29,21 +28,10 @@ bool isOp(SyntaxKind k) {
            InsideExpressionSyntax::isKind(k);
 }
 
-bool skipped(SyntaxKind k) {
-    switch (k) {
-        case SyntaxKind::SpecifyBlock:
-        case SyntaxKind::SpecparamDeclaration:
-        case SyntaxKind::UdpDeclaration:
-        case SyntaxKind::ConfigDeclaration:
-        case SyntaxKind::CheckerDeclaration:
-        case SyntaxKind::AttributeInstance:
-        case SyntaxKind::TimeUnitsDeclaration:
-        case SyntaxKind::NetTypeDeclaration:
-        case SyntaxKind::RandSequenceStatement:
-            return true;
-        default:
-            return false;
-    }
+// Kinds left out of the comparison while the Rust parser brings them up.
+// Empty since slice 4: every construct is compared.
+bool skipped(SyntaxKind) {
+    return false;
 }
 
 void canon(const SyntaxNode* n, std::string& s);
@@ -73,7 +61,10 @@ void plain(const SyntaxNode* n, std::string& s) {
 }
 
 void canon(const SyntaxNode* n, std::string& s) {
-    if (skipped(n->kind)) {
+    if (n->kind == SyntaxKind::AttributeInstance) {
+        // Attributes are left out of the canonical form.
+    }
+    else if (skipped(n->kind)) {
         plain(n, s);
     }
     else if (BinaryExpressionSyntax::isKind(n->kind)) {

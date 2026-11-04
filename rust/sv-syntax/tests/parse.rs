@@ -258,3 +258,197 @@ endclass
         ]
     );
 }
+
+#[test]
+fn slice4_matches_slang() {
+    // Specify blocks, UDPs, a checker, attributes, nettype, randsequence
+    // and a config; the expected lines are Slang's.
+    let src = r#"`timescale 1ns/1ps
+(* top_attr = 1 + 2, keep *)
+module dff (output reg q, input d, clk, rst, en);
+  specparam tRise = 1 + 1 : 2 * 2 : 3, tFall = 4;
+  specparam [7:0] w = 8'hff & 8'h0f;
+  (* full_case, parallel_case = 2 - 1 *)
+  always @(posedge clk) q <= d;
+  specify
+    specparam PATHPULSE$clk$q = (1, 2), tS = 2 + 1;
+    (clk => q) = (tRise, tFall);
+    (posedge clk => (q +: d)) = (1:2:3, 4:5:6);
+    (negedge rst *> q) = 3;
+    if (en == 1'b1) (d +=> q) = tS * 2;
+    if (!rst && en) (d -*> q) = 1;
+    ifnone (d => q) = 2;
+    (d, en *> q) = (1, 2, 3, 4, 5, 6);
+    $setup(d, posedge clk &&& (en == 1), tS + 1, ntfr);
+    $hold(posedge clk, d &&& en, 2);
+    $setuphold(posedge clk, d, 1, 2, ntfr, , , dclk, dd);
+    $width(negedge clk, 1:2:3);
+    $period(edge [01, 10] clk, 10);
+    $recrem(posedge rst, posedge clk, 1, 2);
+    pulsestyle_onevent q;
+    showcancelled q;
+  endspecify
+  nettype real rnet;
+endmodule
+
+primitive mux (out, sel, a, b);
+  output out;
+  input sel, a, b;
+  table
+    0 1 ? : 1 ;
+    0 0 ? : 0 ;
+    1 ? 1 : 1 ;
+    1 ? 0 : 0 ;
+    x 0 0 : 0 ;
+  endtable
+endprimitive
+
+primitive latch (q, clk, d);
+  output q; reg q;
+  input clk, d;
+  initial q = 1'b1;
+  table
+    // clk d : q : q+
+    r 0 : ? : 0 ;
+    (01) 1 : ? : 1 ;
+    f ? : ? : - ;
+    * ? : ? : - ;
+  endtable
+endprimitive : latch
+
+primitive ansi_udp (output reg q = 1'b0, input a, input b);
+  table
+    0 0 : ? : 0;
+    1 1 : ? : 1;
+  endtable
+endprimitive
+
+checker my_check (logic a, b, event clk = $global_clock);
+  default clocking @clk; endclocking
+  logic [1:0] cnt = a + b;
+  a1: assert property (a |-> ##1 b) else $error("x %0d", cnt + 1);
+  always_ff @clk cnt <= cnt + 1;
+  rand bit r;
+  cover property (r && a);
+endchecker : my_check
+
+module top;
+  logic a, b, clk;
+  my_check c1 (a, b, posedge clk);
+  int x;
+  function automatic int F(int w);
+    int y = 0;
+    randsequence (main)
+      main : first := 2 | rand join (0.5 + 0.1) second third := (w + 1) { y++; } | repeat (w - 1) fourth;
+      first : { y = y + 1; } fifth(3 + 4);
+      int second : { y = y * 2; return y + 1; };
+      third : if (w > 3 && y < 2) fourth else fifth(1) ;
+      fourth : case (w % 3)
+        0, 1 : first;
+        2 : third;
+        default : fifth(w);
+      endcase;
+      void fifth(int k) : { y += k << 1; };
+    endsequence
+    return y;
+  endfunction
+  initial x = F (* call_attr *) (5);
+  assign a = b ? (* cond_attr *) clk : ~clk;
+endmodule
+
+config cfg;
+  localparam W = 8;
+  design work.top;
+  default liblist work lib2;
+  instance top.c1 liblist lib3;
+  cell dff use lib2.dff;
+endconfig : cfg
+"#;
+    let t = parse(src);
+    assert!(t.errors.is_empty(), "{:?}", t.errors);
+    assert_eq!(t.file_text(0), src);
+    assert_eq!(lines(&t), ["module dff", "module top", "function F"]);
+    assert_eq!(
+        sv_syntax::canonical_exprs(&t),
+        [
+            r#"(+ 1 2)"#,
+            r#"(+ 1 1)"#,
+            r#"(* 2 2)"#,
+            r#"(& 8'hff 8'h0f)"#,
+            r#"(- 2 1)"#,
+            r#"(<= q d)"#,
+            r#"(+ 2 1)"#,
+            r#"(== en 1'b1)"#,
+            r#"(* tS 2)"#,
+            r#"(&& (! rst) en)"#,
+            r#"(== en 1)"#,
+            r#"(+ tS 1)"#,
+            r#"(+ a b)"#,
+            r#"(+ cnt 1)"#,
+            r#"(<= cnt (+ cnt 1))"#,
+            r#"(&& r a)"#,
+            r#"(+ 0.5 0.1)"#,
+            r#"(+ w 1)"#,
+            r#"(post++ y)"#,
+            r#"(- w 1)"#,
+            r#"(= y (+ y 1))"#,
+            r#"(+ 3 4)"#,
+            r#"(= y (* y 2))"#,
+            r#"(+ y 1)"#,
+            r#"(&& (> w 3) (< y 2))"#,
+            r#"(% w 3)"#,
+            r#"(+= y (<< k 1))"#,
+            r#"(= x F(5))"#,
+            r#"(= a (? b clk (~ clk)))"#,
+        ]
+    );
+    let kinds: Vec<SyntaxKind> = t.preorder().into_iter().map(|n| t.kind(n)).collect();
+    for k in [SyntaxKind::SpecifyBlock, SyntaxKind::PathDecl, SyntaxKind::TimingCheck, SyntaxKind::UdpDecl,
+              SyntaxKind::UdpTable, SyntaxKind::UdpInitial, SyntaxKind::ConfigDecl, SyntaxKind::Production,
+              SyntaxKind::RsWeight, SyntaxKind::RsRandJoin, SyntaxKind::RsCase, SyntaxKind::AttrSpec,
+              SyntaxKind::NetTypeDecl, SyntaxKind::CheckerDecl] {
+        assert!(kinds.contains(&k), "no {k:?}");
+    }
+}
+
+#[test]
+fn reports_what_slang_rejects() {
+    // Each source holds one error Slang's parser reports; none of them
+    // may be silent.
+    for src in [
+        "module m;\n  input clk;\nsyntaxerror\n  wire clk;\nendmodule\n",
+        "module m; endmodule : n\n",
+        "class c; task int t(); endtask endclass\n",
+        "class c; covergroup g; x: cross a; endgroup endclass\n",
+        "class d extends b; function new(); x = 1; super.new(); endfunction endclass\n",
+    ] {
+        let t = parse(src);
+        assert_eq!(t.errors.len(), 1, "{src}: {:?}", t.errors);
+        assert_eq!(t.file_text(0), src);
+    }
+    for src in [
+        "`pragma\n",
+        "`line 1 \"f\" 3\n",
+        "`line -1 \"f\" 0\n",
+        "`define define 1\n",
+        "`timescale 9ns/1ps\n",
+        "`timescale 1ns/10ns\n",
+        "`unconnected_drive pull2\n",
+        "module m;\n`resetall\nendmodule\n",
+        "package p;\n`default_nettype none\nendpackage\n",
+    ] {
+        let t = parse(src);
+        assert_eq!(t.pp_diagnostics.len(), 1, "{src}: {:?}", t.pp_diagnostics);
+    }
+    // And the legal forms stay quiet.
+    for src in [
+        "`timescale 100us / 1ps\n`pragma protect begin\n`line 3 \"x\" 0\n`resetall\nmodule m; endmodule\n`resetall\n",
+        "extern module x();\n`resetall\ninterface class ic; endclass\n`default_nettype wire\n",
+        "class d extends b; function new(); int x; super.new(); x = 1; endfunction endclass\n",
+        "module m; initial begin : a end : a\nalias x = y;\nif (1) $error(\"e\");\nendmodule : m\n",
+        "`celldefine module m; endmodule `endcelldefine\n",
+    ] {
+        let t = parse(src);
+        assert!(t.errors.is_empty() && t.pp_diagnostics.is_empty(), "{src}: {:?} {:?}", t.errors, t.pp_diagnostics);
+    }
+}

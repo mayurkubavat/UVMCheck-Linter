@@ -72,7 +72,7 @@ pub enum SyntaxKind {
     ModportDecl,
     BindDirective,
     LetDecl,
-    /// config, primitive, specify and other blocks kept as written.
+    /// A block kept as written (no longer produced; kept for callers).
     OtherBlock,
     /// Any other item, up to its `;`.
     OtherItem,
@@ -158,6 +158,60 @@ pub enum SyntaxKind {
     ClockingItem,
     /// `default disable iff expr;`
     DefaultDisable,
+
+    // Slice 4: the rarer items.
+    /// `name [= expr]` inside `(* ... *)`.
+    AttrSpec,
+    /// `nettype T name [with f];`
+    NetTypeDecl,
+    /// `alias a = b [= c];`
+    NetAlias,
+    /// `$error(...)`, `$fatal`, `$warning`, `$info` as an item.
+    ElabTask,
+    /// `specify ... endspecify`
+    SpecifyBlock,
+    /// `specparam ...;` (module item or in a specify block).
+    SpecparamDecl,
+    /// `(a => b) = d;` with an optional `if (c)` / `ifnone`.
+    PathDecl,
+    /// The parenthesized source and destination of a path.
+    PathSpec,
+    /// `= d` / `= (d1, d2)` of a path.
+    PathDelays,
+    /// `$setup(...)` and the other timing checks.
+    TimingCheck,
+    /// One argument of a timing check.
+    TimingCheckArg,
+    /// `pulsestyle_onevent`, `showcancelled` and friends.
+    SpecifyOther,
+    /// `primitive ... endprimitive`
+    UdpDecl,
+    /// A port declaration inside a UDP.
+    UdpPortDecl,
+    /// `initial q = v;` in a sequential UDP.
+    UdpInitial,
+    /// `table ... endtable`, kept as written.
+    UdpTable,
+    /// `config ... endconfig`
+    ConfigDecl,
+    /// `design`, `default`, `instance`, `cell` rules of a config.
+    ConfigRule,
+    /// A production of a randsequence: `[type] name [(ports)] : rules ;`
+    Production,
+    /// One alternative of a production, with its weight.
+    RsRule,
+    /// `:= weight [code]`
+    RsWeight,
+    /// `name [(args)]`
+    RsProdItem,
+    /// `{ statements }`
+    RsCodeBlock,
+    RsIfElse,
+    RsRepeat,
+    RsCase,
+    RsCaseItem,
+    /// `rand join [(expr)]`
+    RsRandJoin,
 
     // Expressions.
     BinaryExpr,

@@ -113,6 +113,14 @@ pub struct Preprocessor {
     sources: Vec<Rc<str>>,
     /// `begin_keywords versions in force, innermost last.
     keyword_versions: Vec<sv_lexer::KeywordVersion>,
+    /// Inside a module, interface, program or package (some directives
+    /// are not allowed there).
+    in_design_element: bool,
+    /// Text of the last token handed out, for `extern module` and
+    /// `interface class`.
+    last_text: Rc<str>,
+    /// The last token opened a design element.
+    just_opened: bool,
 }
 
 const STANDARD_MACROS: &[(&str, &str)] = &[
@@ -223,6 +231,9 @@ impl Preprocessor {
             paths: Vec::new(),
             sources: Vec::new(),
             keyword_versions: Vec::new(),
+            in_design_element: false,
+            last_text: empty(),
+            just_opened: false,
         };
         if pp.opts.max_include_depth == 0 {
             pp.opts.max_include_depth = 1024;
@@ -362,7 +373,9 @@ impl Preprocessor {
                             t.kind = Kind::Identifier;
                         }
                     }
+                    self.track_design_element(&t);
                 }
+                self.last_text = t.text.clone();
                 return Some(t);
             }
             let name = &t.text[1..];
@@ -425,9 +438,13 @@ impl Preprocessor {
                     }
                     self.rest_of_line();
                 }
-                _ if LINE_DIRECTIVES.contains(&name) => {
-                    self.rest_of_line();
+                "resetall" | "nounconnected_drive" | "default_nettype" | "unconnected_drive"
+                    if self.in_design_element =>
+                {
+                    self.diag(t.origin, format!("`{name} inside a design element"));
+                    self.directive_args(&t, name);
                 }
+                _ if LINE_DIRECTIVES.contains(&name) => self.directive_args(&t, name),
                 _ => {
                     if let Some(m) = self.macros.get(name).cloned() {
                         self.expand(&t, name, &m);
@@ -444,6 +461,71 @@ impl Preprocessor {
         }
     }
 
+    /// Module, interface, program and package bodies, at the outer level
+    /// only (nested modules are rare and only make this more lenient).
+    fn track_design_element(&mut self, t: &T) {
+        let just_opened = std::mem::take(&mut self.just_opened);
+        match &*t.text {
+            "module" | "macromodule" | "program" | "package" | "interface"
+                if !self.in_design_element && !matches!(&*self.last_text, "extern" | "virtual") =>
+            {
+                self.in_design_element = true;
+                self.just_opened = true;
+            }
+            "class" if just_opened && &*self.last_text == "interface" => self.in_design_element = false,
+            "endmodule" | "endprogram" | "endpackage" | "endinterface" => self.in_design_element = false,
+            _ => {}
+        }
+    }
+
+    /// Arguments of the directives that are checked and dropped. Those
+    /// without arguments leave the rest of the line to the parser, as
+    /// Slang does.
+    fn directive_args(&mut self, d: &T, name: &str) {
+        match name {
+            "resetall" | "celldefine" | "endcelldefine" | "nounconnected_drive" | "delay_mode_distributed"
+            | "delay_mode_path" | "delay_mode_unit" | "delay_mode_zero" => {}
+            "default_nettype" | "default_decay_time" | "default_trireg_strength" => {
+                if self.line_next().is_none() {
+                    self.diag(d.origin, format!("`{name} needs a value"));
+                }
+            }
+            "unconnected_drive" => {
+                if !self.line_next().is_some_and(|t| matches!(&*t.text, "pull0" | "pull1")) {
+                    self.diag(d.origin, "`unconnected_drive needs pull0 or pull1".into());
+                }
+            }
+            "pragma" => {
+                let rest = self.rest_of_line();
+                if !rest.first().is_some_and(|t| matches!(t.kind, Kind::Identifier | Kind::Keyword)) {
+                    self.diag(d.origin, "`pragma needs a name".into());
+                }
+            }
+            "line" => {
+                let rest = self.rest_of_line();
+                let ok = rest.len() == 3
+                    && rest[0].kind == Kind::IntegerLiteral
+                    && rest[1].kind == Kind::StringLiteral
+                    && matches!(&*rest[2].text, "0" | "1" | "2");
+                if !ok {
+                    self.diag(d.origin, "`line needs a line number, a \"file\" and a level 0, 1 or 2".into());
+                }
+            }
+            "timescale" => {
+                let rest = self.rest_of_line();
+                if rest.iter().all(|t| t.kind != Kind::Directive) {
+                    let spec: String = rest.iter().map(|t| &*t.text).collect();
+                    if let Some(msg) = timescale_error(&spec) {
+                        self.diag(d.origin, msg);
+                    }
+                }
+            }
+            _ => {
+                self.rest_of_line();
+            }
+        }
+    }
+
     fn line_of(&self, o: Origin) -> usize {
         let src = &self.sources[o.file as usize];
         1 + src.as_bytes()[..(o.offset as usize).min(src.len())].iter().filter(|&&b| b == b'\n').count()
@@ -456,6 +538,9 @@ impl Preprocessor {
             self.diag(d.origin, "`define without a name".into());
             return;
         };
+        if is_directive_name(&name.text) {
+            self.diag(name.origin, format!("`{} is a directive and cannot be a macro name", name.text));
+        }
         let mut params = None;
         if self.line_peek().is_some_and(|t| &*t.text == "(" && !t.space_before) {
             self.line_next();
@@ -690,19 +775,19 @@ impl Preprocessor {
     fn resolve_include(&self, name: &str, angle: bool) -> Option<PathBuf> {
         let p = Path::new(name);
         if p.is_absolute() {
-            return p.is_file().then(|| p.to_path_buf());
+            return includable(p).then(|| p.to_path_buf());
         }
         if !angle {
             if let Some(f) = self.current_file() {
                 if let Some(dir) = self.paths[f as usize].parent() {
                     let c = dir.join(p);
-                    if c.is_file() {
+                    if includable(&c) {
                         return Some(c);
                     }
                 }
             }
         }
-        self.opts.include_dirs.iter().map(|d| d.join(p)).find(|c| c.is_file())
+        self.opts.include_dirs.iter().map(|d| d.join(p)).find(|c| includable(c))
     }
 
     // ---- macro expansion --------------------------------------------------
@@ -970,4 +1055,54 @@ mod tests {
     fn multi_line_define_and_undef() {
         assert_eq!(pp("`define M(a) \\\n  begin \\\n    a; \\\n  end\n`M(x)\n`undef M\n`ifdef M y `endif"), ["begin", "x", ";", "end"]);
     }
+}
+
+/// A file `include can read: anything but a directory, so device files
+/// such as `/dev/null` work too.
+fn includable(p: &Path) -> bool {
+    p.exists() && !p.is_dir()
+}
+
+/// Checks `1ns / 1ps`: magnitudes 1, 10 or 100, precision no coarser than
+/// the unit.
+fn timescale_error(spec: &str) -> Option<String> {
+    const UNITS: &[&str] = &["fs", "ps", "ns", "us", "ms", "s"];
+    let value = |s: &str| -> Option<i32> {
+        let digits = s.find(|c: char| !c.is_ascii_digit())?;
+        let mag = match &s[..digits] {
+            "1" => 0,
+            "10" => 1,
+            "100" => 2,
+            _ => return None,
+        };
+        let unit = UNITS.iter().position(|u| *u == &s[digits..])? as i32;
+        Some(unit * 3 + mag)
+    };
+    let Some((unit, prec)) = spec.split_once('/') else {
+        return Some("`timescale needs unit / precision".into());
+    };
+    match (value(unit), value(prec)) {
+        (Some(u), Some(p)) if p > u => Some("`timescale precision is coarser than its unit".into()),
+        (Some(_), Some(_)) => None,
+        _ => Some(format!("invalid `timescale {spec}")),
+    }
+}
+
+fn is_directive_name(s: &str) -> bool {
+    matches!(
+        s,
+        "define"
+            | "undef"
+            | "undefineall"
+            | "ifdef"
+            | "ifndef"
+            | "elsif"
+            | "else"
+            | "endif"
+            | "include"
+            | "begin_keywords"
+            | "end_keywords"
+            | "__FILE__"
+            | "__LINE__"
+    ) || LINE_DIRECTIVES.contains(&s)
 }

@@ -8,10 +8,12 @@
 
 mod assertions;
 mod blocks;
+mod checks;
 mod expr;
 mod exprs;
 mod grammar;
 mod kinds;
+mod misc;
 mod outline;
 mod parser;
 mod tree;
@@ -45,5 +47,10 @@ pub fn parse_output(out: sv_preproc::Output) -> Tree {
     let events = std::mem::take(&mut p.events);
     drop(p);
     let (nodes, root) = parser::build(events);
-    Tree { tokens, nodes, root, files: out.files, sources: out.sources, errors, pp_diagnostics: out.diagnostics }
+    let mut tree =
+        Tree { tokens, nodes, root, files: out.files, sources: out.sources, errors, pp_diagnostics: out.diagnostics };
+    let mut more = checks::run(&tree);
+    tree.errors.append(&mut more);
+    tree.errors.sort_by_key(|e| e.token);
+    tree
 }

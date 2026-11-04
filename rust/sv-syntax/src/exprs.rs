@@ -14,14 +14,9 @@ fn is_op(k: SyntaxKind) -> bool {
 }
 
 fn skipped(k: SyntaxKind) -> bool {
-    matches!(
-        k,
-        OtherBlock
-            | Attribute
-            | TimeunitDecl
-            | RandSequenceStmt
-            | CheckerDecl
-    )
+    // Nothing is skipped any more; kept so the gate can exclude a kind
+    // again while a construct is being brought up.
+    matches!(k, OtherBlock)
 }
 
 pub fn canonical_exprs(tree: &Tree) -> Vec<String> {
@@ -113,6 +108,7 @@ fn canon(tree: &Tree, n: NodeId, s: &mut String) {
         _ => {
             for c in &tree.node(n).children {
                 match *c {
+                    Child::Node(x) if tree.kind(x) == Attribute => {}
                     Child::Node(x) => canon(tree, x, s),
                     Child::Token(t) => s.push_str(text(t)),
                 }

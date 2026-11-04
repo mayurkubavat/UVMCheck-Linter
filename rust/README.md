@@ -157,3 +157,23 @@ these: uvm-core (8,972 expressions), all 849 clean sv-tests files and all
 772 clean repo test inputs are identical to Slang with no parse errors.
 Still kept as written: specify blocks, UDPs, config, checkers, attribute
 contents, nettype and randsequence (slice 4).
+
+Slice 4 (2026-11-04) parses the rest: specify blocks (specparams, path
+delays with edges, polarity and conditions, system timing checks), UDPs
+(ports, `initial`, tables), configs, checkers, attribute contents,
+`nettype`, net `alias`, elaboration tasks (`$error` and friends as items)
+and randsequence (productions, weights, `rand join`, `if`/`repeat`/`case`
+items, code blocks). Nothing is left out of the gates any more: Slang's
+side of `tools/cst_exprs.cpp` skips nothing, and uvm-core, the 849 clean
+sv-tests files and the 772 clean repo inputs still match.
+
+It also reports what Slang's parser rejects. The preprocessor checks
+`` `line ``, `` `pragma ``, `` `timescale `` values, `` `unconnected_drive ``,
+directives that are not allowed inside a module, interface, program or
+package, and macro names that are directives. After parsing, `checks.rs`
+reports end labels that do not match, tasks with a return type, crosses
+of one item and a `super.new` after other statements. On sv-tests every
+file Slang's parser rejects (128, including the should-fail tests) is
+rejected and no other file is; the same holds for the repo's inputs. The
+outline example prints preprocessor diagnostics with `--errors` and the
+tree with `--dump`.

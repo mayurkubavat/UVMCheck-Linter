@@ -44,17 +44,7 @@ fn stray(p: &mut Parser) {
 }
 
 pub(crate) fn attributes(p: &mut Parser) {
-    while p.at("(") && p.nth(1) == "*" && p.joined(1) {
-        let m = p.start();
-        p.bump();
-        p.bump();
-        while !p.at_end() && !(p.at("*") && p.nth(1) == ")" && p.joined(1)) {
-            p.bump();
-        }
-        p.bump();
-        p.bump();
-        m.complete(p, Attribute);
-    }
+    crate::misc::attributes(p);
 }
 
 /// Consumes one balanced group starting at an opening bracket.
@@ -105,14 +95,6 @@ pub(crate) fn to_semi(p: &mut Parser) {
 }
 
 /// Consumes tokens until `end_kw` (inclusive) with an optional end label.
-pub(crate) fn to_end_keyword(p: &mut Parser, end_kw: &str) {
-    while !p.at_end() && !p.at(end_kw) {
-        p.bump();
-    }
-    p.expect(end_kw);
-    end_label(p);
-}
-
 pub(crate) fn end_label(p: &mut Parser) {
     if p.at(":") && p.nth(1) != ":" {
         let m = p.start();
@@ -239,9 +221,13 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
             p.expect(";");
             ParamDecl
         }
-        "specparam" => {
-            to_semi(p);
-            OtherItem
+        "specparam" => crate::misc::specparam(p),
+        "nettype" => crate::misc::nettype(p),
+        "alias" => crate::misc::net_alias(p),
+        "$fatal" | "$error" | "$warning" | "$info" => {
+            expr(p);
+            p.expect(";");
+            ElabTask
         }
         "timeunit" | "timeprecision" => {
             to_semi(p);
@@ -302,9 +288,9 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
             crate::assertions::default_disable(p);
             DefaultDisable
         }
-        "config" => other_block(p, "endconfig"),
-        "primitive" => other_block(p, "endprimitive"),
-        "specify" => other_block(p, "endspecify"),
+        "config" => crate::misc::config(p),
+        "primitive" => crate::misc::udp(p),
+        "specify" => crate::misc::specify(p),
         "generate" => {
             p.bump();
             while !p.at_end() && !p.at("endgenerate") && !at_foreign_end(p, "endgenerate") {
@@ -399,6 +385,8 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
                 data_decl(p);
                 return Some(DataDecl);
             }
+            // Nothing else starts an item here.
+            p.error(format!("unexpected `{}`; expected an item", p.cur()));
             to_semi(p);
             OtherItem
         }
@@ -432,12 +420,6 @@ fn generate_block_inner(p: &mut Parser) {
     p.expect("end");
     end_label(p);
 }
-
-fn other_block(p: &mut Parser, end_kw: &str) -> SyntaxKind {
-    to_end_keyword(p, end_kw);
-    OtherBlock
-}
-
 
 /// module / interface / program / checker / package.
 fn unit(p: &mut Parser, end_kw: &str, kind: SyntaxKind) -> SyntaxKind {
@@ -973,7 +955,7 @@ fn declarator(p: &mut Parser) {
 }
 
 /// `parameter|localparam [type] name = value {, ...} ;`, also `type` params.
-fn param_decl(p: &mut Parser) {
+pub(crate) fn param_decl(p: &mut Parser) {
     p.bump();
     if p.eat("type") {
         loop {
@@ -1322,10 +1304,7 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
             p.expect(";");
             ProcAssign
         }
-        "randsequence" => {
-            to_end_keyword(p, "endsequence");
-            RandSequenceStmt
-        }
+        "randsequence" => crate::misc::randsequence(p),
         "typedef" => typedef(p),
         "parameter" | "localparam" => {
             param_decl(p);

@@ -4,13 +4,13 @@
 //! With --exprs, prints the canonical operator expressions instead
 //! (the form of build/uvmcheck_cst_exprs).
 //!
-//!     cargo run --release -p sv-syntax --example outline -- [+incdir+DIR]... [+define+X[=V]]... [--check] [--errors] FILE
+//!     cargo run --release -p sv-syntax --example outline -- [+incdir+DIR]... [+define+X[=V]]... [--check] [--errors] [--exprs] [--dump] FILE
 use std::path::PathBuf;
 
 fn main() {
     let mut opts = sv_syntax::Options::default();
     let mut file = None;
-    let (mut check, mut show_errors, mut exprs) = (false, false, false);
+    let (mut check, mut show_errors, mut exprs, mut dump) = (false, false, false, false);
     for a in std::env::args().skip(1) {
         if let Some(d) = a.strip_prefix("+incdir+") {
             opts.include_dirs.push(PathBuf::from(d));
@@ -20,6 +20,8 @@ fn main() {
             check = true;
         } else if a == "--exprs" {
             exprs = true;
+        } else if a == "--dump" {
+            dump = true;
         } else if a == "--errors" {
             show_errors = true;
         } else {
@@ -31,6 +33,9 @@ fn main() {
     let tree = sv_syntax::parse_file(&file, opts);
     let ms = t.elapsed().as_secs_f64() * 1e3;
     let mut s = String::new();
+    if dump {
+        eprint!("{}", tree.debug_dump());
+    }
     if exprs {
         for e in sv_syntax::canonical_exprs(&tree) {
             s.push_str(&e);
@@ -47,6 +52,12 @@ fn main() {
     print!("{s}");
     println!("errors {}", tree.errors.len());
     if show_errors {
+        for d in &tree.pp_diagnostics {
+            let src = &tree.sources[d.origin.file as usize];
+            let line = 1 + src[..(d.origin.offset as usize).min(src.len())].matches('\n').count();
+            eprintln!("{}:{}: preprocessor: {}", tree.files[d.origin.file as usize].display(), line, d.message);
+        }
+        eprintln!("pp errors {}", tree.pp_diagnostics.len());
         for e in &tree.errors {
             let (f, off) = tree.tokens.get(e.token as usize).map_or((0, 0), |t| (t.origin.file, t.origin.offset));
             let src = &tree.sources[f as usize];
