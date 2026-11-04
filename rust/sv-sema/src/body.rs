@@ -385,7 +385,7 @@ impl<'t> Builder<'t> {
     }
 
     /// Whether a data type names a type declared nowhere.
-    fn undeclared_type(&self, d: NodeRef) -> bool {
+    pub(crate) fn undeclared_type(&self, d: NodeRef) -> bool {
         let toks = self.tokens(d);
         let t = &self.trees[d.tree].tokens;
         let Some(&first) = toks.first() else {

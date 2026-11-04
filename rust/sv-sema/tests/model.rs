@@ -106,3 +106,45 @@ fn bodies_slang_rejects_keep_only_timing() {
     assert!(g.calls.is_empty() && g.timing_controls.len() == 1);
     assert!(method(&d, "c", "t").calls.is_empty());
 }
+
+#[test]
+fn type_strings_as_slang_prints_them() {
+    let d = design(
+        "localparam int W = 8;\n\
+         typedef enum logic [3:0] {P0, P1 = 4'hA, P2} pe_t;\n\
+         package p; typedef logic [W-1:0] w_t; endpackage\n\
+         class box #(type T = int, int N = 2); T t; endclass\n\
+         class c;\n\
+           int unsigned a; logic signed [W-1:0] b; int q[$]; int m[string]; bit [3:0] f[3];\n\
+           p::w_t w; box #(string, 3) bx; box dflt; mailbox mb;\n\
+           function pe_t g(pe_t e, p::w_t x); endfunction\n\
+         endclass\n",
+    );
+    let c = d.find_class("c").unwrap();
+    let ty = |n: &str| {
+        c.properties
+            .iter()
+            .find(|p| p.name == n)
+            .unwrap()
+            .ty
+            .clone()
+    };
+    assert_eq!(ty("a"), "int unsigned");
+    assert_eq!(ty("b"), "logic signed[7:0]");
+    assert_eq!(ty("q"), "int$[$]");
+    assert_eq!(ty("m"), "int$[string]");
+    assert_eq!(ty("f"), "bit[3:0]$[0:2]");
+    assert_eq!(ty("w"), "p::w_t");
+    assert_eq!(ty("bx"), "box#(string,3)");
+    assert_eq!(ty("dflt"), "box#(int,2)");
+    assert_eq!(ty("mb"), "mailbox#(untyped)");
+    let g = method(&d, "c", "g");
+    assert_eq!(g.return_type, "pe_t");
+    assert_eq!(
+        g.arguments[0].canonical_type,
+        "enum{P0=4'd0,P1=4'd10,P2=4'd11}pe_t"
+    );
+    assert_eq!(g.arguments[1].canonical_type, "logic[7:0]");
+    let bx = d.find_class("box").unwrap();
+    assert_eq!(bx.properties[0].ty, "box::T");
+}

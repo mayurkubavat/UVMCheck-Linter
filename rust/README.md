@@ -237,12 +237,38 @@ Slang rejects for type errors sv-sema does not check (a downcast without
 `$cast`, a reversed part select, a wrong array literal size, a blocking
 write to a clocking output, an undeclared identifier, a redefined class),
 plus one argument location inside a stringified macro argument. On
-uvm_pkg.sv 22 call and 3 assignment lines differ: representative
+uvm_pkg.sv 16 call and 3 assignment lines differ (22 before slice 3): representative
 specializations again, arguments of nested macros (Slang places them in
 the inner `define), and receivers that start with a macro use. The
 representative specialization Slang picks varies from run to run, so the
 number of differing argument lines moves between about 20 and 50.
 
-Type strings (`--types`) are next: Slang's canonical form spells out enum
-values and parameter-dependent widths, so it needs constant evaluation.
+Slice 3 (2026-11-04) adds type strings (`types.rs`): property, argument,
+local and return types as Slang's `Type::toString` prints them, and each
+argument's canonical type. Builtins keep only the signing that differs
+from the default (`int unsigned`, `bit signed`); packed and unpacked
+bounds are evaluated (`logic[W-1:0]` prints `logic[7:0]`, `x[3]` prints
+`$[0:2]`); typedefs and type parameters print with their scope path
+(`uvm_pkg::uvm_queue::T`); classes print as `name#(args)` with value
+arguments in Slang's number format; virtual interfaces as `ifc.mp` or
+`ifc#(W=8)`; canonical types expand the alias chain, enums with every
+value (`enum{A=32'sd0,...}e_t`). A small constant evaluator covers
+literals, parameters (with specialization bindings), enum members,
+operators, `$clog2` and `$bits`. Representative specializations are now
+chosen by their full printed form, value arguments included, which also
+narrowed the body and class gaps.
+
+```
+tools/model_parity.py --types --uvm UVM_SRC
+tools/model_parity.py --types --repo UVM_SRC
+```
+
+Measured 2026-11-04 with `--types`: 762 of the 783 repo inputs are
+identical. Of the other 21, 20 differ only in the index Slang gives an
+anonymous struct type (`s$5`), a global counter in the order it happens to
+create them, and one uses a class before declaring it, which Slang rejects
+as `<error>`. On uvm_pkg.sv about 90 of 12,324 lines differ (it varies run
+to run with Slang's representative choice), all in arguments typed through
+nested generic classes, plus the anonymous type indices.
+
 Classes declared inside modules are not compared yet.

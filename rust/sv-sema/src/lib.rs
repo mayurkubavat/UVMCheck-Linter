@@ -19,6 +19,7 @@ use dv_model::{
 use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
 mod body;
+mod types;
 use SyntaxKind::*;
 
 /// Loads and models a design from compile options, as `Design::load` does.
@@ -124,6 +125,8 @@ struct Scope {
     type_params: HashMap<String, Option<NodeRef>>,
     /// Variables and subroutines of a package or the unit.
     values: HashMap<String, Member>,
+    /// Parameters and localparams (value ones): data type and value.
+    consts: HashMap<String, (Option<NodeRef>, Option<NodeRef>)>,
 }
 
 struct ClassDef {
@@ -195,6 +198,8 @@ struct Builder<'t> {
     /// anything else is an error to slang.
     type_names: HashSet<String>,
     sub_names: HashSet<String>,
+    /// Interface declarations by name (virtual interface types).
+    interfaces: HashMap<String, NodeRef>,
     /// The specialization slang reads a parameterized class's members
     /// from: the one that prints first, as its type arguments.
     rep_env: HashMap<usize, Env>,
@@ -215,6 +220,7 @@ impl<'t> Builder<'t> {
             imports: Vec::new(),
             type_params: HashMap::new(),
             values: HashMap::new(),
+            consts: HashMap::new(),
         };
         Builder {
             trees,
@@ -226,6 +232,7 @@ impl<'t> Builder<'t> {
             used_names: HashSet::new(),
             type_names: HashSet::new(),
             sub_names: HashSet::new(),
+            interfaces: HashMap::new(),
             rep_env: HashMap::new(),
             node_scope: HashMap::new(),
             // Index 0 is "no file", as in slang's model.
@@ -240,6 +247,15 @@ impl<'t> Builder<'t> {
             for id in t.preorder() {
                 let r = NodeRef { tree: ti, node: id };
                 let k = t.kind(id);
+                if k == InterfaceDecl {
+                    if let Some(n) = t.child(id, Name) {
+                        if let Some(&tok) = t.token_range(n).last() {
+                            self.interfaces
+                                .entry(t.tokens[tok as usize].text.to_string())
+                                .or_insert(r);
+                        }
+                    }
+                }
                 let set = match k {
                     ClassDecl | TypedefDecl | ForwardTypedef | InterfaceDecl | ModuleDecl
                     | ProgramDecl | CovergroupDecl | PackageDecl | NetTypeDecl | CheckerDecl => {
@@ -361,6 +377,7 @@ impl<'t> Builder<'t> {
             imports: Vec::new(),
             type_params: HashMap::new(),
             values: HashMap::new(),
+            consts: HashMap::new(),
         });
         self.scopes.len() - 1
     }
@@ -404,6 +421,7 @@ impl<'t> Builder<'t> {
                     }
                 }
                 ImportDecl => self.collect_import(c, scope),
+                ParamDecl => self.collect_consts(c, scope),
                 FunctionDecl | TaskDecl => {
                     // `function T C::f(...)`: an out-of-block body.
                     if let Some(n) = self.child(c, Name) {
@@ -442,6 +460,26 @@ impl<'t> Builder<'t> {
                     }
                 }
                 _ => {}
+            }
+        }
+    }
+
+    /// `localparam int A = 1, B = A + 1;`
+    fn collect_consts(&mut self, r: NodeRef, scope: usize) {
+        if self.own_tokens(r).contains(&"type") {
+            return;
+        }
+        let dt = self.child(r, DataType);
+        for d in self.children(r) {
+            if self.kind(d) != Declarator {
+                continue;
+            }
+            if let Some((n, _)) = self.name_of(d) {
+                let v = self
+                    .children(d)
+                    .into_iter()
+                    .find(|c| !matches!(self.kind(*c), Name | Dim));
+                self.scopes[scope].consts.entry(n).or_insert((dt, v));
             }
         }
     }
@@ -522,6 +560,9 @@ impl<'t> Builder<'t> {
                     let Some(pname) = pname else { continue };
                     if sticky_type {
                         self.scopes[own].type_params.insert(pname.clone(), default);
+                    } else {
+                        let dt = self.child(p, DataType);
+                        self.scopes[own].consts.insert(pname.clone(), (dt, default));
                     }
                     params.push((pname, sticky_type, default));
                 }
@@ -582,6 +623,7 @@ impl<'t> Builder<'t> {
                         self.scopes[own].typedefs.insert(n, c);
                     }
                 }
+                ParamDecl => self.collect_consts(c, own),
                 _ => {}
             }
         }
@@ -895,41 +937,7 @@ impl<'t> Builder<'t> {
 
     /// A specialization as slang prints it: `name#(arg,...)`.
     fn print_class(&self, c: usize, env: &Env, depth: usize) -> String {
-        let def = &self.classes[c];
-        let mut s = def.name.clone();
-        if !def.generic {
-            return s;
-        }
-        s.push_str("#(");
-        for (k, (name, is_type, default)) in def.params.iter().enumerate() {
-            if k > 0 {
-                s.push(',');
-            }
-            if *is_type {
-                let printed = match env.get(name) {
-                    Some(b) => self.print_type(b.node, b.scope, &b.env, depth + 1),
-                    None => default.map_or(String::new(), |d| {
-                        self.print_type(d, def.parent, &Env::default(), depth + 1)
-                    }),
-                };
-                s.push_str(&printed);
-            } else if let Some(d) = default {
-                s.push_str(&self.tree(*d).bare_text(d.node));
-            }
-        }
-        s.push(')');
-        s
-    }
-
-    fn print_type(&self, node: NodeRef, scope: usize, env: &Env, depth: usize) -> String {
-        if depth > 16 {
-            return String::new();
-        }
-        let info = self.resolve_env(node, scope, env, depth + 1);
-        match info.resolved {
-            Resolved::Class(c) => self.print_class(c, &info.args, depth + 1),
-            _ => self.tree(node).bare_text(node.node),
-        }
+        self.class_string(c, env, depth)
     }
 
     // ---- lookup -----------------------------------------------------------
@@ -1209,7 +1217,7 @@ impl<'t> Builder<'t> {
             let Some(value) = self.children(a).into_iter().next() else {
                 continue;
             };
-            if params.iter().any(|p| p.0 == name && p.1) {
+            if params.iter().any(|p| p.0 == name) {
                 map.insert(
                     name,
                     Bound {
@@ -1411,7 +1419,7 @@ impl<'t> Builder<'t> {
                         let loc = self.loc(m.tree, t);
                         class.properties.push(Property {
                             name: n,
-                            ty: String::new(),
+                            ty: "<unnamed covergroup>".into(),
                             type_class: None,
                             visibility: Visibility::Public,
                             is_static: false,
@@ -1488,9 +1496,10 @@ impl<'t> Builder<'t> {
             let loc = self.loc(decl.tree, t);
             // An array of class handles is not a class.
             let array = array_type || self.child(decl, Dim).is_some();
+            let ty = self.type_string(self.child(d, DataType), Some(decl), scope, env, false);
             out.push(Property {
                 name,
-                ty: String::new(),
+                ty,
                 type_class: if array {
                     None
                 } else {
@@ -1547,6 +1556,14 @@ impl<'t> Builder<'t> {
         } else {
             PhaseKind::None
         };
+        let return_type = if is_task || name == "new" {
+            "void".to_string()
+        } else {
+            let dt = self
+                .child(body, ReturnType)
+                .and_then(|r| self.child(r, DataType));
+            self.type_string(dt, None, scope, env, false)
+        };
         let arguments = self.arguments(body, scope, env, ids);
         let locals = self.locals(body, scope, env);
         let facts = self.body_facts(decl, body, c, env, &name);
@@ -1561,7 +1578,7 @@ impl<'t> Builder<'t> {
             declared_virtual,
             is_builtin: false,
             is_extern,
-            return_type: String::new(),
+            return_type,
             returns_void,
             loc,
             arguments,
@@ -1664,8 +1681,8 @@ impl<'t> Builder<'t> {
             };
             out.push(Argument {
                 name,
-                ty: String::new(),
-                canonical_type: String::new(),
+                ty: self.type_string(ty, Some(decl), scope, env, false),
+                canonical_type: self.type_string(ty, Some(decl), scope, env, true),
                 type_class,
                 direction: dir,
                 shape,
@@ -1693,9 +1710,11 @@ impl<'t> Builder<'t> {
                 }
                 if let Some((name, t)) = self.name_of(decl) {
                     let loc = self.loc(decl.tree, t);
+                    let ty =
+                        self.type_string(self.child(d, DataType), Some(decl), scope, env, false);
                     out.push(Local {
                         name,
-                        ty: String::new(),
+                        ty,
                         is_virtual_interface: vif,
                         loc,
                     });
@@ -1790,6 +1809,11 @@ fn classify(chain: &[&str]) -> UvmKind {
 /// Built-in class methods (IEEE 1800 18.5-18.13). Interface classes get
 /// all but rand_mode and constraint_mode, as in Slang.
 fn add_builtins(methods: &mut Vec<Method>, is_interface: bool) {
+    let arg_ty = |a: &str| match a {
+        "seed" => "int",
+        "state" => "string",
+        _ => "bit",
+    };
     let builtin = |name: &str, virt: bool, void: bool, arg: Option<&str>| Method {
         name: name.to_string(),
         visibility: Visibility::Public,
@@ -1801,14 +1825,19 @@ fn add_builtins(methods: &mut Vec<Method>, is_interface: bool) {
         declared_virtual: virt,
         is_builtin: true,
         is_extern: false,
-        return_type: String::new(),
+        return_type: match name {
+            "randomize" => "int",
+            "get_randstate" => "string",
+            _ => "void",
+        }
+        .to_string(),
         returns_void: void,
         loc: Loc::default(),
         arguments: arg
             .map(|a| Argument {
                 name: a.to_string(),
-                ty: String::new(),
-                canonical_type: String::new(),
+                ty: arg_ty(a).to_string(),
+                canonical_type: arg_ty(a).to_string(),
                 type_class: None,
                 direction: Direction::In,
                 shape: TypeShape::Other,
