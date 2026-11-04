@@ -452,3 +452,27 @@ fn reports_what_slang_rejects() {
         assert!(t.errors.is_empty() && t.pp_diagnostics.is_empty(), "{src}: {:?} {:?}", t.errors, t.pp_diagnostics);
     }
 }
+
+/// Token ranges come from precomputed spans; they must equal a walk of the
+/// node's children.
+#[test]
+fn token_ranges_match_a_walk() {
+    fn walk(t: &Tree, id: sv_syntax::NodeId, out: &mut Vec<u32>) {
+        for c in &t.node(id).children {
+            match *c {
+                sv_syntax::Child::Token(k) => out.push(k),
+                sv_syntax::Child::Node(n) => walk(t, n, out),
+            }
+        }
+    }
+    let t = parse(
+        "`define M(x) x + 1\nclass c extends b #(int); int q[$]; function int f(int a); return `M(a); endfunction\n\
+         task t(); fork #1; join_none endtask constraint k { q.size() < 4; } endclass\nmodule m; wire w = (; endmodule\n",
+    );
+    for id in t.preorder() {
+        let mut want = Vec::new();
+        walk(&t, id, &mut want);
+        assert_eq!(t.token_range(id), want);
+        assert_eq!(t.token_bounds(id), want.first().map(|&f| (f, *want.last().unwrap())));
+    }
+}

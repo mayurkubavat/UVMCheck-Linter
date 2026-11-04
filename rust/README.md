@@ -304,3 +304,13 @@ Measured 2026-11-04 on the native model: all 783 repo compiles are identical
 (465 findings; every one of the 27 rules fires at least once). On uvm_pkg.sv
 150 of 152 findings match; the other 2 are SV-PRF-001 messages that print an
 anonymous struct type with Slang's `s$N` index.
+
+Slice 5 (2026-11-04) made the native load faster without changing any gate.
+Most of the cost was in placing locations: each one counted newlines from the
+start of its file. Line starts are now indexed once per file. Each tree node
+also records its token span, so taking a node's tokens no longer walks the
+node, and per-class lookups (base classes, base chains, virtual methods) are
+remembered. On uvm_pkg.sv, best of 7 runs, the model build went from about
+730 ms to about 165 ms; parsing takes about 125 ms. Through Slang, the same
+load takes about 80 ms to parse, 160 ms to elaborate and 50 ms to build the
+model. `dv-lint --time` prints these stage times.

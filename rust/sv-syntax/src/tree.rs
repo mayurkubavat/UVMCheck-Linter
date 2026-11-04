@@ -59,6 +59,10 @@ pub struct Tree {
     pub sources: Vec<Rc<str>>,
     pub errors: Vec<SyntaxError>,
     pub pp_diagnostics: Vec<sv_preproc::Diagnostic>,
+    /// Per node: its first token and token count when its tokens are one
+    /// contiguous run (always, for trees the parser builds); `None` makes
+    /// `token_range` walk the node instead.
+    pub(crate) spans: Vec<Option<(u32, u32)>>,
 }
 
 impl Tree {
@@ -83,9 +87,85 @@ impl Tree {
 
     /// Token indices under a node, in order.
     pub fn token_range(&self, id: NodeId) -> Vec<u32> {
+        if let Some(&Some((first, len))) = self.spans.get(id.0 as usize) {
+            return (first..first + len).collect();
+        }
         let mut out = Vec::new();
         self.collect(id, &mut out);
         out
+    }
+
+    /// The node's first and last token, without collecting the rest.
+    pub fn token_bounds(&self, id: NodeId) -> Option<(u32, u32)> {
+        if let Some(&Some((first, len))) = self.spans.get(id.0 as usize) {
+            return (len > 0).then(|| (first, first + len - 1));
+        }
+        let r = self.token_range(id);
+        Some((*r.first()?, *r.last()?))
+    }
+
+    /// Fills `spans`, children before parents.
+    pub(crate) fn compute_spans(&mut self) {
+        // (first, len) or None per node; unreached nodes stay None.
+        let mut spans: Vec<Option<(u32, u32)>> = vec![None; self.nodes.len()];
+        let mut done = vec![false; self.nodes.len()];
+        let mut stack = vec![(self.root, false)];
+        while let Some((n, expanded)) = stack.pop() {
+            let i = n.0 as usize;
+            if done[i] {
+                continue;
+            }
+            if !expanded {
+                stack.push((n, true));
+                for c in &self.nodes[i].children {
+                    if let Child::Node(k) = *c {
+                        if !done[k.0 as usize] {
+                            stack.push((k, false));
+                        }
+                    }
+                }
+                continue;
+            }
+            // All children are done: chain their runs.
+            let mut run: Option<(u32, u32)> = None;
+            let mut ok = true;
+            for c in &self.nodes[i].children {
+                let part = match *c {
+                    Child::Token(t) => Some((t, 1)),
+                    Child::Node(k) => match spans[k.0 as usize] {
+                        Some(sp) => Some(sp),
+                        None if self.empty(k) => None,
+                        None => {
+                            ok = false;
+                            break;
+                        }
+                    },
+                };
+                let Some((f, l)) = part else { continue };
+                if l == 0 {
+                    continue;
+                }
+                run = match run {
+                    None => Some((f, l)),
+                    Some((rf, rl)) if rf + rl == f => Some((rf, rl + l)),
+                    Some(_) => {
+                        ok = false;
+                        break;
+                    }
+                };
+            }
+            spans[i] = if ok { Some(run.unwrap_or((0, 0))) } else { None };
+            done[i] = true;
+        }
+        self.spans = spans;
+    }
+
+    /// A node with no tokens at all.
+    fn empty(&self, id: NodeId) -> bool {
+        self.node(id).children.iter().all(|c| match *c {
+            Child::Token(_) => false,
+            Child::Node(k) => self.empty(k),
+        })
     }
 
     fn collect(&self, id: NodeId, out: &mut Vec<u32>) {

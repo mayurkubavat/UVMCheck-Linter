@@ -10,6 +10,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
+use std::rc::Rc;
 use std::time::Instant;
 
 use dv_model::{
@@ -156,6 +157,9 @@ enum Member {
 /// Actual type parameters of a specialization, by name.
 type Env = std::rc::Rc<HashMap<String, Bound>>;
 
+/// A class's methods by name: first declaration `virtual`, any `virtual`.
+type MethodDecls<'t> = Rc<HashMap<&'t str, (bool, bool)>>;
+
 /// A type argument, resolved where it was written.
 #[derive(Clone)]
 struct Bound {
@@ -207,6 +211,13 @@ struct Builder<'t> {
     node_scope: HashMap<NodeRef, usize>,
     files: Vec<String>,
     file_ids: HashMap<(usize, u32), u32>,
+    /// Byte offset of each line start, per (tree, preprocessor file).
+    line_starts: HashMap<(usize, u32), Vec<u32>>,
+    /// `base_env` of each class with no bindings, as lookups ask it often.
+    base_cache: std::cell::RefCell<HashMap<usize, Option<(usize, Env)>>>,
+    chain_cache: std::cell::RefCell<HashMap<usize, Rc<Vec<usize>>>>,
+    /// Per class, see [`Builder::method_decls`].
+    decl_cache: std::cell::RefCell<HashMap<usize, MethodDecls<'t>>>,
 }
 
 impl<'t> Builder<'t> {
@@ -238,6 +249,10 @@ impl<'t> Builder<'t> {
             // Index 0 is "no file", as in slang's model.
             files: vec![String::new()],
             file_ids: HashMap::new(),
+            line_starts: HashMap::new(),
+            base_cache: Default::default(),
+            chain_cache: Default::default(),
+            decl_cache: Default::default(),
         }
     }
 
@@ -324,9 +339,14 @@ impl<'t> Builder<'t> {
 
     /// Last token of a Name node: the method of `C::f`, or the plain name.
     fn name_of(&self, r: NodeRef) -> Option<(String, u32)> {
+        self.name_str(r).map(|(n, t)| (n.to_string(), t))
+    }
+
+    /// [`Self::name_of`] without copying the name.
+    fn name_str(&self, r: NodeRef) -> Option<(&'t str, u32)> {
         let n = self.child(r, Name)?;
-        let t = *self.tokens(n).last()?;
-        Some((self.text(r.tree, t).to_string(), t))
+        let (_, t) = self.tree(n).token_bounds(n.node)?;
+        Some((self.text(r.tree, t), t))
     }
 
     fn loc(&mut self, tree: usize, tok: u32) -> Loc {
@@ -365,10 +385,15 @@ impl<'t> Builder<'t> {
             }
         };
         let src = &t.sources[o.file as usize];
-        let off = (o.offset as usize).min(src.len());
-        let line_start = src[..off].rfind('\n').map_or(0, |i| i + 1);
-        let line = 1 + src.as_bytes()[..off].iter().filter(|&&b| b == b'\n').count();
-        (file, line as u32, (off - line_start + 1) as u32)
+        let off = (o.offset as usize).min(src.len()) as u32;
+        let starts = self.line_starts.entry(key).or_insert_with(|| {
+            std::iter::once(0)
+                .chain(src.bytes().enumerate().filter(|&(_, b)| b == b'\n').map(|(i, _)| i as u32 + 1))
+                .collect()
+        });
+        // The last line start at or before the offset.
+        let line = starts.partition_point(|&s| s <= off);
+        (file, line as u32, off - starts[line - 1] + 1)
     }
 
     fn new_scope(&mut self, kind: ScopeKind, name: &str, parent: Option<usize>) -> usize {
@@ -882,6 +907,7 @@ impl<'t> Builder<'t> {
             .into_iter()
             .filter_map(|(c, m)| m.into_iter().next().map(|(_, env)| (c, env)))
             .collect();
+        self.chain_cache.borrow_mut().clear();
     }
 
     /// Whether a type use depends on a parameter of generic class `g`,
@@ -1014,6 +1040,18 @@ impl<'t> Builder<'t> {
         if depth > 32 {
             return None;
         }
+        if env.is_empty() {
+            if let Some(hit) = self.base_cache.borrow().get(&c) {
+                return hit.clone();
+            }
+            let r = self.base_env_uncached(c, env, depth);
+            self.base_cache.borrow_mut().insert(c, r.clone());
+            return r;
+        }
+        self.base_env_uncached(c, env, depth)
+    }
+
+    fn base_env_uncached(&self, c: usize, env: &Env, depth: usize) -> Option<(usize, Env)> {
         let dt = self.classes[c].extends?;
         let parent = self.classes[c].parent;
         // The class's own type parameters are visible in its extends clause
@@ -1598,32 +1636,50 @@ impl<'t> Builder<'t> {
     /// A base class declares (or inherits) a virtual method of this name.
     fn overrides_virtual(&self, c: usize, name: &str) -> bool {
         // The nearest base that declares the name decides.
-        let chain = self.chain(c);
+        let chain = self.chain_cached(c);
         for (k, &b) in chain.iter().enumerate().skip(1) {
-            for m in self.children(self.classes[b].node) {
-                if !matches!(self.kind(m), FunctionDecl | TaskDecl | MethodPrototype) {
-                    continue;
+            if let Some(&(first_virtual, _)) = self.method_decls(b).get(name) {
+                if first_virtual {
+                    return true;
                 }
-                if self.name_of(m).is_some_and(|(n, _)| n == name) {
-                    if self.own_tokens(m).contains(&"virtual") {
-                        return true;
-                    }
-                    // Not declared virtual: virtual if it overrides in turn.
-                    return chain[k + 1..]
-                        .iter()
-                        .any(|&x| self.declares_virtual(x, name));
-                }
+                // Not declared virtual: virtual if it overrides in turn.
+                return chain[k + 1..]
+                    .iter()
+                    .any(|&x| self.method_decls(x).get(name).is_some_and(|d| d.1));
             }
         }
         false
     }
 
-    fn declares_virtual(&self, c: usize, name: &str) -> bool {
-        self.children(self.classes[c].node).into_iter().any(|m| {
-            matches!(self.kind(m), FunctionDecl | TaskDecl | MethodPrototype)
-                && self.name_of(m).is_some_and(|(n, _)| n == name)
-                && self.own_tokens(m).contains(&"virtual")
-        })
+    /// [`Self::chain`], remembered per class (bindings are fixed by then).
+    fn chain_cached(&self, c: usize) -> Rc<Vec<usize>> {
+        if let Some(v) = self.chain_cache.borrow().get(&c) {
+            return v.clone();
+        }
+        let v = Rc::new(self.chain(c));
+        self.chain_cache.borrow_mut().insert(c, v.clone());
+        v
+    }
+
+    /// Methods a class declares by name: whether the first declaration has
+    /// `virtual`, and whether any does.
+    fn method_decls(&self, c: usize) -> MethodDecls<'t> {
+        if let Some(v) = self.decl_cache.borrow().get(&c) {
+            return v.clone();
+        }
+        let mut map: HashMap<&'t str, (bool, bool)> = HashMap::new();
+        for m in self.children(self.classes[c].node) {
+            if !matches!(self.kind(m), FunctionDecl | TaskDecl | MethodPrototype) {
+                continue;
+            }
+            let Some((n, _)) = self.name_str(m) else { continue };
+            let v = self.own_tokens(m).contains(&"virtual");
+            let e = map.entry(n).or_insert((v, false));
+            e.1 |= v;
+        }
+        let v = Rc::new(map);
+        self.decl_cache.borrow_mut().insert(c, v.clone());
+        v
     }
 
     fn arguments(

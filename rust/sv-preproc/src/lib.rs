@@ -128,6 +128,8 @@ pub struct Preprocessor {
     last_text: Rc<str>,
     /// The last token opened a design element.
     just_opened: bool,
+    /// Line start offsets per source, built on the first `__LINE__`.
+    line_starts: HashMap<u32, Vec<u32>>,
 }
 
 const STANDARD_MACROS: &[(&str, &str)] = &[
@@ -242,6 +244,7 @@ impl Preprocessor {
             in_design_element: false,
             last_text: empty(),
             just_opened: false,
+            line_starts: HashMap::new(),
         };
         if pp.opts.max_include_depth == 0 {
             pp.opts.max_include_depth = 1024;
@@ -535,9 +538,15 @@ impl Preprocessor {
         }
     }
 
-    fn line_of(&self, o: Origin) -> usize {
+    fn line_of(&mut self, o: Origin) -> usize {
         let src = &self.sources[o.file as usize];
-        1 + src.as_bytes()[..(o.offset as usize).min(src.len())].iter().filter(|&&b| b == b'\n').count()
+        let off = (o.offset as usize).min(src.len()) as u32;
+        let starts = self.line_starts.entry(o.file).or_insert_with(|| {
+            std::iter::once(0)
+                .chain(src.bytes().enumerate().filter(|&(_, b)| b == b'\n').map(|(i, _)| i as u32 + 1))
+                .collect()
+        });
+        starts.partition_point(|&s| s <= off)
     }
 
     // ---- `define ----------------------------------------------------------
