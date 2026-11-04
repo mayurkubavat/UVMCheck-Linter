@@ -14,8 +14,8 @@ use std::rc::Rc;
 use std::time::Instant;
 
 use dv_model::{
-    Argument, Class, ClassId, Constraint, Design, Direction, Error, Loc, Local, Method, PhaseKind,
-    Property, Timings, TypeShape, UvmKind, Visibility,
+    Argument, Class, ClassId, Constraint, Design, Direction, Error, Loc, Local, MacroUse, Method,
+    PhaseKind, Property, Timings, TypeShape, Typedef, UvmKind, Visibility,
 };
 use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
@@ -1427,15 +1427,19 @@ impl<'t> Builder<'t> {
             is_virtual,
             is_parameterized: generic,
             is_library: false,
+            is_interface,
             loc,
             properties: Vec::new(),
             methods: Vec::new(),
             constraints: Vec::new(),
+            macros: self.macros_in(r),
+            typedefs: Vec::new(),
         };
         if !specialized {
-            // No specialization to read members from: the base as written,
-            // nothing else.
+            // No specialization to read members from: the base as written
+            // and the macros used, nothing else.
             class.is_virtual = false;
+            class.is_interface = false;
             if let Some(dt) = self.classes[c].extends {
                 let toks: Vec<&str> = self
                     .tokens(dt)
@@ -1497,11 +1501,43 @@ impl<'t> Builder<'t> {
                         class.constraints.push(Constraint { name: n, loc });
                     }
                 }
+                TypedefDecl => {
+                    if let Some((n, t)) = self.name_of(m) {
+                        let loc = self.loc(m.tree, t);
+                        class.typedefs.push(Typedef { name: n, loc });
+                    }
+                }
                 _ => {}
             }
         }
         add_builtins(&mut class.methods, is_interface);
         class
+    }
+
+    /// Top-level macro uses that start inside the class's text (same file).
+    fn macros_in(&mut self, r: NodeRef) -> Vec<MacroUse> {
+        let t = self.tree(r);
+        let Some((first, last)) = t.token_bounds(r.node) else {
+            return Vec::new();
+        };
+        let (a, b) = (&t.tokens[first as usize], &t.tokens[last as usize]);
+        // A class written by a macro has no text of its own to search.
+        if a.from_macro || b.from_macro || a.origin.file != b.origin.file {
+            return Vec::new();
+        }
+        let (file, start, end) = (a.origin.file, a.origin.offset, b.origin.offset + b.text.len() as u32);
+        let uses: Vec<_> = t
+            .macro_uses
+            .iter()
+            .filter(|u| u.origin.file == file && u.origin.offset >= start && u.origin.offset < end)
+            .cloned()
+            .collect();
+        uses.into_iter()
+            .map(|u| {
+                let (f, line, column) = self.position(r.tree, u.origin);
+                MacroUse { name: u.name.to_string(), loc: Loc { file: f, line, column, expansion: None } }
+            })
+            .collect()
     }
 
     fn class_id(&self, r: Resolved, ids: &[ClassId]) -> Option<ClassId> {

@@ -265,6 +265,21 @@ pub struct Constraint {
     pub loc: Loc,
 }
 
+/// A use of a user macro written inside the class's text, by name without
+/// the backtick (`uvm_object_utils`).
+#[derive(Clone, Debug)]
+pub struct MacroUse {
+    pub name: String,
+    pub loc: Loc,
+}
+
+/// A typedef declared in the class (`type_id` and the like).
+#[derive(Clone, Debug)]
+pub struct Typedef {
+    pub name: String,
+    pub loc: Loc,
+}
+
 #[derive(Clone, Debug)]
 pub struct Class {
     pub id: ClassId,
@@ -276,10 +291,14 @@ pub struct Class {
     pub is_virtual: bool,
     pub is_parameterized: bool,
     pub is_library: bool,
+    /// An `interface class`.
+    pub is_interface: bool,
     pub loc: Loc,
     pub properties: Vec<Property>,
     pub methods: Vec<Method>,
     pub constraints: Vec<Constraint>,
+    pub macros: Vec<MacroUse>,
+    pub typedefs: Vec<Typedef>,
 }
 
 /// Wall-clock cost of a load, by stage, in milliseconds.
@@ -526,6 +545,24 @@ impl Design {
                 let x = unsafe { x.assume_init() };
                 constraints.push(Constraint { name: text(x.name), loc: loc(x.loc) });
             }
+            let mut macros = Vec::with_capacity(c.macro_count as usize);
+            for i in 0..c.macro_count {
+                let mut x = std::mem::MaybeUninit::<ffi::uvmcheck_macro>::uninit();
+                if unsafe { ffi::uvmcheck_get_macro(d, cid, i, x.as_mut_ptr()) } == 0 {
+                    return Err(Error(format!("macro use {i} of class {cid} missing")));
+                }
+                let x = unsafe { x.assume_init() };
+                macros.push(MacroUse { name: text(x.name), loc: loc(x.loc) });
+            }
+            let mut typedefs = Vec::with_capacity(c.typedef_count as usize);
+            for i in 0..c.typedef_count {
+                let mut x = std::mem::MaybeUninit::<ffi::uvmcheck_typedef>::uninit();
+                if unsafe { ffi::uvmcheck_get_typedef(d, cid, i, x.as_mut_ptr()) } == 0 {
+                    return Err(Error(format!("typedef {i} of class {cid} missing")));
+                }
+                let x = unsafe { x.assume_init() };
+                typedefs.push(Typedef { name: text(x.name), loc: loc(x.loc) });
+            }
             classes.push(Class {
                 id: cid,
                 name: text(c.name),
@@ -536,10 +573,13 @@ impl Design {
                 is_virtual: c.is_virtual != 0,
                 is_parameterized: c.is_parameterized != 0,
                 is_library: c.is_library != 0,
+                is_interface: c.is_interface != 0,
                 loc: loc(c.loc),
                 properties,
                 methods,
                 constraints,
+                macros,
+                typedefs,
             });
         }
         let copy_ms = start.elapsed().as_secs_f64() * 1e3;
@@ -654,7 +694,7 @@ impl Design {
         for c in order {
             let _ = writeln!(
                 s,
-                "class {} {} base={} base_id={} uvm={} {} {} {}",
+                "class {} {} base={} base_id={} uvm={} {} {} {}{}",
                 qual(Some(c.id)),
                 at(c.loc),
                 c.base_name,
@@ -663,7 +703,14 @@ impl Design {
                 flag(c.is_virtual, "virtual"),
                 flag(c.is_parameterized, "param"),
                 flag(c.is_library, "library"),
+                flag(c.is_interface, " interface"),
             );
+            for m in &c.macros {
+                let _ = writeln!(s, "  macro {} {}", m.name, at(m.loc));
+            }
+            for t in &c.typedefs {
+                let _ = writeln!(s, "  typedef {} {}", t.name, at(t.loc));
+            }
             for p in &c.properties {
                 let _ = write!(
                     s,

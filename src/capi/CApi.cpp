@@ -94,7 +94,8 @@ int uvmcheck_get_class(const uvmcheck_design* d, uint32_t cls, uvmcheck_class* o
     *out = {c.name.c_str(), c.scope.c_str(), c.baseName.c_str(), c.base, static_cast<uint8_t>(c.uvm),
             c.isVirtual, c.isParameterized, c.isLibrary, toC(c.loc),
             static_cast<uint32_t>(c.properties.size()), static_cast<uint32_t>(c.methods.size()),
-            static_cast<uint32_t>(c.constraints.size())};
+            static_cast<uint32_t>(c.constraints.size()), static_cast<uint32_t>(c.macros.size()),
+            static_cast<uint32_t>(c.typedefs.size()), c.isInterface};
     return 1;
 }
 
@@ -185,6 +186,24 @@ int uvmcheck_get_constraint(const uvmcheck_design* d, uint32_t cls, uint32_t ind
     const auto& cs = m->classes()[cls].constraints;
     if (index >= cs.size()) return 0;
     *out = {cs[index].name.c_str(), toC(cs[index].loc)};
+    return 1;
+}
+
+int uvmcheck_get_macro(const uvmcheck_design* d, uint32_t cls, uint32_t index, uvmcheck_macro* out) {
+    const Model* m = modelOf(d);
+    if (!m || !out || cls >= m->classes().size()) return 0;
+    const auto& xs = m->classes()[cls].macros;
+    if (index >= xs.size()) return 0;
+    *out = {xs[index].name.c_str(), toC(xs[index].loc)};
+    return 1;
+}
+
+int uvmcheck_get_typedef(const uvmcheck_design* d, uint32_t cls, uint32_t index, uvmcheck_typedef* out) {
+    const Model* m = modelOf(d);
+    if (!m || !out || cls >= m->classes().size()) return 0;
+    const auto& xs = m->classes()[cls].typedefs;
+    if (index >= xs.size()) return 0;
+    *out = {xs[index].name.c_str(), toC(xs[index].loc)};
     return 1;
 }
 

@@ -7,6 +7,7 @@
 
 use dv_model::{Class, ClassId, Design, Direction, Loc, Method, PhaseKind, Property, TypeShape};
 
+mod factory;
 mod uvm;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -168,6 +169,7 @@ pub fn rules() -> Vec<Rule> {
         },
     ];
     v.extend(uvm::rules());
+    v.extend(factory::rules());
     v.sort_by_key(|r| r.id);
     v
 }

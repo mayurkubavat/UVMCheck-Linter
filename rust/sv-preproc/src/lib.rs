@@ -63,6 +63,17 @@ pub struct Output {
     /// The text of each file in `files`, as read.
     pub sources: Vec<Rc<str>>,
     pub diagnostics: Vec<Diagnostic>,
+    /// Uses of defined macros written in the source text (not inside
+    /// another expansion), in order: Slang's top-level macro references.
+    pub macro_uses: Vec<MacroUse>,
+}
+
+/// A macro used in the source text: its name without the backtick and the
+/// backtick's position.
+#[derive(Clone, Debug)]
+pub struct MacroUse {
+    pub name: Rc<str>,
+    pub origin: Origin,
 }
 
 /// A token inside the preprocessor: no trivia, but whether trivia came
@@ -130,6 +141,8 @@ pub struct Preprocessor {
     just_opened: bool,
     /// Line start offsets per source, built on the first `__LINE__`.
     line_starts: HashMap<u32, Vec<u32>>,
+    /// Inside `expand`: directives met now are in macro arguments.
+    expanding: u32,
 }
 
 const STANDARD_MACROS: &[(&str, &str)] = &[
@@ -245,6 +258,7 @@ impl Preprocessor {
             last_text: empty(),
             just_opened: false,
             line_starts: HashMap::new(),
+            expanding: 0,
         };
         if pp.opts.max_include_depth == 0 {
             pp.opts.max_include_depth = 1024;
@@ -395,7 +409,10 @@ impl Preprocessor {
                 "define" => self.directive_define(&t),
                 "undef" => {
                     if let Some(n) = self.line_next() {
-                        self.macros.remove(&*n.text);
+                        let builtin = STANDARD_MACROS.iter().any(|(k, _)| *k == &*n.text);
+                        if self.macros.remove(&*n.text).is_some() && !builtin && self.top_level(&t) {
+                            self.out.macro_uses.push(MacroUse { name: n.text.clone(), origin: t.origin });
+                        }
                     }
                 }
                 "undefineall" => self.reset_macros(),
@@ -459,6 +476,9 @@ impl Preprocessor {
                 _ if LINE_DIRECTIVES.contains(&name) => self.directive_args(&t, name),
                 _ => {
                     if let Some(m) = self.macros.get(name).cloned() {
+                        if self.top_level(&t) {
+                            self.out.macro_uses.push(MacroUse { name: Rc::from(name), origin: t.origin });
+                        }
                         self.expand(&t, name, &m);
                     } else {
                         self.diag(t.origin, format!("unknown macro or directive `{name}"));
@@ -810,7 +830,19 @@ impl Preprocessor {
 
     // ---- macro expansion --------------------------------------------------
 
+    /// A directive written in the source text itself: not from a macro
+    /// body, nor in the arguments of a macro being expanded.
+    fn top_level(&self, t: &T) -> bool {
+        !t.from_macro && self.expanding == 0 && self.frames.last().is_some_and(|f| f.file.is_some())
+    }
+
     fn expand(&mut self, use_tok: &T, name: &str, m: &Macro) {
+        self.expanding += 1;
+        self.expand_inner(use_tok, name, m);
+        self.expanding -= 1;
+    }
+
+    fn expand_inner(&mut self, use_tok: &T, name: &str, m: &Macro) {
         if self.frames.iter().any(|f| f.macro_name.as_deref() == Some(name)) {
             self.diag(use_tok.origin, format!("recursive use of macro `{name}"));
             return;

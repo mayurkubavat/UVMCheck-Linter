@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-#define UVMCHECK_MODEL_ABI_VERSION 6u
+#define UVMCHECK_MODEL_ABI_VERSION 7u
 #define UVMCHECK_NONE 0xFFFFFFFFu
 
 typedef struct uvmcheck_design uvmcheck_design;
@@ -48,6 +48,8 @@ typedef struct {
     uint8_t is_virtual, is_parameterized, is_library;
     uvmcheck_loc loc;
     uint32_t property_count, method_count, constraint_count;
+    uint32_t macro_count, typedef_count;
+    uint8_t is_interface;
 } uvmcheck_class;
 
 typedef struct {
@@ -103,6 +105,18 @@ typedef struct {
     const char* name;
     uvmcheck_loc loc;
 } uvmcheck_constraint;
+
+/* A user macro used inside the class's text, by name without the backtick. */
+typedef struct {
+    const char* name;
+    uvmcheck_loc loc;
+} uvmcheck_macro;
+
+/* A typedef declared in the class. */
+typedef struct {
+    const char* name;
+    uvmcheck_loc loc;
+} uvmcheck_typedef;
 
 /* Values of uvmcheck_assignment.root_kind. */
 enum { UVMCHECK_ROOT_OTHER = 0, UVMCHECK_ROOT_ARGUMENT, UVMCHECK_ROOT_LOCAL, UVMCHECK_ROOT_PROPERTY };
@@ -161,6 +175,9 @@ UVMCHECK_API int uvmcheck_get_timing(const uvmcheck_design* d, uint32_t cls, uin
                                      uint32_t index, uvmcheck_loc* out);
 UVMCHECK_API int uvmcheck_get_constraint(const uvmcheck_design* d, uint32_t cls, uint32_t index,
                                          uvmcheck_constraint* out);
+UVMCHECK_API int uvmcheck_get_macro(const uvmcheck_design* d, uint32_t cls, uint32_t index, uvmcheck_macro* out);
+UVMCHECK_API int uvmcheck_get_typedef(const uvmcheck_design* d, uint32_t cls, uint32_t index,
+                                      uvmcheck_typedef* out);
 
 /* The whole model as JSON (schema uvmcheck.model/1), made on first call. */
 UVMCHECK_API const char* uvmcheck_design_json(uvmcheck_design* d);

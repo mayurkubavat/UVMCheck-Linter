@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence
 
-ABI_VERSION = 6
+ABI_VERSION = 7
 NONE = 0xFFFFFFFF
 
 UVM_KINDS = ("none", "object", "sequence_item", "sequence", "component", "test", "env", "agent",
@@ -42,7 +42,8 @@ class _Class(ctypes.Structure):
                 ("base", ctypes.c_uint32), ("uvm", ctypes.c_uint8), ("is_virtual", ctypes.c_uint8),
                 ("is_parameterized", ctypes.c_uint8), ("is_library", ctypes.c_uint8), ("loc", _Loc),
                 ("property_count", ctypes.c_uint32), ("method_count", ctypes.c_uint32),
-                ("constraint_count", ctypes.c_uint32)]
+                ("constraint_count", ctypes.c_uint32), ("macro_count", ctypes.c_uint32),
+                ("typedef_count", ctypes.c_uint32), ("is_interface", ctypes.c_uint8)]
 
 
 class _Property(ctypes.Structure):

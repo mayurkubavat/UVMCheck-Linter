@@ -18,9 +18,10 @@ int main(int argc, char** argv) {
     CHECK(uvmcheck_model_abi_version() == UVMCHECK_MODEL_ABI_VERSION);
     /* rust/sv-slang asserts the same sizes for its copies of these structs */
     if (sizeof(void*) == 8) {
-        CHECK(sizeof(uvmcheck_class) == 64 && sizeof(uvmcheck_property) == 48);
+        CHECK(sizeof(uvmcheck_class) == 80 && sizeof(uvmcheck_property) == 48);
         CHECK(sizeof(uvmcheck_method) == 104 && sizeof(uvmcheck_argument) == 56);
         CHECK(sizeof(uvmcheck_assignment) == 48);
+        CHECK(sizeof(uvmcheck_macro) == 32 && sizeof(uvmcheck_typedef) == 32);
         CHECK(sizeof(uvmcheck_call) == 72);
         CHECK(sizeof(uvmcheck_local) == 40 && sizeof(uvmcheck_constraint) == 32);
     }

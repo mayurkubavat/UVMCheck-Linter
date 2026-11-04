@@ -18,12 +18,12 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
     class uvm_monitor extends uvm_component; function new(string name, uvm_component parent); super.new(name, parent); endfunction endclass\n";
 
 #[test]
-fn twenty_seven_rules_with_unique_ids() {
+fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 27);
+    assert_eq!(r.len(), 31);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 27);
+    assert_eq!(ids.len(), 31);
 }
 
 #[test]
@@ -78,4 +78,21 @@ fn macro_code_is_reported_at_the_expansion() {
         got.contains(&("t.sv".into(), 4, 0, "SV-OOP-007")),
         "{got:?}"
     );
+}
+
+#[test]
+fn factory_and_phase_rules() {
+    let src = "`define uvm_object_utils(T) typedef int type_id;\n\
+               class uvm_object; virtual function void do_print(); endfunction endclass\n\
+               class uvm_phase; endclass\n\
+               class uvm_component extends uvm_object; virtual function void build_phase(uvm_phase phase); endfunction endclass\n\
+               class a_env extends uvm_component;\n  `uvm_object_utils(a_env)\n\
+               function void build_phase(uvm_phase phase); endfunction\nendclass\n\
+               class b_obj extends uvm_object; function void f(); do_print(); endfunction endclass\n";
+    let got: Vec<_> = findings(src).into_iter().map(|f| (f.1, f.3)).collect();
+    assert!(got.contains(&(6, "UVM-FAC-002")), "{got:?}");
+    assert!(got.contains(&(7, "UVM-PHS-001")), "{got:?}");
+    assert!(got.contains(&(9, "UVM-FAC-003")), "{got:?}");
+    assert!(got.contains(&(9, "UVM-BAN-003")), "{got:?}");
+    assert!(!got.contains(&(5, "UVM-FAC-003")), "{got:?}");
 }

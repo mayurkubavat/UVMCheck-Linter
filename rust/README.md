@@ -276,7 +276,7 @@ packages, `$unit` and nested classes, and so does sv-sema.
 
 ## dv-lint (R3 slice 4, rules without Slang)
 
-The 27 C++ rules that read only the model facade (`UvmModel::facade()`), ported
+The C++ rules that read only the model facade (`UvmModel::facade()`), ported
 line for line with their messages verbatim. `dv-lint` runs them on a design
 built natively by sv-sema, or through Slang with `--slang`, and prints findings
 in uvmcheck's text form:
@@ -314,3 +314,12 @@ remembered. On uvm_pkg.sv, best of 7 runs, the model build went from about
 730 ms to about 165 ms; parsing takes about 125 ms. Through Slang, the same
 load takes about 80 ms to parse, 160 ms to elaborate and 50 ms to build the
 model. `dv-lint --time` prints these stage times.
+
+Slice 6 (2026-11-04) moved four more rules onto the model: UVM-FAC-002,
+UVM-FAC-003, UVM-PHS-001 and UVM-BAN-003 (31 in all). They needed three new
+class facts, filled by both front ends: `is_interface`, the user macros used in
+the class's text (`macros`, as Slang's top-level macro references: no uses
+inside macro bodies or arguments, plus `` `undef `` of user macros), and the
+class's `typedefs` by name. The C ABI is now version 7. On the native model
+all 783 repo compiles are identical (906 findings) and uvm_pkg.sv keeps only
+the two `s$N` messages; through Slang both are exact.

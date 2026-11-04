@@ -178,6 +178,17 @@ struct Constraint {
     std::string name;
     Loc loc;
 };
+/// A use of a user macro written inside the class's text (`uvm_object_utils
+/// and the like), by the macro's name without the backtick.
+struct MacroUse {
+    std::string name;
+    Loc loc;
+};
+/// A typedef declared in the class (`type_id` and the like).
+struct Typedef {
+    std::string name;
+    Loc loc;
+};
 
 struct Class {
     std::string name;
@@ -193,9 +204,13 @@ struct Class {
     bool isParameterized = false;
     /// True for classes from a library path (uvm-core and the like).
     bool isLibrary = false;
+    /// An `interface class`.
+    bool isInterface = false;
     std::vector<Property> properties;
     std::vector<Method> methods;
     std::vector<Constraint> constraints;
+    std::vector<MacroUse> macros;
+    std::vector<Typedef> typedefs;
 
     /// Members declared in this class itself (not inherited), by name.
     const Property* findProperty(std::string_view n) const;

@@ -4,7 +4,7 @@
 
 use std::os::raw::{c_char, c_int};
 
-pub const ABI_VERSION: u32 = 6;
+pub const ABI_VERSION: u32 = 7;
 pub const NONE: u32 = u32::MAX;
 
 #[repr(C)]
@@ -37,6 +37,9 @@ pub struct uvmcheck_class {
     pub property_count: u32,
     pub method_count: u32,
     pub constraint_count: u32,
+    pub macro_count: u32,
+    pub typedef_count: u32,
+    pub is_interface: u8,
 }
 
 #[repr(C)]
@@ -133,6 +136,20 @@ pub struct uvmcheck_constraint {
     pub loc: uvmcheck_loc,
 }
 
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct uvmcheck_macro {
+    pub name: *const c_char,
+    pub loc: uvmcheck_loc,
+}
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug)]
+pub struct uvmcheck_typedef {
+    pub name: *const c_char,
+    pub loc: uvmcheck_loc,
+}
+
 extern "C" {
     pub fn uvmcheck_model_abi_version() -> u32;
     pub fn uvmcheck_design_load(argc: c_int, argv: *const *const c_char) -> *mut uvmcheck_design;
@@ -197,6 +214,13 @@ extern "C" {
         index: u32,
         out: *mut uvmcheck_constraint,
     ) -> c_int;
+    pub fn uvmcheck_get_macro(d: *const uvmcheck_design, cls: u32, index: u32, out: *mut uvmcheck_macro) -> c_int;
+    pub fn uvmcheck_get_typedef(
+        d: *const uvmcheck_design,
+        cls: u32,
+        index: u32,
+        out: *mut uvmcheck_typedef,
+    ) -> c_int;
     pub fn uvmcheck_design_json(d: *mut uvmcheck_design) -> *const c_char;
 }
 
@@ -207,7 +231,10 @@ mod tests {
         use std::mem::size_of;
         // Pointer-sized fields first, then fixed-width ones, as in CApi.h.
         assert_eq!(size_of::<super::uvmcheck_loc>(), 20);
-        assert_eq!(size_of::<super::uvmcheck_class>(), 3 * 8 + 4 + 4 + 12 + 20);
+        // 3 pointers, base, 4 flags, loc, 5 counts, is_interface, padded to 8.
+        assert_eq!(size_of::<super::uvmcheck_class>(), 80);
+        assert_eq!(size_of::<super::uvmcheck_macro>(), 32);
+        assert_eq!(size_of::<super::uvmcheck_typedef>(), 32);
         // Sizes with the padding a C compiler adds (8-byte pointers).
         assert_eq!(size_of::<super::uvmcheck_property>(), 48);
         assert_eq!(size_of::<super::uvmcheck_method>(), 104);

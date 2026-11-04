@@ -54,7 +54,7 @@ pub fn parse_output(out: sv_preproc::Output) -> Tree {
     drop(p);
     let (nodes, root) = parser::build(events);
     let mut tree =
-        Tree { tokens, nodes, root, files: out.files, sources: out.sources, errors, pp_diagnostics: out.diagnostics, spans: Vec::new() };
+        Tree { tokens, nodes, root, files: out.files, sources: out.sources, errors, pp_diagnostics: out.diagnostics, macro_uses: out.macro_uses, spans: Vec::new() };
     tree.compute_spans();
     let mut more = checks::run(&tree);
     tree.errors.append(&mut more);

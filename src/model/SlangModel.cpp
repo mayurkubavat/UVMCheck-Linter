@@ -1,5 +1,6 @@
 #include "uvmcheck/model/SlangModel.h"
 
+#include <optional>
 #include <unordered_map>
 
 #include "slang/ast/ASTVisitor.h"
@@ -13,6 +14,7 @@
 #include "slang/ast/symbols/ClassSymbols.h"
 #include "slang/ast/symbols/CompilationUnitSymbols.h"
 #include "slang/syntax/AllSyntax.h"
+#include "slang/syntax/SyntaxTree.h"
 #include "slang/ast/symbols/SubroutineSymbols.h"
 #include "slang/ast/symbols/VariableSymbols.h"
 #include "slang/ast/types/Type.h"
@@ -178,6 +180,28 @@ private:
         return text;
     }
 
+    /// Macro uses that start inside a class's syntax, as rules find them
+    /// (the trees' top-level macro references).
+    std::vector<MacroUse> macrosIn(const slang::syntax::SyntaxNode* syntax) {
+        std::vector<MacroUse> out;
+        if (!syntax) return out;
+        if (!macroRefs) {
+            macroRefs.emplace();
+            for (const auto& tree : compilation.getSyntaxTrees()) {
+                for (const auto& r : tree->getMacroRefs()) {
+                    if (!r.syntax || !r.definition) continue;
+                    macroRefs->push_back({r.syntax->sourceRange().start(), r.definition->name.valueText()});
+                }
+            }
+        }
+        const auto range = syntax->sourceRange();
+        for (const auto& [at, name] : *macroRefs) {
+            if (at >= range.start() && at < range.end()) out.push_back({std::string(name), loc(at)});
+        }
+        return out;
+    }
+    std::optional<std::vector<std::pair<slang::SourceLocation, std::string_view>>> macroRefs;
+
     Class makeGeneric(const sa::GenericClassDefSymbol& g) {
         const sa::ClassType* rep = representative(g);
         Class c = rep ? makeClass(*rep) : Class{};
@@ -190,6 +214,7 @@ private:
                 c.scope = std::string(sym.name);
         }
         c.isParameterized = true;
+        c.macros = macrosIn(g.getSyntax());
         if (!rep) {
             c.baseName = baseNameFromSyntax(g);
             if (options.isLibraryFile) c.isLibrary = options.isLibraryFile(model.fileName(c.loc));
@@ -393,6 +418,8 @@ private:
                 c.scope = std::string(sym.name);
         }
         c.isVirtual = ct.isAbstract;
+        c.isInterface = ct.isInterface;
+        c.macros = macrosIn(ct.getSyntax());
         if (const auto* base = ct.getBaseClass(); base && !base->isError()) {
             const auto& canon = base->getCanonicalType();
             if (canon.isClass()) {
@@ -472,6 +499,8 @@ private:
                 c.methods.push_back(std::move(m));
             } else if (member.kind == sa::SymbolKind::ConstraintBlock) {
                 c.constraints.push_back({std::string(member.name), loc(member.location)});
+            } else if (member.kind == sa::SymbolKind::TypeAlias) {
+                c.typedefs.push_back({std::string(member.name), loc(member.location)});
             }
         }
         return c;

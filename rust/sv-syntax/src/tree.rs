@@ -59,6 +59,8 @@ pub struct Tree {
     pub sources: Vec<Rc<str>>,
     pub errors: Vec<SyntaxError>,
     pub pp_diagnostics: Vec<sv_preproc::Diagnostic>,
+    /// Macros used in the source text, in order (see `sv_preproc::Output`).
+    pub macro_uses: Vec<sv_preproc::MacroUse>,
     /// Per node: its first token and token count when its tokens are one
     /// contiguous run (always, for trees the parser builds); `None` makes
     /// `token_range` walk the node instead.
