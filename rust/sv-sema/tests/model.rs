@@ -47,3 +47,62 @@ fn virtual_overrides_and_extern_bodies() {
     assert!(g.is_extern && g.returns_void);
     assert_eq!(g.arguments.len(), 1);
 }
+
+fn method<'d>(d: &'d dv_model::Design, class: &str, name: &str) -> &'d dv_model::Method {
+    d.find_class(class)
+        .unwrap()
+        .methods
+        .iter()
+        .find(|m| m.name == name)
+        .unwrap()
+}
+
+#[test]
+fn body_calls_assignments_and_timing() {
+    let d = design(
+        "class base; function new(string n); endfunction virtual function void f(int x); endfunction endclass\n\
+         class c extends base;\n\
+           int q[$]; base h;\n\
+           function new(string n); super.new(n); h = new(\"x\"); endfunction\n\
+           task run(); #1 h.f(1); q.push_back(2); q[0] <= 3; @(q.size()); endtask\n\
+         endclass\n",
+    );
+    let new = method(&d, "c", "new");
+    assert!(new.calls_super_new);
+    assert!(new.super_new.is_some_and(|(i, _)| i == 0));
+    let calls: Vec<(&str, &str)> = new
+        .calls
+        .iter()
+        .map(|c| (c.name.as_str(), c.callee_scope.as_str()))
+        .collect();
+    assert_eq!(calls, [("new", "base"), ("new", "base")]);
+    assert_eq!(new.assignments[0].lhs, "h");
+    assert_eq!(new.assignments[0].root_kind, dv_model::RootKind::Property);
+
+    let run = method(&d, "c", "run");
+    assert_eq!(run.timing_controls.len(), 2);
+    let f = run.calls.iter().find(|c| c.name == "f").unwrap();
+    assert!(f.callee_declared_virtual && f.receiver == "h");
+    let push = run.calls.iter().find(|c| c.name == "push_back").unwrap();
+    assert!(push.is_system && push.receiver == "q");
+    assert!(run
+        .assignments
+        .iter()
+        .any(|a| a.is_non_blocking && a.root_name == "q"));
+}
+
+#[test]
+fn bodies_slang_rejects_keep_only_timing() {
+    let d = design(
+        "class c;\n\
+           missing_t m;\n\
+           function void f(); m.go(); $display(\"x\"); endfunction\n\
+           function void g(); #1 $display(\"y\"); endfunction\n\
+           task t(); undeclared_task(); endtask\n\
+         endclass\n",
+    );
+    assert!(method(&d, "c", "f").calls.is_empty());
+    let g = method(&d, "c", "g");
+    assert!(g.calls.is_empty() && g.timing_controls.len() == 1);
+    assert!(method(&d, "c", "t").calls.is_empty());
+}

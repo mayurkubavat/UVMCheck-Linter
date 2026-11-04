@@ -211,6 +211,38 @@ where the representative specialization differs: Slang only creates
 specializations it elaborates, while sv-sema sees every one named in the
 source, so for example `uvm_callbacks` is represented by a `uvm_event`
 specialization instead of `uvm_mem`. The native model loads uvm_pkg.sv in
-about 0.6 s including preprocessing and parsing. Type strings, method
-bodies (calls, assignments, timing, `super.new`) and classes declared
-inside modules are not compared yet (slice 2).
+about 0.6 s including preprocessing and parsing.
+
+Slice 2 (2026-11-04) adds method bodies (`body.rs`): calls (callee scope,
+virtual and built-in flags, receiver as Slang prints it, `super.`, first
+argument and whether it is `null`), assignments (sides, root and root
+kind, non-blocking, output and inout arguments as writes), timing controls
+and `super.new` with its statement index. The walker follows Slang's
+binding rules: method resolution through the base chain and type
+parameters, built-in methods of arrays, strings, enums, events,
+covergroups and `std` classes, default arguments walked in the callee's
+context, and constructor calls only for classes that declare `new`. A body
+Slang rejects (an undeclared type or subroutine, `super` of an undeclared
+base, timing in a function, `new` of a virtual class, an assignment used as
+an `if` condition or chained) keeps only its timing controls, as in Slang.
+
+```
+tools/model_parity.py --bodies --uvm UVM_SRC
+tools/model_parity.py --bodies --repo UVM_SRC
+```
+
+Measured 2026-11-04 with `--bodies`: 776 of the 783 repo inputs are
+identical, and the class gate stays at 783. The other 7 are test inputs
+Slang rejects for type errors sv-sema does not check (a downcast without
+`$cast`, a reversed part select, a wrong array literal size, a blocking
+write to a clocking output, an undeclared identifier, a redefined class),
+plus one argument location inside a stringified macro argument. On
+uvm_pkg.sv 22 call and 3 assignment lines differ: representative
+specializations again, arguments of nested macros (Slang places them in
+the inner `define), and receivers that start with a macro use. The
+representative specialization Slang picks varies from run to run, so the
+number of differing argument lines moves between about 20 and 50.
+
+Type strings (`--types`) are next: Slang's canonical form spells out enum
+values and parameter-dependent widths, so it needs constant evaluation.
+Classes declared inside modules are not compared yet.

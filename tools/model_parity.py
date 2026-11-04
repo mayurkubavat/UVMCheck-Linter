@@ -10,7 +10,8 @@ paths are cut to the file name since Slang reports them relative.
     tools/model_parity.py --repo UVM_SRC                        # tests/ and examples/
     tools/model_parity.py -- +incdir+DIR FILE...                # any compile
 
---show=N prints the first N lines of each diff. Lines are compared as
+--bodies also compares method bodies (calls, assignments, timing, super.new),
+--types the type strings. --show=N prints the first N lines of each diff. Lines are compared as
 multisets, so the count is how many member lines one side lacks.
 """
 import collections, difflib, glob, os, re, subprocess, sys
@@ -24,14 +25,19 @@ def norm(text):
     return re.sub(r'@[^@\s]*/([^/\s:]+):', r'@\1:', text).splitlines()
 
 
+FLAGS = []
+
+
 def both(args):
-    run = lambda extra: norm(subprocess.run([DUMP] + extra + args, capture_output=True,
+    run = lambda extra: norm(subprocess.run([DUMP] + FLAGS + extra + args, capture_output=True,
                                             text=True, errors='replace').stdout)
     return run(['--slang']), run([])
 
 
 def main():
     argv = sys.argv[1:]
+    while argv and argv[0] in ('--bodies', '--types'):
+        FLAGS.append(argv.pop(0))
     show = 0
     if argv and argv[0].startswith('--show='):
         show = int(argv[0][7:])

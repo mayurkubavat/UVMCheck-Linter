@@ -17,6 +17,8 @@ use dv_model::{
     Property, Timings, TypeShape, UvmKind, Visibility,
 };
 use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
+
+mod body;
 use SyntaxKind::*;
 
 /// Loads and models a design from compile options, as `Design::load` does.
@@ -90,6 +92,7 @@ pub fn load<S: AsRef<str>>(args: &[S]) -> Result<Design, Error> {
 /// Models already parsed trees (one per compilation unit).
 pub fn build(trees: &[Tree]) -> Design {
     let mut b = Builder::new(trees);
+    b.collect_names();
     b.collect();
     b.finish()
 }
@@ -119,6 +122,8 @@ struct Scope {
     imports: Vec<(String, Option<String>)>,
     /// Type parameters of a class, with their default type.
     type_params: HashMap<String, Option<NodeRef>>,
+    /// Variables and subroutines of a package or the unit.
+    values: HashMap<String, Member>,
 }
 
 struct ClassDef {
@@ -132,6 +137,17 @@ struct ClassDef {
     extends: Option<NodeRef>,
     /// Parameters in order: name, whether a type, default.
     params: Vec<(String, bool, Option<NodeRef>)>,
+    /// Properties and methods by name.
+    members: HashMap<String, Member>,
+}
+
+/// A named value or subroutine declared in a class or package.
+#[derive(Clone, Copy)]
+enum Member {
+    /// A variable: its DataDecl and Declarator.
+    Var { decl: NodeRef, item: NodeRef },
+    /// A function or task: its declaration (or prototype).
+    Sub { decl: NodeRef },
 }
 
 /// Actual type parameters of a specialization, by name.
@@ -150,6 +166,11 @@ struct Bound {
 enum Resolved {
     Class(usize),
     Vif,
+    Str,
+    Enum,
+    Event,
+    /// A built-in class of package std: process, semaphore, mailbox.
+    Std(&'static str),
     Other,
 }
 
@@ -170,6 +191,10 @@ struct Builder<'t> {
     bodies: HashMap<(String, String), NodeRef>,
     /// Names used as types anywhere (generic classes with a use have members).
     used_names: HashSet<String>,
+    /// Names declared as types and as subroutines anywhere: a use of
+    /// anything else is an error to slang.
+    type_names: HashSet<String>,
+    sub_names: HashSet<String>,
     /// The specialization slang reads a parameterized class's members
     /// from: the one that prints first, as its type arguments.
     rep_env: HashMap<usize, Env>,
@@ -189,6 +214,7 @@ impl<'t> Builder<'t> {
             typedefs: HashMap::new(),
             imports: Vec::new(),
             type_params: HashMap::new(),
+            values: HashMap::new(),
         };
         Builder {
             trees,
@@ -198,11 +224,43 @@ impl<'t> Builder<'t> {
             classes: Vec::new(),
             bodies: HashMap::new(),
             used_names: HashSet::new(),
+            type_names: HashSet::new(),
+            sub_names: HashSet::new(),
             rep_env: HashMap::new(),
             node_scope: HashMap::new(),
             // Index 0 is "no file", as in slang's model.
             files: vec![String::new()],
             file_ids: HashMap::new(),
+        }
+    }
+
+    fn collect_names(&mut self) {
+        use sv_syntax::SyntaxKind::*;
+        for (ti, t) in self.trees.iter().enumerate() {
+            for id in t.preorder() {
+                let r = NodeRef { tree: ti, node: id };
+                let k = t.kind(id);
+                let set = match k {
+                    ClassDecl | TypedefDecl | ForwardTypedef | InterfaceDecl | ModuleDecl
+                    | ProgramDecl | CovergroupDecl | PackageDecl | NetTypeDecl | CheckerDecl => {
+                        &mut self.type_names
+                    }
+                    FunctionDecl | TaskDecl | MethodPrototype | DpiImport => &mut self.sub_names,
+                    _ => continue,
+                };
+                if let Some(n) = t.child(id, Name) {
+                    if let Some(&tok) = t.token_range(n).last() {
+                        set.insert(t.tokens[tok as usize].text.to_string());
+                    }
+                }
+                let _ = r;
+            }
+            // `type T` parameters.
+            for w in t.tokens.windows(2) {
+                if &*w[0].text == "type" && w[1].kind == sv_syntax::TokenKind::Identifier {
+                    self.type_names.insert(w[1].text.to_string());
+                }
+            }
         }
     }
 
@@ -302,6 +360,7 @@ impl<'t> Builder<'t> {
             typedefs: HashMap::new(),
             imports: Vec::new(),
             type_params: HashMap::new(),
+            values: HashMap::new(),
         });
         self.scopes.len() - 1
     }
@@ -353,6 +412,32 @@ impl<'t> Builder<'t> {
                             let class = self.text(c.tree, toks[toks.len() - 3]).to_string();
                             let method = self.text(c.tree, toks[toks.len() - 1]).to_string();
                             self.bodies.entry((class, method)).or_insert(c);
+                        } else if let Some(&t) = toks.last() {
+                            let name = self.text(c.tree, t).to_string();
+                            self.scopes[scope]
+                                .values
+                                .entry(name)
+                                .or_insert(Member::Sub { decl: c });
+                        }
+                    }
+                }
+                DpiImport => {
+                    if let Some((name, _)) = self.name_of(c) {
+                        self.scopes[scope]
+                            .values
+                            .entry(name)
+                            .or_insert(Member::Sub { decl: c });
+                    }
+                }
+                DataDecl => {
+                    for item in self.children(c) {
+                        if self.kind(item) == Declarator {
+                            if let Some((name, _)) = self.name_of(item) {
+                                self.scopes[scope]
+                                    .values
+                                    .entry(name)
+                                    .or_insert(Member::Var { decl: c, item });
+                            }
                         }
                     }
                 }
@@ -451,6 +536,32 @@ impl<'t> Builder<'t> {
                 extends = self.child(e, DataType);
             }
         }
+        let mut members = HashMap::new();
+        for m in self.children(r) {
+            match self.kind(m) {
+                DataDecl => {
+                    for item in self.children(m) {
+                        if self.kind(item) == Declarator {
+                            if let Some((n, _)) = self.name_of(item) {
+                                members.entry(n).or_insert(Member::Var { decl: m, item });
+                            }
+                        }
+                    }
+                }
+                FunctionDecl | TaskDecl | MethodPrototype => {
+                    if let Some((n, _)) = self.name_of(m) {
+                        members.entry(n).or_insert(Member::Sub { decl: m });
+                    }
+                }
+                // An embedded covergroup is also a property of its type.
+                CovergroupDecl => {
+                    if let Some((n, _)) = self.name_of(m) {
+                        members.entry(n).or_insert(Member::Var { decl: m, item: m });
+                    }
+                }
+                _ => {}
+            }
+        }
         self.classes.push(ClassDef {
             name: name.clone(),
             node: r,
@@ -459,6 +570,7 @@ impl<'t> Builder<'t> {
             generic,
             extends,
             params,
+            members,
         });
         self.scopes[parent].classes.entry(name).or_insert(idx);
         self.node_scope.insert(r, own);
@@ -945,10 +1057,6 @@ impl<'t> Builder<'t> {
         out
     }
 
-    fn resolve(&self, dt: NodeRef, scope: usize, depth: usize) -> TypeInfo {
-        self.resolve_env(dt, scope, &Env::default(), depth)
-    }
-
     /// Resolves a type (a DataType, or a name expression standing for a
     /// type) seen from `scope`, with type parameters bound by `env`.
     fn resolve_env(&self, dt: NodeRef, scope: usize, env: &Env, depth: usize) -> TypeInfo {
@@ -987,14 +1095,44 @@ impl<'t> Builder<'t> {
         if self.trees[dt.tree].tokens[self.tokens(dt)[0] as usize].kind
             != sv_syntax::TokenKind::Identifier
         {
-            return other;
+            let resolved = match first {
+                "string" => Resolved::Str,
+                "event" => Resolved::Event,
+                "enum" => Resolved::Enum,
+                _ => Resolved::Other,
+            };
+            return TypeInfo { resolved, ..other };
         }
         // `a::b::c`, stopping at `#(` and dimensions.
         let mut path = vec![first];
         let mut i = 1;
-        while i + 1 < toks.len() && toks[i] == "::" {
-            path.push(toks[i + 1]);
-            i += 2;
+        loop {
+            // `C#(...)::T`: the arguments do not name anything here.
+            let mut j = i;
+            if toks.get(j) == Some(&"#") && toks.get(j + 1) == Some(&"(") {
+                let mut depth = 0;
+                j += 1;
+                while j < toks.len() {
+                    match toks[j] {
+                        "(" => depth += 1,
+                        ")" => {
+                            depth -= 1;
+                            if depth == 0 {
+                                j += 1;
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                    j += 1;
+                }
+            }
+            if j + 1 < toks.len() && toks[j] == "::" {
+                path.push(toks[j + 1]);
+                i = j + 2;
+            } else {
+                break;
+            }
         }
         if path.len() == 1 {
             if let Some(b) = env.get(first) {
@@ -1016,11 +1154,30 @@ impl<'t> Builder<'t> {
             Some(Found::Param(Some(d), s)) => {
                 // A type parameter: its default, which is what the
                 // definition's own specialization uses.
-                let parent = match self.scopes[s].kind {
-                    ScopeKind::Class(c) => self.classes[c].parent,
-                    _ => s,
+                // Earlier parameters are visible in a default.
+                self.resolve_env(d, s, env, depth + 1)
+            }
+            None => {
+                let name = if path.len() == 2 && path[0] == "std" {
+                    path[1]
+                } else {
+                    path[0]
                 };
-                self.resolve(d, parent, depth + 1)
+                match (path.len() == 1 || path[0] == "std", name) {
+                    (true, "process") => TypeInfo {
+                        resolved: Resolved::Std("process"),
+                        ..other
+                    },
+                    (true, "semaphore") => TypeInfo {
+                        resolved: Resolved::Std("semaphore"),
+                        ..other
+                    },
+                    (true, "mailbox") => TypeInfo {
+                        resolved: Resolved::Std("mailbox"),
+                        ..other
+                    },
+                    _ => other,
+                }
             }
             _ => other,
         }
@@ -1073,6 +1230,16 @@ impl<'t> Builder<'t> {
         } else {
             match self.lookup(path[0], scope, depth)? {
                 Found::Class(c) => self.classes[c].scope,
+                // `typedef C #(T) t;` then `t::x`.
+                Found::Typedef(t, s) => {
+                    match self
+                        .resolve_typedef(t, s, &Env::default(), depth + 1)
+                        .resolved
+                    {
+                        Resolved::Class(c) => self.classes[c].scope,
+                        _ => return None,
+                    }
+                }
                 _ => return None,
             }
         };
@@ -1382,6 +1549,7 @@ impl<'t> Builder<'t> {
         };
         let arguments = self.arguments(body, scope, env, ids);
         let locals = self.locals(body, scope, env);
+        let facts = self.body_facts(decl, body, c, env, &name);
         Some(Method {
             name,
             visibility: visibility(&own),
@@ -1398,11 +1566,11 @@ impl<'t> Builder<'t> {
             loc,
             arguments,
             locals,
-            calls: Vec::new(),
-            assignments: Vec::new(),
-            timing_controls: Vec::new(),
-            calls_super_new: false,
-            super_new: None,
+            calls: facts.calls,
+            assignments: facts.assignments,
+            timing_controls: facts.timing,
+            calls_super_new: facts.calls_super_new || facts.super_new.is_some(),
+            super_new: facts.super_new,
         })
     }
 

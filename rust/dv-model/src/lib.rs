@@ -725,17 +725,22 @@ impl Design {
                             flag(k.callee_declared_virtual, "callee_virtual"),
                             flag(k.callee_builtin, "callee_builtin"),
                             flag(k.first_arg_is_null, "null_arg"),
-                            k.receiver,
+                            k.receiver.replace('\n', "\\n"),
                             flag(k.via_super, "super"),
                             at(k.loc)
                         );
+                        if k.first_arg_loc.line != 0 {
+                            let n = s.len();
+                            s.truncate(n - 1);
+                            let _ = writeln!(s, " arg0{}", at(k.first_arg_loc));
+                        }
                     }
                     for a in &m.assignments {
                         let _ = writeln!(
                             s,
                             "    assign {} = {} {} {:?} {} {}",
-                            a.lhs,
-                            a.rhs,
+                            a.lhs.replace('\n', "\\n"),
+                            a.rhs.replace('\n', "\\n"),
                             flag(a.is_non_blocking, "nonblocking"),
                             a.root_kind,
                             a.root_name,
