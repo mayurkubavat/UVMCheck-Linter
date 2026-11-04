@@ -1,0 +1,113 @@
+#!/usr/bin/env python3
+"""Parity of dv-lint (the 27 model rules in Rust) with uvmcheck's C++ rules.
+
+For each compile, runs `uvmcheck --preset all --experimental --json` and
+keeps the findings of the ported rules, then runs dv-lint on the native model
+(default) and, with --slang, on the slang-backed one. Findings are compared as
+multisets of (file name, line, column, rule, message).
+
+    cmake --build build && cmake --build build-model
+    cargo build --release -p dv-lint                  # in rust/
+    tools/lint_parity.py --repo UVM_SRC [--slang] [--show=N]
+    tools/lint_parity.py --uvm UVM_SRC [--slang] [--show=N]
+    tools/lint_parity.py -- +incdir+DIR FILE...
+"""
+import collections, glob, json, os, re, subprocess, sys, tempfile
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+REPO = os.path.dirname(HERE)
+UVMCHECK = os.environ.get('UVMCHECK', os.path.join(REPO, 'build', 'uvmcheck'))
+DVLINT = os.environ.get('DV_LINT', os.path.join(REPO, 'rust', 'target', 'release', 'dv-lint'))
+LINE = re.compile(r'^(.*?):(\d+):(\d+): \[(\w+)\] (\S+) \((\w+)\): (.*)$')
+
+RULES = set(subprocess.run([DVLINT, '--list'], capture_output=True, text=True).stdout.split()[0::2])
+
+
+def reference(args):
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, 'r.json')
+        subprocess.run([UVMCHECK, '--no-config', '--no-cache', '--preset', 'all', '--experimental',
+                        '--json', out, *args], capture_output=True, text=True, errors='replace')
+        try:
+            data = json.load(open(out))
+        except (OSError, ValueError):
+            return None
+    return collections.Counter((os.path.basename(v['file']), v['line'], v['column'], v['ruleId'], v['message'])
+                               for v in data['violations'] if v['ruleId'] in RULES)
+
+
+def ported(args, slang):
+    res = subprocess.run([DVLINT, *(['--slang'] if slang else []), *args], capture_output=True, text=True,
+                         errors='replace')
+    got = collections.Counter()
+    for line in res.stdout.splitlines():
+        m = LINE.match(line)
+        if m:
+            got[(os.path.basename(m[1]), int(m[2]), int(m[3]), m[5], m[7])] += 1
+    return got
+
+
+def compare(args, slang, show, label):
+    ref = reference(args)
+    if ref is None:
+        print('NOREF', label)
+        return None
+    got = ported(args, slang)
+    missing, extra = ref - got, got - ref
+    if missing or extra:
+        print(f'DIFF {label} missing={sum(missing.values())} extra={sum(extra.values())}')
+        rows = [('-', k) for k in missing.elements()] + [('+', k) for k in extra.elements()]
+        for sign, (f, l, c, rule, msg) in rows[:show]:
+            print(f'  {sign} {f}:{l}:{c} {rule} {msg[:110]}')
+    return ref, missing, extra
+
+
+def main():
+    argv = sys.argv[1:]
+    slang, show = False, 0
+    while argv and argv[0].startswith('--') and argv[0] not in ('--repo', '--uvm', '--'):
+        if argv[0] == '--slang':
+            slang = True
+        elif argv[0].startswith('--show='):
+            show = int(argv[0][7:])
+        argv.pop(0)
+    if argv[:1] == ['--repo']:
+        uvm = argv[1]
+        files = sorted(glob.glob(os.path.join(REPO, 'tests/**/*.sv*'), recursive=True)
+                       + glob.glob(os.path.join(REPO, 'examples/**/*.sv*'), recursive=True))
+        cases = [(os.path.relpath(f, REPO), ['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'tests/common'),
+                                            '+incdir+' + os.path.dirname(f), f]) for f in files]
+    elif argv[:1] == ['--uvm']:
+        cases = [('uvm_pkg', ['+incdir+' + argv[1], os.path.join(argv[1], 'uvm_pkg.sv')])]
+    else:
+        cases = [('args', argv[1:] if argv[:1] == ['--'] else argv)]
+    total = bad = noref = 0
+    findings = missing = extra = 0
+    by_rule = collections.Counter()
+    fired = collections.Counter()
+    for label, args in cases:
+        r = compare(args, slang, show, label)
+        if r is None:
+            noref += 1
+            continue
+        total += 1
+        ref, m, e = r
+        findings += sum(ref.values())
+        for k, n in ref.items():
+            fired[k[3]] += n
+        missing += sum(m.values())
+        extra += sum(e.values())
+        bad += bool(m or e)
+        for k in list(m.elements()) + list(e.elements()):
+            by_rule[k[3]] += 1
+    print(f'compiles={total} identical={total - bad} differ={bad} noref={noref} '
+          f'findings={findings} missing={missing} extra={extra} by_rule={dict(by_rule)}')
+    print('reference findings by rule:', dict(sorted(fired.items())))
+    silent = sorted(RULES - set(fired))
+    if silent:
+        print('rules with no reference finding:', ' '.join(silent))
+    return 1 if bad else 0
+
+
+if __name__ == '__main__':
+    sys.exit(main())

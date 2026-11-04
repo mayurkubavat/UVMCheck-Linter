@@ -20,7 +20,7 @@
 extern "C" {
 #endif
 
-#define UVMCHECK_MODEL_ABI_VERSION 5u
+#define UVMCHECK_MODEL_ABI_VERSION 6u
 #define UVMCHECK_NONE 0xFFFFFFFFu
 
 typedef struct uvmcheck_design uvmcheck_design;
@@ -35,6 +35,8 @@ enum {
 
 typedef struct {
     uint32_t file, line, column;
+    /* Code from a macro: file and line of the outermost expansion; 0 otherwise. */
+    uint32_t exp_file, exp_line;
 } uvmcheck_loc;
 
 typedef struct {

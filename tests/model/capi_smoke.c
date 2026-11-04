@@ -18,11 +18,11 @@ int main(int argc, char** argv) {
     CHECK(uvmcheck_model_abi_version() == UVMCHECK_MODEL_ABI_VERSION);
     /* rust/sv-slang asserts the same sizes for its copies of these structs */
     if (sizeof(void*) == 8) {
-        CHECK(sizeof(uvmcheck_class) == 56 && sizeof(uvmcheck_property) == 40);
-        CHECK(sizeof(uvmcheck_method) == 88 && sizeof(uvmcheck_argument) == 48);
-        CHECK(sizeof(uvmcheck_assignment) == 40);
-        CHECK(sizeof(uvmcheck_call) == 56);
-        CHECK(sizeof(uvmcheck_local) == 32 && sizeof(uvmcheck_constraint) == 24);
+        CHECK(sizeof(uvmcheck_class) == 64 && sizeof(uvmcheck_property) == 48);
+        CHECK(sizeof(uvmcheck_method) == 104 && sizeof(uvmcheck_argument) == 56);
+        CHECK(sizeof(uvmcheck_assignment) == 48);
+        CHECK(sizeof(uvmcheck_call) == 72);
+        CHECK(sizeof(uvmcheck_local) == 40 && sizeof(uvmcheck_constraint) == 32);
     }
 
     char incdir[4096];

@@ -1,0 +1,20 @@
+[package]
+name = "dv-lint"
+description = "UVMCheck's model-based rules in Rust, over dv-model, with no Slang needed"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[features]
+default = ["slang"]
+# `--slang`: load the design through slang too (needs libuvmcheck_model).
+slang = ["dv-model/slang"]
+
+[dependencies]
+dv-model = { path = "../dv-model", default-features = false }
+sv-sema = { path = "../sv-sema" }
+
+[dev-dependencies]
+sv-syntax = { path = "../sv-syntax" }

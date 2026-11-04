@@ -4,7 +4,7 @@
 
 use std::os::raw::{c_char, c_int};
 
-pub const ABI_VERSION: u32 = 5;
+pub const ABI_VERSION: u32 = 6;
 pub const NONE: u32 = u32::MAX;
 
 #[repr(C)]
@@ -18,6 +18,8 @@ pub struct uvmcheck_loc {
     pub file: u32,
     pub line: u32,
     pub column: u32,
+    pub exp_file: u32,
+    pub exp_line: u32,
 }
 
 #[repr(C)]
@@ -204,16 +206,16 @@ mod tests {
     fn layout_matches_the_c_header() {
         use std::mem::size_of;
         // Pointer-sized fields first, then fixed-width ones, as in CApi.h.
-        assert_eq!(size_of::<super::uvmcheck_loc>(), 12);
-        assert_eq!(size_of::<super::uvmcheck_class>(), 3 * 8 + 4 + 4 + 12 + 12);
+        assert_eq!(size_of::<super::uvmcheck_loc>(), 20);
+        assert_eq!(size_of::<super::uvmcheck_class>(), 3 * 8 + 4 + 4 + 12 + 20);
         // Sizes with the padding a C compiler adds (8-byte pointers).
-        assert_eq!(size_of::<super::uvmcheck_property>(), 40);
-        assert_eq!(size_of::<super::uvmcheck_method>(), 88);
-        assert_eq!(size_of::<super::uvmcheck_assignment>(), 40);
-        assert_eq!(size_of::<super::uvmcheck_argument>(), 48);
-        assert_eq!(size_of::<super::uvmcheck_local>(), 32);
-        assert_eq!(size_of::<super::uvmcheck_constraint>(), 24);
-        assert_eq!(size_of::<super::uvmcheck_call>(), 56);
+        assert_eq!(size_of::<super::uvmcheck_property>(), 48);
+        assert_eq!(size_of::<super::uvmcheck_method>(), 104);
+        assert_eq!(size_of::<super::uvmcheck_assignment>(), 48);
+        assert_eq!(size_of::<super::uvmcheck_argument>(), 56);
+        assert_eq!(size_of::<super::uvmcheck_local>(), 40);
+        assert_eq!(size_of::<super::uvmcheck_constraint>(), 32);
+        assert_eq!(size_of::<super::uvmcheck_call>(), 72);
         assert_eq!(unsafe { super::uvmcheck_model_abi_version() }, super::ABI_VERSION);
     }
 }

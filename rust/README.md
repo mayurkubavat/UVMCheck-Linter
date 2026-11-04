@@ -271,4 +271,36 @@ as `<error>`. On uvm_pkg.sv about 90 of 12,324 lines differ (it varies run
 to run with Slang's representative choice), all in arguments typed through
 nested generic classes, plus the anonymous type indices.
 
-Classes declared inside modules are not compared yet.
+Classes declared inside modules need no work: Slang's model only walks
+packages, `$unit` and nested classes, and so does sv-sema.
+
+## dv-lint (R3 slice 4, rules without Slang)
+
+The 27 C++ rules that read only the model facade (`UvmModel::facade()`), ported
+line for line with their messages verbatim. `dv-lint` runs them on a design
+built natively by sv-sema, or through Slang with `--slang`, and prints findings
+in uvmcheck's text form:
+
+```
+cargo build --release -p dv-lint
+target/release/dv-lint [--slang] [--rule ID]... [--list] <compile options>
+```
+
+As in uvmcheck, a finding on code from a macro is reported at the line of the
+outermost expansion with column 0, and nothing is reported in the test
+`uvm_mock.svh`. For that, `Loc` carries the expansion site (`expansion` in
+Rust, `exp_file`/`exp_line` in the C ABI, now version 6).
+
+`tools/lint_parity.py` runs `uvmcheck --preset all --experimental --json`,
+keeps the findings of the 27 rules, and compares them with dv-lint's as
+multisets of file name, line, column, rule and message:
+
+```
+tools/lint_parity.py [--slang] --repo UVM_SRC
+tools/lint_parity.py [--slang] --uvm UVM_SRC
+```
+
+Measured 2026-11-04 on the native model: all 783 repo compiles are identical
+(465 findings; every one of the 27 rules fires at least once). On uvm_pkg.sv
+150 of 152 findings match; the other 2 are SV-PRF-001 messages that print an
+anonymous struct type with Slang's `s$N` index.

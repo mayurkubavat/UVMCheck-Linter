@@ -364,6 +364,10 @@ private:
         out.file = model.internFile(sm->getFileName(orig));
         out.line = static_cast<uint32_t>(sm->getLineNumber(orig));
         out.column = static_cast<uint32_t>(sm->getColumnNumber(orig));
+        if (sm->isMacroLoc(l)) {
+            out.expFile = model.internFile(sm->getFileName(l));
+            out.expLine = static_cast<uint32_t>(sm->getLineNumber(l));
+        }
         return out;
     }
 

@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Iterator, List, Optional, Sequence
 
-ABI_VERSION = 5
+ABI_VERSION = 6
 NONE = 0xFFFFFFFF
 
 UVM_KINDS = ("none", "object", "sequence_item", "sequence", "component", "test", "env", "agent",
@@ -33,7 +33,8 @@ SHAPES = ("other", "dynamic_array", "queue", "associative_array", "fixed_unpacke
 
 
 class _Loc(ctypes.Structure):
-    _fields_ = [("file", ctypes.c_uint32), ("line", ctypes.c_uint32), ("column", ctypes.c_uint32)]
+    _fields_ = [("file", ctypes.c_uint32), ("line", ctypes.c_uint32), ("column", ctypes.c_uint32),
+                ("exp_file", ctypes.c_uint32), ("exp_line", ctypes.c_uint32)]
 
 
 class _Class(ctypes.Structure):

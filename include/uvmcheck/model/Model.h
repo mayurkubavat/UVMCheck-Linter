@@ -26,6 +26,10 @@ struct Loc {
     uint32_t file = 0; ///< index into Model::files(); 0 is the empty name
     uint32_t line = 0;
     uint32_t column = 0;
+    /// For code from a macro: the file and line of the outermost expansion,
+    /// which is where findings on it are reported (column 0). 0 otherwise.
+    uint32_t expFile = 0;
+    uint32_t expLine = 0;
 };
 
 /// What a class is in UVM terms, most specific first.

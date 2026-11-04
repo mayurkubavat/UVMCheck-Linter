@@ -12,6 +12,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dv-lint"
+version = "0.1.0"
+dependencies = [
+ "dv-model",
+ "sv-sema",
+ "sv-syntax",
+]
+
+[[package]]
 name = "dv-map"
 version = "0.1.0"
 dependencies = [

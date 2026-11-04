@@ -22,7 +22,7 @@ struct uvmcheck_design {
 
 namespace {
 
-uvmcheck_loc toC(const Loc& l) { return {l.file, l.line, l.column}; }
+uvmcheck_loc toC(const Loc& l) { return {l.file, l.line, l.column, l.expFile, l.expLine}; }
 
 const Model* modelOf(const uvmcheck_design* d) {
     return d && d->session && d->session->ok() ? &d->session->model() : nullptr;

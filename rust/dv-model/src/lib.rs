@@ -148,6 +148,9 @@ pub struct Loc {
     pub file: u32,
     pub line: u32,
     pub column: u32,
+    /// For code from a macro: the file and line of the outermost expansion,
+    /// where uvmcheck reports findings on it (with column 0).
+    pub expansion: Option<(u32, u32)>,
 }
 
 #[derive(Clone, Debug)]
@@ -331,7 +334,7 @@ fn text(p: *const c_char) -> String {
 
 #[cfg(feature = "slang")]
 fn loc(l: ffi::uvmcheck_loc) -> Loc {
-    Loc { file: l.file, line: l.line, column: l.column }
+    Loc { file: l.file, line: l.line, column: l.column, expansion: (l.exp_line != 0).then_some((l.exp_file, l.exp_line)) }
 }
 
 #[cfg(feature = "slang")]

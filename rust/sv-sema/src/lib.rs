@@ -330,13 +330,24 @@ impl<'t> Builder<'t> {
     }
 
     fn loc(&mut self, tree: usize, tok: u32) -> Loc {
-        let t = &self.trees[tree];
-        let Some(token) = t.tokens.get(tok as usize) else {
+        let Some(token) = self.trees[tree].tokens.get(tok as usize) else {
             return Loc::default();
         };
         // Code from a macro is placed where its text was written, as
-        // slang's model does.
-        let o = token.written;
+        // slang's model does, and also remembers the expansion site, where
+        // findings on it are reported.
+        let (written, origin, from_macro) = (token.written, token.origin, token.from_macro);
+        let (file, line, column) = self.position(tree, written);
+        let expansion = from_macro.then(|| {
+            let (f, l, _) = self.position(tree, origin);
+            (f, l)
+        });
+        Loc { file, line, column, expansion }
+    }
+
+    /// Design file index, line and column of a preprocessor origin.
+    fn position(&mut self, tree: usize, o: sv_syntax::Origin) -> (u32, u32, u32) {
+        let t = &self.trees[tree];
         let key = (tree, o.file);
         let file = match self.file_ids.get(&key) {
             Some(&f) => f,
@@ -356,15 +367,8 @@ impl<'t> Builder<'t> {
         let src = &t.sources[o.file as usize];
         let off = (o.offset as usize).min(src.len());
         let line_start = src[..off].rfind('\n').map_or(0, |i| i + 1);
-        let line = 1 + src.as_bytes()[..off]
-            .iter()
-            .filter(|&&b| b == b'\n')
-            .count();
-        Loc {
-            file,
-            line: line as u32,
-            column: (off - line_start + 1) as u32,
-        }
+        let line = 1 + src.as_bytes()[..off].iter().filter(|&&b| b == b'\n').count();
+        (file, line as u32, (off - line_start + 1) as u32)
     }
 
     fn new_scope(&mut self, kind: ScopeKind, name: &str, parent: Option<usize>) -> usize {
