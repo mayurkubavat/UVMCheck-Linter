@@ -447,6 +447,7 @@ fn class_decl(p: &mut Parser, q: usize) -> SyntaxKind {
         p.bump();
     }
     p.expect("class");
+    override_specifiers(p);
     if p.at_any(&["static", "automatic"]) {
         p.bump();
     }
@@ -460,6 +461,15 @@ fn class_decl(p: &mut Parser, q: usize) -> SyntaxKind {
     p.expect("endclass");
     end_label(p);
     ClassDecl
+}
+
+/// 1800-2023 `:initial`, `:extends`, `:final` after `class`, `function`,
+/// `task` or `constraint`.
+pub(crate) fn override_specifiers(p: &mut Parser) {
+    while p.at(":") && matches!(p.nth(1), "initial" | "extends" | "final") {
+        p.bump();
+        p.bump();
+    }
 }
 
 /// Finds the method name in a header `[lifetime] [type] name (` or `;`:
@@ -542,9 +552,11 @@ pub(crate) fn subroutine(p: &mut Parser, q: usize, proto: bool) -> SyntaxKind {
     }
     let is_task = p.at("task");
     p.bump();
+    override_specifiers(p);
     if p.at_any(&["static", "automatic"]) {
         p.bump();
     }
+    override_specifiers(p);
     match find_method_name(p) {
         Some((s, e)) => {
             if s > p.pos() {
@@ -650,6 +662,7 @@ fn constraint(p: &mut Parser, q: usize) -> SyntaxKind {
         p.bump();
     }
     p.bump();
+    override_specifiers(p);
     let n = p.start();
     while !p.at_end() && !p.at_any(&["{", ";"]) {
         p.bump();

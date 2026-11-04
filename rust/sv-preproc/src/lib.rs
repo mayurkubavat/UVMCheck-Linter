@@ -44,6 +44,10 @@ pub struct PpToken {
     pub origin: Origin,
     /// Made or rearranged by a macro expansion.
     pub from_macro: bool,
+    /// Where the token's text was written: inside a `define body or a
+    /// macro argument for expanded tokens (slang's "fully original"
+    /// location), else the same as `origin`.
+    pub written: Origin,
 }
 
 #[derive(Clone, Debug)]
@@ -79,6 +83,9 @@ struct T {
     newline_before: bool,
     origin: Origin,
     from_macro: bool,
+    /// Where the text was written (a define body or a macro argument);
+    /// None for text a macro made (pasting, stringifying, the command line).
+    written: Option<Origin>,
 }
 
 #[derive(Clone, Debug)]
@@ -211,6 +218,7 @@ fn lex_to_t(src: &str, file: u32, from_macro: bool, origin_override: Option<Orig
                     newline_before: newline,
                     origin: origin_override.unwrap_or(Origin { file, offset: tok.start }),
                     from_macro,
+                    written: (!from_macro).then_some(Origin { file, offset: tok.start }),
                 });
                 space = false;
                 newline = false;
@@ -286,7 +294,8 @@ impl Preprocessor {
         let id = self.add_file(PathBuf::from(name), src);
         self.push_file(id);
         while let Some(t) = self.next() {
-            self.out.tokens.push(PpToken { kind: t.kind, text: t.text, origin: t.origin, from_macro: t.from_macro });
+            let written = t.written.unwrap_or(t.origin);
+            self.out.tokens.push(PpToken { kind: t.kind, text: t.text, origin: t.origin, from_macro: t.from_macro, written });
         }
         if !self.conds.is_empty() {
             self.diag(Origin { file: id, offset: src.len() as u32 }, "missing `endif".into());
@@ -948,6 +957,7 @@ impl Preprocessor {
                         newline_before: false,
                         origin,
                         from_macro: true,
+                        written: None,
                     });
                     i = j + 1;
                     continue;
@@ -968,7 +978,10 @@ impl Preprocessor {
                         glued.push_str(&first.text);
                     }
                     let mut re = lex_to_t(&glued, origin.file, true, Some(origin));
+                    // Placed where the left half was written, as slang does.
+                    let written = left.as_ref().and_then(|l| l.written).or_else(|| next.first().and_then(|n| n.written));
                     for (n, r) in re.iter_mut().enumerate() {
+                        r.written = written;
                         if n == 0 {
                             r.space_before = space;
                         }

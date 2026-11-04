@@ -1,0 +1,1675 @@
+//! Native symbols: the class model that `dv-model` describes, built from
+//! `sv-syntax` trees instead of slang (R3 of the Rust front end).
+//!
+//! [`load`] takes compile options (`+incdir+`, `+define+`, files) and returns
+//! a [`dv_model::Design`] like `Design::load` does. What it resolves today:
+//! packages, `$unit`, nested classes, typedefs, imports, base classes (with
+//! specializations), UVM roles, properties, methods (extern bodies and
+//! virtual overrides included), arguments, locals and constraints. Type
+//! strings and method bodies (calls, assignments, timing) are not built yet.
+
+use std::collections::{HashMap, HashSet};
+use std::path::PathBuf;
+use std::time::Instant;
+
+use dv_model::{
+    Argument, Class, ClassId, Constraint, Design, Direction, Error, Loc, Local, Method, PhaseKind,
+    Property, Timings, TypeShape, UvmKind, Visibility,
+};
+use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
+use SyntaxKind::*;
+
+/// Loads and models a design from compile options, as `Design::load` does.
+pub fn load<S: AsRef<str>>(args: &[S]) -> Result<Design, Error> {
+    let mut opts = Options::default();
+    let mut files = Vec::new();
+    let mut it = args.iter().map(|a| a.as_ref());
+    while let Some(a) = it.next() {
+        if let Some(rest) = a.strip_prefix("+incdir+") {
+            opts.include_dirs
+                .extend(rest.split('+').filter(|s| !s.is_empty()).map(PathBuf::from));
+        } else if let Some(rest) = a.strip_prefix("+define+") {
+            opts.defines
+                .extend(rest.split('+').filter(|s| !s.is_empty()).map(String::from));
+        } else if a == "-I" || a == "--include-directory" {
+            opts.include_dirs.push(PathBuf::from(
+                it.next()
+                    .ok_or_else(|| Error("-I needs a directory".into()))?,
+            ));
+        } else if let Some(d) = a.strip_prefix("-I") {
+            opts.include_dirs.push(PathBuf::from(d));
+        } else if a == "-D" {
+            opts.defines.push(
+                it.next()
+                    .ok_or_else(|| Error("-D needs a macro".into()))?
+                    .to_string(),
+            );
+        } else if let Some(d) = a.strip_prefix("-D") {
+            opts.defines.push(d.to_string());
+        } else if a.starts_with('-') || a.starts_with('+') {
+            // Other tool options mean nothing to the model.
+        } else {
+            files.push(PathBuf::from(a));
+        }
+    }
+    if files.is_empty() {
+        return Err(Error("no sources given".into()));
+    }
+    let t0 = Instant::now();
+    let mut trees = Vec::with_capacity(files.len());
+    for f in &files {
+        if !f.exists() {
+            return Err(Error(format!(
+                "could not read the sources: {}",
+                f.display()
+            )));
+        }
+        trees.push(sv_syntax::parse_file(f, opts.clone()));
+    }
+    let parse_ms = t0.elapsed().as_secs_f64() * 1e3;
+    let errors = trees
+        .iter()
+        .map(|t| t.errors.len() + t.pp_diagnostics.len())
+        .sum::<usize>() as u32;
+    let t1 = Instant::now();
+    let design = build(&trees);
+    let model_ms = t1.elapsed().as_secs_f64() * 1e3;
+    Ok(Design::from_parts(
+        design.files().to_vec(),
+        design.classes().to_vec(),
+        errors,
+        Timings {
+            parse_ms,
+            elaborate_ms: 0.0,
+            model_ms,
+            copy_ms: 0.0,
+        },
+    ))
+}
+
+/// Models already parsed trees (one per compilation unit).
+pub fn build(trees: &[Tree]) -> Design {
+    let mut b = Builder::new(trees);
+    b.collect();
+    b.finish()
+}
+
+// ---- symbol tables ----------------------------------------------------
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
+struct NodeRef {
+    tree: usize,
+    node: NodeId,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ScopeKind {
+    Unit,
+    Package,
+    Class(usize),
+}
+
+struct Scope {
+    kind: ScopeKind,
+    name: String,
+    parent: Option<usize>,
+    classes: HashMap<String, usize>,
+    typedefs: HashMap<String, NodeRef>,
+    /// `import p::*` (None) and `import p::x` (Some).
+    imports: Vec<(String, Option<String>)>,
+    /// Type parameters of a class, with their default type.
+    type_params: HashMap<String, Option<NodeRef>>,
+}
+
+struct ClassDef {
+    name: String,
+    node: NodeRef,
+    /// Scope the class is declared in.
+    parent: usize,
+    /// The class's own scope (members, nested classes, typedefs).
+    scope: usize,
+    generic: bool,
+    extends: Option<NodeRef>,
+    /// Parameters in order: name, whether a type, default.
+    params: Vec<(String, bool, Option<NodeRef>)>,
+}
+
+/// Actual type parameters of a specialization, by name.
+type Env = std::rc::Rc<HashMap<String, Bound>>;
+
+/// A type argument, resolved where it was written.
+#[derive(Clone)]
+struct Bound {
+    node: NodeRef,
+    scope: usize,
+    env: Env,
+}
+
+/// What a type name stands for.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum Resolved {
+    Class(usize),
+    Vif,
+    Other,
+}
+
+struct TypeInfo {
+    resolved: Resolved,
+    shape: TypeShape,
+    /// For a class: its type arguments.
+    args: Env,
+}
+
+struct Builder<'t> {
+    trees: &'t [Tree],
+    scopes: Vec<Scope>,
+    packages: HashMap<String, usize>,
+    unit: usize,
+    classes: Vec<ClassDef>,
+    /// Out-of-block bodies: (class name, method name) -> body.
+    bodies: HashMap<(String, String), NodeRef>,
+    /// Names used as types anywhere (generic classes with a use have members).
+    used_names: HashSet<String>,
+    /// The specialization slang reads a parameterized class's members
+    /// from: the one that prints first, as its type arguments.
+    rep_env: HashMap<usize, Env>,
+    /// Scope of each class and package node.
+    node_scope: HashMap<NodeRef, usize>,
+    files: Vec<String>,
+    file_ids: HashMap<(usize, u32), u32>,
+}
+
+impl<'t> Builder<'t> {
+    fn new(trees: &'t [Tree]) -> Self {
+        let unit = Scope {
+            kind: ScopeKind::Unit,
+            name: String::new(),
+            parent: None,
+            classes: HashMap::new(),
+            typedefs: HashMap::new(),
+            imports: Vec::new(),
+            type_params: HashMap::new(),
+        };
+        Builder {
+            trees,
+            scopes: vec![unit],
+            packages: HashMap::new(),
+            unit: 0,
+            classes: Vec::new(),
+            bodies: HashMap::new(),
+            used_names: HashSet::new(),
+            rep_env: HashMap::new(),
+            node_scope: HashMap::new(),
+            // Index 0 is "no file", as in slang's model.
+            files: vec![String::new()],
+            file_ids: HashMap::new(),
+        }
+    }
+
+    fn tree(&self, r: NodeRef) -> &'t Tree {
+        &self.trees[r.tree]
+    }
+
+    fn kind(&self, r: NodeRef) -> SyntaxKind {
+        self.tree(r).kind(r.node)
+    }
+
+    fn child(&self, r: NodeRef, k: SyntaxKind) -> Option<NodeRef> {
+        self.tree(r)
+            .child(r.node, k)
+            .map(|node| NodeRef { tree: r.tree, node })
+    }
+
+    fn children(&self, r: NodeRef) -> Vec<NodeRef> {
+        self.tree(r)
+            .children(r.node)
+            .map(|node| NodeRef { tree: r.tree, node })
+            .collect()
+    }
+
+    /// The node's own tokens (not its children's), in order.
+    fn own_tokens(&self, r: NodeRef) -> Vec<&'t str> {
+        let t = self.tree(r);
+        t.node(r.node)
+            .children
+            .iter()
+            .filter_map(|c| match *c {
+                sv_syntax::Child::Token(i) => Some(&*t.tokens[i as usize].text),
+                _ => None,
+            })
+            .collect()
+    }
+
+    fn tokens(&self, r: NodeRef) -> Vec<u32> {
+        self.tree(r).token_range(r.node)
+    }
+
+    fn text(&self, tree: usize, tok: u32) -> &'t str {
+        &self.trees[tree].tokens[tok as usize].text
+    }
+
+    /// Last token of a Name node: the method of `C::f`, or the plain name.
+    fn name_of(&self, r: NodeRef) -> Option<(String, u32)> {
+        let n = self.child(r, Name)?;
+        let t = *self.tokens(n).last()?;
+        Some((self.text(r.tree, t).to_string(), t))
+    }
+
+    fn loc(&mut self, tree: usize, tok: u32) -> Loc {
+        let t = &self.trees[tree];
+        let Some(token) = t.tokens.get(tok as usize) else {
+            return Loc::default();
+        };
+        // Code from a macro is placed where its text was written, as
+        // slang's model does.
+        let o = token.written;
+        let key = (tree, o.file);
+        let file = match self.file_ids.get(&key) {
+            Some(&f) => f,
+            None => {
+                let name = t.files[o.file as usize].to_string_lossy().into_owned();
+                let f = match self.files.iter().position(|n| *n == name) {
+                    Some(i) => i as u32,
+                    None => {
+                        self.files.push(name);
+                        (self.files.len() - 1) as u32
+                    }
+                };
+                self.file_ids.insert(key, f);
+                f
+            }
+        };
+        let src = &t.sources[o.file as usize];
+        let off = (o.offset as usize).min(src.len());
+        let line_start = src[..off].rfind('\n').map_or(0, |i| i + 1);
+        let line = 1 + src.as_bytes()[..off]
+            .iter()
+            .filter(|&&b| b == b'\n')
+            .count();
+        Loc {
+            file,
+            line: line as u32,
+            column: (off - line_start + 1) as u32,
+        }
+    }
+
+    fn new_scope(&mut self, kind: ScopeKind, name: &str, parent: Option<usize>) -> usize {
+        self.scopes.push(Scope {
+            kind,
+            name: name.to_string(),
+            parent,
+            classes: HashMap::new(),
+            typedefs: HashMap::new(),
+            imports: Vec::new(),
+            type_params: HashMap::new(),
+        });
+        self.scopes.len() - 1
+    }
+
+    // ---- collection -----------------------------------------------------
+
+    fn collect(&mut self) {
+        for i in 0..self.trees.len() {
+            let root = NodeRef {
+                tree: i,
+                node: self.trees[i].root,
+            };
+            self.collect_scope(root, self.unit);
+        }
+        self.specialized_generics();
+        self.representatives();
+    }
+
+    fn collect_scope(&mut self, r: NodeRef, scope: usize) {
+        for c in self.children(r) {
+            match self.kind(c) {
+                PackageDecl => {
+                    let Some((name, _)) = self.name_of(c) else {
+                        continue;
+                    };
+                    let s = match self.packages.get(&name) {
+                        Some(&s) => s,
+                        None => {
+                            let s = self.new_scope(ScopeKind::Package, &name, Some(self.unit));
+                            self.packages.insert(name.clone(), s);
+                            s
+                        }
+                    };
+                    self.node_scope.insert(c, s);
+                    self.collect_scope(c, s);
+                }
+                ClassDecl => self.collect_class(c, scope),
+                TypedefDecl => {
+                    if let Some((name, _)) = self.name_of(c) {
+                        self.scopes[scope].typedefs.insert(name, c);
+                    }
+                }
+                ImportDecl => self.collect_import(c, scope),
+                FunctionDecl | TaskDecl => {
+                    // `function T C::f(...)`: an out-of-block body.
+                    if let Some(n) = self.child(c, Name) {
+                        let toks = self.tokens(n);
+                        if toks.len() >= 3 {
+                            let class = self.text(c.tree, toks[toks.len() - 3]).to_string();
+                            let method = self.text(c.tree, toks[toks.len() - 1]).to_string();
+                            self.bodies.entry((class, method)).or_insert(c);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    fn collect_import(&mut self, r: NodeRef, scope: usize) {
+        let toks: Vec<&str> = self
+            .tokens(r)
+            .iter()
+            .map(|&t| self.text(r.tree, t))
+            .collect();
+        // import a::*, b::x;
+        let mut i = 1;
+        while i + 2 < toks.len() {
+            if toks[i + 1] == "::" {
+                let item = if toks[i + 2] == "*" {
+                    None
+                } else {
+                    Some(toks[i + 2].to_string())
+                };
+                self.scopes[scope].imports.push((toks[i].to_string(), item));
+                i += 3;
+            } else {
+                i += 1;
+            }
+            if i < toks.len() && toks[i] == "," {
+                i += 1;
+            }
+        }
+    }
+
+    fn collect_class(&mut self, r: NodeRef, parent: usize) {
+        let Some((name, _)) = self.name_of(r) else {
+            return;
+        };
+        let idx = self.classes.len();
+        let own = self.new_scope(ScopeKind::Class(idx), &name, Some(parent));
+        let header = self.child(r, Header);
+        let mut generic = false;
+        let mut extends = None;
+        let mut params = Vec::new();
+        if let Some(h) = header {
+            if let Some(pl) = self.child(h, ParamList) {
+                generic = true;
+                // `type` carries over to the following parameters until a
+                // data type or `parameter` says otherwise.
+                let mut sticky_type = false;
+                for p in self.children(pl) {
+                    if self.kind(p) != ParamDecl {
+                        continue;
+                    }
+                    let own_toks = self.own_tokens(p);
+                    if own_toks.contains(&"type") {
+                        sticky_type = true;
+                    } else if own_toks
+                        .iter()
+                        .any(|t| matches!(*t, "parameter" | "localparam"))
+                        || self.child(p, DataType).is_some()
+                    {
+                        sticky_type = false;
+                    }
+                    let (pname, default) = if let Some(n) = self.child(p, Name) {
+                        (
+                            self.tokens(n)
+                                .last()
+                                .map(|&t| self.text(n.tree, t).to_string()),
+                            self.child(p, DataType),
+                        )
+                    } else if let Some(d) = self.child(p, Declarator) {
+                        let n = self.name_of(d).map(|(n, _)| n);
+                        let v = self
+                            .children(d)
+                            .into_iter()
+                            .find(|c| !matches!(self.kind(*c), Name | Dim));
+                        (n, v)
+                    } else {
+                        (None, None)
+                    };
+                    let Some(pname) = pname else { continue };
+                    if sticky_type {
+                        self.scopes[own].type_params.insert(pname.clone(), default);
+                    }
+                    params.push((pname, sticky_type, default));
+                }
+            }
+            // `implements` lists share the Extends node kind; only the
+            // `extends` clause names a base class.
+            let base = self.children(h).into_iter().find(|&e| {
+                self.tree(e).node(e.node).kind == Extends
+                    && self.own_tokens(e).first() == Some(&"extends")
+            });
+            if let Some(e) = base {
+                extends = self.child(e, DataType);
+            }
+        }
+        self.classes.push(ClassDef {
+            name: name.clone(),
+            node: r,
+            parent,
+            scope: own,
+            generic,
+            extends,
+            params,
+        });
+        self.scopes[parent].classes.entry(name).or_insert(idx);
+        self.node_scope.insert(r, own);
+        for c in self.children(r) {
+            match self.kind(c) {
+                ClassDecl => self.collect_class(c, own),
+                TypedefDecl => {
+                    if let Some((n, _)) = self.name_of(c) {
+                        self.scopes[own].typedefs.insert(n, c);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Identifiers used outside the name of their own declaration, each
+    /// with the parameterized class whose body it is in (if any).
+    fn collect_name_uses(
+        &self,
+        tree: usize,
+        generics: &HashSet<&str>,
+        uses: &mut HashSet<(String, Option<String>)>,
+    ) {
+        let t = &self.trees[tree];
+        let mut own = HashSet::new();
+        // Token ranges of generic class bodies (and their out-of-block
+        // methods), innermost last after sorting by start.
+        let mut regions: Vec<(u32, u32, String)> = Vec::new();
+        for n in t.preorder() {
+            let k = t.kind(n);
+            match k {
+                ClassDecl | ForwardTypedef | EndLabel | FunctionDecl | TaskDecl => {
+                    if let Some(name) = t.child(n, Name) {
+                        own.extend(t.token_range(name));
+                    }
+                    if k == EndLabel {
+                        own.extend(t.token_range(n));
+                    }
+                }
+                _ => {}
+            }
+            let owner = match k {
+                ClassDecl => t
+                    .child(n, Name)
+                    .and_then(|x| t.token_range(x).last().copied()),
+                FunctionDecl | TaskDecl => t.child(n, Name).and_then(|x| {
+                    let r = t.token_range(x);
+                    (r.len() >= 3).then(|| r[r.len() - 3])
+                }),
+                _ => None,
+            };
+            if let Some(o) = owner {
+                let name = &*t.tokens[o as usize].text;
+                if generics.contains(name) {
+                    let r = t.token_range(n);
+                    if let (Some(&lo), Some(&hi)) = (r.first(), r.last()) {
+                        regions.push((lo, hi, name.to_string()));
+                    }
+                }
+            }
+        }
+        for (i, tok) in t.tokens.iter().enumerate() {
+            let i = i as u32;
+            if tok.kind != sv_syntax::TokenKind::Identifier
+                || own.contains(&i)
+                || !generics.contains(&*tok.text)
+            {
+                continue;
+            }
+            // The innermost generic region holding the use.
+            let owner = regions
+                .iter()
+                .filter(|(lo, hi, _)| *lo <= i && i <= *hi)
+                .min_by_key(|(lo, hi, _)| hi - lo)
+                .map(|(_, _, n)| n.clone());
+            uses.insert((tok.text.to_string(), owner));
+        }
+    }
+
+    /// Parameterized classes something specializes: used from code that is
+    /// itself elaborated (anything outside an unspecialized generic class).
+    fn specialized_generics(&mut self) {
+        let generics: HashSet<&str> = self
+            .classes
+            .iter()
+            .filter(|c| c.generic)
+            .map(|c| c.name.as_str())
+            .collect();
+        let mut uses = HashSet::new();
+        for i in 0..self.trees.len() {
+            self.collect_name_uses(i, &generics, &mut uses);
+        }
+        let mut live: HashSet<String> = HashSet::new();
+        loop {
+            let before = live.len();
+            for (name, owner) in &uses {
+                if owner
+                    .as_ref()
+                    .map_or(true, |o| live.contains(o) && o != name)
+                {
+                    live.insert(name.clone());
+                }
+            }
+            if live.len() == before {
+                break;
+            }
+        }
+        self.used_names = live;
+    }
+
+    /// Innermost scope around each token range: classes, packages and the
+    /// out-of-block bodies of class methods.
+    fn regions(&self, tree: usize) -> Vec<(u32, u32, usize)> {
+        let t = &self.trees[tree];
+        let mut out = Vec::new();
+        let mut stack = vec![(t.root, self.unit)];
+        while let Some((n, scope)) = stack.pop() {
+            let r = NodeRef { tree, node: n };
+            let mut inner = scope;
+            if let Some(&s) = self.node_scope.get(&r) {
+                inner = s;
+            } else if matches!(t.kind(n), FunctionDecl | TaskDecl) {
+                // `function T C::f` belongs to class C.
+                if let Some(name) = t.child(n, Name) {
+                    let toks = t.token_range(name);
+                    if toks.len() >= 3 {
+                        let class = &*t.tokens[toks[toks.len() - 3] as usize].text;
+                        if let Some(Found::Class(c)) = self.lookup(class, scope, 0) {
+                            inner = self.classes[c].scope;
+                        }
+                    }
+                }
+            }
+            if inner != scope {
+                let r = t.token_range(n);
+                if let (Some(&lo), Some(&hi)) = (r.first(), r.last()) {
+                    out.push((lo, hi, inner));
+                }
+            }
+            if matches!(
+                t.kind(n),
+                ClassDecl | PackageDecl | SourceFile | FunctionDecl | TaskDecl
+            ) || inner != scope
+            {
+                for c in t.children(n) {
+                    stack.push((c, inner));
+                }
+            }
+        }
+        out
+    }
+
+    fn scope_at(regions: &[(u32, u32, usize)], tok: u32, unit: usize) -> usize {
+        regions
+            .iter()
+            .filter(|(lo, hi, _)| *lo <= tok && tok <= *hi)
+            .min_by_key(|(lo, hi, _)| hi - lo)
+            .map_or(unit, |r| r.2)
+    }
+
+    /// The generic class whose (unspecialized) body holds `scope`, if any.
+    fn generic_owner(&self, scope: usize) -> Option<usize> {
+        let mut cur = Some(scope);
+        while let Some(s) = cur {
+            if let ScopeKind::Class(c) = self.scopes[s].kind {
+                if self.classes[c].generic {
+                    return Some(c);
+                }
+            }
+            cur = self.scopes[s].parent;
+        }
+        None
+    }
+
+    /// For each specialized generic class, the specialization that prints
+    /// first (slang reads the definition's members from that one).
+    fn representatives(&mut self) {
+        // Every specialization by its printed form. Uses inside a generic
+        // class that depend on its parameters specialize once per
+        // specialization of that class, so this runs to a fixpoint.
+        let mut specs: HashMap<usize, std::collections::BTreeMap<String, Env>> = HashMap::new();
+        let mut uses = Vec::new();
+        for tree in 0..self.trees.len() {
+            let regions = self.regions(tree);
+            let t = &self.trees[tree];
+            for n in t.preorder() {
+                if !matches!(t.kind(n), DataType | NameExpr) {
+                    continue;
+                }
+                let r = NodeRef { tree, node: n };
+                let toks = t.token_range(n);
+                let Some(&first) = toks.first() else { continue };
+                if t.tokens[first as usize].kind != sv_syntax::TokenKind::Identifier {
+                    continue;
+                }
+                // Only a class named right here specializes it (not one a
+                // typedef or parameter stands for).
+                let head = toks
+                    .iter()
+                    .take_while(|&&k| &*t.tokens[k as usize].text != "#")
+                    .last()
+                    .unwrap_or(&first);
+                let head = &*t.tokens[*head as usize].text;
+                if !self.classes.iter().any(|c| c.generic && c.name == head) {
+                    continue;
+                }
+                let scope = Self::scope_at(&regions, first, self.unit);
+                let owner = self.generic_owner(scope);
+                if let Some(g) = owner {
+                    // Code inside an unspecialized generic is never elaborated.
+                    if !self.used_names.contains(&self.classes[g].name) {
+                        continue;
+                    }
+                }
+                // The enclosing generic class (innermost first) whose
+                // parameters the use depends on.
+                let mut dependent = None;
+                let mut cur = owner;
+                while let Some(g) = cur {
+                    if self.uses_type_param(r, g) {
+                        dependent = Some(g);
+                        break;
+                    }
+                    cur = self.scopes[self.classes[g].parent]
+                        .parent
+                        .and_then(|_| self.generic_owner(self.classes[g].parent));
+                }
+                uses.push((r, scope, head.to_string(), dependent));
+            }
+        }
+        for _round in 0..6 {
+            let mut changed = false;
+            for (r, scope, head, dependent) in &uses {
+                let envs: Vec<Env> = match dependent {
+                    None => vec![Env::default()],
+                    Some(g) => specs
+                        .get(g)
+                        .map(|m| m.values().cloned().collect())
+                        .unwrap_or_default(),
+                };
+                for env in envs {
+                    let info = self.resolve_env(*r, *scope, &env, 0);
+                    let Resolved::Class(c) = info.resolved else {
+                        continue;
+                    };
+                    if self.classes[c].name != *head || !self.classes[c].generic {
+                        continue;
+                    }
+                    let key = self.print_class(c, &info.args, 0);
+                    let m = specs.entry(c).or_default();
+                    if m.len() < 64 && !m.contains_key(&key) {
+                        m.insert(key, info.args);
+                        changed = true;
+                    }
+                }
+            }
+            if !changed {
+                break;
+            }
+        }
+        self.rep_env = specs
+            .into_iter()
+            .filter_map(|(c, m)| m.into_iter().next().map(|(_, env)| (c, env)))
+            .collect();
+    }
+
+    /// Whether a type use depends on a parameter of generic class `g`,
+    /// directly or through typedefs and type arguments.
+    fn uses_type_param(&self, r: NodeRef, g: usize) -> bool {
+        let scope = {
+            // Resolve from inside g, where its parameters are visible.
+            self.classes[g].scope
+        };
+        self.depends(r, scope, g, 0)
+    }
+
+    fn depends(&self, r: NodeRef, scope: usize, g: usize, depth: usize) -> bool {
+        if depth > 16 {
+            return false;
+        }
+        let gscope = self.classes[g].scope;
+        let toks: Vec<&str> = self
+            .tokens(r)
+            .iter()
+            .map(|&t| self.text(r.tree, t))
+            .collect();
+        // Every identifier in the use (names, arguments, dimensions).
+        for (k, name) in toks.iter().enumerate() {
+            if k > 0 && toks[k - 1] == "::" {
+                continue;
+            }
+            if self.classes[g].params.iter().any(|p| p.0 == *name) {
+                return true;
+            }
+            match self.lookup(name, scope, depth + 1) {
+                Some(Found::Param(_, s)) if s == gscope => return true,
+                Some(Found::Typedef(t, s)) if self.is_within(s, gscope) => {
+                    if let Some(dt) = self.child(t, DataType) {
+                        if self.depends(dt, s, g, depth + 1) {
+                            return true;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+        false
+    }
+
+    /// `s` is `outer` or nested in it.
+    fn is_within(&self, s: usize, outer: usize) -> bool {
+        let mut cur = Some(s);
+        while let Some(x) = cur {
+            if x == outer {
+                return true;
+            }
+            cur = self.scopes[x].parent;
+        }
+        false
+    }
+
+    /// A specialization as slang prints it: `name#(arg,...)`.
+    fn print_class(&self, c: usize, env: &Env, depth: usize) -> String {
+        let def = &self.classes[c];
+        let mut s = def.name.clone();
+        if !def.generic {
+            return s;
+        }
+        s.push_str("#(");
+        for (k, (name, is_type, default)) in def.params.iter().enumerate() {
+            if k > 0 {
+                s.push(',');
+            }
+            if *is_type {
+                let printed = match env.get(name) {
+                    Some(b) => self.print_type(b.node, b.scope, &b.env, depth + 1),
+                    None => default.map_or(String::new(), |d| {
+                        self.print_type(d, def.parent, &Env::default(), depth + 1)
+                    }),
+                };
+                s.push_str(&printed);
+            } else if let Some(d) = default {
+                s.push_str(&self.tree(*d).bare_text(d.node));
+            }
+        }
+        s.push(')');
+        s
+    }
+
+    fn print_type(&self, node: NodeRef, scope: usize, env: &Env, depth: usize) -> String {
+        if depth > 16 {
+            return String::new();
+        }
+        let info = self.resolve_env(node, scope, env, depth + 1);
+        match info.resolved {
+            Resolved::Class(c) => self.print_class(c, &info.args, depth + 1),
+            _ => self.tree(node).bare_text(node.node),
+        }
+    }
+
+    // ---- lookup -----------------------------------------------------------
+
+    /// A name seen from `scope`: a class, a typedef (with the scope it lives
+    /// in) or nothing.
+    fn lookup(&self, name: &str, scope: usize, depth: usize) -> Option<Found> {
+        if depth > 32 {
+            return None;
+        }
+        let mut cur = Some(scope);
+        while let Some(s) = cur {
+            if let Some(f) = self.lookup_in(name, s, depth) {
+                return Some(f);
+            }
+            cur = self.scopes[s].parent;
+        }
+        None
+    }
+
+    /// Declared in `s`, inherited into it (classes) or imported into it.
+    fn lookup_in(&self, name: &str, s: usize, depth: usize) -> Option<Found> {
+        let sc = &self.scopes[s];
+        if let Some(d) = sc.type_params.get(name) {
+            return Some(Found::Param(*d, s));
+        }
+        if let Some(&c) = sc.classes.get(name) {
+            return Some(Found::Class(c));
+        }
+        if let Some(&t) = sc.typedefs.get(name) {
+            return Some(Found::Typedef(t, s));
+        }
+        if let ScopeKind::Class(c) = sc.kind {
+            // Inherited typedefs, nested classes and parameters.
+            if let Some(b) = self.base_of(c, depth + 1) {
+                let bs = self.classes[b].scope;
+                if bs != s {
+                    if let Some(f) = self.lookup_in(name, bs, depth + 1) {
+                        return Some(f);
+                    }
+                }
+            }
+        }
+        for (pkg, item) in &sc.imports {
+            if item.as_deref().is_some_and(|i| i != name) {
+                continue;
+            }
+            if let Some(&p) = self.packages.get(pkg) {
+                if p != s {
+                    let ps = &self.scopes[p];
+                    if let Some(&c) = ps.classes.get(name) {
+                        return Some(Found::Class(c));
+                    }
+                    if let Some(&t) = ps.typedefs.get(name) {
+                        return Some(Found::Typedef(t, p));
+                    }
+                }
+            }
+        }
+        None
+    }
+
+    fn base_of(&self, c: usize, depth: usize) -> Option<usize> {
+        self.base_env(c, &Env::default(), depth).map(|(b, _)| b)
+    }
+
+    /// The base class of `c` specialized with `env`, and the base's own
+    /// type arguments.
+    fn base_env(&self, c: usize, env: &Env, depth: usize) -> Option<(usize, Env)> {
+        if depth > 32 {
+            return None;
+        }
+        let dt = self.classes[c].extends?;
+        let parent = self.classes[c].parent;
+        // The class's own type parameters are visible in its extends clause
+        // (`extends BASE`); nothing else of its scope is.
+        let first = self
+            .tokens(dt)
+            .first()
+            .map(|&t| self.text(dt.tree, t))
+            .unwrap_or("");
+        let own = self.classes[c].scope;
+        // The extends clause sees the class's own parameters: bound by
+        // `env`, else their defaults.
+        let mut full = (**env).clone();
+        for (name, is_type, default) in &self.classes[c].params {
+            if *is_type && !full.contains_key(name) {
+                if let Some(d) = default {
+                    full.insert(
+                        name.clone(),
+                        Bound {
+                            node: *d,
+                            scope: parent,
+                            env: Env::default(),
+                        },
+                    );
+                }
+            }
+        }
+        let env = &std::rc::Rc::new(full);
+        let info = if let Some(b) = env.get(first) {
+            self.resolve_env(b.node, b.scope, &b.env, depth + 1)
+        } else if self.scopes[own].type_params.contains_key(first) {
+            return None;
+        } else {
+            self.resolve_env(dt, parent, env, depth + 1)
+        };
+        match info.resolved {
+            Resolved::Class(b) if b != c => Some((b, info.args)),
+            _ => None,
+        }
+    }
+
+    /// `c` and its bases, with type arguments followed through.
+    fn chain(&self, c: usize) -> Vec<usize> {
+        let mut out = vec![c];
+        let mut cur = (c, self.rep_env.get(&c).cloned().unwrap_or_default());
+        while out.len() <= self.classes.len() {
+            let Some(next) = self.base_env(cur.0, &cur.1, 0) else {
+                break;
+            };
+            out.push(next.0);
+            cur = next;
+        }
+        out
+    }
+
+    fn resolve(&self, dt: NodeRef, scope: usize, depth: usize) -> TypeInfo {
+        self.resolve_env(dt, scope, &Env::default(), depth)
+    }
+
+    /// Resolves a type (a DataType, or a name expression standing for a
+    /// type) seen from `scope`, with type parameters bound by `env`.
+    fn resolve_env(&self, dt: NodeRef, scope: usize, env: &Env, depth: usize) -> TypeInfo {
+        let other = TypeInfo {
+            resolved: Resolved::Other,
+            shape: TypeShape::Other,
+            args: Env::default(),
+        };
+        if depth > 32 {
+            return other;
+        }
+        let toks: Vec<&str> = self
+            .tokens(dt)
+            .iter()
+            .map(|&t| self.text(dt.tree, t))
+            .collect();
+        let Some(&first) = toks.first() else {
+            return other;
+        };
+        if first == "virtual" || first == "interface" {
+            return TypeInfo {
+                resolved: Resolved::Vif,
+                ..other
+            };
+        }
+        if matches!(first, "struct" | "union") {
+            let packed = toks.get(1).is_some_and(|t| *t == "packed")
+                || toks.get(2).is_some_and(|t| *t == "packed");
+            let shape = if packed {
+                TypeShape::Other
+            } else {
+                TypeShape::UnpackedStruct
+            };
+            return TypeInfo { shape, ..other };
+        }
+        if self.trees[dt.tree].tokens[self.tokens(dt)[0] as usize].kind
+            != sv_syntax::TokenKind::Identifier
+        {
+            return other;
+        }
+        // `a::b::c`, stopping at `#(` and dimensions.
+        let mut path = vec![first];
+        let mut i = 1;
+        while i + 1 < toks.len() && toks[i] == "::" {
+            path.push(toks[i + 1]);
+            i += 2;
+        }
+        if path.len() == 1 {
+            if let Some(b) = env.get(first) {
+                return self.resolve_env(b.node, b.scope, &b.env, depth + 1);
+            }
+        }
+        let found = if path.len() == 1 {
+            self.lookup(path[0], scope, depth + 1)
+        } else {
+            self.lookup_path(&path, scope, depth + 1)
+        };
+        match found {
+            Some(Found::Class(c)) => TypeInfo {
+                resolved: Resolved::Class(c),
+                shape: TypeShape::Other,
+                args: self.bind_args(c, dt, scope, env),
+            },
+            Some(Found::Typedef(t, s)) => self.resolve_typedef(t, s, env, depth + 1),
+            Some(Found::Param(Some(d), s)) => {
+                // A type parameter: its default, which is what the
+                // definition's own specialization uses.
+                let parent = match self.scopes[s].kind {
+                    ScopeKind::Class(c) => self.classes[c].parent,
+                    _ => s,
+                };
+                self.resolve(d, parent, depth + 1)
+            }
+            _ => other,
+        }
+    }
+
+    /// The type arguments in `#(...)` after a class name.
+    fn bind_args(&self, c: usize, node: NodeRef, scope: usize, env: &Env) -> Env {
+        let Some(pl) = self.child(node, ParamList) else {
+            return Env::default();
+        };
+        let Some(al) = self.child(pl, ArgList) else {
+            return Env::default();
+        };
+        let params = &self.classes[c].params;
+        let mut map = HashMap::new();
+        let mut pos = 0;
+        for a in self.children(al) {
+            if self.kind(a) != Arg {
+                continue;
+            }
+            let own = self.own_tokens(a);
+            let name = if own.first() == Some(&".") {
+                own.get(1).map(|s| s.to_string())
+            } else {
+                pos += 1;
+                params.get(pos - 1).map(|p| p.0.clone())
+            };
+            let Some(name) = name else { continue };
+            let Some(value) = self.children(a).into_iter().next() else {
+                continue;
+            };
+            if params.iter().any(|p| p.0 == name && p.1) {
+                map.insert(
+                    name,
+                    Bound {
+                        node: value,
+                        scope,
+                        env: env.clone(),
+                    },
+                );
+            }
+        }
+        std::rc::Rc::new(map)
+    }
+
+    fn lookup_path(&self, path: &[&str], scope: usize, depth: usize) -> Option<Found> {
+        // The first segment is a package or a class.
+        let mut cur = if let Some(&p) = self.packages.get(path[0]) {
+            p
+        } else {
+            match self.lookup(path[0], scope, depth)? {
+                Found::Class(c) => self.classes[c].scope,
+                _ => return None,
+            }
+        };
+        for (k, seg) in path[1..].iter().enumerate() {
+            let last = k == path.len() - 2;
+            let f = self.lookup_in(seg, cur, depth + 1)?;
+            if last {
+                return Some(f);
+            }
+            match f {
+                Found::Class(c) => cur = self.classes[c].scope,
+                _ => return None,
+            }
+        }
+        None
+    }
+
+    fn resolve_typedef(&self, td: NodeRef, scope: usize, env: &Env, depth: usize) -> TypeInfo {
+        let Some(dt) = self.child(td, DataType) else {
+            return TypeInfo {
+                resolved: Resolved::Other,
+                shape: TypeShape::Other,
+                args: Env::default(),
+            };
+        };
+        let mut info = self.resolve_env(dt, scope, env, depth + 1);
+        // Unpacked dimensions after the typedef's name.
+        if let Some(d) = self.children(td).into_iter().find(|c| self.kind(*c) == Dim) {
+            info.shape = self.dim_shape(d, scope, depth);
+        }
+        info
+    }
+
+    /// The array kind of one unpacked dimension.
+    fn dim_shape(&self, d: NodeRef, scope: usize, depth: usize) -> TypeShape {
+        let toks: Vec<&str> = self
+            .tokens(d)
+            .iter()
+            .map(|&t| self.text(d.tree, t))
+            .collect();
+        let inner = &toks[1..toks.len().saturating_sub(1)];
+        match inner {
+            [] => TypeShape::DynamicArray,
+            ["$", ..] => TypeShape::Queue,
+            ["*"] => TypeShape::AssociativeArray,
+            [t] if sv_syntax::is_builtin_type(t) => TypeShape::AssociativeArray,
+            _ => {
+                // `[name]`: a type makes it associative, a value fixed.
+                let first = inner[0];
+                let is_type = inner.len() == 1
+                    && self.tree(d).tokens[self.tokens(d)[1] as usize].kind
+                        == sv_syntax::TokenKind::Identifier
+                    && matches!(
+                        self.lookup(first, scope, depth + 1),
+                        Some(Found::Class(_)) | Some(Found::Typedef(..)) | Some(Found::Param(..))
+                    );
+                if is_type {
+                    TypeShape::AssociativeArray
+                } else {
+                    TypeShape::FixedUnpackedArray
+                }
+            }
+        }
+    }
+
+    // ---- model --------------------------------------------------------------
+
+    fn finish(mut self) -> Design {
+        // Ids: plain classes first, then parameterized definitions, as in
+        // slang's model.
+        let mut order: Vec<usize> = (0..self.classes.len())
+            .filter(|&c| !self.classes[c].generic)
+            .collect();
+        order.extend((0..self.classes.len()).filter(|&c| self.classes[c].generic));
+        let mut ids = vec![0 as ClassId; self.classes.len()];
+        for (id, &c) in order.iter().enumerate() {
+            ids[c] = id as ClassId;
+        }
+        let mut out = Vec::with_capacity(order.len());
+        for (id, &c) in order.iter().enumerate() {
+            out.push(self.make_class(c, id as ClassId, &ids));
+        }
+        // A definition nothing specialized takes its base by name.
+        for i in 0..out.len() {
+            if out[i].base.is_none() && !out[i].base_name.is_empty() {
+                let name = out[i].base_name.clone();
+                if let Some(b) = out.iter().position(|c| c.name == name) {
+                    if b != i {
+                        out[i].base = Some(b as ClassId);
+                    }
+                }
+            }
+        }
+        // UVM roles follow the resolved base chain; a definition nothing
+        // specialized has none.
+        for (id, &c) in order.iter().enumerate() {
+            if !self.classes[c].generic || self.used_names.contains(&self.classes[c].name) {
+                let chain: Vec<&str> = self
+                    .chain(c)
+                    .into_iter()
+                    .map(|x| self.classes[x].name.as_str())
+                    .collect();
+                out[id].uvm = classify(&chain);
+            }
+        }
+        let files = std::mem::take(&mut self.files);
+        Design::from_parts(files, out, 0, Timings::default())
+    }
+
+    fn make_class(&mut self, c: usize, id: ClassId, ids: &[ClassId]) -> Class {
+        let (r, generic, scope_idx, parent) = (
+            self.classes[c].node,
+            self.classes[c].generic,
+            self.classes[c].scope,
+            self.classes[c].parent,
+        );
+        let name = self.classes[c].name.clone();
+        let (_, name_tok) = self.name_of(r).unwrap_or_default();
+        let loc = self.loc(r.tree, name_tok);
+        let scope = match self.scopes[parent].kind {
+            ScopeKind::Package | ScopeKind::Class(_) => self.scopes[parent].name.clone(),
+            ScopeKind::Unit => String::new(),
+        };
+        let own = self.own_tokens(r);
+        let is_interface = own.contains(&"interface");
+        let is_virtual = own.contains(&"virtual");
+        let specialized = !generic || self.used_names.contains(&name);
+        let mut class = Class {
+            id,
+            name,
+            scope,
+            base_name: String::new(),
+            base: None,
+            uvm: UvmKind::None,
+            is_virtual,
+            is_parameterized: generic,
+            is_library: false,
+            loc,
+            properties: Vec::new(),
+            methods: Vec::new(),
+            constraints: Vec::new(),
+        };
+        if !specialized {
+            // No specialization to read members from: the base as written,
+            // nothing else.
+            class.is_virtual = false;
+            if let Some(dt) = self.classes[c].extends {
+                let toks: Vec<&str> = self
+                    .tokens(dt)
+                    .iter()
+                    .map(|&t| self.text(dt.tree, t))
+                    .collect();
+                let end = toks.iter().position(|t| *t == "#").unwrap_or(toks.len());
+                class.base_name = toks[..end].last().copied().unwrap_or("").to_string();
+            }
+            return class;
+        }
+        let env = self.rep_env.get(&c).cloned().unwrap_or_default();
+        if let Some((b, _)) = self.base_env(c, &env, 0) {
+            class.base_name = self.classes[b].name.clone();
+            class.base = Some(ids[b]);
+        }
+        for m in self.children(r) {
+            match self.kind(m) {
+                DataDecl => self.properties(m, scope_idx, &env, ids, &mut class.properties),
+                CovergroupDecl => {
+                    // An embedded covergroup is also a property of its type.
+                    if let Some((n, t)) = self.name_of(m) {
+                        let loc = self.loc(m.tree, t);
+                        class.properties.push(Property {
+                            name: n,
+                            ty: String::new(),
+                            type_class: None,
+                            visibility: Visibility::Public,
+                            is_static: false,
+                            // The covergroup handle cannot be reassigned.
+                            is_const: true,
+                            is_rand: false,
+                            is_virtual_interface: false,
+                            loc,
+                        });
+                    }
+                }
+                FunctionDecl | TaskDecl => {
+                    if let Some(method) = self.method(m, m, false, c, &env, ids) {
+                        class.methods.push(method);
+                    }
+                }
+                MethodPrototype => {
+                    let own = self.own_tokens(m);
+                    let pure = own.contains(&"pure");
+                    let body = self.name_of(m).and_then(|(n, _)| {
+                        self.bodies.get(&(self.classes[c].name.clone(), n)).copied()
+                    });
+                    let body = if pure { Some(m) } else { body };
+                    if let Some(b) = body {
+                        if let Some(method) = self.method(m, b, true, c, &env, ids) {
+                            class.methods.push(method);
+                        }
+                    }
+                }
+                ConstraintDecl | ConstraintPrototype => {
+                    if let Some((n, t)) = self.name_of(m) {
+                        let loc = self.loc(m.tree, t);
+                        class.constraints.push(Constraint { name: n, loc });
+                    }
+                }
+                _ => {}
+            }
+        }
+        add_builtins(&mut class.methods, is_interface);
+        class
+    }
+
+    fn class_id(&self, r: Resolved, ids: &[ClassId]) -> Option<ClassId> {
+        match r {
+            Resolved::Class(c) => Some(ids[c]),
+            _ => None,
+        }
+    }
+
+    fn properties(
+        &mut self,
+        d: NodeRef,
+        scope: usize,
+        env: &Env,
+        ids: &[ClassId],
+        out: &mut Vec<Property>,
+    ) {
+        let own = self.own_tokens(d);
+        let visibility = visibility(&own);
+        let (is_static, is_const) = (own.contains(&"static"), own.contains(&"const"));
+        let is_rand = own.contains(&"rand") || own.contains(&"randc");
+        let info = self
+            .child(d, DataType)
+            .map(|dt| self.resolve_env(dt, scope, env, 0));
+        let resolved = info.as_ref().map_or(Resolved::Other, |i| i.resolved);
+        let array_type = info.as_ref().is_some_and(|i| i.shape != TypeShape::Other);
+        for decl in self.children(d) {
+            if self.kind(decl) != Declarator {
+                continue;
+            }
+            let Some((name, t)) = self.name_of(decl) else {
+                continue;
+            };
+            let loc = self.loc(decl.tree, t);
+            // An array of class handles is not a class.
+            let array = array_type || self.child(decl, Dim).is_some();
+            out.push(Property {
+                name,
+                ty: String::new(),
+                type_class: if array {
+                    None
+                } else {
+                    self.class_id(resolved, ids)
+                },
+                visibility,
+                is_static,
+                is_const,
+                is_rand,
+                is_virtual_interface: resolved == Resolved::Vif,
+                loc,
+            });
+        }
+    }
+
+    /// A method from its declaration `decl` (qualifiers) and `body`
+    /// (name, ports, locals); the same node unless the body is out of block.
+    fn method(
+        &mut self,
+        decl: NodeRef,
+        body: NodeRef,
+        is_extern: bool,
+        c: usize,
+        env: &Env,
+        ids: &[ClassId],
+    ) -> Option<Method> {
+        let own = self.own_tokens(decl);
+        let kw = own.iter().position(|t| *t == "function" || *t == "task")?;
+        let is_task = own[kw] == "task";
+        let (name, t) = self.name_of(body)?;
+        let loc = self.loc(body.tree, t);
+        let declared_virtual = own.contains(&"virtual");
+        let is_pure = own.contains(&"pure");
+        let is_static = own[..kw].contains(&"static");
+        let scope = self.classes[c].scope;
+        let returns_void = is_task
+            || self.child(body, ReturnType).is_some_and(|r| {
+                self.tokens(r)
+                    .iter()
+                    .map(|&t| self.text(r.tree, t))
+                    .collect::<Vec<_>>()
+                    == ["void"]
+            })
+            || name == "new";
+        let overrides = name != "new" && self.overrides_virtual(c, &name);
+        let is_virtual = name != "new" && (declared_virtual || overrides);
+        // An out-of-block body that overrides a virtual method is marked
+        // virtual like its base (slang sets the flag when it joins them).
+        let declared_virtual = declared_virtual || (is_extern && !is_pure && overrides);
+        let phase = if FUNCTION_PHASES.contains(&name.as_str()) {
+            PhaseKind::Function
+        } else if TASK_PHASES.contains(&name.as_str()) {
+            PhaseKind::Task
+        } else {
+            PhaseKind::None
+        };
+        let arguments = self.arguments(body, scope, env, ids);
+        let locals = self.locals(body, scope, env);
+        Some(Method {
+            name,
+            visibility: visibility(&own),
+            is_task,
+            is_virtual,
+            is_pure,
+            is_static,
+            phase,
+            declared_virtual,
+            is_builtin: false,
+            is_extern,
+            return_type: String::new(),
+            returns_void,
+            loc,
+            arguments,
+            locals,
+            calls: Vec::new(),
+            assignments: Vec::new(),
+            timing_controls: Vec::new(),
+            calls_super_new: false,
+            super_new: None,
+        })
+    }
+
+    /// A base class declares (or inherits) a virtual method of this name.
+    fn overrides_virtual(&self, c: usize, name: &str) -> bool {
+        // The nearest base that declares the name decides.
+        let chain = self.chain(c);
+        for (k, &b) in chain.iter().enumerate().skip(1) {
+            for m in self.children(self.classes[b].node) {
+                if !matches!(self.kind(m), FunctionDecl | TaskDecl | MethodPrototype) {
+                    continue;
+                }
+                if self.name_of(m).is_some_and(|(n, _)| n == name) {
+                    if self.own_tokens(m).contains(&"virtual") {
+                        return true;
+                    }
+                    // Not declared virtual: virtual if it overrides in turn.
+                    return chain[k + 1..]
+                        .iter()
+                        .any(|&x| self.declares_virtual(x, name));
+                }
+            }
+        }
+        false
+    }
+
+    fn declares_virtual(&self, c: usize, name: &str) -> bool {
+        self.children(self.classes[c].node).into_iter().any(|m| {
+            matches!(self.kind(m), FunctionDecl | TaskDecl | MethodPrototype)
+                && self.name_of(m).is_some_and(|(n, _)| n == name)
+                && self.own_tokens(m).contains(&"virtual")
+        })
+    }
+
+    fn arguments(
+        &mut self,
+        body: NodeRef,
+        scope: usize,
+        env: &Env,
+        ids: &[ClassId],
+    ) -> Vec<Argument> {
+        let mut out = Vec::new();
+        let Some(pl) = self.child(body, PortList) else {
+            return out;
+        };
+        let mut dir = Direction::In;
+        let mut ty: Option<NodeRef> = None;
+        for p in self.children(pl) {
+            if self.kind(p) != Port {
+                continue;
+            }
+            let own = self.own_tokens(p);
+            let explicit_dir = own.iter().find_map(|t| match *t {
+                "input" => Some(Direction::In),
+                "output" => Some(Direction::Out),
+                "inout" => Some(Direction::InOut),
+                "ref" => Some(Direction::Ref),
+                _ => None,
+            });
+            let dt = self.child(p, DataType);
+            match (explicit_dir, dt) {
+                (_, Some(d)) => ty = Some(d),
+                // A direction without a type means logic.
+                (Some(_), None) => ty = None,
+                // Neither: both carry over from the previous port.
+                (None, None) => {}
+            }
+            if let Some(d) = explicit_dir {
+                dir = d;
+            }
+            let Some(decl) = self.child(p, Declarator) else {
+                continue;
+            };
+            let Some((name, t)) = self.name_of(decl) else {
+                continue;
+            };
+            let loc = self.loc(decl.tree, t);
+            let info = ty.map(|d| self.resolve_env(d, scope, env, 0));
+            let mut shape = info.as_ref().map_or(TypeShape::Other, |i| i.shape);
+            if let Some(d) = self
+                .children(decl)
+                .into_iter()
+                .find(|c| self.kind(*c) == Dim)
+            {
+                shape = self.dim_shape(d, scope, 0);
+            }
+            let type_class = if shape == TypeShape::Other {
+                info.and_then(|i| self.class_id(i.resolved, ids))
+            } else {
+                None
+            };
+            out.push(Argument {
+                name,
+                ty: String::new(),
+                canonical_type: String::new(),
+                type_class,
+                direction: dir,
+                shape,
+                loc,
+            });
+        }
+        out
+    }
+
+    fn locals(&mut self, body: NodeRef, scope: usize, env: &Env) -> Vec<Local> {
+        let mut out = Vec::new();
+        let Some(b) = self.child(body, Body) else {
+            return out;
+        };
+        for d in self.children(b) {
+            if self.kind(d) != DataDecl {
+                continue;
+            }
+            let vif = self
+                .child(d, DataType)
+                .is_some_and(|dt| self.resolve_env(dt, scope, env, 0).resolved == Resolved::Vif);
+            for decl in self.children(d) {
+                if self.kind(decl) != Declarator {
+                    continue;
+                }
+                if let Some((name, t)) = self.name_of(decl) {
+                    let loc = self.loc(decl.tree, t);
+                    out.push(Local {
+                        name,
+                        ty: String::new(),
+                        is_virtual_interface: vif,
+                        loc,
+                    });
+                }
+            }
+        }
+        out
+    }
+}
+
+#[derive(Clone, Copy)]
+enum Found {
+    Class(usize),
+    Typedef(NodeRef, usize),
+    /// A type parameter with its default type, and the class scope.
+    Param(Option<NodeRef>, usize),
+}
+
+fn visibility(own: &[&str]) -> Visibility {
+    if own.contains(&"local") {
+        Visibility::Local
+    } else if own.contains(&"protected") {
+        Visibility::Protected
+    } else {
+        Visibility::Public
+    }
+}
+
+const FUNCTION_PHASES: &[&str] = &[
+    "build_phase",
+    "connect_phase",
+    "end_of_elaboration_phase",
+    "start_of_simulation_phase",
+    "extract_phase",
+    "check_phase",
+    "report_phase",
+    "final_phase",
+];
+
+const TASK_PHASES: &[&str] = &[
+    "run_phase",
+    "pre_reset_phase",
+    "reset_phase",
+    "post_reset_phase",
+    "pre_configure_phase",
+    "configure_phase",
+    "post_configure_phase",
+    "pre_main_phase",
+    "main_phase",
+    "post_main_phase",
+    "pre_shutdown_phase",
+    "shutdown_phase",
+    "post_shutdown_phase",
+];
+
+/// The UVM role from the names along the base chain, most specific first
+/// (as slang's model does it).
+fn classify(chain: &[&str]) -> UvmKind {
+    let has = |n: &str| chain.contains(&n);
+    if has("uvm_component") {
+        for (base, kind) in [
+            ("uvm_test", UvmKind::Test),
+            ("uvm_env", UvmKind::Env),
+            ("uvm_agent", UvmKind::Agent),
+            ("uvm_driver", UvmKind::Driver),
+            ("uvm_monitor", UvmKind::Monitor),
+            ("uvm_sequencer_base", UvmKind::Sequencer),
+            ("uvm_scoreboard", UvmKind::Scoreboard),
+            ("uvm_subscriber", UvmKind::Subscriber),
+        ] {
+            if has(base) {
+                return kind;
+            }
+        }
+        return UvmKind::Component;
+    }
+    if has("uvm_sequence_base") || has("uvm_sequence") {
+        return UvmKind::Sequence;
+    }
+    if has("uvm_sequence_item") {
+        return UvmKind::SequenceItem;
+    }
+    if has("uvm_object") {
+        UvmKind::Object
+    } else {
+        UvmKind::None
+    }
+}
+
+/// The methods every class has (randomize and friends), after its own
+/// members, unless the class declares one itself.
+/// Built-in class methods (IEEE 1800 18.5-18.13). Interface classes get
+/// all but rand_mode and constraint_mode, as in Slang.
+fn add_builtins(methods: &mut Vec<Method>, is_interface: bool) {
+    let builtin = |name: &str, virt: bool, void: bool, arg: Option<&str>| Method {
+        name: name.to_string(),
+        visibility: Visibility::Public,
+        is_task: false,
+        is_virtual: virt,
+        is_pure: false,
+        is_static: false,
+        phase: PhaseKind::None,
+        declared_virtual: virt,
+        is_builtin: true,
+        is_extern: false,
+        return_type: String::new(),
+        returns_void: void,
+        loc: Loc::default(),
+        arguments: arg
+            .map(|a| Argument {
+                name: a.to_string(),
+                ty: String::new(),
+                canonical_type: String::new(),
+                type_class: None,
+                direction: Direction::In,
+                shape: TypeShape::Other,
+                loc: Loc::default(),
+            })
+            .into_iter()
+            .collect(),
+        locals: Vec::new(),
+        calls: Vec::new(),
+        assignments: Vec::new(),
+        timing_controls: Vec::new(),
+        calls_super_new: false,
+        super_new: None,
+    };
+    for (name, virt, void, arg) in [
+        ("randomize", true, false, None),
+        ("pre_randomize", false, true, None),
+        ("post_randomize", false, true, None),
+        ("get_randstate", false, false, None),
+        ("set_randstate", false, true, Some("state")),
+        ("srandom", false, true, Some("seed")),
+        ("rand_mode", false, true, Some("on_ff")),
+        ("constraint_mode", false, true, Some("on_ff")),
+    ] {
+        if is_interface && name.ends_with("_mode") {
+            continue;
+        }
+        if !methods.iter().any(|m| m.name == name) {
+            methods.push(builtin(name, virt, void, arg));
+        }
+    }
+}

@@ -177,3 +177,40 @@ file Slang's parser rejects (128, including the should-fail tests) is
 rejected and no other file is; the same holds for the repo's inputs. The
 outline example prints preprocessor diagnostics with `--errors` and the
 tree with `--dump`.
+
+## sv-sema (R3, native class model)
+
+Builds `dv_model::Design`, the same model the Slang-backed facade gives,
+from sv-syntax trees with no Slang: `sv_sema::load(args)` takes the usual
+compile arguments (`+incdir+`, `+define+`, `-I`, `-D`, files). Slice 1
+(2026-11-04) covers classes in packages and compilation units, nested
+classes, typedefs, imports and inheritance through them; parameterized
+classes (each definition once, with members read from one representative
+specialization chosen as Slang does: the one that prints shortest);
+properties, methods (extern bodies, pure, static, virtual by declaration
+or override, UVM phases), arguments, locals and constraints; UVM roles from
+the base chain; and the built-in methods every class gets (`randomize` and
+friends; interface classes get all but `rand_mode` and `constraint_mode`).
+Locations of macro-made members point where Slang points: into the
+`define body (sv-preproc now records each token's written origin).
+
+`dv-model` builds without Slang (`default-features = false`), which is how
+sv-sema uses it; `Design::dump` is the canonical text form both sides print.
+
+```
+cargo run --release -p sv-sema --example model_dump -- [--slang] [--types] +incdir+DIR FILE
+tools/model_parity.py --uvm UVM_SRC        # uvm_pkg.sv, Slang vs native
+tools/model_parity.py --repo UVM_SRC       # every test and example input
+```
+
+Measured 2026-11-04: on this repo's 783 test and example inputs (32,731
+classes) the two models are identical. On uvm-core's `uvm_pkg.sv` all 353
+class lines are identical and 83 of 12,324 member lines differ. Those are
+all arguments or properties typed by a type parameter of a generic class,
+where the representative specialization differs: Slang only creates
+specializations it elaborates, while sv-sema sees every one named in the
+source, so for example `uvm_callbacks` is represented by a `uvm_event`
+specialization instead of `uvm_mem`. The native model loads uvm_pkg.sv in
+about 0.6 s including preprocessing and parsing. Type strings, method
+bodies (calls, assignments, timing, `super.new`) and classes declared
+inside modules are not compared yet (slice 2).

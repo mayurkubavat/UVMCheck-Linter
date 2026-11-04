@@ -38,6 +38,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "sv-sema"
+version = "0.1.0"
+dependencies = [
+ "dv-model",
+ "sv-syntax",
+]
+
+[[package]]
 name = "sv-slang"
 version = "0.1.0"
 

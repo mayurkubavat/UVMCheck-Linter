@@ -7,5 +7,10 @@ license.workspace = true
 rust-version.workspace = true
 build = "build.rs"
 
+[features]
+default = ["slang"]
+# Load designs through slang (needs libuvmcheck_model).
+slang = ["dep:sv-slang"]
+
 [dependencies]
-sv-slang = { path = "../sv-slang" }
+sv-slang = { path = "../sv-slang", optional = true }

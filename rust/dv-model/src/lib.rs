@@ -6,11 +6,15 @@
 //! front end is slang behind `sv-slang`; tools do not see that and will not
 //! notice when layers move to native Rust.
 
-use std::ffi::{CStr, CString};
 use std::fmt;
+#[cfg(feature = "slang")]
+use std::ffi::{CStr, CString};
+#[cfg(feature = "slang")]
 use std::os::raw::c_char;
+#[cfg(feature = "slang")]
 use std::time::Instant;
 
+#[cfg(feature = "slang")]
 use sv_slang as ffi;
 
 pub type ClassId = u32;
@@ -33,6 +37,7 @@ pub enum UvmKind {
 }
 
 impl UvmKind {
+    #[cfg(feature = "slang")]
     fn from_c(v: u8) -> Self {
         use UvmKind::*;
         [None, Object, SequenceItem, Sequence, Component, Test, Env, Agent, Driver, Monitor, Sequencer, Scoreboard, Subscriber]
@@ -74,6 +79,7 @@ pub enum Visibility {
 }
 
 impl Visibility {
+    #[cfg(feature = "slang")]
     fn from_c(v: u8) -> Self {
         match v {
             1 => Visibility::Protected,
@@ -99,6 +105,7 @@ pub enum Direction {
 }
 
 impl Direction {
+    #[cfg(feature = "slang")]
     fn from_c(v: u8) -> Self {
         match v {
             1 => Direction::Out,
@@ -122,6 +129,7 @@ pub enum TypeShape {
 }
 
 impl TypeShape {
+    #[cfg(feature = "slang")]
     fn from_c(v: u8) -> Self {
         match v {
             1 => TypeShape::DynamicArray,
@@ -302,14 +310,17 @@ pub struct Design {
 }
 
 /// Owns a C design and frees it on every exit path.
+#[cfg(feature = "slang")]
 struct Handle(*mut ffi::uvmcheck_design);
 
+#[cfg(feature = "slang")]
 impl Drop for Handle {
     fn drop(&mut self) {
         unsafe { ffi::uvmcheck_design_free(self.0) }
     }
 }
 
+#[cfg(feature = "slang")]
 fn text(p: *const c_char) -> String {
     if p.is_null() {
         String::new()
@@ -318,17 +329,25 @@ fn text(p: *const c_char) -> String {
     }
 }
 
+#[cfg(feature = "slang")]
 fn loc(l: ffi::uvmcheck_loc) -> Loc {
     Loc { file: l.file, line: l.line, column: l.column }
 }
 
+#[cfg(feature = "slang")]
 fn id(v: u32) -> Option<ClassId> {
     (v != ffi::NONE).then_some(v)
 }
 
 impl Design {
-    /// Loads a design from compile options as given to `uvmcheck`, e.g.
+    /// A design built by another front end (the native one in sv-sema).
+    pub fn from_parts(files: Vec<String>, classes: Vec<Class>, compile_errors: u32, timings: Timings) -> Design {
+        Design { files, classes, compile_errors, timings }
+    }
+
+    /// Loads a design through slang (libuvmcheck_model) from compile options as given to `uvmcheck`, e.g.
     /// `["+incdir+src", "src/uvm_pkg.sv"]` or `["-f", "files.f"]`.
+    #[cfg(feature = "slang")]
     pub fn load<I, S>(args: I) -> Result<Design, Error>
     where
         I: IntoIterator<Item = S>,
@@ -587,5 +606,156 @@ impl Design {
             let t = self.class(p.type_class?);
             t.uvm.is_component().then_some((p, t))
         })
+    }
+}
+
+/// What [`Design::dump`] prints beyond names, flags and locations.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct DumpOptions {
+    /// Type strings (property, argument, local and return types).
+    pub types: bool,
+    /// Calls, assignments, timing controls and `super.new` of each method.
+    pub bodies: bool,
+}
+
+impl Design {
+    /// A canonical text form, for comparing front ends: classes sorted by
+    /// scope, name and location, class references by name.
+    pub fn dump(&self, opts: DumpOptions) -> String {
+        use std::fmt::Write;
+        let qual = |id: Option<ClassId>| match id {
+            Some(i) => {
+                let c = self.class(i);
+                if c.scope.is_empty() { c.name.clone() } else { format!("{}::{}", c.scope, c.name) }
+            }
+            None => "-".into(),
+        };
+        let at = |l: Loc| format!("@{}:{}:{}", self.file_name(l), l.line, l.column);
+        let vis = |v: Visibility| match v {
+            Visibility::Public => "public",
+            Visibility::Protected => "protected",
+            Visibility::Local => "local",
+        };
+        let flag = |b: bool, s: &'static str| if b { s } else { "" };
+        let mut order: Vec<&Class> = self.classes.iter().collect();
+        order.sort_by(|a, b| {
+            (&a.scope, &a.name, self.file_name(a.loc), a.loc.line, a.loc.column).cmp(&(
+                &b.scope,
+                &b.name,
+                self.file_name(b.loc),
+                b.loc.line,
+                b.loc.column,
+            ))
+        });
+        let mut s = String::new();
+        for c in order {
+            let _ = writeln!(
+                s,
+                "class {} {} base={} base_id={} uvm={} {} {} {}",
+                qual(Some(c.id)),
+                at(c.loc),
+                c.base_name,
+                qual(c.base),
+                c.uvm.as_str(),
+                flag(c.is_virtual, "virtual"),
+                flag(c.is_parameterized, "param"),
+                flag(c.is_library, "library"),
+            );
+            for p in &c.properties {
+                let _ = write!(
+                    s,
+                    "  prop {} {} {} {} {} {} class={} {}",
+                    p.name,
+                    vis(p.visibility),
+                    flag(p.is_static, "static"),
+                    flag(p.is_const, "const"),
+                    flag(p.is_rand, "rand"),
+                    flag(p.is_virtual_interface, "vif"),
+                    qual(p.type_class),
+                    at(p.loc)
+                );
+                if opts.types {
+                    let _ = write!(s, " type={}", p.ty);
+                }
+                s.push('\n');
+            }
+            for m in &c.methods {
+                let _ = write!(
+                    s,
+                    "  method {} {} {} {} {} {} {:?} {} {} {} {} {}",
+                    m.name,
+                    vis(m.visibility),
+                    flag(m.is_task, "task"),
+                    flag(m.is_virtual, "virtual"),
+                    flag(m.is_pure, "pure"),
+                    flag(m.is_static, "static"),
+                    m.phase,
+                    flag(m.declared_virtual, "declared_virtual"),
+                    flag(m.is_builtin, "builtin"),
+                    flag(m.is_extern, "extern"),
+                    flag(m.returns_void, "void"),
+                    at(m.loc)
+                );
+                if opts.types {
+                    let _ = write!(s, " returns={}", m.return_type);
+                }
+                s.push('\n');
+                for a in &m.arguments {
+                    let _ = write!(s, "    arg {} {:?} {:?} class={} {}", a.name, a.direction, a.shape, qual(a.type_class), at(a.loc));
+                    if opts.types {
+                        let _ = write!(s, " type={} canonical={}", a.ty, a.canonical_type);
+                    }
+                    s.push('\n');
+                }
+                for l in &m.locals {
+                    let _ = write!(s, "    local {} {} {}", l.name, flag(l.is_virtual_interface, "vif"), at(l.loc));
+                    if opts.types {
+                        let _ = write!(s, " type={}", l.ty);
+                    }
+                    s.push('\n');
+                }
+                if opts.bodies {
+                    for k in &m.calls {
+                        let _ = writeln!(
+                            s,
+                            "    call {} {} scope={} {} {} {} receiver={} {} {}",
+                            k.name,
+                            flag(k.is_system, "system"),
+                            k.callee_scope,
+                            flag(k.callee_declared_virtual, "callee_virtual"),
+                            flag(k.callee_builtin, "callee_builtin"),
+                            flag(k.first_arg_is_null, "null_arg"),
+                            k.receiver,
+                            flag(k.via_super, "super"),
+                            at(k.loc)
+                        );
+                    }
+                    for a in &m.assignments {
+                        let _ = writeln!(
+                            s,
+                            "    assign {} = {} {} {:?} {} {}",
+                            a.lhs,
+                            a.rhs,
+                            flag(a.is_non_blocking, "nonblocking"),
+                            a.root_kind,
+                            a.root_name,
+                            at(a.loc)
+                        );
+                    }
+                    for t in &m.timing_controls {
+                        let _ = writeln!(s, "    timing {}", at(*t));
+                    }
+                    if let Some((i, l)) = m.super_new {
+                        let _ = writeln!(s, "    super_new {} {}", i, at(l));
+                    } else if m.calls_super_new {
+                        s.push_str("    super_new nested\n");
+                    }
+                }
+            }
+            for k in &c.constraints {
+                let _ = writeln!(s, "  constraint {} {}", k.name, at(k.loc));
+            }
+        }
+        s
     }
 }

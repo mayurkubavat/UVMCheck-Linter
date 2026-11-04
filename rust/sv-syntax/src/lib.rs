@@ -23,7 +23,13 @@ use std::path::Path;
 pub use exprs::canonical_exprs;
 pub use kinds::SyntaxKind;
 pub use outline::{outline, OutlineEntry};
+pub use sv_lexer::Kind as TokenKind;
 pub use sv_preproc::Options;
+/// A built-in data type keyword (`int`, `bit`, `string`, ...).
+pub fn is_builtin_type(s: &str) -> bool {
+    grammar::BUILTIN_TYPES.contains(&s)
+}
+
 pub use tree::{Child, Node, NodeId, SyntaxError, Token, Tree};
 
 /// Preprocesses and parses one file.

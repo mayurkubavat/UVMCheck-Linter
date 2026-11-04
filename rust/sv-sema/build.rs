@@ -1,0 +1,15 @@
+// The examples and tests also load the slang-backed model to compare
+// against; let them find libuvmcheck_model at run time (same lookup as
+// sv-slang: $UVMCHECK_BUILD_DIR, else <repo>/build-model).
+use std::path::PathBuf;
+
+fn main() {
+    println!("cargo:rerun-if-env-changed=UVMCHECK_BUILD_DIR");
+    let dir = match std::env::var_os("UVMCHECK_BUILD_DIR") {
+        Some(d) => PathBuf::from(d),
+        None => PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build-model"),
+    };
+    let dir = dir.canonicalize().unwrap_or(dir);
+    println!("cargo:rustc-link-arg-examples=-Wl,-rpath,{}", dir.display());
+    println!("cargo:rustc-link-arg-tests=-Wl,-rpath,{}", dir.display());
+}

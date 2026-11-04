@@ -1,0 +1,16 @@
+[package]
+name = "sv-sema"
+description = "Native symbols for SystemVerilog: the class model of dv-model built from sv-syntax trees"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+build = "build.rs"
+
+[dependencies]
+sv-syntax = { path = "../sv-syntax" }
+dv-model = { path = "../dv-model", default-features = false }
+
+[dev-dependencies]
+# The examples and tests compare against the slang-backed model.
+dv-model = { path = "../dv-model" }
