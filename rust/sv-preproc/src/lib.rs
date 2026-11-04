@@ -111,6 +111,8 @@ pub struct Preprocessor {
     out: Output,
     paths: Vec<PathBuf>,
     sources: Vec<Rc<str>>,
+    /// `begin_keywords versions in force, innermost last.
+    keyword_versions: Vec<sv_lexer::KeywordVersion>,
 }
 
 const STANDARD_MACROS: &[(&str, &str)] = &[
@@ -142,8 +144,6 @@ const LINE_DIRECTIVES: &[&str] = &[
     "nounconnected_drive",
     "pragma",
     "line",
-    "begin_keywords",
-    "end_keywords",
     "default_decay_time",
     "default_trireg_strength",
     "delay_mode_distributed",
@@ -222,6 +222,7 @@ impl Preprocessor {
             out: Output::default(),
             paths: Vec::new(),
             sources: Vec::new(),
+            keyword_versions: Vec::new(),
         };
         if pp.opts.max_include_depth == 0 {
             pp.opts.max_include_depth = 1024;
@@ -352,8 +353,16 @@ impl Preprocessor {
 
     fn next(&mut self) -> Option<T> {
         loop {
-            let t = self.raw_next()?;
+            let mut t = self.raw_next()?;
             if t.kind != Kind::Directive {
+                if t.kind == Kind::Keyword {
+                    if let Some(&v) = self.keyword_versions.last() {
+                        if !sv_lexer::is_keyword_in(v, &t.text) {
+                            // Not reserved under the `begin_keywords in force.
+                            t.kind = Kind::Identifier;
+                        }
+                    }
+                }
                 return Some(t);
             }
             let name = &t.text[1..];
@@ -398,6 +407,23 @@ impl Preprocessor {
                 "__LINE__" => {
                     let line = self.line_of(t.origin);
                     return Some(T { kind: Kind::IntegerLiteral, text: Rc::from(line.to_string()), from_macro: true, ..t });
+                }
+                "begin_keywords" => {
+                    let spec = self.line_next();
+                    let v = spec.as_ref().and_then(|s| {
+                        sv_lexer::KeywordVersion::from_specifier(s.text.trim_matches('"'))
+                    });
+                    match v {
+                        Some(v) => self.keyword_versions.push(v),
+                        None => self.diag(t.origin, "unknown `begin_keywords version".into()),
+                    }
+                    self.rest_of_line();
+                }
+                "end_keywords" => {
+                    if self.keyword_versions.pop().is_none() {
+                        self.diag(t.origin, "`end_keywords without `begin_keywords".into());
+                    }
+                    self.rest_of_line();
                 }
                 _ if LINE_DIRECTIVES.contains(&name) => {
                     self.rest_of_line();

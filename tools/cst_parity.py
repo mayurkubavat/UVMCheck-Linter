@@ -10,18 +10,26 @@ For every .sv file under ROOT/tests (an sv-tests checkout), skipping
     cmake --build build --target uvmcheck_cst_outline
     cargo build --release -p sv-syntax --example outline   # in rust/
     tools/cst_parity.py ~/sv-tests [chapter-8]
+
+With --exprs, compares the canonical operator expressions instead
+(uvmcheck_cst_exprs against the Rust outline example's --exprs).
 """
 import glob, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 SLANG = os.environ.get('SLANG_OUTLINE', os.path.join(REPO, 'build', 'uvmcheck_cst_outline'))
+SLANG_EXPRS = os.environ.get('SLANG_EXPRS', os.path.join(REPO, 'build', 'uvmcheck_cst_exprs'))
 RUST = os.environ.get('RUST_OUTLINE', os.path.join(REPO, 'rust', 'target', 'release', 'examples', 'outline'))
 
 
 def main():
-    root = sys.argv[1]
-    sel = sys.argv[2] if len(sys.argv) > 2 else ''
+    argv = [a for a in sys.argv[1:] if a != '--exprs']
+    exprs = len(argv) != len(sys.argv) - 1
+    root = argv[0]
+    sel = argv[1] if len(argv) > 1 else ''
+    slang = SLANG_EXPRS if exprs else SLANG
+    rust_mode = ['--exprs'] if exprs else []
     ok = slang_err = skip = 0
     fails = []
     for f in sorted(glob.glob(root + '/tests/**/*.sv', recursive=True)):
@@ -40,8 +48,8 @@ def main():
             args += ['+incdir+' + os.path.join(root, d) for d in m.group(1).split()]
         args += ['+incdir+' + os.path.dirname(f)]
         try:
-            a = subprocess.run([SLANG] + args + [f], capture_output=True, text=True, timeout=20, errors='replace')
-            b = subprocess.run([RUST, '--check', '--errors'] + args + [f], capture_output=True, text=True,
+            a = subprocess.run([slang] + args + [f], capture_output=True, text=True, timeout=20, errors='replace')
+            b = subprocess.run([RUST, '--check', '--errors'] + rust_mode + args + [f], capture_output=True, text=True,
                                timeout=20, errors='replace')
         except subprocess.TimeoutExpired:
             fails.append((f, 'timeout'))

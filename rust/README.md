@@ -132,3 +132,16 @@ Measured on slice 1: uvm-core's `uvm_pkg.sv` (168 files, 5,402 entries)
 identical with no errors in about 100 ms including preprocessing; all 849
 sv-tests files Slang parses cleanly identical; all 772 of this repo's test
 inputs Slang parses cleanly identical.
+
+Slice 2 (2026-11-04) adds expressions (precedence climbing over Table
+11-2, calls, selects, casts, concatenation, streaming, assignment
+patterns, `new`, `with`, `inside`, patterns after `matches`), data types
+and declarations (enums, structs, parameters, instantiations, gates,
+non-ANSI ports) and statements built on them. `begin_keywords` is
+honored by the preprocessor. `tools/cst_parity.py --exprs` compares every
+top-level operator expression in prefix form, `(+ a (* b c))`, with
+Slang's (`uvmcheck_cst_exprs`): uvm-core (8,849 expressions), all 849
+clean sv-tests files and all 772 clean repo test inputs are identical,
+with no parse errors; uvm_pkg.sv preprocesses and parses in about 120 ms.
+Constraint bodies, covergroups, assertions, timing controls and
+module/class/function headers are still kept as written (slice 3).

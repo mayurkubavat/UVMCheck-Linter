@@ -96,6 +96,72 @@ pub enum SyntaxKind {
     /// `label:` in front of a statement.
     StmtLabel,
     EmptyStmt,
-    /// Any other statement or a local declaration, up to its `;`.
-    SimpleStmt,
+    /// An expression statement: assignment, call, increment.
+    ExprStmt,
+    ReturnStmt,
+    /// `break;` / `continue;`
+    JumpStmt,
+    DisableStmt,
+    /// `-> e;`
+    EventTrigger,
+    /// Procedural assign/deassign/force/release.
+    ProcAssign,
+    /// `assert property`, `cover sequence`, `expect`: kept as written.
+    ConcurrentAssert,
+    /// `#d`, `@(e)`, `##n`: kept as written.
+    TimingControl,
+
+    // Declarations.
+    DataType,
+    /// `[...]` packed or unpacked dimension.
+    Dim,
+    /// A declared name with its dimensions and initializer.
+    Declarator,
+    /// A module or interface instantiation.
+    Instantiation,
+    /// One instance: name, dimensions, port connections.
+    Instance,
+    /// Gate or switch primitive instantiation.
+    GateInst,
+
+    // Expressions.
+    BinaryExpr,
+    PrefixExpr,
+    PostfixExpr,
+    CondExpr,
+    InsideExpr,
+    /// `{ ... }` after `inside`.
+    RangeList,
+    /// `[lo : hi]` in a range list or case item.
+    OpenRange,
+    ParenExpr,
+    Literal,
+    /// An identifier, system name, `this`, `super`, `null`, `$`.
+    NameExpr,
+    /// `a::b`
+    ScopedExpr,
+    /// `a.b`
+    MemberExpr,
+    /// `a[i]`, `a[i:j]`, `a[i+:w]`
+    SelectExpr,
+    /// `f(args)`, also `x.m() with (...)`.
+    CallExpr,
+    ArgList,
+    Arg,
+    /// `with (...)` / `with { ... }` after a method call.
+    WithClause,
+    ConcatExpr,
+    /// `'{ ... }`
+    AssignPattern,
+    /// `T'(x)`, `8'(x)`, `T'{...}`
+    CastExpr,
+    NewExpr,
+    TaggedExpr,
+    /// `x matches pattern`, `a &&& b` in a condition.
+    MatchExpr,
+    Pattern,
+    /// `#1 x` inside an assignment.
+    TimedExpr,
+    /// A type standing where an expression may: `$bits(int)`.
+    TypeExpr,
 }

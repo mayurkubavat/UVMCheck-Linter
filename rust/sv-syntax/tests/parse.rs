@@ -117,3 +117,74 @@ fn macros_expand_inside_the_tree() {
     let decls = t.preorder().into_iter().filter(|&n| t.kind(n) == SyntaxKind::DataDecl).count();
     assert_eq!(decls, 2);
 }
+
+/// Canonical forms checked against Slang (build/uvmcheck_cst_exprs).
+#[test]
+fn expressions_match_slang() {
+    let src = r#"module m;
+  initial begin
+    a = b + c * d ** 2 - -e;
+    x <= y ? p : q ? r : s;
+    if (a <= b && !c || d inside {[1:3], 5}) z = {2{a, b}};
+    v = int'(w) + T'(u) + 8'(k) + {<< 8 {s}};
+    o = '{default: 0} ;
+    n = obj.m(.a(1), , i++) [3+:4];
+    q = #5 a | b & c ^ d;
+    r = cond -> a <-> b;
+    void'(f(x << 2 >>> 1));
+  end
+endmodule
+"#;
+    let t = parse(src);
+    assert!(t.errors.is_empty(), "{:?}", t.errors);
+    assert_eq!(
+        sv_syntax::canonical_exprs(&t),
+        [
+            "(= a (- (+ b (* c (** d 2))) (- e)))",
+            "(<= x (? y p (? q r s)))",
+            "(|| (&& (<= a b) (! c)) (inside d {[1:3],5}))",
+            "(= z {2{a,b}})",
+            "(= v (+ (+ (+ int'(w) T'(u)) 8'(k)) {<<8{s}}))",
+            "(= o '{default:0})",
+            "(= n obj.m(.a(1),,(post++ i))[3+:4])",
+            "(= q #5(| a (^ (& b c) d)))",
+            "(= r (-> cond (<-> a b)))",
+            "(>>> (<< x 2) 1)",
+        ]
+    );
+}
+
+#[test]
+fn declarations_and_statements() {
+    let src = r#"class c extends base;
+  rand bit [W-1:0] data[$];
+  local static uvm_config_db#(virtual bus_if)::type_id x = null, y;
+  typedef enum logic [1:0] { IDLE = 0, BUSY = 1 + 1 } state_t;
+  function automatic int unsigned f(int a);
+    uvm_object o;
+    for (int i = 0, j = n - 1; i < j; i++, j--) o = T::type_id::create($sformatf("o%0d", i), this);
+    foreach (data[k]) data[k] = k;
+    -> done;
+    return a;
+  endfunction
+endclass
+"#;
+    let t = parse(src);
+    assert!(t.errors.is_empty(), "{:?}", t.errors);
+    assert_eq!(t.file_text(0), src);
+    let n = |k: SyntaxKind| t.preorder().into_iter().filter(|&x| t.kind(x) == k).count();
+    assert_eq!(n(SyntaxKind::Declarator), 8);
+    assert_eq!(n(SyntaxKind::ReturnStmt), 1);
+    assert_eq!(n(SyntaxKind::EventTrigger), 1);
+    assert_eq!(
+        sv_syntax::canonical_exprs(&t),
+        ["(- W 1)", "(+ 1 1)", "(- n 1)", "(< i j)", "(post++ i)", "(post-- j)", "(= o T::type_id::create($sformatf(\"o%0d\",i),this))", "(= data[k] k)"]
+    );
+}
+
+#[test]
+fn begin_keywords_makes_identifiers() {
+    let src = "`begin_keywords \"1364-2001\"\nmodule b; reg logic; endmodule\n`end_keywords\n";
+    let t = parse(src);
+    assert!(t.errors.is_empty(), "{:?}", t.errors);
+}

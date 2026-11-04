@@ -3,6 +3,7 @@
 //! constraint bodies are kept as balanced token runs inside their nodes;
 //! later slices parse them in place.
 
+use crate::expr::{arg_list, expr, expr_bp, expr_with, param_values, value_range, ASSIGNABLE, STATEMENT};
 use crate::parser::Parser;
 use crate::SyntaxKind::{self, *};
 
@@ -41,7 +42,7 @@ fn stray(p: &mut Parser) {
     m.complete(p, Error);
 }
 
-fn attributes(p: &mut Parser) {
+pub(crate) fn attributes(p: &mut Parser) {
     while p.at("(") && p.nth(1) == "*" && p.joined(1) {
         let m = p.start();
         p.bump();
@@ -185,8 +186,8 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
         if ctx == Ctx::Top && p.at("virtual") && head == "interface" && p.nth(q + 1) == "class" {
             return Some(class_decl(p, q + 1));
         }
-        to_semi(p);
-        return Some(if (0..q).any(|i| p.nth(i) == "const") { DataDecl } else { DataDecl });
+        data_decl(p);
+        return Some(DataDecl);
     }
     let k = match p.cur() {
         "" => return None,
@@ -220,9 +221,26 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
             to_semi(p);
             ExportDecl
         }
-        "parameter" | "localparam" | "specparam" | "defparam" => {
-            to_semi(p);
+        "parameter" | "localparam" => {
+            param_decl(p);
             ParamDecl
+        }
+        "defparam" => {
+            p.bump();
+            loop {
+                expr_bp(p, 30, Default::default());
+                p.expect("=");
+                expr(p);
+                if !p.eat(",") {
+                    break;
+                }
+            }
+            p.expect(";");
+            ParamDecl
+        }
+        "specparam" => {
+            to_semi(p);
+            OtherItem
         }
         "timeunit" | "timeprecision" => {
             to_semi(p);
@@ -245,7 +263,18 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
             LetDecl
         }
         "assign" => {
-            to_semi(p);
+            p.bump();
+            strength(p);
+            if p.at("#") {
+                timing_control(p);
+            }
+            loop {
+                expr_with(p, ASSIGNABLE);
+                if !p.eat(",") {
+                    break;
+                }
+            }
+            p.expect(";");
             ContinuousAssign
         }
         "covergroup" => {
@@ -290,19 +319,25 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
             statement(p);
             ProceduralBlock
         }
-        "assert" | "assume" | "cover" | "restrict" | "expect" => {
-            statement(p);
-            AssertStmt
-        }
+        "assert" | "assume" | "cover" | "restrict" | "expect" => statement_body(p),
         "for" if ctx != Ctx::Class => {
             p.bump();
-            group(p);
+            p.expect("(");
+            p.eat("genvar");
+            name_token(p);
+            p.expect("=");
+            expr(p);
+            p.expect(";");
+            expr(p);
+            p.expect(";");
+            expr_with(p, ASSIGNABLE);
+            p.expect(")");
             generate_block(p);
             LoopGenerate
         }
         "if" if ctx != Ctx::Class => {
             p.bump();
-            group(p);
+            paren_expr(p);
             generate_block(p);
             if p.at("else") {
                 let e = p.start();
@@ -314,12 +349,24 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
         }
         "case" if ctx != Ctx::Class => {
             p.bump();
-            group(p);
+            paren_expr(p);
             while !p.at_end() && !p.at("endcase") && !p.at_any(&END_KEYWORDS[5..]) {
-                if p.at("begin") {
-                    generate_block(p);
-                } else {
+                let before = p.pos();
+                if p.at("default") {
                     p.bump();
+                    p.eat(":");
+                } else {
+                    loop {
+                        expr(p);
+                        if !p.eat(",") {
+                            break;
+                        }
+                    }
+                    p.expect(":");
+                }
+                generate_block(p);
+                if p.pos() == before {
+                    stray(p);
                 }
             }
             p.expect("endcase");
@@ -333,11 +380,26 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
         _ => {
             // `label: assert property (...)`
             if p.at_ident() && p.nth(1) == ":" && matches!(p.nth(2), "assert" | "assume" | "cover" | "restrict") {
-                statement(p);
-                return Some(AssertStmt);
+                let l = p.start();
+                p.bump();
+                p.bump();
+                l.complete(p, StmtLabel);
+                return Some(statement_body(p));
+            }
+            if GATES.contains(&p.cur()) {
+                gate_instantiation(p);
+                return Some(GateInst);
+            }
+            if ctx != Ctx::Class && is_instantiation(p) {
+                instantiation(p);
+                return Some(Instantiation);
+            }
+            if is_decl_start(p) {
+                data_decl(p);
+                return Some(DataDecl);
             }
             to_semi(p);
-            DataDecl
+            OtherItem
         }
     };
     Some(k)
@@ -528,6 +590,9 @@ fn subroutine(p: &mut Parser, q: usize, proto: bool) -> SyntaxKind {
         Some((s, e)) => {
             if s > p.pos() {
                 let r = p.start();
+                if !proto {
+                    data_type(p);
+                }
                 while p.pos() < s {
                     p.bump();
                 }
@@ -606,17 +671,21 @@ fn typedef(p: &mut Parser) -> SyntaxKind {
         p.error("typedef without a name".into());
         return TypedefDecl;
     };
-    let ty = p.start();
+    p.bump();
+    data_type(p);
     while p.pos() < n {
+        // What data_type left over (unusual forms) stays as written.
         if p.at_any(&["(", "[", "{", "'{"]) {
             group(p);
         } else {
             p.bump();
         }
     }
-    ty.complete(p, Header);
     name_token(p);
-    to_semi(p);
+    while p.at("[") {
+        dim(p);
+    }
+    p.expect(";");
     TypedefDecl
 }
 
@@ -632,14 +701,401 @@ fn constraint(p: &mut Parser, q: usize) -> SyntaxKind {
     }
     n.complete(p, Name);
     if p.at("{") {
-        let b = p.start();
-        group(p);
-        b.complete(p, ConstraintBlock);
+        constraint_block(p);
         ConstraintDecl
     } else {
         p.expect(";");
         ConstraintPrototype
     }
+}
+
+// ---- types and declarations -------------------------------------------
+
+/// Keywords that start a data type.
+pub(crate) const BUILTIN_TYPES: &[&str] = &[
+    "bit", "logic", "reg", "byte", "shortint", "int", "longint", "integer", "time", "real", "shortreal", "realtime",
+    "string", "chandle", "event", "void", "enum", "struct", "union",
+];
+
+const NET_TYPES: &[&str] = &[
+    "wire", "tri", "tri0", "tri1", "triand", "trior", "trireg", "wand", "wor", "supply0", "supply1", "uwire",
+    "interconnect",
+];
+
+const GATES: &[&str] = &[
+    "and", "nand", "or", "nor", "xor", "xnor", "buf", "not", "bufif0", "bufif1", "notif0", "notif1", "nmos", "pmos",
+    "rnmos", "rpmos", "cmos", "rcmos", "tran", "rtran", "tranif0", "tranif1", "rtranif0", "rtranif1", "pullup",
+    "pulldown",
+];
+
+const STRENGTHS: &[&str] = &[
+    "supply0", "strong0", "pull0", "weak0", "highz0", "supply1", "strong1", "pull1", "weak1", "highz1", "small",
+    "medium", "large",
+];
+
+const DECL_QUALIFIERS: &[&str] = &[
+    "const", "var", "static", "automatic", "rand", "randc", "local", "protected", "virtual", "input", "output",
+    "inout", "ref",
+];
+
+fn ident_at(p: &Parser, i: usize) -> bool {
+    matches!(p.kind_at(i), Some(sv_lexer::Kind::Identifier | sv_lexer::Kind::EscapedIdentifier))
+}
+
+/// Index past a type name `a [#(..)] {:: b [#(..)]}` starting at `i`, or
+/// None if no name is there.
+fn type_name_end(p: &Parser, mut i: usize) -> Option<usize> {
+    if !(ident_at(p, i) || (matches!(p.text_at(i), "$unit" | "local" | "std") && p.text_at(i + 1) == "::")) {
+        return None;
+    }
+    i += 1;
+    loop {
+        if p.text_at(i) == "#" && p.text_at(i + 1) == "(" {
+            i = skip_group_at(p, i + 1);
+        }
+        if p.text_at(i) == "::" && (ident_at(p, i + 1) || p.kind_at(i + 1) == Some(sv_lexer::Kind::Keyword)) {
+            i += 2;
+            continue;
+        }
+        return Some(i);
+    }
+}
+
+/// Lookahead: does a data declaration start here (in a block or item)?
+pub(crate) fn is_decl_start(p: &Parser) -> bool {
+    let mut i = p.pos();
+    while DECL_QUALIFIERS.contains(&p.text_at(i)) {
+        i += 1;
+    }
+    let t = p.text_at(i);
+    if i > p.pos() && matches!(p.text_at(p.pos()), "input" | "output" | "inout" | "ref") {
+        // Non-ANSI port declaration: `input a;`, `output [3:0] b, c;`.
+        return true;
+    }
+    if p.text_at(i + 1) == "'" {
+        // A cast: `void'(f())`, `int'(x)`.
+        return false;
+    }
+    if BUILTIN_TYPES.contains(&t) || NET_TYPES.contains(&t) || matches!(t, "signed" | "unsigned") {
+        return true;
+    }
+    if t == "virtual" || t == "interface" {
+        return true;
+    }
+    if t == "type" && p.text_at(i + 1) == "(" {
+        return true;
+    }
+    let Some(mut j) = type_name_end(p, i) else { return false };
+    if i > p.pos() && matches!(p.text_at(j), "=" | ";" | ",") {
+        // `var x = 1;`, `const x = 1;`: no type.
+        return true;
+    }
+    while p.text_at(j) == "[" {
+        j = skip_group_at(p, j);
+    }
+    ident_at(p, j)
+}
+
+/// Lookahead: `type [#(..)] name [dims] (` is a module instantiation.
+fn is_instantiation(p: &Parser) -> bool {
+    let i = p.pos();
+    if !ident_at(p, i) {
+        return false;
+    }
+    let mut j = i + 1;
+    if p.text_at(j) == "#" {
+        if p.text_at(j + 1) == "(" {
+            j = skip_group_at(p, j + 1);
+        } else {
+            j += 2;
+        }
+    }
+    if !ident_at(p, j) {
+        return false;
+    }
+    j += 1;
+    while p.text_at(j) == "[" {
+        j = skip_group_at(p, j);
+    }
+    p.text_at(j) == "("
+}
+
+/// A data type, or an implicit one (`signed [3:0]`, `[7:0]`).
+pub(crate) fn data_type(p: &mut Parser) {
+    let m = p.start();
+    match p.cur() {
+        "enum" => {
+            p.bump();
+            if !p.at("{") {
+                data_type(p);
+            }
+            if p.expect("{") {
+                while !p.at_end() && !p.at("}") {
+                    let e = p.start();
+                    name_token(p);
+                    if p.at("[") {
+                        dim(p);
+                    }
+                    if p.eat("=") {
+                        expr(p);
+                    }
+                    e.complete(p, Declarator);
+                    if !p.eat(",") {
+                        break;
+                    }
+                }
+                p.expect("}");
+            }
+        }
+        "struct" | "union" => {
+            p.bump();
+            p.eat("tagged");
+            p.eat("soft");
+            p.eat("packed");
+            if p.at_any(&["signed", "unsigned"]) {
+                p.bump();
+            }
+            if p.expect("{") {
+                while !p.at_end() && !p.at("}") && !p.at_any(END_KEYWORDS) {
+                    let d = p.start();
+                    attributes(p);
+                    data_decl(p);
+                    d.complete(p, DataDecl);
+                }
+                p.expect("}");
+            }
+        }
+        "virtual" => {
+            p.bump();
+            p.eat("interface");
+            name_token(p);
+            if p.at("#") && p.nth(1) == "(" {
+                param_values(p);
+            }
+            if p.eat(".") {
+                name_token(p);
+            }
+        }
+        "interface" => {
+            p.bump();
+            name_token(p);
+            if p.eat(".") {
+                name_token(p);
+            }
+        }
+        "type" => {
+            p.bump();
+            p.expect("(");
+            crate::expr::type_or_expr(p);
+            p.expect(")");
+        }
+        "signed" | "unsigned" | "[" => {}
+        s if BUILTIN_TYPES.contains(&s) => {
+            p.bump();
+        }
+        _ => {
+            if type_name_end(p, p.pos()).is_some() {
+                p.bump();
+                loop {
+                    if p.at("#") && p.nth(1) == "(" {
+                        param_values(p);
+                    }
+                    if p.at("::") {
+                        p.bump();
+                        p.bump();
+                        continue;
+                    }
+                    break;
+                }
+            } else {
+                p.error(format!("expected a data type, found `{}`", p.cur()));
+            }
+        }
+    }
+    if p.at_any(&["signed", "unsigned"]) {
+        p.bump();
+    }
+    while p.at("[") {
+        dim(p);
+    }
+    m.complete(p, DataType);
+}
+
+/// `[ ]`, `[$]`, `[$:n]`, `[*]`, `[type]`, `[n]`, `[a:b]`, `[a+:w]`.
+pub(crate) fn dim(p: &mut Parser) {
+    let m = p.start();
+    p.bump();
+    if p.at("]") {
+    } else if p.at("$") && matches!(p.nth(1), "]" | ":") {
+        p.bump();
+        if p.eat(":") {
+            expr(p);
+        }
+    } else if p.at("*") && p.nth(1) == "]" {
+        p.bump();
+    } else {
+        crate::expr::type_or_expr(p);
+        if p.at_any(&[":", "+:", "-:"]) {
+            p.bump();
+            expr(p);
+        }
+    }
+    p.expect("]");
+    m.complete(p, Dim);
+}
+
+/// `[qualifiers] type declarator {, declarator} ;`
+pub(crate) fn data_decl(p: &mut Parser) {
+    let mut quals = 0;
+    // `virtual` here starts a virtual interface type, not a qualifier.
+    while p.at_any(DECL_QUALIFIERS) && !p.at("virtual") {
+        p.bump();
+        quals += 1;
+    }
+    if p.at_any(NET_TYPES) {
+        p.bump();
+        strength(p);
+        if p.at_any(&["vectored", "scalared"]) {
+            p.bump();
+        }
+        // An explicit data type, or an implicit one.
+        if !(p.at_ident() && matches!(p.nth(1), "=" | ";" | "," | "[")) && !p.at("#") {
+            data_type(p);
+        }
+        if p.at("#") {
+            timing_control(p);
+        }
+    } else if quals > 0 && p.at_ident() && matches!(p.nth(1), "=" | ";" | ",") {
+        // `var x = 1;`, `input a;`: implicit type.
+    } else {
+        data_type(p);
+    }
+    loop {
+        declarator(p);
+        if !p.eat(",") {
+            break;
+        }
+    }
+    p.expect(";");
+}
+
+fn declarator(p: &mut Parser) {
+    let m = p.start();
+    name_token(p);
+    while p.at("[") {
+        dim(p);
+    }
+    if p.eat("=") {
+        expr(p);
+    }
+    m.complete(p, Declarator);
+}
+
+/// `parameter|localparam [type] name = value {, ...} ;`, also `type` params.
+fn param_decl(p: &mut Parser) {
+    p.bump();
+    if p.eat("type") {
+        loop {
+            let d = p.start();
+            name_token(p);
+            if p.eat("=") {
+                data_type(p);
+            }
+            d.complete(p, Declarator);
+            if !p.eat(",") {
+                break;
+            }
+        }
+        p.expect(";");
+        return;
+    }
+    if !(p.at_ident() && matches!(p.nth(1), "=" | "," | ";" | "[")) {
+        data_type(p);
+    }
+    loop {
+        declarator(p);
+        if !p.eat(",") {
+            break;
+        }
+    }
+    p.expect(";");
+}
+
+/// `(strong0, weak1)` or `(pull1)` drive strength, if present.
+fn strength(p: &mut Parser) {
+    if p.at("(") && STRENGTHS.contains(&p.nth(1)) {
+        group(p);
+    }
+}
+
+/// `type [#(params)] name [dims] (ports) {, name (ports)} ;`
+fn instantiation(p: &mut Parser) {
+    let t = p.start();
+    p.bump();
+    if p.at("#") && p.nth(1) == "(" {
+        param_values(p);
+    } else if p.at("#") {
+        timing_control(p);
+    }
+    t.complete(p, DataType);
+    loop {
+        let i = p.start();
+        name_token(p);
+        while p.at("[") {
+            dim(p);
+        }
+        if p.at("(") {
+            arg_list(p);
+        } else {
+            p.expect("(");
+        }
+        i.complete(p, Instance);
+        if !p.eat(",") {
+            break;
+        }
+    }
+    p.expect(";");
+}
+
+/// `and #1 g1 (o, a, b), (o2, c, d);`
+fn gate_instantiation(p: &mut Parser) {
+    p.bump();
+    strength(p);
+    if p.at("#") {
+        timing_control(p);
+    }
+    loop {
+        let i = p.start();
+        if p.at_ident() {
+            name_token(p);
+            while p.at("[") {
+                dim(p);
+            }
+        }
+        if p.at("(") {
+            arg_list(p);
+        } else {
+            p.expect("(");
+        }
+        i.complete(p, Instance);
+        if !p.eat(",") {
+            break;
+        }
+    }
+    p.expect(";");
+}
+
+pub(crate) fn constraint_block(p: &mut Parser) {
+    let b = p.start();
+    group(p);
+    b.complete(p, ConstraintBlock);
+}
+
+/// `( expr )` around a condition.
+fn paren_expr(p: &mut Parser) {
+    p.expect("(");
+    expr_with(p, ASSIGNABLE);
+    p.expect(")");
 }
 
 // ---- statements -------------------------------------------------------
@@ -652,7 +1108,7 @@ pub(crate) fn statement(p: &mut Parser) -> bool {
     let m = p.start();
     attributes(p);
     // `label :` (not `::`)
-    if (p.at_ident()) && p.nth(1) == ":" && p.nth(2) != ":" {
+    if p.at_ident() && p.nth(1) == ":" && p.nth(2) != ":" {
         let l = p.start();
         p.bump();
         p.bump();
@@ -666,6 +1122,15 @@ pub(crate) fn statement(p: &mut Parser) -> bool {
 fn statement_or_missing(p: &mut Parser) {
     if !statement(p) {
         p.error("expected a statement".into());
+    }
+}
+
+fn else_clause(p: &mut Parser) {
+    if p.at("else") {
+        let e = p.start();
+        p.bump();
+        statement_or_missing(p);
+        e.complete(p, ElseClause);
     }
 }
 
@@ -709,32 +1174,79 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
         }
         "if" => {
             p.bump();
-            group(p);
+            paren_expr(p);
             statement_or_missing(p);
-            if p.at("else") {
-                let e = p.start();
-                p.bump();
-                statement_or_missing(p);
-                e.complete(p, ElseClause);
-            }
+            else_clause(p);
             IfStmt
         }
-        "case" | "casex" | "casez" | "randcase" => {
-            let open = p.cur() != "randcase";
+        "case" | "casex" | "casez" => {
             p.bump();
-            if open {
-                group(p);
-                if p.at_any(&["inside", "matches"]) {
-                    p.bump();
-                }
+            paren_expr(p);
+            let matches = p.at("matches");
+            if p.at_any(&["inside", "matches"]) {
+                p.bump();
             }
-            case_items(p);
+            case_items(p, matches);
             p.expect("endcase");
             CaseStmt
         }
-        "for" | "foreach" | "while" | "repeat" => {
+        "randcase" => {
+            p.bump();
+            case_items(p, false);
+            p.expect("endcase");
+            CaseStmt
+        }
+        "for" => {
+            p.bump();
+            p.expect("(");
+            if !p.at(";") {
+                // After one declaration, the rest are declarations too,
+                // with the type optional: `int i = 0, j = n`.
+                let mut decls = false;
+                loop {
+                    if is_decl_start(p) || (decls && p.at_ident() && p.nth(1) == "=") {
+                        let d = p.start();
+                        p.eat("var");
+                        if is_decl_start(p) {
+                            data_type(p);
+                        }
+                        declarator(p);
+                        d.complete(p, DataDecl);
+                        decls = true;
+                    } else {
+                        expr_with(p, ASSIGNABLE);
+                    }
+                    if !p.eat(",") {
+                        break;
+                    }
+                }
+            }
+            p.expect(";");
+            if !p.at(";") {
+                expr(p);
+            }
+            p.expect(";");
+            if !p.at(")") {
+                loop {
+                    expr_with(p, ASSIGNABLE);
+                    if !p.eat(",") {
+                        break;
+                    }
+                }
+            }
+            p.expect(")");
+            statement_or_missing(p);
+            LoopStmt
+        }
+        "foreach" => {
             p.bump();
             group(p);
+            statement_or_missing(p);
+            LoopStmt
+        }
+        "while" | "repeat" => {
+            p.bump();
+            paren_expr(p);
             statement_or_missing(p);
             LoopStmt
         }
@@ -747,7 +1259,7 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
             p.bump();
             statement_or_missing(p);
             p.expect("while");
-            group(p);
+            paren_expr(p);
             p.expect(";");
             DoWhileStmt
         }
@@ -760,64 +1272,136 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
             to_semi(p);
             WaitStmt
         }
-        "wait" | "wait_order" => {
+        "wait" => {
             p.bump();
-            group(p);
-            if p.at("else") {
-                p.bump();
-            }
+            paren_expr(p);
             statement_or_missing(p);
-            if p.at("else") {
-                let e = p.start();
-                p.bump();
-                statement_or_missing(p);
-                e.complete(p, ElseClause);
-            }
             WaitStmt
         }
-        "assert" | "assume" | "cover" | "restrict" | "expect" => {
+        "wait_order" => {
             p.bump();
-            while p.at_any(&["property", "sequence", "final"]) {
-                p.bump();
+            group(p);
+            if !p.at("else") {
+                statement_or_missing(p);
             }
+            else_clause(p);
+            WaitStmt
+        }
+        "assert" | "assume" | "cover" | "restrict" | "expect"
+            if p.cur() == "expect" || matches!(p.nth(1), "property" | "sequence") =>
+        {
+            // Concurrent assertion: kept as written until slice 3.
+            p.bump();
+            p.eat("property");
+            p.eat("sequence");
+            group(p);
+            if !p.at("else") {
+                statement_or_missing(p);
+            }
+            else_clause(p);
+            ConcurrentAssert
+        }
+        "assert" | "assume" | "cover" => {
+            p.bump();
             if p.at("#") {
                 p.bump();
                 p.bump();
-            }
-            group(p);
-            // Action block: a statement, an else, or both.
-            if p.at("else") {
-                let e = p.start();
-                p.bump();
-                statement_or_missing(p);
-                e.complete(p, ElseClause);
             } else {
-                statement_or_missing(p);
-                if p.at("else") {
-                    let e = p.start();
-                    p.bump();
-                    statement_or_missing(p);
-                    e.complete(p, ElseClause);
-                }
+                p.eat("final");
             }
+            paren_expr(p);
+            if !p.at("else") {
+                statement_or_missing(p);
+            }
+            else_clause(p);
             AssertStmt
+        }
+        "return" => {
+            p.bump();
+            if !p.at(";") {
+                expr(p);
+            }
+            p.expect(";");
+            ReturnStmt
+        }
+        "break" | "continue" => {
+            p.bump();
+            p.expect(";");
+            JumpStmt
+        }
+        "disable" => {
+            to_semi(p);
+            DisableStmt
+        }
+        "->" | "->>" => {
+            p.bump();
+            if p.at_any(&["#", "@", "##"]) {
+                timing_control(p);
+            }
+            expr_bp(p, 30, Default::default());
+            p.expect(";");
+            EventTrigger
+        }
+        "assign" | "force" => {
+            p.bump();
+            expr_with(p, ASSIGNABLE);
+            p.expect(";");
+            ProcAssign
+        }
+        "deassign" | "release" => {
+            p.bump();
+            expr(p);
+            p.expect(";");
+            ProcAssign
         }
         "randsequence" => {
             to_end_keyword(p, "endsequence");
             RandSequenceStmt
         }
         "typedef" => typedef(p),
-        _ => {
+        "parameter" | "localparam" => {
+            param_decl(p);
+            ParamDecl
+        }
+        "import" => {
             to_semi(p);
-            SimpleStmt
+            ImportDecl
+        }
+        "let" => {
+            to_semi(p);
+            LetDecl
+        }
+        _ => {
+            if is_decl_start(p) {
+                data_decl(p);
+                return DataDecl;
+            }
+            let before = p.pos();
+            if expr_with(p, STATEMENT) {
+                p.expect(";");
+            } else if p.pos() == before {
+                to_semi(p);
+            } else {
+                to_semi(p);
+            }
+            ExprStmt
         }
     }
 }
 
-fn timing_control(p: &mut Parser) {
+pub(crate) fn timing_control(p: &mut Parser) {
     // `#5`, `#(d)`, `#1ns`, `##[1:3]`, `@(posedge clk)`, `@e`, `@*`, `@ (*)`.
+    let m = p.start();
     let op = p.cur();
     p.bump();
+    if op == "repeat" {
+        group(p);
+        if p.at_any(&["@", "#"]) {
+            timing_control(p);
+        }
+        m.complete(p, TimingControl);
+        return;
+    }
     if p.at_any(&["(", "["]) {
         group(p);
     } else if op == "@" && p.at("*") {
@@ -830,34 +1414,35 @@ fn timing_control(p: &mut Parser) {
             p.bump();
         }
     }
+    m.complete(p, TimingControl);
 }
 
 /// Case items: `expr {, expr} : stmt` or `default [:] stmt`, to `endcase`.
-fn case_items(p: &mut Parser) {
+fn case_items(p: &mut Parser, matches: bool) {
     while !p.at_end() && !p.at("endcase") && !at_foreign_end(p, "endcase") && !p.at("end") {
+        let before = p.pos();
         if p.at("default") {
             p.bump();
             p.eat(":");
         } else {
-            // Expressions up to the `:` that is not inside brackets or `?:`.
-            let mut ternary = 0;
-            while !p.at_end() && !p.at_any(END_KEYWORDS) {
-                if p.at_any(&["(", "[", "{", "'{"]) {
-                    group(p);
-                    continue;
-                }
-                if p.at("?") {
-                    ternary += 1;
-                } else if p.at(":") {
-                    if ternary == 0 {
-                        break;
+            loop {
+                if matches {
+                    crate::expr::pattern(p);
+                    if p.eat("&&&") {
+                        expr(p);
                     }
-                    ternary -= 1;
+                } else {
+                    value_range(p);
                 }
-                p.bump();
+                if !p.eat(",") {
+                    break;
+                }
             }
             p.expect(":");
         }
         statement_or_missing(p);
+        if p.pos() == before {
+            stray(p);
+        }
     }
 }

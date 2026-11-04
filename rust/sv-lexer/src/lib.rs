@@ -13,7 +13,7 @@
 //! ```
 
 mod keywords;
-pub use keywords::{is_keyword, KEYWORDS};
+pub use keywords::{is_keyword, is_keyword_in, KeywordVersion, KEYWORDS};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {

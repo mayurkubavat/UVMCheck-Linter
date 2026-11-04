@@ -1,6 +1,8 @@
 //! Prints a file's outline in the form of the Slang reference tool
 //! (build/uvmcheck_cst_outline), then `errors N`. With --check, also
 //! verifies that every file round-trips through the tree byte for byte.
+//! With --exprs, prints the canonical operator expressions instead
+//! (the form of build/uvmcheck_cst_exprs).
 //!
 //!     cargo run --release -p sv-syntax --example outline -- [+incdir+DIR]... [+define+X[=V]]... [--check] [--errors] FILE
 use std::path::PathBuf;
@@ -8,7 +10,7 @@ use std::path::PathBuf;
 fn main() {
     let mut opts = sv_syntax::Options::default();
     let mut file = None;
-    let (mut check, mut show_errors) = (false, false);
+    let (mut check, mut show_errors, mut exprs) = (false, false, false);
     for a in std::env::args().skip(1) {
         if let Some(d) = a.strip_prefix("+incdir+") {
             opts.include_dirs.push(PathBuf::from(d));
@@ -16,6 +18,8 @@ fn main() {
             opts.defines.push(d.to_string());
         } else if a == "--check" {
             check = true;
+        } else if a == "--exprs" {
+            exprs = true;
         } else if a == "--errors" {
             show_errors = true;
         } else {
@@ -27,11 +31,18 @@ fn main() {
     let tree = sv_syntax::parse_file(&file, opts);
     let ms = t.elapsed().as_secs_f64() * 1e3;
     let mut s = String::new();
-    for e in sv_syntax::outline(&tree) {
-        s.push_str(e.kind);
-        s.push(' ');
-        s.push_str(&e.name);
-        s.push('\n');
+    if exprs {
+        for e in sv_syntax::canonical_exprs(&tree) {
+            s.push_str(&e);
+            s.push('\n');
+        }
+    } else {
+        for e in sv_syntax::outline(&tree) {
+            s.push_str(e.kind);
+            s.push(' ');
+            s.push_str(&e.name);
+            s.push('\n');
+        }
     }
     print!("{s}");
     println!("errors {}", tree.errors.len());

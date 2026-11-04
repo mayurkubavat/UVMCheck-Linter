@@ -25,7 +25,6 @@ pub(crate) struct Parser<'t> {
 
 pub(crate) struct Marker(usize);
 #[derive(Clone, Copy)]
-#[allow(dead_code)] // `precede` is for the expression parser (slice 2).
 pub(crate) struct Completed(usize);
 
 impl Marker {
@@ -47,7 +46,6 @@ impl Marker {
     }
 }
 
-#[allow(dead_code)]
 impl Completed {
     /// Starts a node that will become this one's parent.
     pub(crate) fn precede(self, p: &mut Parser) -> Marker {
@@ -99,14 +97,14 @@ impl<'t> Parser<'t> {
         self.nth(0)
     }
 
-    /// The current token is this keyword or punctuation. Identifiers and
-    /// literals never compare equal to those, so text is enough.
+    /// The current token is this keyword or punctuation. An identifier
+    /// spelled like a keyword (under `begin_keywords) is not.
     pub(crate) fn at(&self, s: &str) -> bool {
-        self.cur() == s
+        self.cur() == s && !self.at_ident()
     }
 
     pub(crate) fn at_any(&self, set: &[&str]) -> bool {
-        set.contains(&self.cur())
+        set.contains(&self.cur()) && !self.at_ident()
     }
 
     pub(crate) fn at_ident(&self) -> bool {

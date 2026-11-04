@@ -42,3 +42,84 @@ mod tests {
         assert_eq!(super::KEYWORDS.len(), 248);
     }
 }
+
+/// The keyword sets `begin_keywords can select (IEEE 1800-2023 22.14).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum KeywordVersion {
+    V1364_1995,
+    V1364_2001,
+    V1364_2001NoConfig,
+    V1364_2005,
+    V1800_2005,
+    V1800_2009,
+    V1800_2012,
+    V1800_2017,
+    V1800_2023,
+}
+
+impl KeywordVersion {
+    /// Parses the string of a `begin_keywords directive, without quotes.
+    pub fn from_specifier(s: &str) -> Option<Self> {
+        Some(match s {
+            "1364-1995" => Self::V1364_1995,
+            "1364-2001" => Self::V1364_2001,
+            "1364-2001-noconfig" => Self::V1364_2001NoConfig,
+            "1364-2005" => Self::V1364_2005,
+            "1800-2005" => Self::V1800_2005,
+            "1800-2009" => Self::V1800_2009,
+            "1800-2012" => Self::V1800_2012,
+            "1800-2017" => Self::V1800_2017,
+            "1800-2023" => Self::V1800_2023,
+            _ => return None,
+        })
+    }
+}
+
+const V1995: &[&str] = &[
+    "always", "and", "assign", "begin", "buf", "bufif0", "bufif1", "case", "casex", "casez", "cmos", "deassign",
+    "default", "defparam", "disable", "edge", "else", "end", "endcase", "endfunction", "endmodule", "endprimitive",
+    "endspecify", "endtable", "endtask", "event", "for", "force", "forever", "fork", "function", "highz0", "highz1",
+    "if", "ifnone", "initial", "inout", "input", "integer", "join", "large", "macromodule", "medium", "module",
+    "nand", "negedge", "nmos", "nor", "not", "notif0", "notif1", "or", "output", "parameter", "pmos", "posedge",
+    "primitive", "pull0", "pull1", "pulldown", "pullup", "rcmos", "real", "realtime", "reg", "release", "repeat",
+    "rnmos", "rpmos", "rtran", "rtranif0", "rtranif1", "scalared", "small", "specify", "specparam", "strong0",
+    "strong1", "supply0", "supply1", "table", "task", "time", "tran", "tranif0", "tranif1", "tri", "tri0", "tri1",
+    "triand", "trior", "trireg", "vectored", "wait", "wand", "weak0", "weak1", "while", "wire", "wor", "xnor",
+    "xor",
+];
+
+const V2001_CONFIG: &[&str] =
+    &["cell", "config", "design", "endconfig", "incdir", "include", "instance", "liblist", "library", "use"];
+
+const V2001_REST: &[&str] = &[
+    "automatic", "endgenerate", "generate", "genvar", "localparam", "noshowcancelled", "pulsestyle_ondetect",
+    "pulsestyle_onevent", "showcancelled", "signed", "unsigned",
+];
+
+const V2009_NEW: &[&str] = &[
+    "accept_on", "checker", "endchecker", "eventually", "global", "implies", "let", "nexttime", "reject_on",
+    "restrict", "s_always", "s_eventually", "s_nexttime", "s_until", "s_until_with", "strong", "sync_accept_on",
+    "sync_reject_on", "unique0", "until", "until_with", "untyped", "weak",
+];
+
+const V2012_NEW: &[&str] = &["implements", "interconnect", "nettype", "soft"];
+
+/// Whether `word` is a keyword under `version`.
+pub fn is_keyword_in(version: KeywordVersion, word: &str) -> bool {
+    use KeywordVersion::*;
+    let verilog = |with_config: bool, uwire: bool| {
+        V1995.contains(&word)
+            || V2001_REST.contains(&word)
+            || (with_config && V2001_CONFIG.contains(&word))
+            || (uwire && word == "uwire")
+    };
+    match version {
+        V1364_1995 => V1995.contains(&word),
+        V1364_2001 => verilog(true, false),
+        V1364_2001NoConfig => verilog(false, false),
+        V1364_2005 => verilog(true, true),
+        V1800_2005 => is_keyword(word) && !V2009_NEW.contains(&word) && !V2012_NEW.contains(&word),
+        V1800_2009 => is_keyword(word) && !V2012_NEW.contains(&word),
+        V1800_2012 | V1800_2017 | V1800_2023 => is_keyword(word),
+    }
+}

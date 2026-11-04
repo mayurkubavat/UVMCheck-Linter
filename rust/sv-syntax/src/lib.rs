@@ -6,6 +6,8 @@
 //! assert_eq!(tree.file_text(0), "module m; endmodule\n");
 //! ```
 
+mod expr;
+mod exprs;
 mod grammar;
 mod kinds;
 mod outline;
@@ -14,6 +16,7 @@ mod tree;
 
 use std::path::Path;
 
+pub use exprs::canonical_exprs;
 pub use kinds::SyntaxKind;
 pub use outline::{outline, OutlineEntry};
 pub use sv_preproc::Options;
