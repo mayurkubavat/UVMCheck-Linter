@@ -145,3 +145,15 @@ clean sv-tests files and all 772 clean repo test inputs are identical,
 with no parse errors; uvm_pkg.sv preprocesses and parses in about 120 ms.
 Constraint bodies, covergroups, assertions, timing controls and
 module/class/function headers are still kept as written (slice 3).
+
+Slice 3 (2026-11-04) parses what slice 2 still kept as written: module,
+class and function headers (parameter and port lists, extends,
+implements), timing and event controls, constraint blocks (dist,
+implication, if/foreach, unique, soft), covergroups (options,
+coverpoints, bins, transitions, cross selections), properties, sequences
+and concurrent assertions, clocking blocks, `let`, `default disable iff`,
+DPI imports, modports and `bind`. The expression gate now covers all of
+these: uvm-core (8,972 expressions), all 849 clean sv-tests files and all
+772 clean repo test inputs are identical to Slang with no parse errors.
+Still kept as written: specify blocks, UDPs, config, checkers, attribute
+contents, nettype and randsequence (slice 4).

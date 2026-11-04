@@ -124,6 +124,41 @@ pub enum SyntaxKind {
     /// Gate or switch primitive instantiation.
     GateInst,
 
+    // Headers and slice 3a.
+    /// `extends ...` / `implements ...` of a class.
+    Extends,
+    PortList,
+    Port,
+    /// `[edge] expr [iff expr]` in an event control.
+    EventExpr,
+    ConstraintItem,
+    /// `expr dist { ... }`
+    ExprOrDist,
+    DistItem,
+    /// `@@(begin f)`
+    BlockEvent,
+    /// `option.x = v;`
+    CoverageOption,
+    Coverpoint,
+    Cross,
+    Bins,
+    TransList,
+    TransItem,
+    BinsSelect,
+
+    // Slice 3b.
+    /// `disable iff (expr)`
+    DisableIff,
+    /// A property specification: clocking, disable iff, expression.
+    PropertyExpr,
+    /// A sequence or property expression or one of its operands.
+    SequenceExpr,
+    /// `[*n]`, `[->n]`, `[=n]` or a cycle range.
+    Repetition,
+    ClockingItem,
+    /// `default disable iff expr;`
+    DefaultDisable,
+
     // Expressions.
     BinaryExpr,
     PrefixExpr,

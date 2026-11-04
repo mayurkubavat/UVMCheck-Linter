@@ -4,12 +4,13 @@
 //! later slices parse them in place.
 
 use crate::expr::{arg_list, expr, expr_bp, expr_with, param_values, value_range, ASSIGNABLE, STATEMENT};
+pub(crate) use crate::blocks::{constraint_block, timing_control};
 use crate::parser::Parser;
 use crate::SyntaxKind::{self, *};
 
 /// Keywords that close a scope. A statement or item never consumes one it
 /// does not own, which keeps one bad construct from swallowing the rest.
-const END_KEYWORDS: &[&str] = &[
+pub(crate) const END_KEYWORDS: &[&str] = &[
     "end", "join", "join_any", "join_none", "endcase", "endfunction", "endtask", "endclass", "endmodule",
     "endinterface", "endprogram", "endpackage", "endchecker", "endgenerate", "endgroup", "endproperty",
     "endsequence", "endclocking", "endspecify", "endconfig", "endprimitive", "endtable",
@@ -57,7 +58,7 @@ pub(crate) fn attributes(p: &mut Parser) {
 }
 
 /// Consumes one balanced group starting at an opening bracket.
-fn group(p: &mut Parser) {
+pub(crate) fn group(p: &mut Parser) {
     let close = match p.cur() {
         "(" => ")",
         "[" => "]",
@@ -84,7 +85,7 @@ fn group(p: &mut Parser) {
 
 /// Consumes tokens up to and including the `;` that ends this construct,
 /// stepping over bracketed groups. Stops before an end keyword.
-fn to_semi(p: &mut Parser) {
+pub(crate) fn to_semi(p: &mut Parser) {
     while !p.at_end() {
         if p.at(";") {
             p.bump();
@@ -104,7 +105,7 @@ fn to_semi(p: &mut Parser) {
 }
 
 /// Consumes tokens until `end_kw` (inclusive) with an optional end label.
-fn to_end_keyword(p: &mut Parser, end_kw: &str) {
+pub(crate) fn to_end_keyword(p: &mut Parser, end_kw: &str) {
     while !p.at_end() && !p.at(end_kw) {
         p.bump();
     }
@@ -112,7 +113,7 @@ fn to_end_keyword(p: &mut Parser, end_kw: &str) {
     end_label(p);
 }
 
-fn end_label(p: &mut Parser) {
+pub(crate) fn end_label(p: &mut Parser) {
     if p.at(":") && p.nth(1) != ":" {
         let m = p.start();
         p.bump();
@@ -121,7 +122,7 @@ fn end_label(p: &mut Parser) {
     }
 }
 
-fn name_token(p: &mut Parser) {
+pub(crate) fn name_token(p: &mut Parser) {
     let m = p.start();
     if p.at_ident() || p.nth_kind(0) == Some(sv_lexer::Kind::Keyword) {
         if !p.at_ident() {
@@ -206,11 +207,11 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
         "typedef" => typedef(p),
         "constraint" => constraint(p, 0),
         "import" if p.nth_kind(1) == Some(sv_lexer::Kind::StringLiteral) => {
-            to_semi(p);
+            crate::assertions::dpi(p);
             DpiImport
         }
         "export" if p.nth_kind(1) == Some(sv_lexer::Kind::StringLiteral) => {
-            to_semi(p);
+            crate::assertions::dpi(p);
             DpiExport
         }
         "import" => {
@@ -251,15 +252,15 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
             GenvarDecl
         }
         "modport" => {
-            to_semi(p);
+            crate::assertions::modport(p);
             ModportDecl
         }
         "bind" => {
-            to_semi(p);
+            crate::assertions::bind(p);
             BindDirective
         }
         "let" => {
-            to_semi(p);
+            crate::assertions::let_decl(p);
             LetDecl
         }
         "assign" => {
@@ -278,28 +279,28 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
             ContinuousAssign
         }
         "covergroup" => {
-            p.bump();
-            name_token(p);
-            to_end_keyword(p, "endgroup");
+            crate::blocks::covergroup(p);
             CovergroupDecl
         }
         "property" => {
-            p.bump();
-            name_token(p);
-            to_end_keyword(p, "endproperty");
+            crate::assertions::property_decl(p, "endproperty");
             PropertyDecl
         }
         "sequence" => {
-            p.bump();
-            name_token(p);
-            to_end_keyword(p, "endsequence");
+            crate::assertions::property_decl(p, "endsequence");
             SequenceDecl
         }
-        "clocking" => clocking(p),
-        "default" | "global" if p.nth(1) == "clocking" => clocking(p),
+        "clocking" => {
+            crate::assertions::clocking(p);
+            ClockingDecl
+        }
+        "default" | "global" if p.nth(1) == "clocking" => {
+            crate::assertions::clocking(p);
+            ClockingDecl
+        }
         "default" if p.nth(1) == "disable" => {
-            to_semi(p);
-            OtherItem
+            crate::assertions::default_disable(p);
+            DefaultDisable
         }
         "config" => other_block(p, "endconfig"),
         "primitive" => other_block(p, "endprimitive"),
@@ -437,26 +438,6 @@ fn other_block(p: &mut Parser, end_kw: &str) -> SyntaxKind {
     OtherBlock
 }
 
-fn clocking(p: &mut Parser) -> SyntaxKind {
-    // `default clocking name;` refers to a block; one with an event is a block.
-    let start = p.pos();
-    let mut i = start;
-    let mut has_event = false;
-    while i < start + 64 {
-        match p.text_at(i) {
-            ";" | "" => break,
-            "@" => has_event = true,
-            _ => {}
-        }
-        i += 1;
-    }
-    if has_event {
-        to_end_keyword(p, "endclocking");
-    } else {
-        to_semi(p);
-    }
-    ClockingDecl
-}
 
 /// module / interface / program / checker / package.
 fn unit(p: &mut Parser, end_kw: &str, kind: SyntaxKind) -> SyntaxKind {
@@ -465,9 +446,7 @@ fn unit(p: &mut Parser, end_kw: &str, kind: SyntaxKind) -> SyntaxKind {
         p.bump();
     }
     name_token(p);
-    let h = p.start();
-    to_semi(p);
-    h.complete(p, Header);
+    crate::blocks::module_header(p);
     let ctx = if kind == PackageDecl { Ctx::Package } else { Ctx::Module };
     while !p.at_end() && !p.at(end_kw) && !at_foreign_end(p, end_kw) {
         if !item(p, ctx) {
@@ -490,9 +469,7 @@ fn class_decl(p: &mut Parser, q: usize) -> SyntaxKind {
         p.bump();
     }
     name_token(p);
-    let h = p.start();
-    to_semi(p);
-    h.complete(p, Header);
+    crate::blocks::class_header(p);
     while !p.at_end() && !p.at("endclass") && !at_foreign_end(p, "endclass") {
         if !item(p, Ctx::Class) {
             stray(p);
@@ -577,7 +554,7 @@ fn skip_group_at(p: &Parser, mut i: usize) -> usize {
 }
 
 /// function / task, declaration or prototype. `q` qualifier tokens first.
-fn subroutine(p: &mut Parser, q: usize, proto: bool) -> SyntaxKind {
+pub(crate) fn subroutine(p: &mut Parser, q: usize, proto: bool) -> SyntaxKind {
     for _ in 0..q {
         p.bump();
     }
@@ -590,9 +567,7 @@ fn subroutine(p: &mut Parser, q: usize, proto: bool) -> SyntaxKind {
         Some((s, e)) => {
             if s > p.pos() {
                 let r = p.start();
-                if !proto {
-                    data_type(p);
-                }
+                data_type(p);
                 while p.pos() < s {
                     p.bump();
                 }
@@ -607,9 +582,7 @@ fn subroutine(p: &mut Parser, q: usize, proto: bool) -> SyntaxKind {
         None => p.error("expected a function or task name".into()),
     }
     if p.at("(") {
-        let l = p.start();
-        group(p);
-        l.complete(p, ParenList);
+        crate::blocks::port_list(p);
     }
     p.expect(";");
     if proto {
@@ -716,6 +689,10 @@ pub(crate) const BUILTIN_TYPES: &[&str] = &[
     "bit", "logic", "reg", "byte", "shortint", "int", "longint", "integer", "time", "real", "shortreal", "realtime",
     "string", "chandle", "event", "void", "enum", "struct", "union",
 ];
+
+pub(crate) fn is_net_type(s: &str) -> bool {
+    NET_TYPES.contains(&s)
+}
 
 const NET_TYPES: &[&str] = &[
     "wire", "tri", "tri0", "tri1", "triand", "trior", "trireg", "wand", "wor", "supply0", "supply1", "uwire",
@@ -891,6 +868,10 @@ pub(crate) fn data_type(p: &mut Parser) {
         }
         "signed" | "unsigned" | "[" => {}
         s if BUILTIN_TYPES.contains(&s) => {
+            p.bump();
+        }
+        // Formal argument types of properties, sequences and checkers.
+        "untyped" | "sequence" | "property" => {
             p.bump();
         }
         _ => {
@@ -1085,14 +1066,9 @@ fn gate_instantiation(p: &mut Parser) {
     p.expect(";");
 }
 
-pub(crate) fn constraint_block(p: &mut Parser) {
-    let b = p.start();
-    group(p);
-    b.complete(p, ConstraintBlock);
-}
 
 /// `( expr )` around a condition.
-fn paren_expr(p: &mut Parser) {
+pub(crate) fn paren_expr(p: &mut Parser) {
     p.expect("(");
     expr_with(p, ASSIGNABLE);
     p.expect(")");
@@ -1290,15 +1266,7 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
         "assert" | "assume" | "cover" | "restrict" | "expect"
             if p.cur() == "expect" || matches!(p.nth(1), "property" | "sequence") =>
         {
-            // Concurrent assertion: kept as written until slice 3.
-            p.bump();
-            p.eat("property");
-            p.eat("sequence");
-            group(p);
-            if !p.at("else") {
-                statement_or_missing(p);
-            }
-            else_clause(p);
+            crate::assertions::concurrent_assertion(p);
             ConcurrentAssert
         }
         "assert" | "assume" | "cover" => {
@@ -1368,7 +1336,7 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
             ImportDecl
         }
         "let" => {
-            to_semi(p);
+            crate::assertions::let_decl(p);
             LetDecl
         }
         _ => {
@@ -1387,34 +1355,6 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
             ExprStmt
         }
     }
-}
-
-pub(crate) fn timing_control(p: &mut Parser) {
-    // `#5`, `#(d)`, `#1ns`, `##[1:3]`, `@(posedge clk)`, `@e`, `@*`, `@ (*)`.
-    let m = p.start();
-    let op = p.cur();
-    p.bump();
-    if op == "repeat" {
-        group(p);
-        if p.at_any(&["@", "#"]) {
-            timing_control(p);
-        }
-        m.complete(p, TimingControl);
-        return;
-    }
-    if p.at_any(&["(", "["]) {
-        group(p);
-    } else if op == "@" && p.at("*") {
-        p.bump();
-    } else {
-        // A name, possibly hierarchical, or a literal.
-        p.bump();
-        while p.at_any(&[".", "::"]) {
-            p.bump();
-            p.bump();
-        }
-    }
-    m.complete(p, TimingControl);
 }
 
 /// Case items: `expr {, expr} : stmt` or `default [:] stmt`, to `endcase`.

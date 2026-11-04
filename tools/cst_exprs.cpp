@@ -3,8 +3,8 @@
 // binary, unary, conditional and inside expression is written in prefix
 // form, `(+ a (* b c))`, and everything else as its tokens without trivia.
 // "Top-level" means no operator expression above it. Regions the Rust
-// parser does not parse yet (headers, constraints, covergroups, assertions,
-// timing controls, ...) are skipped. The reference for tools/cst_parity.py
+// parser keeps as written (specify, UDPs, config, checkers, attributes,
+// randsequence, ...) are skipped. The reference for tools/cst_parity.py
 // --exprs.
 //
 //   uvmcheck_cst_exprs [+incdir+DIR]... [+define+NAME[=VALUE]]... FILE
@@ -30,45 +30,15 @@ bool isOp(SyntaxKind k) {
 }
 
 bool skipped(SyntaxKind k) {
-    if (TimingControlSyntax::isKind(k))
-        return true;
     switch (k) {
-        case SyntaxKind::ConstraintDeclaration:
-        case SyntaxKind::ConstraintPrototype:
-        case SyntaxKind::ConstraintBlock:
-        case SyntaxKind::CovergroupDeclaration:
-        case SyntaxKind::PropertyDeclaration:
-        case SyntaxKind::SequenceDeclaration:
-        case SyntaxKind::AssertPropertyStatement:
-        case SyntaxKind::AssumePropertyStatement:
-        case SyntaxKind::CoverPropertyStatement:
-        case SyntaxKind::CoverSequenceStatement:
-        case SyntaxKind::RestrictPropertyStatement:
-        case SyntaxKind::ExpectPropertyStatement:
-        case SyntaxKind::ClockingDeclaration:
-        case SyntaxKind::DefaultDisableDeclaration:
         case SyntaxKind::SpecifyBlock:
         case SyntaxKind::SpecparamDeclaration:
         case SyntaxKind::UdpDeclaration:
         case SyntaxKind::ConfigDeclaration:
         case SyntaxKind::CheckerDeclaration:
-        case SyntaxKind::ModuleHeader:
-        case SyntaxKind::ProgramHeader:
-        case SyntaxKind::InterfaceHeader:
-        case SyntaxKind::PackageHeader:
-        case SyntaxKind::ParameterPortList:
-        case SyntaxKind::FunctionPortList:
-        case SyntaxKind::ExtendsClause:
-        case SyntaxKind::ImplementsClause:
         case SyntaxKind::AttributeInstance:
-        case SyntaxKind::LetDeclaration:
-        case SyntaxKind::DPIImport:
-        case SyntaxKind::DPIExport:
-        case SyntaxKind::ModportDeclaration:
-        case SyntaxKind::BindDirective:
         case SyntaxKind::TimeUnitsDeclaration:
         case SyntaxKind::NetTypeDeclaration:
-        case SyntaxKind::ClassMethodPrototype:
         case SyntaxKind::RandSequenceStatement:
             return true;
         default:

@@ -16,25 +16,8 @@ fn is_op(k: SyntaxKind) -> bool {
 fn skipped(k: SyntaxKind) -> bool {
     matches!(
         k,
-        Header
-            | ParenList
-            | MethodPrototype
-            | ConstraintDecl
-            | ConstraintPrototype
-            | ConstraintBlock
-            | CovergroupDecl
-            | PropertyDecl
-            | SequenceDecl
-            | ClockingDecl
-            | OtherBlock
-            | TimingControl
-            | ConcurrentAssert
+        OtherBlock
             | Attribute
-            | LetDecl
-            | DpiImport
-            | DpiExport
-            | ModportDecl
-            | BindDirective
             | TimeunitDecl
             | RandSequenceStmt
             | CheckerDecl

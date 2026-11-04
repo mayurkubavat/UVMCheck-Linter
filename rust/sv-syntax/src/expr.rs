@@ -4,7 +4,8 @@
 
 use sv_lexer::Kind;
 
-use crate::grammar::{attributes, constraint_block, data_type, timing_control, BUILTIN_TYPES};
+use crate::blocks::{constraint_block, timing_control};
+use crate::grammar::{attributes, data_type, BUILTIN_TYPES};
 use crate::parser::{Completed, Parser};
 use crate::SyntaxKind::*;
 
@@ -41,10 +42,12 @@ pub(crate) struct Flags {
     pub assign: bool,
     /// `<=` after the first operand is a nonblocking assignment.
     pub nonblocking: bool,
+    /// `->` ends the expression (constraint implication).
+    pub no_implication: bool,
 }
 
-pub(crate) const ASSIGNABLE: Flags = Flags { assign: true, nonblocking: false };
-pub(crate) const STATEMENT: Flags = Flags { assign: true, nonblocking: true };
+pub(crate) const ASSIGNABLE: Flags = Flags { assign: true, nonblocking: false, no_implication: false };
+pub(crate) const STATEMENT: Flags = Flags { assign: true, nonblocking: true, no_implication: false };
 
 /// An expression; false (with an error) if none starts here.
 pub(crate) fn expr(p: &mut Parser) -> bool {
@@ -103,7 +106,7 @@ pub(crate) fn expr_bp(p: &mut Parser, min_bp: u8, flags: Flags) -> Option<Comple
             continue;
         }
         let Some((l, r)) = infix(op) else { break };
-        if l < min_bp {
+        if l < min_bp || (flags.no_implication && op == "->") {
             break;
         }
         let m = lhs.precede(p);
@@ -340,6 +343,8 @@ fn postfix(p: &mut Parser, mut lhs: Completed) -> Completed {
                 }
                 lhs = m.complete(p, ScopedExpr);
             }
+            // `a[*2]`, `a[->1]`, `a[=3]`: a repetition, not a select.
+            "[" if matches!(p.nth(1), "*" | "->" | "=") => return lhs,
             "[" => {
                 let m = lhs.precede(p);
                 p.bump();

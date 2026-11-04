@@ -6,6 +6,8 @@
 //! assert_eq!(tree.file_text(0), "module m; endmodule\n");
 //! ```
 
+mod assertions;
+mod blocks;
 mod expr;
 mod exprs;
 mod grammar;
