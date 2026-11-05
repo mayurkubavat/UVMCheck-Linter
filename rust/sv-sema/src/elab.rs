@@ -306,10 +306,8 @@ impl<'b, 't> Elab<'b, 't> {
                                 }
                                 _ => b.eval_xz(v, scope, &empty, two).map(|c| match shape {
                                     Some((w, s)) if c.w < w => {
-                                        b.allow_xz.set(two);
                                         let x = b.eval_ctx(v, w, s, scope, &empty, 0).unwrap_or_else(|| c.cast(w, s));
-                                        b.allow_xz.set(false);
-                                        x
+                                        if two { x.two_state() } else { x }
                                     }
                                     Some((w, s)) => c.cast(w, s),
                                     None => c,

@@ -336,7 +336,7 @@ impl Builder<'_> {
         if lo.checked_add(w)? > v.w {
             return None;
         }
-        Some(CVal::new(w, s, v.v.bits(lo, w)))
+        Some(v.slice(lo, w, s))
     }
 
     // ---- building values of a type -------------------------------------------
@@ -344,6 +344,12 @@ impl Builder<'_> {
     /// The value of `e` assigned to a variable of type `ty`: assignment
     /// patterns are laid out by the type, anything else converted to it.
     pub(crate) fn eval_typed(&self, e: NodeRef, ty: Ty, scope: usize, env: &Env, depth: usize) -> Option<CVal> {
+        let v = self.eval_typed4(e, ty, scope, env, depth)?;
+        // x and z read as 0 in a two-state type.
+        Some(if self.two_state(ty.dt) { v.two_state() } else { v })
+    }
+
+    fn eval_typed4(&self, e: NodeRef, ty: Ty, scope: usize, env: &Env, depth: usize) -> Option<CVal> {
         if depth > types::MAX_EVAL_DEPTH {
             return None;
         }
@@ -358,6 +364,8 @@ impl Builder<'_> {
         match toks.as_slice() {
             ["'1"] => return Some(CVal::new(w, s, -1i128)),
             ["'0"] => return Some(CVal::new(w, s, 0i128)),
+            ["'x" | "'X"] => return Some(CVal::all_x(w, s)),
+            ["'z" | "'Z"] => return Some(CVal::four(w, s, Int::from(-1), Int::from(-1))),
             _ => {}
         }
         if self.kind(e) != AssignPattern {
@@ -365,7 +373,7 @@ impl Builder<'_> {
         }
         let items = self.pattern_items(e);
         let default = items.iter().find(|(k, _)| matches!(k, Key::Default)).map(|x| x.1);
-        let mut v = Int::from(0);
+        let mut acc = CVal::new(w, s, 0i128);
         match self.shape(ty, env, 0)? {
             Shape::Struct { fields, .. } => {
                 let positional = items.iter().all(|(k, _)| matches!(k, Key::None));
@@ -384,7 +392,7 @@ impl Builder<'_> {
                             .or(default)
                     };
                     let fv = self.eval_typed(x?, f.ty, scope, env, depth + 1)?;
-                    v = v.or(&fv.v.trunc(f.w, false).shl(f.lo));
+                    acc = acc.with_bits(f.lo, &fv.cast(f.w, false));
                 }
             }
             Shape::Array { left, right, elem, elem_w } => {
@@ -411,7 +419,7 @@ impl Builder<'_> {
                     };
                     let ev = self.eval_typed(x?, elem, scope, env, depth + 1)?;
                     let at = (n - 1 - k) as u32 * elem_w;
-                    v = v.or(&ev.v.trunc(elem_w, false).shl(at));
+                    acc = acc.with_bits(at, &ev.cast(elem_w, false));
                 }
             }
             Shape::Scalar { .. } => {
@@ -420,7 +428,7 @@ impl Builder<'_> {
                 return Some(x.cast(w, s));
             }
         }
-        Some(CVal::new(w, s, v))
+        Some(acc)
     }
 
     /// `e` evaluated in a context `w` bits wide (IEEE 1800 11.6.1): the
@@ -448,18 +456,21 @@ impl Builder<'_> {
             }
             (PrefixExpr, Some("-")) => {
                 let a = sub(*kids.first()?)?;
-                CVal { v: a.v.neg(), ..a }.norm()
+types::unary("-", a)?
             }
             (PrefixExpr, Some("~")) => {
                 let a = sub(*kids.first()?)?;
-                CVal { v: a.v.not(), ..a }.norm()
+types::unary("~", a)?
             }
             (CondExpr, _) => {
                 let c = self.eval(*kids.first()?, scope, env, depth + 1)?;
-                sub(*kids.get(if c.is_true() { 1 } else { 2 })?)?
+                match c.truth() {
+                    Some(t) => sub(*kids.get(if t { 1 } else { 2 })?)?,
+                    None => CVal::merge(&sub(*kids.get(1)?)?, &sub(*kids.get(2)?)?),
+                }
             }
             // A leaf: extended by its own sign only when the context is signed.
-            _ => CVal::new(cw, cs, v.v.trunc(v.w, v.s && cs)),
+            _ => CVal { s: v.s && cs, ..v }.norm().cast(cw, cs),
         };
         Some(out.cast(w, s))
     }
@@ -576,12 +587,10 @@ impl Builder<'_> {
         if lo.checked_add(w)? > root.w {
             return None;
         }
-        let ones = Int::from(1).shl(w).sub(&Int::from(1)).shl(lo);
-        let cleared = root.v.trunc(root.w, false).and(&ones.not());
-        let put = v.v.trunc(w, false).shl(lo);
+        let new = root.with_bits(lo, &v.cast(w, false));
         let mut frames = self.frames.borrow_mut();
         let slot = frames.last_mut()?.get_mut(&name)?;
-        *slot = CVal::new(root.w, root.s, cleared.or(&put));
+        *slot = new;
         Some(())
     }
 }

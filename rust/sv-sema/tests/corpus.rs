@@ -135,3 +135,46 @@ fn literals_take_their_target_type() {
     has(&l, "n parameter D", "32'd300");
     has(&l, "k parameter T", "10");
 }
+
+#[test]
+fn unknown_bits_follow_slang() {
+    // cva6: widths from an all-zero config divide by zero.
+    let l = values(
+        "module m #(parameter int A = 0, parameter int B = 0);\n\
+         localparam int unsigned P = A / B; localparam P2 = A / B; localparam logic [7:0] P4 = A / B;\n\
+         localparam int P5 = $clog2(A / B); localparam P7 = (A / B) == 0; localparam P8 = 0 && (A / B);\n\
+         localparam P11 = (A / B) ? 3 : 4; localparam logic [3:0] P13 = 4'b10x1; localparam bit [3:0] P16 = 4'b10x1;\n\
+         localparam P17 = {4'b1010, 4'bxxxx}; localparam P19 = (A/B) & 0; localparam P22 = 4'bzzzz; localparam P23 = 8'hx5;\n\
+         localparam int unsigned W = 0; localparam logic [W-1:0] R = 0; localparam logic [3:0] L = {W{1'b1}};\n\
+         endmodule\n",
+    );
+    for (sym, val) in [
+        ("P", "32'd0"),
+        ("P2", "32'sdx"),
+        ("P4", "8'dx"),
+        ("P5", "0"),
+        ("P7", "1'bx"),
+        ("P8", "1'b0"),
+        ("P11", "32'sb0xxx"),
+        ("P13", "4'b10x1"),
+        ("P16", "4'b1001"),
+        ("P17", "8'b1010xxxx"),
+        ("P19", "0"),
+        ("P22", "4'bzzzz"),
+        ("P23", "8'bxxxx0101"),
+        ("R", "2'b0"),
+        ("L", "<unset>"),
+    ] {
+        has(&l, &format!("m parameter {sym}"), val);
+    }
+}
+
+#[test]
+fn macros_expand_inside_stringified_text() {
+    // UVM: `define UVM_VERSION_STRING `"`UVM_NAME``-```UVM_MAJOR_REV...`"
+    let l = values(
+        "`define N UVM\n`define M 1\n`define S `\"`N``-```M``.```M```\"\n\
+         package p; parameter string r = `S; endpackage\n",
+    );
+    has(&l, "p parameter r", "\"UVM-1.1\"");
+}

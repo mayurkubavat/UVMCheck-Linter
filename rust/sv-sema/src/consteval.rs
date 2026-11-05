@@ -439,21 +439,42 @@ impl Builder<'_> {
             if !(0..=1 << 20).contains(&n) || inner.w as i128 * n > 1 << 24 {
                 return None;
             }
-            let part = inner.v.trunc(inner.w, false);
-            let mut v = Int::from(0);
-            for _ in 0..n {
-                v = v.shl(inner.w).or(&part);
+            if n == 0 {
+                // Zero replication is legal only beside other operands.
+                self.invalid.set(true);
+                return None;
             }
-            return Some(CVal::new((inner.w as i128 * n).max(1) as u32, false, v));
+            let mut v = inner.clone();
+            for _ in 1..n {
+                v = CVal::concat(&v, &inner);
+            }
+            return Some(v);
         }
-        let mut w = 0u32;
-        let mut v = Int::from(0);
+        let mut acc: Option<CVal> = None;
         for k in kids {
+            if self.zero_replication(k, scope, env, depth) {
+                continue;
+            }
             let x = self.eval(k, scope, env, depth + 1)?;
-            w = w.checked_add(x.w)?;
-            v = v.shl(x.w).or(&x.v.trunc(x.w, false));
+            if acc.as_ref().is_some_and(|a| a.w.checked_add(x.w).is_none()) {
+                return None;
+            }
+            acc = Some(match acc {
+                Some(a) => CVal::concat(&a, &x),
+                None => x.cast(x.w, false),
+            });
         }
-        Some(CVal::new(w.max(1), false, v))
+        acc
+    }
+
+    /// `{0{a}}`: no bits, inside a larger concatenation.
+    fn zero_replication(&self, e: NodeRef, scope: usize, env: &Env, depth: usize) -> bool {
+        let kids = self.children(e);
+        self.kind(e) == ConcatExpr
+            && kids.len() == 2
+            && !self.own_tokens(e).contains(&",")
+            && self.kind(kids[1]) == ConcatExpr
+            && self.eval(kids[0], scope, env, depth + 1).is_some_and(|n| n.known() && n.i() == 0)
     }
 
     /// `arr[i]` of a constant unpacked array parameter (`'{...}`).

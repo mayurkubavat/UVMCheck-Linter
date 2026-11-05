@@ -491,10 +491,9 @@ struct Builder<'t> {
     frames: std::cell::RefCell<Vec<HashMap<String, types::CVal>>>,
     /// The declared types of those locals (with "" for the return value).
     ftypes: std::cell::RefCell<Vec<HashMap<String, packed::Ty>>>,
-    /// While set, x and z digits read as 0 (a two-state target), and
-    /// `saw_xz` records that one was read.
-    allow_xz: std::cell::Cell<bool>,
-    saw_xz: std::cell::Cell<bool>,
+    /// Set when an evaluation met an invalid constant (a zero replication
+    /// or a cast to zero width): slang leaves such a value `<unset>`.
+    invalid: std::cell::Cell<bool>,
     /// Parameters and genvars of the instance being elaborated (see `elab`).
     /// `None`: a parameter with no value here (its declaration's must not be used).
     inst: std::cell::RefCell<HashMap<String, Option<types::CVal>>>,
@@ -533,8 +532,7 @@ impl<'t> Builder<'t> {
             designs: false,
             frames: Default::default(),
             ftypes: Default::default(),
-            allow_xz: Default::default(),
-            saw_xz: Default::default(),
+            invalid: Default::default(),
             inst: Default::default(),
         }
     }

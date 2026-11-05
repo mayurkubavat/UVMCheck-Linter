@@ -948,6 +948,27 @@ impl Preprocessor {
         Some(args)
     }
 
+    /// The text an object-like macro expands to, with the macros it uses
+    /// expanded and pastes removed (for a use inside `" ... `").
+    fn object_text(&self, name: &str, depth: u32) -> Option<String> {
+        let m = self.macros.get(name)?;
+        if m.params.is_some() || depth > 16 {
+            return None;
+        }
+        let mut s = String::new();
+        for (i, t) in m.body.iter().enumerate() {
+            if i > 0 {
+                s.push_str(&t.ws);
+            }
+            match t.kind {
+                Kind::MacroPaste => {}
+                Kind::Directive => s.push_str(&self.object_text(&t.text[1..], depth + 1)?),
+                _ => s.push_str(&t.text),
+            }
+        }
+        Some(s)
+    }
+
     fn substitute(&self, use_tok: &T, body: &[T], names: &[&str], args: &[Vec<T>]) -> Vec<T> {
         let origin = use_tok.origin;
         let mark = |t: &T, space: bool| T { origin, from_macro: true, space_before: space, newline_before: false, ..t.clone() };
@@ -999,6 +1020,11 @@ impl Preprocessor {
                                 }
                             }
                             _ if b.kind == Kind::MacroPaste => {}
+                            // A macro used inside the string expands there.
+                            _ if b.kind == Kind::Directive && self.object_text(&b.text[1..], 0).is_some() => {
+                                s.push_str(&b.ws);
+                                s.push_str(&self.object_text(&b.text[1..], 0).unwrap_or_default());
+                            }
                             _ => push(&mut s, &b.ws, b),
                         }
                         j += 1;

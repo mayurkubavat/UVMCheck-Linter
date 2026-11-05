@@ -6,14 +6,16 @@ use super::*;
 
 pub(crate) use super::bigint::Int;
 
-/// A constant integer: its width, signedness and value (two-state), of any
-/// width. The value is kept normalized: below 2^w when unsigned, and in
-/// -2^(w-1) .. 2^(w-1) when signed.
+/// A constant integer: its width, signedness and four-state value, of any
+/// width. `v` is kept normalized: below 2^w when unsigned, and in
+/// -2^(w-1) .. 2^(w-1) when signed. `u` marks unknown bits (below 2^w);
+/// at those bits `v` holds 0 for x and 1 for z, as in slang.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CVal {
     pub w: u32,
     pub s: bool,
     pub v: Int,
+    pub u: Int,
 }
 
 /// How deep constant evaluation may nest (expressions, calls), so a
@@ -25,7 +27,80 @@ const ABBREVIATE_BITS: u32 = 128;
 
 impl CVal {
     pub fn new(w: u32, s: bool, v: impl Into<Int>) -> CVal {
-        CVal { w, s, v: v.into() }.norm()
+        CVal { w, s, v: v.into(), u: Int::from(0) }.norm()
+    }
+
+    /// Every bit x.
+    pub fn all_x(w: u32, s: bool) -> CVal {
+        CVal { w, s, v: Int::from(0), u: Int::from(-1) }.norm()
+    }
+
+    /// Value and unknown bits as unsigned integers of the width.
+    pub fn four(w: u32, s: bool, v: Int, u: Int) -> CVal {
+        let u = u.trunc(w.max(1), false);
+        CVal { w, s, v, u }.norm()
+    }
+
+    pub fn known(&self) -> bool {
+        self.u.is_zero()
+    }
+
+    /// The value bits as an unsigned integer of the width.
+    pub fn bits_v(&self) -> Int {
+        self.v.trunc(self.w.max(1), false)
+    }
+
+    /// Known one bits.
+    fn ones(&self) -> Int {
+        self.bits_v().and(&self.u.not())
+    }
+
+    /// True, false, or unknown (x) as a condition.
+    pub fn truth(&self) -> Option<bool> {
+        if !self.ones().is_zero() {
+            Some(true)
+        } else if self.known() {
+            Some(false)
+        } else {
+            None
+        }
+    }
+
+    /// Bits where `a` and `b` agree, x elsewhere (same width and sign).
+    pub fn merge(a: &CVal, b: &CVal) -> CVal {
+        let (av, bv) = (a.bits_v(), b.bits_v());
+        let u = a.u.or(&b.u).or(&av.xor(&bv));
+        CVal::four(a.w, a.s, av.and(&u.not()), u)
+    }
+
+    /// Bits `lo..lo+w` as a value of width `w`.
+    pub fn slice(&self, lo: u32, w: u32, s: bool) -> CVal {
+        CVal::four(w, s, self.bits_v().bits(lo, w), self.u.bits(lo, w))
+    }
+
+    /// `hi` above `lo` (`{hi, lo}`), unsigned.
+    pub fn concat(hi: &CVal, lo: &CVal) -> CVal {
+        let w = hi.w + lo.w;
+        let v = hi.bits_v().shl(lo.w).or(&lo.bits_v());
+        let u = hi.u.shl(lo.w).or(&lo.u);
+        CVal::four(w.max(1), false, v, u)
+    }
+
+    /// The bits of `x` written at `lo..lo+x.w` of this value.
+    pub fn with_bits(&self, lo: u32, x: &CVal) -> CVal {
+        let ones = Int::from(1).shl(x.w).sub(&Int::from(1)).shl(lo);
+        let keep = ones.not();
+        let v = self.bits_v().and(&keep).or(&x.bits_v().trunc(x.w, false).shl(lo));
+        let u = self.u.and(&keep).or(&x.u.trunc(x.w, false).shl(lo));
+        CVal::four(self.w, self.s, v, u)
+    }
+
+    /// Into a two-state type: unknown bits become 0.
+    pub fn two_state(&self) -> CVal {
+        if self.known() {
+            return self.clone();
+        }
+        CVal::new(self.w, self.s, self.ones())
     }
 
     pub fn int(v: i128) -> CVal {
@@ -42,28 +117,39 @@ impl CVal {
     }
 
     pub fn is_true(&self) -> bool {
-        !self.v.is_zero()
+        self.truth() == Some(true)
     }
 
     /// Truncated to the width, sign-extended if signed.
     pub fn norm(self) -> CVal {
-        let v = self.v.trunc(self.w.max(1), self.s);
-        CVal { w: self.w, s: self.s, v }
+        let w = self.w.max(1);
+        let v = self.v.trunc(w, self.s);
+        let u = self.u.trunc(w, false);
+        CVal { w: self.w, s: self.s, v, u }
     }
 
     pub fn cast(&self, w: u32, s: bool) -> CVal {
-        CVal { w, s, v: self.v.clone() }.norm()
+        // A signed value's unknown top bit extends.
+        let u = if self.s && w > self.w { self.u.trunc(self.w.max(1), true) } else { self.u.clone() };
+        // `v` is sign-normalized, so x (0) extends as x and z (1) as z.
+        CVal { w, s, v: self.v.clone(), u }.norm()
     }
 
     /// The value plus a small step, in the same type.
     pub fn bump(&self, d: i128) -> CVal {
-        CVal { w: self.w, s: self.s, v: self.v.add(&Int::from(d)) }.norm()
+        if !self.known() {
+            return CVal::all_x(self.w, self.s);
+        }
+        CVal::new(self.w, self.s, self.v.add(&Int::from(d)))
     }
 
     /// slang's SVInt::writeTo: an optional `-`, the base, the digits;
     /// over 128 active bits, decimal cut to its leading digits with
     /// `...e<n>`.
     fn write(&self, radix: u32, mut with_base: bool) -> String {
+        if !self.known() {
+            return self.write_unknown(radix);
+        }
         let neg = self.s && self.v.is_neg();
         let mag = if neg { self.v.neg() } else { self.v.clone() };
         let mut radix = radix;
@@ -99,10 +185,86 @@ impl CVal {
         out
     }
 
+    /// slang's SVInt::writeTo for a value with unknown bits: decimal is
+    /// one letter, other bases a digit (or x, z, X, Z) per group of bits.
+    fn write_unknown(&self, radix: u32) -> String {
+        let mut out = format!("{}'{}{}", self.w, if self.s { "s" } else { "" }, match radix {
+            2 => 'b',
+            8 => 'o',
+            10 => 'd',
+            _ => 'h',
+        });
+        let w = self.w.max(1);
+        let all_u = self.u == Int::from(-1).trunc(w, false);
+        let v = self.bits_v();
+        if radix == 10 {
+            let any_x = !self.u.and(&v.not()).is_zero();
+            out.push(if all_u && v == self.u {
+                'z'
+            } else if all_u && v.is_zero() {
+                'x'
+            } else if any_x {
+                'X'
+            } else {
+                'Z'
+            });
+            return out;
+        }
+        let shift = match radix {
+            2 => 1,
+            8 => 3,
+            _ => 4,
+        };
+        let mut digits = Vec::new();
+        let (mut tv, mut tu) = (v, self.u.clone());
+        let mut left = w as i64;
+        while !tv.is_zero() || !tu.is_zero() {
+            let n = if left < shift as i64 { left.max(0) as u32 } else { shift };
+            let mask = (1u32 << n) - 1;
+            let d = tv.bits(0, shift).low_i128() as u32 & mask;
+            let du = tu.bits(0, shift).low_i128() as u32 & mask;
+            digits.push(if du == 0 {
+                char::from_digit(d, 16).unwrap_or('?')
+            } else if du == mask && d == 0 {
+                'x'
+            } else if du == mask && d == mask {
+                'z'
+            } else if !d & du != 0 {
+                'X'
+            } else {
+                'Z'
+            });
+            tv = tv.shr(shift);
+            tu = tu.shr(shift);
+            left -= shift as i64;
+        }
+        if left > 0 && matches!(digits.last(), Some('x' | 'z')) {
+            digits.push('0');
+        }
+        if digits.is_empty() {
+            digits.push('0');
+        }
+        out.extend(digits.iter().rev());
+        out
+    }
+
     /// slang's default form: binary below 8 unsigned bits, decimal up to
     /// 32 bits or signed, hex above; a plain number for a signed 32-bit
     /// decimal.
     pub fn show(&self) -> String {
+        if !self.known() {
+            let w = self.w.max(1);
+            let all_u = self.u == Int::from(-1).trunc(w, false);
+            let all_xz = all_u && (self.bits_v().is_zero() || self.bits_v() == self.u);
+            let radix = if (self.w < 8 && !self.s) || (self.w <= 64 && !all_xz) {
+                2
+            } else if self.w <= 32 || self.s || all_xz {
+                10
+            } else {
+                16
+            };
+            return self.write_unknown(radix);
+        }
         let radix = if self.w < 8 && !self.s {
             2
         } else if self.w <= 32 || self.s {
@@ -295,10 +457,10 @@ impl<'t> Builder<'t> {
         let own = self.own_tokens(d);
         match exprs.as_slice() {
             [a, b] if own.contains(&":") => Some((
-                self.eval(*a, scope, env, 0)?.i(),
-                self.eval(*b, scope, env, 0)?.i(),
+                dim_bound(self.eval(*a, scope, env, 0)?)?,
+                dim_bound(self.eval(*b, scope, env, 0)?)?,
             )),
-            [n] if !own.contains(&":") => Some((0, self.eval(*n, scope, env, 0)?.i() - 1)),
+            [n] if !own.contains(&":") => Some((0, dim_bound(self.eval(*n, scope, env, 0)?)? - 1)),
             _ => None,
         }
     }
@@ -483,15 +645,7 @@ impl<'t> Builder<'t> {
                         return string_value(lit);
                     }
                 }
-                let text = toks.concat();
-                if !has_xz(&text) {
-                    return literal(&toks);
-                }
-                if !self.allow_xz.get() {
-                    return None;
-                }
-                self.saw_xz.set(true);
-                literal(&[zero_xz(&text).as_str()])
+                literal(&toks)
             }
             NameExpr => {
                 let toks = self.toks_of(e);
@@ -540,6 +694,7 @@ impl<'t> Builder<'t> {
                     _ => {
                         let n = self.eval(target, scope, env, depth + 1)?.i();
                         if !(1..=1 << 24).contains(&n) {
+                            self.invalid.set(n <= 0);
                             return None;
                         }
                         Some(a.cast(n as u32, a.s))
@@ -554,13 +709,7 @@ impl<'t> Builder<'t> {
             PrefixExpr => {
                 let op = *self.own_tokens(e).first()?;
                 let a = self.eval(*kids.first()?, scope, env, depth + 1)?;
-                Some(match op {
-                    "-" => CVal { v: a.v.neg(), ..a }.norm(),
-                    "+" => a,
-                    "~" => CVal { v: a.v.not(), ..a }.norm(),
-                    "!" => CVal::bool(!a.is_true()),
-                    _ => return None,
-                })
+                Some(unary(op, a)?)
             }
             BinaryExpr => {
                 let op = *self.own_tokens(e).first()?;
@@ -580,6 +729,14 @@ impl<'t> Builder<'t> {
             CondExpr => {
                 let c = self.eval(*kids.first()?, scope, env, depth + 1)?;
                 let (l, r) = (*kids.get(1)?, *kids.get(2)?);
+                if c.truth().is_none() {
+                    // An unknown condition: the branches merged bit by bit.
+                    let (a, b) = (self.eval(l, scope, env, depth + 1)?, self.eval(r, scope, env, depth + 1)?);
+                    let (w, s) = (a.w.max(b.w), a.s && b.s);
+                    let a = if a.w < w { self.eval_ctx(l, w, s, scope, env, depth + 1)? } else { a.cast(w, s) };
+                    let b = if b.w < w { self.eval_ctx(r, w, s, scope, env, depth + 1)? } else { b.cast(w, s) };
+                    return Some(CVal::merge(&a, &b));
+                }
                 let (pick, other) = if c.is_true() { (l, r) } else { (r, l) };
                 let v = self.eval(pick, scope, env, depth + 1)?;
                 // The branch not taken only sizes the result (and may not
@@ -609,8 +766,8 @@ impl<'t> Builder<'t> {
                 match name.as_str() {
                     "$clog2" => {
                         let a = self.eval(*args.first()?, scope, env, depth + 1)?;
-                        // Bits to hold a-1 (0 for a <= 1).
-                        let m = a.v.trunc(a.w, false).sub(&Int::from(1));
+                        // Unknown bits count as 0, as in slang.
+                        let m = a.two_state().v.trunc(a.w, false).sub(&Int::from(1));
                         Some(CVal::int(if m.is_neg() { 0 } else { m.active_bits() as i128 }))
                     }
                     "$bits" => {
@@ -1210,42 +1367,30 @@ impl<'t> Builder<'t> {
                     }
                 }
             }
-            return self.aggregate_value(r(v), shape, scope, env);
+            return self.aggregate_value(r(v), dtype, shape, scope, env);
+        }
+        // A constant unpacked array named by another (`= pkg::Rst`).
+        if matches!(t.kind(v), NameExpr | ScopedExpr) && self.unpacked_decl(r(v)) {
+            if let Some((ddt, dv, ds)) = self.const_decl(r(v), scope) {
+                if self.unpacked_decl(dv) {
+                    return self.value_text(ddt, dv, ds, &Env::default());
+                }
+            }
         }
         let two_state = dtype.is_some_and(|d| self.two_state(d));
-        // An all-x or all-z literal into a four-state target.
-        let text = toks.concat();
-        if t.kind(v) == Literal && has_xz(&text) && !two_state {
-            let after = text.rsplit_once('\'').map_or("", |(_, d)| d);
-            let after = after.strip_prefix(['s', 'S']).unwrap_or(after);
-            let digits = after.get(1..).unwrap_or("");
-            let all = |set: &str| {
-                !digits.is_empty() && digits.chars().all(|c| c == '_' || set.contains(c))
-            };
-            let mark = if all("xX") {
-                'x'
-            } else if all("zZ?") {
-                'z'
-            } else {
-                return None;
-            };
-            let lit = literal(&[zero_xz(&text).as_str()])?;
-            let (w, s) = shape.unwrap_or((lit.w, lit.s));
-            return Some(format!("{w}'{}d{mark}", if s { "s" } else { "" }));
-        }
-        let c = self.eval_xz(r(v), scope, env, two_state)?;
+        self.invalid.set(false);
+        let Some(c) = self.eval_xz(r(v), scope, env, two_state) else {
+            return self.invalid.get().then(|| "<unset>".into());
+        };
         let c = match shape {
             Some((w, s)) if c.w < w => {
                 // Sized by the target (IEEE 11.6).
-                self.allow_xz.set(two_state);
-                let x = self.eval_ctx(r(v), w, s, scope, env, 0);
-                self.allow_xz.set(false);
-                x.unwrap_or_else(|| c.cast(w, s))
+                self.eval_ctx(r(v), w, s, scope, env, 0).unwrap_or_else(|| c.cast(w, s))
             }
             Some((w, s)) => c.cast(w, s),
             None => c,
         };
-        Some(c.show())
+        Some(if two_state { c.two_state() } else { c }.show())
     }
 
     /// `eval`, reading x and z digits as 0 only for a two-state target.
@@ -1256,11 +1401,8 @@ impl<'t> Builder<'t> {
         env: &Env,
         two_state: bool,
     ) -> Option<CVal> {
-        self.allow_xz.set(two_state);
-        self.saw_xz.set(false);
-        let c = self.eval(v, scope, env, 0);
-        self.allow_xz.set(false);
-        c
+        let c = self.eval(v, scope, env, 0)?;
+        Some(if two_state { c.two_state() } else { c })
     }
 
     /// Whether a data type is two-state (`bit`, `int` ... and enums of them).
@@ -1275,9 +1417,37 @@ impl<'t> Builder<'t> {
 
     /// A constant unpacked array, `'{a, b, c}`, as slang prints it:
     /// `[a,b,c]`, each element in the element type.
+    /// The declaration of a constant named by `e` (`X`, `pkg::X`): its
+    /// type, value and scope.
+    fn const_decl(&self, e: NodeRef, scope: usize) -> Option<(Option<NodeRef>, NodeRef, usize)> {
+        let toks = self.toks_of(e);
+        let (name, mut cur) = match toks.as_slice() {
+            [n] => (*n, Some(scope)),
+            [p, "::", n] => (*n, Some(*self.packages.get(*p)?)),
+            _ => return None,
+        };
+        while let Some(s) = cur {
+            if let Some(&(dt, val)) = self.scopes[s].consts.get(name) {
+                return Some((dt, val?, s));
+            }
+            for (pkg, item) in &self.scopes[s].imports {
+                if item.as_deref().is_none_or(|i| i == name) {
+                    if let Some(&p) = self.packages.get(pkg) {
+                        if let Some(&(dt, val)) = self.scopes[p].consts.get(name) {
+                            return Some((dt, val?, p));
+                        }
+                    }
+                }
+            }
+            cur = self.scopes[s].parent;
+        }
+        None
+    }
+
     fn aggregate_value(
         &self,
         v: NodeRef,
+        dtype: Option<NodeRef>,
         shape: Option<(u32, bool)>,
         scope: usize,
         env: &Env,
@@ -1291,12 +1461,18 @@ impl<'t> Builder<'t> {
         for e in self
             .children(v)
             .into_iter()
-            .filter(|c| body_is_expr(self.kind(*c)))
+            .filter(|c| body_is_expr(self.kind(*c)) || self.kind(*c) == AssignPattern)
         {
+            // Elements of the declared element type (a packed struct too).
+            if let Some(d) = dtype.filter(|d| self.packed_aggregate(*d, scope, env) || self.kind(e) == AssignPattern) {
+                out.push(self.eval_typed(e, packed::Ty::of(d, scope), scope, env, 0)?.show());
+                continue;
+            }
             if self.kind(e) == AssignPattern {
                 return None;
             }
             let c = self.eval(e, scope, env, 0)?;
+            let c = if dtype.is_some_and(|d| self.two_state(d)) { c.two_state() } else { c };
             out.push(match shape {
                 Some((w, s)) => c.cast(w, s).show(),
                 None => c.show(),
@@ -1482,18 +1658,6 @@ fn body_is_expr(k: SyntaxKind) -> bool {
     )
 }
 
-/// `4'hA`, `12`, `'1`, `2'sb11` as a value.
-/// A based literal with x, z or ? digits.
-fn has_xz(t: &str) -> bool {
-    match t.find('\'') {
-        Some(i) => t[i + 1..]
-            .trim_start_matches(['s', 'S'])
-            .get(1..)
-            .is_some_and(|d| d.contains(['x', 'X', 'z', 'Z', '?'])),
-        None => false,
-    }
-}
-
 /// A based literal whose digits are all x.
 fn all_x(t: &str) -> bool {
     match t.find('\'') {
@@ -1505,23 +1669,7 @@ fn all_x(t: &str) -> bool {
     }
 }
 
-fn zero_xz(t: &str) -> String {
-    match t.find('\'') {
-        Some(i) => {
-            let (a, b) = t.split_at(i + 1);
-            let b = b.trim_start_matches(['s', 'S']);
-            let sign = &t[i + 1..t.len() - b.len()];
-            let (base, digits) = b.split_at(b.len().min(1));
-            let digits: String = digits
-                .chars()
-                .map(|c| if "xXzZ?".contains(c) { '0' } else { c })
-                .collect();
-            format!("{a}{sign}{base}{digits}")
-        }
-        None => t.to_string(),
-    }
-}
-
+/// `4'hA`, `12`, `'1`, `2'sb11`, `4'b10x1` as a value.
 fn literal(toks: &[&str]) -> Option<CVal> {
     let joined: String = toks.concat().replace('_', "");
     if let Some(i) = joined.find('\'') {
@@ -1543,11 +1691,19 @@ fn literal(toks: &[&str]) -> Option<CVal> {
                 // `'0` / `'1`: all bits, here taken as one.
                 return Some(CVal::bool(b == '1'));
             }
+            'x' if size.is_empty() && rest.len() == 1 => return Some(CVal::all_x(1, false)),
+            'z' if size.is_empty() && rest.len() == 1 => {
+                return Some(CVal::four(1, false, Int::from(1), Int::from(1)));
+            }
             _ => return None,
         };
-        let v = Int::parse_radix(&digits.to_ascii_lowercase(), radix)?;
         let w = if size.is_empty() { 32 } else { size.parse().ok()? };
-        return Some(CVal::new(w, signed, v));
+        let digits = digits.to_ascii_lowercase();
+        if !digits.contains(['x', 'z', '?']) {
+            let v = Int::parse_radix(&digits, radix)?;
+            return Some(CVal::new(w, signed, v));
+        }
+        return four_state_literal(&digits, radix, w, signed);
     }
     if joined.is_empty() || !joined.bytes().all(|c| c.is_ascii_digit()) {
         return None;
@@ -1558,10 +1714,60 @@ fn literal(toks: &[&str]) -> Option<CVal> {
     Some(CVal::new(w, true, v))
 }
 
+/// Digits with x, z or ? (IEEE 5.7.1): each such digit stands for all its
+/// bits, and a leading one fills the bits above.
+fn four_state_literal(digits: &str, radix: u32, w: u32, signed: bool) -> Option<CVal> {
+    if radix == 10 {
+        // Only a single x or z digit is legal in decimal.
+        return match digits {
+            "x" => Some(CVal::all_x(w, signed)),
+            "z" | "?" => Some(CVal::four(w, signed, Int::from(-1), Int::from(-1))),
+            _ => None,
+        };
+    }
+    let per = match radix {
+        2 => 1,
+        8 => 3,
+        _ => 4,
+    };
+    let (mut v, mut u) = (Int::from(0), Int::from(0));
+    let ones = Int::from((1i128 << per) - 1);
+    for c in digits.chars() {
+        v = v.shl(per);
+        u = u.shl(per);
+        match c {
+            'x' => u = u.or(&ones),
+            'z' | '?' => {
+                u = u.or(&ones);
+                v = v.or(&ones);
+            }
+            _ => v = v.or(&Int::from(c.to_digit(radix)? as i128)),
+        }
+    }
+    let n = digits.len() as u32 * per;
+    if n < w {
+        let top = digits.chars().next()?;
+        if matches!(top, 'x' | 'z' | '?') {
+            let fill = Int::from(-1).shl(n).trunc(w, false);
+            u = u.or(&fill);
+            if top != 'x' {
+                v = v.or(&fill);
+            }
+        }
+    }
+    Some(CVal::four(w, signed, v.trunc(w, false), u))
+}
+
 fn binary(op: &str, a: CVal, b: CVal) -> Option<CVal> {
+    if !a.known() || !b.known() {
+        return binary_unknown(op, a, b);
+    }
     let w = a.w.max(b.w);
     let s = a.s && b.s;
     let (x, y) = (a.cast(w, s).v, b.cast(w, s).v);
+    if matches!(op, "/" | "%") && y.is_zero() {
+        return Some(CVal::all_x(w, s));
+    }
     let r = match op {
         "+" => x.add(&y),
         "-" => x.sub(&y),
@@ -1571,7 +1777,7 @@ fn binary(op: &str, a: CVal, b: CVal) -> Option<CVal> {
         "**" => {
             let e = u32::try_from(b.i()).ok()?;
             // The result has the left operand's type.
-            return Some(CVal { w: a.w, s: a.s, v: a.v.pow(e.min(a.w.max(64) + 1)) }.norm());
+            return Some(CVal::new(a.w, a.s, a.v.pow(e.min(a.w.max(64) + 1))));
         }
         "&" => x.and(&y),
         "|" => x.or(&y),
@@ -1596,6 +1802,100 @@ fn binary(op: &str, a: CVal, b: CVal) -> Option<CVal> {
         _ => return None,
     };
     Some(CVal::new(w, s, r))
+}
+
+/// A range bound as slang reads it: a known value as a 32-bit int
+/// (`W - 1` with an unsigned `W` of 0 is -1).
+fn dim_bound(c: CVal) -> Option<i128> {
+    if !c.known() {
+        return None;
+    }
+    Some(if c.w <= 32 { c.cast(32, true).i() } else { c.i() })
+}
+
+/// `-a`, `+a`, `~a`, `!a` with four-state bits.
+pub(crate) fn unary(op: &str, a: CVal) -> Option<CVal> {
+    Some(match op {
+        "-" if !a.known() => CVal::all_x(a.w, a.s),
+        "-" => CVal::new(a.w, a.s, a.v.neg()),
+        "+" => a,
+        "~" => {
+            let v = a.bits_v().not().and(&a.u.not());
+            CVal::four(a.w, a.s, v, a.u.clone())
+        }
+        "!" => a.truth().map_or_else(|| CVal::all_x(1, false), |t| CVal::bool(!t)),
+        _ => return None,
+    })
+}
+
+/// `binary` with an operand that has unknown bits (IEEE 11.4): bitwise
+/// operators work bit by bit, the rest give x.
+fn binary_unknown(op: &str, a: CVal, b: CVal) -> Option<CVal> {
+    let w = a.w.max(b.w);
+    let s = a.s && b.s;
+    let (ca, cb) = (a.cast(w, s), b.cast(w, s));
+    let (au, bu) = (&ca.u, &cb.u);
+    let (a1, b1) = (ca.ones(), cb.ones());
+    // Known zero bits.
+    let a0 = ca.bits_v().or(au).not().trunc(w, false);
+    let b0 = cb.bits_v().or(bu).not().trunc(w, false);
+    let x1 = |op: &str| -> CVal { CVal::all_x(if op.is_empty() { 1 } else { w }, s && !op.is_empty()) };
+    Some(match op {
+        "&" => {
+            let zero = a0.or(&b0);
+            let u = au.or(bu).and(&zero.not());
+            CVal::four(w, s, a1.and(&b1), u)
+        }
+        "|" => {
+            let one = a1.or(&b1);
+            let u = au.or(bu).and(&one.not());
+            CVal::four(w, s, one, u)
+        }
+        "^" | "~^" | "^~" => {
+            let u = au.or(bu);
+            let mut v = ca.bits_v().xor(&cb.bits_v());
+            if op != "^" {
+                v = v.not();
+            }
+            CVal::four(w, s, v.and(&u.not()), u)
+        }
+        "===" | "!==" => {
+            let same = ca.bits_v() == cb.bits_v() && ca.u == cb.u;
+            CVal::bool(same == (op == "==="))
+        }
+        "&&" | "||" => {
+            let (ta, tb) = (a.truth(), b.truth());
+            let r = if op == "&&" {
+                match (ta, tb) {
+                    (Some(false), _) | (_, Some(false)) => Some(false),
+                    (Some(true), Some(true)) => Some(true),
+                    _ => None,
+                }
+            } else {
+                match (ta, tb) {
+                    (Some(true), _) | (_, Some(true)) => Some(true),
+                    (Some(false), Some(false)) => Some(false),
+                    _ => None,
+                }
+            };
+            r.map_or_else(|| x1(""), CVal::bool)
+        }
+        "==" | "!=" | "<" | "<=" | ">" | ">=" => x1(""),
+        "<<" | "<<<" | ">>" | ">>>" if b.known() => {
+            let n = b.i().clamp(0, a.w as i128 + 1) as u32;
+            let (v, u) = if op.starts_with("<<") {
+                (a.v.shl(n), a.u.shl(n))
+            } else if op == ">>>" && a.s {
+                (a.v.shr(n), a.u.trunc(a.w.max(1), true).shr(n))
+            } else {
+                (a.bits_v().shr(n), a.u.shr(n))
+            };
+            CVal::four(a.w, a.s, v, u)
+        }
+        "**" | "<<" | "<<<" | ">>" | ">>>" => CVal::all_x(a.w, a.s),
+        "+" | "-" | "*" | "/" | "%" => x1("w"),
+        _ => return None,
+    })
 }
 
 /// 1ns, the time unit without a `timescale, as a power of ten femtoseconds.
