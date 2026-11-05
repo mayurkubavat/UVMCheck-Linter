@@ -1,0 +1,760 @@
+//! Elaboration (builder phase N4): the instance tree of a design. From each
+//! top module down, every instance (arrays expanded), every generate block
+//! that is taken (loops unrolled, `if` and `case` decided) and every value
+//! parameter with the value it has in that instance.
+//!
+//! Lines are those of `uvmcheck_sym_dump --hier`:
+//!
+//! ```text
+//! <path> instance <name> : <definition>
+//! <path> generate <name>
+//! <path> parameter <name> = <value>
+//! ```
+//!
+//! Values come from the constant evaluator ([`Builder::eval`]); the
+//! parameters of the instance being elaborated and the genvars around are
+//! in `Builder::inst`, which name lookups read after a function's locals.
+//! A parameter whose value cannot be evaluated is left out, and so is
+//! anything under a generate condition or loop bound that cannot be.
+
+use super::types::CVal;
+use super::*;
+
+/// Instances deeper than this are not elaborated (recursive designs).
+const MAX_DEPTH: usize = 64;
+/// Generate loop iterations allowed in one loop.
+const MAX_ITER: i128 = 1 << 16;
+
+/// Values of the parameters and genvars visible at a point of an instance.
+/// `None`: one with no value (unknown, or not integral).
+type Vals = HashMap<String, Option<CVal>>;
+
+/// An override of a parameter: its expression where the instance (or
+/// defparam) is, and its value when integral.
+#[derive(Clone)]
+struct Over {
+    val: Option<CVal>,
+    node: NodeRef,
+    scope: usize,
+    vals: Rc<Vals>,
+    env: Env,
+}
+
+type Overrides = HashMap<String, Over>;
+
+struct Def {
+    decl: NodeRef,
+    scope: usize,
+}
+
+pub(crate) struct Elab<'b, 't> {
+    b: &'b Builder<'t>,
+    defs: HashMap<String, Def>,
+    /// `bind` directives by target: a definition's name or an instance path.
+    binds: Vec<(String, Option<Vec<String>>, NodeRef)>,
+    /// Defparams of the instances being elaborated: the target path from
+    /// here and the value (evaluated where the defparam is).
+    defparams: Vec<Vec<(Vec<String>, Over)>>,
+    /// Type parameters of the instances being elaborated.
+    envs: Vec<Env>,
+    pub out: Vec<String>,
+    /// Errors only elaboration finds, once per node.
+    pub diags: Vec<crate::names::Diag>,
+    checked: HashSet<NodeRef>,
+}
+
+impl<'b, 't> Elab<'b, 't> {
+    pub fn new(b: &'b Builder<'t>) -> Self {
+        let mut defs = HashMap::new();
+        for (ti, t) in b.trees.iter().enumerate() {
+            for n in t.preorder() {
+                if matches!(t.kind(n), ModuleDecl | InterfaceDecl | ProgramDecl) {
+                    let r = NodeRef { tree: ti, node: n };
+                    let Some((name, _)) = b.name_of(r) else { continue };
+                    let Some(&scope) = b.node_scope.get(&r) else { continue };
+                    defs.entry(name).or_insert(Def { decl: r, scope });
+                }
+            }
+        }
+        let mut binds = Vec::new();
+        for (ti, t) in b.trees.iter().enumerate() {
+            for n in t.preorder() {
+                if t.kind(n) != BindDirective {
+                    continue;
+                }
+                let r = NodeRef { tree: ti, node: n };
+                let kids = b.children(r);
+                let Some(&target) = kids.first() else { continue };
+                if b.kind(target) == DataType {
+                    continue;
+                }
+                let target = b.toks_of(target).concat();
+                // `bind m : a.b, c ...`: those instances of m only.
+                let list = b.own_tokens(r).contains(&":").then(|| {
+                    kids.iter()
+                        .skip(1)
+                        .take_while(|k| b.kind(**k) != DataType)
+                        .map(|k| b.toks_of(*k).concat())
+                        .collect()
+                });
+                binds.push((target, list, r));
+            }
+        }
+        Elab {
+            b,
+            defs,
+            binds,
+            defparams: Vec::new(),
+            envs: vec![Rc::new(HashMap::new())],
+            out: Vec::new(),
+            diags: Vec::new(),
+            checked: HashSet::new(),
+        }
+    }
+
+    /// Modules no design unit instantiates (and that need no parameter value).
+    pub fn tops(&self) -> Vec<String> {
+        let b = self.b;
+        let mut used = HashSet::new();
+        for t in b.trees {
+            for n in t.preorder() {
+                if matches!(t.kind(n), Instantiation | BindDirective) {
+                    if let Some(dt) = t.child(n, DataType) {
+                        if let Some(c) = t.token_bounds(dt) {
+                            used.insert(t.tokens[c.0 as usize].text.to_string());
+                        }
+                    }
+                }
+            }
+        }
+        let mut tops: Vec<String> = self
+            .defs
+            .iter()
+            .filter(|(n, d)| {
+                !used.contains(*n) && matches!(b.kind(d.decl), ModuleDecl | ProgramDecl) && !self.needs_params(d.decl)
+            })
+            .map(|(n, _)| n.clone())
+            .collect();
+        tops.sort();
+        tops
+    }
+
+    /// A header parameter without a default (a top cannot have one).
+    fn needs_params(&self, decl: NodeRef) -> bool {
+        let b = self.b;
+        let Some(pl) = b.child(decl, Header).and_then(|h| b.child(h, ParamList)) else { return false };
+        b.children(pl).into_iter().filter(|p| b.kind(*p) == ParamDecl).any(|p| {
+            b.children(p)
+                .into_iter()
+                .filter(|d| b.kind(*d) == Declarator)
+                .any(|d| b.children(d).into_iter().all(|c| matches!(b.kind(c), Name | Dim)))
+        })
+    }
+
+    pub fn run(&mut self) {
+        for top in self.tops() {
+            self.out.push(format!("$root instance {top} : {top}"));
+            self.instance(&top, &top, &Overrides::new(), Vec::new(), Rc::new(HashMap::new()), 0);
+        }
+        self.out.sort();
+    }
+
+    /// One instance of definition `def` at `path`.
+    fn instance(
+        &mut self,
+        def: &str,
+        path: &str,
+        over: &Overrides,
+        pend: Vec<(Vec<String>, Over)>,
+        env: Env,
+        depth: usize,
+    ) {
+        if depth > MAX_DEPTH {
+            return;
+        }
+        self.defparams.push(pend);
+        self.envs.push(env);
+        self.instance_body(def, path, over, depth);
+        self.envs.pop();
+        self.defparams.pop();
+    }
+
+    fn env(&self) -> Env {
+        self.envs.last().cloned().unwrap_or_default()
+    }
+
+    fn instance_body(&mut self, def: &str, path: &str, over: &Overrides, depth: usize) {
+        let Some(d) = self.defs.get(def) else { return };
+        let (decl, scope) = (d.decl, d.scope);
+        let b = self.b;
+        let mut vals = Vals::new();
+        // Header parameters: `#(parameter A = 1, int B = 2, localparam C = 3)`.
+        let header = b.child(decl, Header).and_then(|h| b.child(h, ParamList));
+        if let Some(pl) = header {
+            let (mut dt, mut local, mut ty) = (None, false, false);
+            for p in b.children(pl) {
+                if b.kind(p) != ParamDecl {
+                    continue;
+                }
+                let own = b.own_tokens(p);
+                if own.contains(&"type") {
+                    ty = true;
+                    local = own.contains(&"localparam");
+                    continue;
+                }
+                let kw = own.iter().any(|t| matches!(*t, "parameter" | "localparam"));
+                if kw {
+                    local = own.contains(&"localparam");
+                }
+                if kw || b.child(p, DataType).is_some() {
+                    dt = b.child(p, DataType);
+                    ty = false;
+                }
+                if ty {
+                    continue;
+                }
+                self.params(p, dt, !local, path, scope, over, &mut vals);
+            }
+        }
+        let body: Vec<NodeRef> = b.children(decl);
+        self.defparams_of(&body, scope, over, header.is_none(), &vals);
+        self.items(&body, path, scope, over, header.is_none(), &mut vals, depth);
+        self.check_selects(decl, scope, &vals);
+        // Instances bound into this one.
+        let binds: Vec<NodeRef> = self
+            .binds
+            .iter()
+            .filter(|(target, list, _)| match list {
+                _ if target == path || path.ends_with(&format!(".{target}")) => true,
+                None => target == def,
+                Some(l) => target == def && l.iter().any(|i| i == path || path.ends_with(&format!(".{i}"))),
+            })
+            .map(|x| x.2)
+            .collect();
+        for bd in binds {
+            self.instantiation(bd, path, scope, &vals, depth);
+        }
+    }
+
+    /// The declarators of one parameter declaration.
+    #[allow(clippy::too_many_arguments)]
+    fn params(
+        &mut self,
+        p: NodeRef,
+        dt: Option<NodeRef>,
+        overridable: bool,
+        path: &str,
+        scope: usize,
+        over: &Overrides,
+        vals: &mut Vals,
+    ) {
+        let b = self.b;
+        let empty = self.env();
+        for d in b.children(p) {
+            if b.kind(d) != Declarator {
+                continue;
+            }
+            let Some((name, _)) = b.name_of(d) else { continue };
+            *b.inst.borrow_mut() = vals.clone();
+            let shape = dt.and_then(|t| b.int_shape(t, scope, &empty, 0));
+            let (text, val) = match over.get(&name).filter(|_| overridable) {
+                Some(o) => match o.val {
+                    Some(v) => {
+                        let v = match shape {
+                            Some((w, s)) => v.cast(w, s),
+                            None => v,
+                        };
+                        (Some(v.show()), Some(v))
+                    }
+                    // A string or real: printed as written there.
+                    None => {
+                        *b.inst.borrow_mut() = (*o.vals).clone();
+                        let text = b.value_text(dt, o.node, o.scope, &o.env);
+                        (text, None)
+                    }
+                },
+                None => {
+                    let v = b.children(d).into_iter().find(|c| !matches!(b.kind(*c), Name | Dim));
+                    match v {
+                        Some(v) => {
+                            let text = b.value_text(dt, v, scope, &empty);
+                            let two = dt.is_some_and(|t| b.two_state(t));
+                            let val = b.eval_xz(v, scope, &empty, two).map(|c| match shape {
+                                Some((w, s)) => c.cast(w, s),
+                                None => c,
+                            });
+                            (text, val)
+                        }
+                        None => (None, None),
+                    }
+                }
+            };
+            if let Some(t) = text {
+                self.out.push(format!("{path} parameter {name} = {t}"));
+            }
+            vals.insert(name, val);
+        }
+    }
+
+    /// The items of a module body or generate block.
+    #[allow(clippy::too_many_arguments)]
+    fn items(
+        &mut self,
+        items: &[NodeRef],
+        path: &str,
+        scope: usize,
+        over: &Overrides,
+        body_params: bool,
+        vals: &mut Vals,
+        depth: usize,
+    ) {
+        let mut construct = 0;
+        self.walk(items, path, scope, over, body_params, vals, depth, &mut construct);
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn walk(
+        &mut self,
+        items: &[NodeRef],
+        path: &str,
+        scope: usize,
+        over: &Overrides,
+        body_params: bool,
+        vals: &mut Vals,
+        depth: usize,
+        construct: &mut usize,
+    ) {
+        let b = self.b;
+        for &c in items {
+            match b.kind(c) {
+                ParamDecl => {
+                    let own = b.own_tokens(c);
+                    if own.contains(&"defparam") {
+                        continue;
+                    }
+                    if own.contains(&"type") {
+                        continue;
+                    }
+                    let overridable = body_params && own.contains(&"parameter");
+                    self.params(c, b.child(c, DataType), overridable, path, scope, over, vals);
+                }
+                GenerateRegion => self.walk(&b.children(c), path, scope, over, body_params, vals, depth, construct),
+                Instantiation => self.instantiation(c, path, scope, vals, depth),
+                LoopGenerate => {
+                    *construct += 1;
+                    self.loop_gen(c, path, scope, vals, depth, *construct);
+                }
+                IfGenerate | CaseGenerate => {
+                    *construct += 1;
+                    let n = *construct;
+                    let mut item = self.choose(c, scope, vals);
+                    // `if (a) if (b) ...`: a nested construct with no
+                    // block of its own belongs to this one.
+                    for _ in 0..64 {
+                        match item {
+                            Some(i) if matches!(b.kind(i), IfGenerate | CaseGenerate) => {
+                                item = self.choose(i, scope, vals)
+                            }
+                            _ => break,
+                        }
+                    }
+                    if let Some(item) = item {
+                        self.block(item, None, path, scope, vals, depth, n);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// The item an `if` or `case` generate takes (`None`: none, or unknown).
+    fn choose(&self, c: NodeRef, scope: usize, vals: &Vals) -> Option<NodeRef> {
+        let b = self.b;
+        let t = b.tree(c);
+        if b.kind(c) == IfGenerate {
+            let kids = b.children(c);
+            let cond = self.eval(*kids.first()?, scope, vals)?;
+            if cond.v != 0 {
+                return kids.get(1).copied();
+            }
+            let e = kids.into_iter().find(|k| b.kind(*k) == ElseClause)?;
+            let item = *b.children(e).first()?;
+            // `else if`: the same construct.
+            return if b.kind(item) == IfGenerate { self.choose(item, scope, vals) } else { Some(item) };
+        }
+        // case: `e1, e2 : item` ... `default : item`
+        let mut kids = b.children(c).into_iter();
+        let sel = self.eval(kids.next()?, scope, vals)?;
+        let mut labels: Vec<NodeRef> = Vec::new();
+        let mut default = false;
+        let mut default_item = None;
+        let mut after_colon = false;
+        for ch in &t.node(c.node).children {
+            match *ch {
+                sv_syntax::Child::Token(i) => match &*t.tokens[i as usize].text {
+                    ":" => after_colon = true,
+                    "default" => default = true,
+                    _ => {}
+                },
+                sv_syntax::Child::Node(n) => {
+                    let r = NodeRef { tree: c.tree, node: n };
+                    if r.node == b.children(c)[0].node {
+                        continue;
+                    }
+                    if after_colon {
+                        if default {
+                            default_item = Some(r);
+                        } else {
+                            for l in &labels {
+                                let v = self.eval(*l, scope, vals)?;
+                                let w = v.w.max(sel.w);
+                                if v.cast(w, v.s && sel.s).v == sel.cast(w, v.s && sel.s).v {
+                                    return Some(r);
+                                }
+                            }
+                        }
+                        labels.clear();
+                        default = false;
+                        after_colon = false;
+                    } else {
+                        labels.push(r);
+                    }
+                }
+            }
+        }
+        default_item
+    }
+
+    fn eval(&self, e: NodeRef, scope: usize, vals: &Vals) -> Option<CVal> {
+        *self.b.inst.borrow_mut() = vals.clone();
+        self.b.eval(e, scope, &self.env(), 0)
+    }
+
+    /// A taken generate item: a block of its own (named, or `genblk<n>`).
+    #[allow(clippy::too_many_arguments)]
+    fn block(
+        &mut self,
+        item: NodeRef,
+        index: Option<i128>,
+        path: &str,
+        scope: usize,
+        vals: &Vals,
+        depth: usize,
+        construct: usize,
+    ) {
+        let b = self.b;
+        let (label, items) = if b.kind(item) == GenerateBlock {
+            (self.label(item), b.children(item).into_iter().filter(|k| b.kind(*k) != EndLabel).collect())
+        } else {
+            (None, vec![item])
+        };
+        let mut name = label.unwrap_or_else(|| format!("genblk{construct}"));
+        if let Some(i) = index {
+            name = format!("{name}[{i}]");
+        }
+        self.out.push(format!("{path} generate {name}"));
+        let inner = format!("{path}.{name}");
+        let mut v = vals.clone();
+        self.items(&items, &inner, scope, &Overrides::new(), false, &mut v, depth);
+    }
+
+    fn label(&self, block: NodeRef) -> Option<String> {
+        let b = self.b;
+        let l = b.child(block, EndLabel)?;
+        b.own_tokens(l).last().map(|s| s.to_string()).filter(|s| *s != ":")
+    }
+
+    /// `for (i = 0; i < N; i++) begin : g ... end`
+    fn loop_gen(&mut self, c: NodeRef, path: &str, scope: usize, vals: &Vals, depth: usize, construct: usize) {
+        let b = self.b;
+        let t = b.tree(c);
+        let mut part = 0;
+        let mut parts: [Vec<NodeRef>; 4] = Default::default();
+        let mut var = None;
+        for ch in &t.node(c.node).children {
+            match *ch {
+                sv_syntax::Child::Token(i) => {
+                    if matches!(&*t.tokens[i as usize].text, ";" | ")") {
+                        part += 1;
+                    }
+                }
+                sv_syntax::Child::Node(n) => {
+                    let r = NodeRef { tree: c.tree, node: n };
+                    if part == 0 && b.kind(r) == Name {
+                        var = b.own_tokens(r).last().map(|s| s.to_string());
+                        continue;
+                    }
+                    parts[part.min(3)].push(r);
+                }
+            }
+        }
+        let Some(var) = var else { return };
+        let (Some(&init), Some(&cond), Some(&step), Some(&body)) =
+            (parts[0].first(), parts[1].first(), parts[2].first(), parts[3].first())
+        else {
+            return;
+        };
+        let mut v = vals.clone();
+        let Some(mut i) = self.eval(init, scope, &v).map(|x| x.cast(32, true)) else { return };
+        for _ in 0..MAX_ITER {
+            v.insert(var.clone(), Some(i));
+            match self.eval(cond, scope, &v) {
+                Some(x) if x.v != 0 => {}
+                _ => return,
+            }
+            // The genvar is a parameter of each block.
+            let before = self.out.len();
+            self.block(body, Some(i.v), path, scope, &v, depth, construct);
+            if self.out.len() > before {
+                let head = self.out[before].clone();
+                if let Some(name) = head.strip_prefix(&format!("{path} generate ")) {
+                    self.out.push(format!("{path}.{name} parameter {var} = {}", i.show()));
+                }
+            }
+            let Some(n) = self.step(step, &var, scope, &v) else { return };
+            if n.v == i.v {
+                return;
+            }
+            i = n;
+        }
+    }
+
+    /// The genvar's next value: `i++`, `i--`, `i = e`, `i += e` ...
+    fn step(&self, s: NodeRef, var: &str, scope: usize, vals: &Vals) -> Option<CVal> {
+        let b = self.b;
+        let cur = (*vals.get(var)?)?;
+        let kids = b.children(s);
+        let op = *b.own_tokens(s).first()?;
+        let v = match (b.kind(s), op) {
+            (PostfixExpr | PrefixExpr, "++") => CVal { v: cur.v + 1, ..cur },
+            (PostfixExpr | PrefixExpr, "--") => CVal { v: cur.v - 1, ..cur },
+            (BinaryExpr, "=") => self.eval(*kids.get(1)?, scope, vals)?,
+            (BinaryExpr, op) => {
+                let r = self.eval(*kids.get(1)?, scope, vals)?;
+                types::binary_op(op.strip_suffix('=')?, cur, r)?
+            }
+            _ => return None,
+        };
+        Some(v.cast(32, true))
+    }
+
+    /// `m #(...) a(...), b[0:1](...);`
+    fn instantiation(&mut self, c: NodeRef, path: &str, scope: usize, vals: &Vals, depth: usize) {
+        let b = self.b;
+        let Some(dt) = b.child(c, DataType) else { return };
+        let Some(def) = b.toks_of(dt).first().map(|s| s.to_string()) else { return };
+        let Some(d) = self.defs.get(&def) else { return };
+        let child = d.decl;
+        // Overrides, evaluated here.
+        let mut over = Overrides::new();
+        let mut types: HashMap<String, Bound> = HashMap::new();
+        let shared = Rc::new(vals.clone());
+        if let Some(pl) = b.child(dt, ParamList) {
+            let args: Vec<NodeRef> = match b.child(pl, ArgList) {
+                Some(al) => b.children(al).into_iter().filter(|a| b.kind(*a) == Arg).collect(),
+                None => b.children(pl),
+            };
+            let order = self.param_order(child);
+            for (k, a) in args.iter().enumerate() {
+                let (name, e) = if b.kind(*a) == Arg {
+                    let own = b.own_tokens(*a);
+                    let e = b.children(*a).into_iter().find(|x| b.kind(*x) != Attribute);
+                    if own.first() == Some(&".") {
+                        (own.get(1).map(|s| s.to_string()), e)
+                    } else {
+                        (order.get(k).map(|o| o.0.clone()), e)
+                    }
+                } else {
+                    (order.get(k).map(|o| o.0.clone()), Some(*a))
+                };
+                let (Some(name), Some(e)) = (name, e) else { continue };
+                let is_type = order.iter().any(|(n, t)| *t && *n == name);
+                if b.kind(e) == DataType || is_type {
+                    types.insert(name, Bound { node: e, scope, env: self.env() });
+                    continue;
+                }
+                let val = self.eval(e, scope, vals);
+                over.insert(name, Over { val, node: e, scope, vals: shared.clone(), env: self.env() });
+            }
+        }
+        for inst in b.children(c) {
+            if b.kind(inst) != Instance {
+                continue;
+            }
+            let Some((name, _)) = b.name_of(inst) else { continue };
+            let dims: Vec<NodeRef> = b.children(inst).into_iter().filter(|k| b.kind(*k) == Dim).collect();
+            let mut names = vec![name];
+            for dim in dims {
+                *b.inst.borrow_mut() = vals.clone();
+                let Some((l, r)) = b.dim_range(dim, scope, &self.env()) else { return };
+                if (l - r).abs() > MAX_ITER {
+                    return;
+                }
+                let idx: Vec<i128> = if l >= r { (r..=l).collect() } else { (l..=r).collect() };
+                names = names.iter().flat_map(|n| idx.iter().map(move |i| format!("{n}[{i}]"))).collect();
+            }
+            for n in names {
+                self.out.push(format!("{path} instance {n} : {def}"));
+                // Defparams through this instance: the last name is ours.
+                let mut over = over.clone();
+                let mut pend = Vec::new();
+                for (segs, v) in self.defparams.last().into_iter().flatten() {
+                    if segs.first() != Some(&n) {
+                        continue;
+                    }
+                    match &segs[1..] {
+                        [p] => {
+                            over.insert(p.clone(), v.clone());
+                        }
+                        rest => pend.push((rest.to_vec(), v.clone())),
+                    }
+                }
+                let env = Rc::new(types.clone());
+                self.instance(&def, &format!("{path}.{n}"), &over, pend, env, depth + 1);
+            }
+        }
+    }
+
+    /// `a[i +: w]` with a constant width that is not positive (11.5.1).
+    /// Only in the module's own items: not in subroutines, classes or
+    /// generate blocks, where a name may be something else.
+    fn check_selects(&mut self, decl: NodeRef, scope: usize, vals: &Vals) {
+        let b = self.b;
+        let mut stack = b.children(decl);
+        while let Some(n) = stack.pop() {
+            match b.kind(n) {
+                FunctionDecl | TaskDecl | ClassDecl | GenerateBlock | LoopGenerate | IfGenerate | CaseGenerate
+                | ModuleDecl | InterfaceDecl | ProgramDecl | CovergroupDecl => continue,
+                SelectExpr if !self.checked.contains(&n) => {
+                    let own = b.own_tokens(n);
+                    if own.iter().any(|t| matches!(*t, "+:" | "-:")) {
+                        if let Some(&w) = b.children(n).last() {
+                            if let Some(v) = self.eval(w, scope, vals) {
+                                if v.v <= 0 {
+                                    self.checked.insert(n);
+                                    self.diags.push(crate::names::Diag {
+                                        tree: n.tree,
+                                        node: w.node,
+                                        message: format!("indexed part-select width must be positive, not {}", v.v),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+            stack.extend(b.children(n));
+        }
+    }
+
+    /// The defparams of a body, evaluated with its parameters' values (a
+    /// defparam may come before or after the instance it changes).
+    fn defparams_of(&mut self, body: &[NodeRef], scope: usize, over: &Overrides, body_params: bool, vals: &Vals) {
+        let b = self.b;
+        let mut items = Vec::new();
+        let mut stack: Vec<NodeRef> = body.iter().rev().copied().collect();
+        while let Some(x) = stack.pop() {
+            match b.kind(x) {
+                GenerateRegion => stack.extend(b.children(x).into_iter().rev()),
+                ParamDecl => items.push(x),
+                _ => {}
+            }
+        }
+        if !items.iter().any(|p| b.own_tokens(*p).contains(&"defparam")) {
+            return;
+        }
+        let mut v = vals.clone();
+        let saved = std::mem::take(&mut self.out);
+        for &p in &items {
+            let own = b.own_tokens(p);
+            if !own.contains(&"defparam") && !own.contains(&"type") {
+                let overridable = body_params && own.contains(&"parameter");
+                self.params(p, b.child(p, DataType), overridable, "", scope, over, &mut v);
+            }
+        }
+        self.out = saved;
+        for &p in &items {
+            if b.own_tokens(p).contains(&"defparam") {
+                self.defparam(p, scope, &v);
+            }
+        }
+    }
+
+    /// `defparam a.b.P = e;`
+    fn defparam(&mut self, c: NodeRef, scope: usize, vals: &Vals) {
+        let b = self.b;
+        let kids = b.children(c);
+        let (Some(&target), Some(&e)) = (kids.first(), kids.get(1)) else { return };
+        let segs: Vec<String> = b.toks_of(target).split(|t| *t == ".").map(|p| p.concat()).collect();
+        if segs.len() < 2 {
+            return;
+        }
+        let val = self.eval(e, scope, vals);
+        let o = Over { val, node: e, scope, vals: Rc::new(vals.clone()), env: self.env() };
+        if let Some(d) = self.defparams.last_mut() {
+            d.push((segs, o));
+        }
+    }
+
+    /// The names positional overrides bind, in order: the header's
+    /// parameters, or the body's when there is no header list.
+    fn param_order(&self, decl: NodeRef) -> Vec<(String, bool)> {
+        let b = self.b;
+        let mut out = Vec::new();
+        let header = b.child(decl, Header).and_then(|h| b.child(h, ParamList));
+        let decls: Vec<NodeRef> = match header {
+            Some(pl) => b.children(pl),
+            None => {
+                let mut v = Vec::new();
+                let mut stack = b.children(decl);
+                stack.reverse();
+                while let Some(x) = stack.pop() {
+                    match b.kind(x) {
+                        GenerateRegion => {
+                            let mut k = b.children(x);
+                            k.reverse();
+                            stack.extend(k);
+                        }
+                        ParamDecl if b.own_tokens(x).contains(&"parameter") => v.push(x),
+                        _ => {}
+                    }
+                }
+                v
+            }
+        };
+        let (mut local, mut ty) = (false, false);
+        for p in decls {
+            if b.kind(p) != ParamDecl {
+                continue;
+            }
+            let own = b.own_tokens(p);
+            if own.contains(&"localparam") {
+                local = true;
+            } else if own.contains(&"parameter") {
+                local = false;
+            }
+            if own.contains(&"type") {
+                ty = true;
+            } else if own.iter().any(|t| matches!(*t, "parameter" | "localparam")) || b.child(p, DataType).is_some() {
+                ty = false;
+            }
+            if local {
+                continue;
+            }
+            if let Some(n) = b.child(p, Name) {
+                if let Some(s) = b.own_tokens(n).last() {
+                    out.push((s.to_string(), ty));
+                }
+            }
+            for d in b.children(p) {
+                if b.kind(d) == Declarator {
+                    if let Some((n, _)) = b.name_of(d) {
+                        out.push((n, ty));
+                    }
+                }
+            }
+        }
+        out
+    }
+}

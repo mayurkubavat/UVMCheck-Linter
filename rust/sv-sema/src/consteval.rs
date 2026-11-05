@@ -120,6 +120,12 @@ impl Builder<'_> {
     }
 
     fn function_decl(&self, name: &str, scope: usize) -> Option<NodeRef> {
+        if let Some((pkg, f)) = name.split_once("::") {
+            return match self.scopes[*self.packages.get(pkg)?].values.get(f) {
+                Some(Member::Sub { decl }) => Some(*decl),
+                _ => None,
+            };
+        }
         let mut cur = Some(scope);
         while let Some(s) = cur {
             if let Some(Member::Sub { decl }) = self.scopes[s].values.get(name) {

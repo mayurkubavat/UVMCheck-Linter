@@ -189,12 +189,28 @@ fn cycle_range(p: &mut Parser) {
 /// `(` that opens a sequence: some sequence operator, `##`, `@`, a
 /// repetition or a match-item comma sits at its own level.
 fn is_paren_sequence(p: &Parser) -> bool {
-    let mut i = p.pos() + 1;
+    paren_sequence_at(p, p.pos(), 0)
+}
+
+/// [`is_paren_sequence`] for the `(` at token `open`; a group nested in it
+/// that is one makes it one too (`((a |=> b))`).
+fn paren_sequence_at(p: &Parser, open: usize, nest: u32) -> bool {
+    let mut i = open + 1;
     let mut depth = 0i32;
     loop {
         let t = p.text_at(i);
         match t {
             "" | ";" => return false,
+            // Not a call's arguments.
+            "(" if depth == 0
+                && nest < 16
+                && !matches!(p.kind_at(i - 1), Some(sv_lexer::Kind::Identifier | sv_lexer::Kind::SystemIdentifier)) =>
+            {
+                if paren_sequence_at(p, i, nest + 1) {
+                    return true;
+                }
+                depth += 1;
+            }
             "(" | "{" | "'{" => depth += 1,
             "[" => {
                 if depth == 0 && matches!(p.text_at(i + 1), "*" | "->" | "=" | "+") {

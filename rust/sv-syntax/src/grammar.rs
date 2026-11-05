@@ -935,7 +935,7 @@ pub(crate) fn data_decl(p: &mut Parser) {
             p.bump();
         }
         // An explicit data type, or an implicit one.
-        if !(p.at_ident() && matches!(p.nth(1), "=" | ";" | "," | "[")) && !p.at("#") {
+        if (!(p.at_ident() && matches!(p.nth(1), "=" | ";" | "," | "[")) || type_with_dims(p)) && !p.at("#") {
             data_type(p);
         }
         if p.at("#") {
@@ -985,7 +985,7 @@ pub(crate) fn param_decl(p: &mut Parser) {
         p.expect(";");
         return;
     }
-    if !(p.at_ident() && matches!(p.nth(1), "=" | "," | ";" | "[")) {
+    if !(p.at_ident() && matches!(p.nth(1), "=" | "," | ";" | "[")) || type_with_dims(p) {
         data_type(p);
     }
     loop {
@@ -995,6 +995,31 @@ pub(crate) fn param_decl(p: &mut Parser) {
         }
     }
     p.expect(";");
+}
+
+/// `T [2:0] name`: a type name with packed dimensions, then the name
+/// (not a name with unpacked ones).
+pub(crate) fn type_with_dims(p: &Parser) -> bool {
+    if !(p.at_ident() && p.nth(1) == "[") {
+        return false;
+    }
+    let mut k = 1;
+    let mut depth = 0;
+    while k < 4096 {
+        match p.nth(k) {
+            "[" => depth += 1,
+            "]" => {
+                depth -= 1;
+                if depth == 0 && p.nth(k + 1) != "[" {
+                    return matches!(p.nth_kind(k + 1), Some(sv_lexer::Kind::Identifier | sv_lexer::Kind::EscapedIdentifier));
+                }
+            }
+            "" => return false,
+            _ => {}
+        }
+        k += 1;
+    }
+    false
 }
 
 /// `(strong0, weak1)` or `(pull1)` drive strength, if present.

@@ -473,3 +473,24 @@ arrays. x and z digits read as 0 only for a two-state target; `'0`/`'1`
 fill the target; `$` and `'{...}` aggregates print as slang prints them.
 Anything it cannot evaluate gives no value, never a wrong one. Value gate:
 sv-tests 949/949, repo 783/783.
+
+### Phase N4: elaboration
+
+`dv-build --hier` prints the elaborated design the way
+`uvmcheck_sym_dump --hier` prints Slang's: from each top module and program
+down, every instance (instance arrays expanded), every generate block that
+is taken (loops unrolled, `if` and `case` decided, unnamed blocks named
+`genblk<n>`, a directly nested `if` kept in its construct) and every value
+parameter with its value in that instance. `sv-sema::elab` handles named
+and positional overrides, type parameters, defparams (before or after the
+instance), `bind` to a module or to instances, package functions, casts,
+`$bits` of type names and packed structs. A parameter that cannot be
+evaluated is left out, and nothing that depends on it is guessed from its
+declaration. Elaboration also rejects indexed part-selects with a constant
+width that is not positive. Gate (`tools/sym_gate.py --hier`): sv-tests
+949/949, repo 783/783; on PULP common_cells 1903 of 1926 lines match with
+no wrong value (the rest are packed values wider than 128 bits). That run
+also fixed the parser for pasted `/``* *``/` comments in macros, typed
+ports and parameters with packed dimensions, attributes on port
+connections and doubly parenthesized implications. IEEE gate after N4:
+should_fail 61/75.

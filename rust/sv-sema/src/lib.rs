@@ -22,6 +22,7 @@ use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 mod body;
 pub mod checks;
 mod consteval;
+mod elab;
 pub mod names;
 pub mod scopes;
 mod types;
@@ -197,6 +198,23 @@ impl Locator {
 /// symbols), as slang prints it: builder phase N2.
 pub fn symbol_types(trees: &[Tree], s: &scopes::Scopes) -> Vec<Option<String>> {
     symbol_info(trees, s).0
+}
+
+/// The elaborated design as `uvmcheck_sym_dump --hier` prints it (phase
+/// N4): instances, taken generate blocks and parameter values by path.
+pub fn hierarchy(trees: &[Tree]) -> Vec<String> {
+    elaborate(trees).0
+}
+
+/// The hierarchy (as [`hierarchy`]) and the errors elaboration finds.
+pub fn elaborate(trees: &[Tree]) -> (Vec<String>, Vec<names::Diag>) {
+    let mut b = Builder::new(trees);
+    b.designs = true;
+    b.collect_names();
+    b.collect();
+    let mut e = elab::Elab::new(&b);
+    e.run();
+    (e.out, e.diags)
 }
 
 /// Types (as [`symbol_types`]) and the values of parameters, specparams
@@ -478,6 +496,9 @@ struct Builder<'t> {
     /// `saw_xz` records that one was read.
     allow_xz: std::cell::Cell<bool>,
     saw_xz: std::cell::Cell<bool>,
+    /// Parameters and genvars of the instance being elaborated (see `elab`).
+    /// `None`: a parameter with no value here (its declaration's must not be used).
+    inst: std::cell::RefCell<HashMap<String, Option<types::CVal>>>,
 }
 
 impl<'t> Builder<'t> {
@@ -514,6 +535,7 @@ impl<'t> Builder<'t> {
             frames: Default::default(),
             allow_xz: Default::default(),
             saw_xz: Default::default(),
+            inst: Default::default(),
         }
     }
 

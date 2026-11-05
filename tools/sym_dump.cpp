@@ -11,7 +11,15 @@
 // statement blocks and compiler-made symbols are left out: elaboration
 // (phase N4) checks those. Lines come out sorted.
 //
-//   uvmcheck_sym_dump [--types] [--values] [slang options: +incdir+DIR +define+X -f FILE ...] FILE...
+// --hier prints the elaborated design instead (phase N4): from each top
+// instance down, one line per instance, instance array, generate block and
+// parameter, by hierarchical path:
+//
+//     <path> instance <name> : <definition>
+//     <path> generate <name>              (instantiated blocks only)
+//     <path> parameter <name> = <value>   (value parameters)
+//
+//   uvmcheck_sym_dump [--types] [--values] [--hier] [slang options: +incdir+DIR +define+X -f FILE ...] FILE...
 #include <algorithm>
 #include <cstdio>
 #include <string>
@@ -38,6 +46,7 @@ std::vector<std::string> lines;
 
 bool withTypes = false;
 bool withValues = false;
+bool withHier = false;
 // Inside a parameterized class, types are left out: slang prints a type
 // parameter by name or by value depending on which specialization it made
 // first. The builder checks those types on specializations (phase N4).
@@ -163,6 +172,76 @@ void scope(const std::string& path, const Scope& s) {
     for (auto& m : s.members()) member(path, m);
 }
 
+// ---- --hier: the elaborated hierarchy ---------------------------------------
+
+void hier(const std::string& path, const Scope& s);
+
+// The name of the instance array being walked (its elements have none).
+std::string arrayName;
+
+std::string blockName(const Symbol& b) {
+    std::string n(b.name);
+    if (n.empty()) n = std::string(b.as<GenerateBlockSymbol>().getExternalName());
+    return n;
+}
+
+void hierMember(const std::string& path, const Symbol& m) {
+    switch (m.kind) {
+        case SymbolKind::Instance: {
+            auto& i = m.as<InstanceSymbol>();
+            std::string name(i.name);
+            if (name.empty()) name = arrayName;
+            lines.push_back(path + " instance " + name + " : " + std::string(i.getDefinition().name));
+            hier(path + "." + name, i.body);
+            break;
+        }
+        case SymbolKind::InstanceArray: {
+            auto& a = m.as<InstanceArraySymbol>();
+            auto saved = arrayName;
+            std::string base = a.name.empty() ? saved : std::string(a.name);
+            int k = 0;
+            for (auto e : a.elements) {
+                int idx = a.range.left >= a.range.right ? a.range.left - k : a.range.left + k;
+                ++k;
+                arrayName = base + "[" + std::to_string(idx) + "]";
+                hierMember(path, *e);
+            }
+            arrayName = saved;
+            break;
+        }
+        case SymbolKind::GenerateBlock: {
+            auto& b = m.as<GenerateBlockSymbol>();
+            if (b.isUninstantiated) break;
+            std::string n = blockName(b);
+            lines.push_back(path + " generate " + n);
+            hier(path + "." + n, b);
+            break;
+        }
+        case SymbolKind::GenerateBlockArray: {
+            auto& a = m.as<GenerateBlockArraySymbol>();
+            std::string n(a.name);
+            if (n.empty()) n = std::string(a.getExternalName());
+            for (auto e : a.entries) {
+                if (e->isUninstantiated) continue;
+                std::string en = n + "[" + e->arrayIndex->toString(LiteralBase::Decimal, false) + "]";
+                lines.push_back(path + " generate " + en);
+                hier(path + "." + en, *e);
+            }
+            break;
+        }
+        case SymbolKind::Parameter: {
+            auto& p = m.as<ParameterSymbol>();
+            lines.push_back(path + " parameter " + std::string(p.name) + " = " + p.getValue().toString());
+            break;
+        }
+        default: break;
+    }
+}
+
+void hier(const std::string& path, const Scope& s) {
+    for (auto& m : s.members()) hierMember(path, m);
+}
+
 } // namespace
 
 int main(int argc, char** argv) {
@@ -171,6 +250,7 @@ int main(int argc, char** argv) {
     for (int i = 0; i < argc; ++i) {
         if (std::string(argv[i]) == "--types") withTypes = true;
         else if (std::string(argv[i]) == "--values") withValues = true;
+        else if (std::string(argv[i]) == "--hier") withHier = true;
         else args.push_back(argv[i]);
     }
     argc = int(args.size());
@@ -179,7 +259,16 @@ int main(int argc, char** argv) {
     drv.addStandardArgs();
     if (!drv.parseCommandLine(argc, argv) || !drv.processOptions() || !drv.parseAllSources()) return 2;
     auto comp = drv.createCompilation();
-    comp->getRoot();
+    auto& root = comp->getRoot();
+    if (withHier) {
+        for (auto top : root.topInstances) {
+            lines.push_back("$root instance " + std::string(top->name) + " : " + std::string(top->getDefinition().name));
+            hier(std::string(top->name), top->body);
+        }
+        std::sort(lines.begin(), lines.end());
+        for (auto& l : lines) std::printf("%s\n", l.c_str());
+        return 0;
+    }
     for (auto unit : comp->getCompilationUnits()) {
         bool any = false;
         for (auto& m : unit->members()) {

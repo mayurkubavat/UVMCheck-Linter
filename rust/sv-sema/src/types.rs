@@ -146,8 +146,21 @@ impl<'t> Builder<'t> {
                 .all(|t| matches!(*t, "signed" | "unsigned" | "parameter" | "localparam"))
             && (!own.is_empty() || self.child(dt, Dim).is_some());
         if kw.is_none() && !implicit {
-            // A typedef of an integral type.
             let toks = self.toks_of(dt);
+            // A type parameter: bound, or its default in a design unit.
+            if let [name] = toks.as_slice() {
+                if let Some(bd) = env.get(*name) {
+                    return self.int_shape(bd.node, bd.scope, &bd.env, depth + 1);
+                }
+                let mut cur = Some(scope);
+                while let Some(c) = cur {
+                    if let Some(d) = self.scopes[c].type_params.get(*name) {
+                        return self.int_shape((*d)?, c, env, depth + 1);
+                    }
+                    cur = self.scopes[c].parent;
+                }
+            }
+            // A typedef of an integral type.
             if toks.len() == 1 || toks.contains(&"::") {
                 if let Some(Found::Typedef(t, s)) = self.lookup_type(dt, scope) {
                     let inner = self.child(t, DataType)?;
@@ -156,6 +169,36 @@ impl<'t> Builder<'t> {
                     }
                     return self.int_shape(inner, s, env, depth + 1);
                 }
+            }
+            if matches!(own.first(), Some(&"struct" | &"union")) && own.contains(&"packed") {
+                // Members' widths: summed, or the widest for a union.
+                let union = own.first() == Some(&"union");
+                let mut w: u32 = 0;
+                for m in self.children(dt) {
+                    if self.kind(m) != DataDecl {
+                        continue;
+                    }
+                    let (mw, _) =
+                        self.int_shape(self.child(m, DataType)?, scope, env, depth + 1)?;
+                    let n = self
+                        .children(m)
+                        .into_iter()
+                        .filter(|d| self.kind(*d) == Declarator)
+                        .count() as u32;
+                    w = if union {
+                        w.max(mw)
+                    } else {
+                        w.checked_add(mw.checked_mul(n)?)?
+                    };
+                }
+                let mut w = w.max(1);
+                for d in self.children(dt) {
+                    if self.kind(d) == Dim {
+                        let (a, b) = self.dim_range(d, scope, env)?;
+                        w = w.checked_mul((a - b).unsigned_abs() as u32 + 1)?;
+                    }
+                }
+                return Some((w, own.contains(&"signed")));
             }
             if own.first() == Some(&"enum") {
                 return Some(match self.child(dt, DataType) {
@@ -261,6 +304,30 @@ impl<'t> Builder<'t> {
     fn enum_member(&self, name: &str, scope: usize, depth: usize) -> Option<CVal> {
         let mut cur = Some(scope);
         while let Some(s) = cur {
+            // Imported: `import p::*;`, `import p::NAME;`.
+            for (pkg, item) in &self.scopes[s].imports {
+                if item.as_deref().is_some_and(|i| i != name) {
+                    continue;
+                }
+                if let Some(&p) = self.packages.get(pkg) {
+                    if p != s {
+                        if let Some(v) = self.enum_in(name, p, depth) {
+                            return Some(v);
+                        }
+                    }
+                }
+            }
+            if let Some(v) = self.enum_in(name, s, depth) {
+                return Some(v);
+            }
+            cur = self.scopes[s].parent;
+        }
+        None
+    }
+
+    /// A member of an enum typedef declared in scope `s` itself.
+    fn enum_in(&self, name: &str, s: usize, depth: usize) -> Option<CVal> {
+        {
             for &t in self.scopes[s].typedefs.values() {
                 if let Some(dt) = self.child(t, DataType) {
                     if self.own_tokens(dt).first() == Some(&"enum") {
@@ -274,7 +341,6 @@ impl<'t> Builder<'t> {
                     }
                 }
             }
-            cur = self.scopes[s].parent;
         }
         None
     }
@@ -379,10 +445,16 @@ impl<'t> Builder<'t> {
             NameExpr => {
                 let toks = self.toks_of(e);
                 match toks.as_slice() {
-                    [n] => match self.get_local(n) {
-                        Some(v) => Some(v),
-                        None => self.const_named(n, scope, env, depth + 1),
-                    },
+                    [n] => {
+                        if let Some(v) = self.get_local(n) {
+                            return Some(v);
+                        }
+                        let here = self.inst.borrow().get(*n).copied();
+                        match here {
+                            Some(v) => v,
+                            None => self.const_named(n, scope, env, depth + 1),
+                        }
+                    }
                     _ => None,
                 }
             }
@@ -395,6 +467,32 @@ impl<'t> Builder<'t> {
                 None
             }
             ParenExpr => self.eval(*kids.first()?, scope, env, depth + 1),
+            CastExpr => {
+                let target = *kids.first()?;
+                let a = self.eval(*kids.get(1)?, scope, env, depth + 1)?;
+                let toks = self.toks_of(target);
+                match toks.as_slice() {
+                    ["signed"] => Some(a.cast(a.w, true)),
+                    ["unsigned"] => Some(a.cast(a.w, false)),
+                    ["const"] => Some(a),
+                    [kw] if INT_TYPES.contains(kw) => {
+                        let (w, s) = int_width(kw);
+                        Some(a.cast(w, s))
+                    }
+                    _ if matches!(self.kind(target), NameExpr | ScopedExpr) => {
+                        let (w, s) = self.int_shape(target, scope, env, depth + 1)?;
+                        Some(a.cast(w, s))
+                    }
+                    // `8'(x)`, `(W)'(x)`
+                    _ => {
+                        let n = self.eval(target, scope, env, depth + 1)?.v;
+                        if !(1..=128).contains(&n) {
+                            return None;
+                        }
+                        Some(a.cast(n as u32, a.s))
+                    }
+                }
+            }
             ConcatExpr => self.eval_concat(e, scope, env, depth + 1),
             SelectExpr => self.eval_select(e, scope, env, depth + 1),
             PrefixExpr => {
@@ -451,6 +549,12 @@ impl<'t> Builder<'t> {
                         let a = *args.first()?;
                         let w = match self.kind(a) {
                             DataType => self.int_shape(a, scope, env, depth + 1)?.0,
+                            // A type name (typedef, type parameter) or a value.
+                            NameExpr | ScopedExpr => match self.int_shape(a, scope, env, depth + 1)
+                            {
+                                Some((w, _)) => w,
+                                None => self.eval(a, scope, env, depth + 1)?.w,
+                            },
                             _ => self.eval(a, scope, env, depth + 1)?.w,
                         };
                         Some(CVal::int(w as i128))
@@ -919,8 +1023,26 @@ impl<'t> Builder<'t> {
         let Some(v) = v else {
             return Some("<unset>".into());
         };
+        self.value_text(y.dtype.map(r), r(v), scope, env)
+    }
+
+    /// A constant's value as slang prints it: `v` in a declaration of type
+    /// `dtype` (`None`: implicit) in `scope`.
+    pub(crate) fn value_text(
+        &self,
+        dtype: Option<NodeRef>,
+        v: NodeRef,
+        scope: usize,
+        env: &Env,
+    ) -> Option<String> {
+        let t = &self.trees[v.tree];
+        let r = |n: NodeId| NodeRef {
+            tree: v.tree,
+            node: n,
+        };
+        let v = v.node;
         let toks = self.toks_of(r(v));
-        let kw = y.dtype.and_then(|d| self.own_tokens(r(d)).first().copied());
+        let kw = dtype.and_then(|d| self.own_tokens(d).first().copied());
         if let [lit] = toks.as_slice() {
             if lit.starts_with('"') {
                 if kw == Some("string") {
@@ -948,7 +1070,7 @@ impl<'t> Builder<'t> {
                 return lit.parse::<f64>().ok().map(|f| format!("{f}"));
             }
         }
-        let shape = y.dtype.and_then(|d| self.int_shape(r(d), scope, env, 0));
+        let shape = dtype.and_then(|d| self.int_shape(d, scope, env, 0));
         match toks.as_slice() {
             ["$"] => return Some("$".into()),
             // `'0`, `'1`: every bit of the target.
@@ -962,7 +1084,27 @@ impl<'t> Builder<'t> {
         if t.kind(v) == AssignPattern {
             return self.aggregate_value(r(v), shape, scope, env);
         }
-        let two_state = y.dtype.is_some_and(|d| self.two_state(r(d)));
+        let two_state = dtype.is_some_and(|d| self.two_state(d));
+        // An all-x or all-z literal into a four-state target.
+        let text = toks.concat();
+        if t.kind(v) == Literal && has_xz(&text) && !two_state {
+            let after = text.rsplit_once('\'').map_or("", |(_, d)| d);
+            let after = after.strip_prefix(['s', 'S']).unwrap_or(after);
+            let digits = after.get(1..).unwrap_or("");
+            let all = |set: &str| {
+                !digits.is_empty() && digits.chars().all(|c| c == '_' || set.contains(c))
+            };
+            let mark = if all("xX") {
+                'x'
+            } else if all("zZ?") {
+                'z'
+            } else {
+                return None;
+            };
+            let lit = literal(&[zero_xz(&text).as_str()])?;
+            let (w, s) = shape.unwrap_or((lit.w, lit.s));
+            return Some(format!("{w}'{}d{mark}", if s { "s" } else { "" }));
+        }
         let c = self.eval_xz(r(v), scope, env, two_state)?;
         let c = match shape {
             Some((w, s)) => c.cast(w, s),
@@ -972,7 +1114,13 @@ impl<'t> Builder<'t> {
     }
 
     /// `eval`, reading x and z digits as 0 only for a two-state target.
-    fn eval_xz(&self, v: NodeRef, scope: usize, env: &Env, two_state: bool) -> Option<CVal> {
+    pub(crate) fn eval_xz(
+        &self,
+        v: NodeRef,
+        scope: usize,
+        env: &Env,
+        two_state: bool,
+    ) -> Option<CVal> {
         self.allow_xz.set(two_state);
         self.saw_xz.set(false);
         let c = self.eval(v, scope, env, 0);
@@ -981,7 +1129,7 @@ impl<'t> Builder<'t> {
     }
 
     /// Whether a data type is two-state (`bit`, `int` ... and enums of them).
-    fn two_state(&self, dt: NodeRef) -> bool {
+    pub(crate) fn two_state(&self, dt: NodeRef) -> bool {
         let own = self.own_tokens(dt);
         match own.first().copied() {
             Some("bit" | "int" | "byte" | "shortint" | "longint") => true,

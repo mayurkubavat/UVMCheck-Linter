@@ -5,7 +5,7 @@
 //! builds a scope for every design unit and checks the names declared in
 //! them; types, constants, elaboration and type checking follow.
 //!
-//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--values] [--quiet] <options, e.g. -f top.f FILE...>
+//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--values] [--hier] [--quiet] <options, e.g. -f top.f FILE...>
 //!
 //! Diagnostics go to stdout as `file:line:col: error: message`, then a
 //! summary line `errors N`. --dump also prints the design: one line per
@@ -15,6 +15,8 @@
 //! declared symbol, the form of tools/sym_dump.cpp (tools/sym_gate.py);
 //! --types adds ` : <type>` to values and typedefs (phase N2), --values
 //! ` = <value>` to parameters, specparams and enum values (phase N3).
+//! --hier prints the elaborated design instead: instances, generate blocks
+//! and parameter values by hierarchical path (phase N4).
 //! Exit status: 0 no errors, 1 errors, 2 bad usage or unreadable input.
 
 use std::process::ExitCode;
@@ -33,6 +35,7 @@ struct Diag {
 fn main() -> ExitCode {
     let mut dialect = Dialect::Any;
     let (mut dump, mut quiet, mut symbols, mut types, mut values) = (false, false, false, false, false);
+    let mut hier = false;
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -40,6 +43,7 @@ fn main() -> ExitCode {
             "--dump" => dump = true,
             "--quiet" => quiet = true,
             "--symbols" => symbols = true,
+            "--hier" => hier = true,
             "--values" => {
                 symbols = true;
                 values = true;
@@ -61,7 +65,7 @@ fn main() -> ExitCode {
             }
             "-h" | "--help" => {
                 println!(
-                    "usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--quiet] <options> FILE..."
+                    "usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--values] [--hier] [--quiet] <options> FILE..."
                 );
                 return ExitCode::SUCCESS;
             }
@@ -112,6 +116,8 @@ fn main() -> ExitCode {
     let scopes = sv_sema::scopes::build(&trees);
     let mut checks = sv_sema::names::check(&trees, &scopes);
     checks.extend(sv_sema::checks::check(&trees, &scopes));
+    let (hier_lines, elab_diags) = sv_sema::elaborate(&trees);
+    checks.extend(elab_diags);
     for d in checks {
         let t = &trees[d.tree];
         let Some((tok, _)) = t.token_bounds(d.node) else {
@@ -135,7 +141,11 @@ fn main() -> ExitCode {
             print_dump(t);
         }
     }
-    if symbols {
+    if hier {
+        for l in hier_lines {
+            println!("{l}");
+        }
+    } else if symbols {
         let (tys, vals) = if types || values { sv_sema::symbol_info(&trees, &scopes) } else { Default::default() };
         let lines = scopes.dump_full(types.then_some(tys.as_slice()), values.then_some(vals.as_slice()));
         for l in lines {

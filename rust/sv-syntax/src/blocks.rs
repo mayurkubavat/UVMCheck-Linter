@@ -92,7 +92,7 @@ pub(crate) fn param_port_list(p: &mut Parser) {
                 data_type(p);
             }
         } else {
-            if !(p.at_ident() && matches!(p.nth(1), "=" | "," | ")" | "[")) {
+            if !(p.at_ident() && matches!(p.nth(1), "=" | "," | ")" | "[")) || crate::grammar::type_with_dims(p) {
                 data_type(p);
             }
             let dl = p.start();
@@ -178,7 +178,7 @@ fn port(p: &mut Parser) {
         p.bump();
         p.bump();
         p.bump();
-    } else if p.at_ident() && matches!(p.nth(1), "," | ")" | "[" | "=") {
+    } else if p.at_ident() && matches!(p.nth(1), "," | ")" | "[" | "=") && !crate::grammar::type_with_dims(p) {
         // Name only; the type is implicit or inherited.
     } else if !p.at_any(&[",", ")"]) {
         data_type(p);

@@ -447,6 +447,8 @@ pub(crate) fn arg_list(p: &mut Parser) {
             continue;
         }
         let a = p.start();
+        // `(* async *) .port(sig)`
+        crate::misc::attributes(p);
         if p.at(".") && p.nth(1) == "*" {
             p.bump();
             p.bump();

@@ -942,6 +942,8 @@ impl Preprocessor {
         let mut out: Vec<T> = Vec::new();
         let mut i = 0;
         let mut carry: Option<(bool, Rc<str>)> = None;
+        // `/``* ... *``/`: a comment made by pasting, from where it starts.
+        let mut comment_at: Option<usize> = None;
         while i < body.len() {
             let t = &body[i];
             let before = out.len();
@@ -1017,6 +1019,18 @@ impl Preprocessor {
                     let space = left.as_ref().map_or(false, |l| l.space_before);
                     if let Some(first) = next.first() {
                         glued.push_str(&first.text);
+                    }
+                    if glued == "/*" && comment_at.is_none() {
+                        comment_at = Some(out.len());
+                        i += 2;
+                        continue;
+                    }
+                    if glued == "*/" {
+                        if let Some(at) = comment_at.take() {
+                            out.truncate(at);
+                            i += 2;
+                            continue;
+                        }
                     }
                     let mut re = lex_to_t(&glued, origin.file, true, Some(origin));
                     // Placed where the left half was written, as slang does.
@@ -1097,6 +1111,13 @@ mod tests {
         // formal parameter's spacing.
         let src = "`define N(T) h(a, \\\n     `\"T``(s)`\");\n`N(q)\n`define S(x) `\"x  \"y\"`\"\n`S( z)";
         assert_eq!(pp(src), ["h", "(", "a", ",", "\" q(s)\"", ")", ";", "\"z  \\\"y\\\"\""]);
+    }
+
+    #[test]
+    fn pasted_comment_is_dropped() {
+        // `/``* ... *``/` makes a comment, as in PULP's registers.svh.
+        let src = "`define F(q) /``* keep `\"q`\" *``/ q <= 1;\n`F(x)";
+        assert_eq!(pp(src), ["x", "<=", "1", ";"]);
     }
 
     #[test]
