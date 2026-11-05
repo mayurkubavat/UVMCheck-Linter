@@ -1,15 +1,16 @@
 {
   "name": "uvmcheck-vscode",
   "displayName": "UVMCheck SystemVerilog & UVM Linter",
-  "description": "High-performance semantic linter and static analyzer for SystemVerilog and UVM testbenches powered by Slang",
-  "version": "0.1.0",
+  "description": "SystemVerilog and UVM linter with live diagnostics, quick fixes, syntax highlighting and UVM snippets",
+  "version": "0.2.0",
   "publisher": "mayurkubavat",
   "engines": {
-    "vscode": "^1.75.0"
+    "vscode": "^1.82.0"
   },
   "categories": [
     "Linters",
-    "Programming Languages"
+    "Programming Languages",
+    "Snippets"
   ],
   "keywords": [
     "systemverilog",
@@ -42,13 +43,25 @@
         "uvmcheck.preset": {
           "type": "string",
           "default": "all",
-          "enum": ["all", "soundness", "methodology", "performance", "style", "security", "smells"],
+          "enum": [
+            "all",
+            "soundness",
+            "methodology",
+            "performance",
+            "style",
+            "security",
+            "smells"
+          ],
           "description": "Active rule profile preset."
         },
         "uvmcheck.trace.server": {
           "type": "string",
           "default": "off",
-          "enum": ["off", "messages", "verbose"],
+          "enum": [
+            "off",
+            "messages",
+            "verbose"
+          ],
           "description": "Traces the communication between VS Code / Cursor and the UVMCheck language server daemon."
         }
       }
@@ -58,21 +71,85 @@
         "command": "uvmcheck.restartServer",
         "title": "UVMCheck: Restart Language Server"
       }
+    ],
+    "languages": [
+      {
+        "id": "systemverilog",
+        "aliases": [
+          "SystemVerilog",
+          "systemverilog",
+          "sv"
+        ],
+        "extensions": [
+          ".sv",
+          ".svh",
+          ".svi",
+          ".svp"
+        ],
+        "configuration": "./language-configuration.json",
+        "icon": {
+          "light": "./images/uvmcheck.svg",
+          "dark": "./images/uvmcheck.svg"
+        }
+      },
+      {
+        "id": "verilog",
+        "aliases": [
+          "Verilog",
+          "verilog"
+        ],
+        "extensions": [
+          ".v",
+          ".vh",
+          ".vlib"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "systemverilog",
+        "scopeName": "source.systemverilog",
+        "path": "./syntaxes/systemverilog.tmLanguage.json"
+      },
+      {
+        "language": "verilog",
+        "scopeName": "source.verilog.uvmcheck",
+        "path": "./syntaxes/verilog.tmLanguage.json"
+      }
+    ],
+    "snippets": [
+      {
+        "language": "systemverilog",
+        "path": "./snippets/systemverilog.json"
+      }
     ]
   },
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
     "package": "vsce package",
-    "watch": "tsc -watch -p ./"
+    "watch": "tsc -watch -p ./",
+    "publish:openvsx": "ovsx publish"
   },
   "devDependencies": {
-    "@types/node": "^18.14.0",
-    "@types/vscode": "^1.75.0",
-    "typescript": "^5.0.0",
-    "@vscode/vsce": "^2.24.0"
+    "@types/node": "^18.19.0",
+    "@types/vscode": "~1.82.0",
+    "typescript": "^5.4.0",
+    "@vscode/vsce": "^3.2.0",
+    "ovsx": "^0.10.0"
   },
   "dependencies": {
-    "vscode-languageclient": "^8.1.0"
+    "vscode-languageclient": "^9.0.1"
+  },
+  "icon": "images/uvmcheck.png",
+  "license": "SEE LICENSE IN LICENSE",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mayurkubavat/UVMCheck-Linter"
+  },
+  "galleryBanner": {
+    "color": "#0A1A28",
+    "theme": "dark"
   }
 }

@@ -1,0 +1,190 @@
+{
+  "UVM component": {
+    "prefix": "uvm_component",
+    "description": "UVM component skeleton",
+    "body": [
+      "class ${1:my_component} extends uvm_component;",
+      "\t`uvm_component_utils($1)",
+      "",
+      "\tfunction new(string name = \"$1\", uvm_component parent = null);",
+      "\t\tsuper.new(name, parent);",
+      "\tendfunction",
+      "",
+      "\tfunction void build_phase(uvm_phase phase);",
+      "\t\tsuper.build_phase(phase);",
+      "\t\t$0",
+      "\tendfunction",
+      "endclass : $1"
+    ]
+  },
+  "UVM object": {
+    "prefix": "uvm_object",
+    "description": "UVM object skeleton",
+    "body": [
+      "class ${1:my_object} extends uvm_object;",
+      "\t`uvm_object_utils($1)",
+      "",
+      "\tfunction new(string name = \"$1\");",
+      "\t\tsuper.new(name);",
+      "\tendfunction",
+      "\t$0",
+      "endclass : $1"
+    ]
+  },
+  "UVM sequence item": {
+    "prefix": "uvm_sequence_item",
+    "description": "UVM sequence item with field macros",
+    "body": [
+      "class ${1:my_item} extends uvm_sequence_item;",
+      "\trand ${2:bit [31:0]} ${3:data};",
+      "",
+      "\t`uvm_object_utils_begin($1)",
+      "\t\t`uvm_field_int($3, UVM_ALL_ON)",
+      "\t`uvm_object_utils_end",
+      "",
+      "\tfunction new(string name = \"$1\");",
+      "\t\tsuper.new(name);",
+      "\tendfunction",
+      "\t$0",
+      "endclass : $1"
+    ]
+  },
+  "UVM sequence": {
+    "prefix": "uvm_sequence",
+    "description": "UVM sequence skeleton",
+    "body": [
+      "class ${1:my_seq} extends uvm_sequence #(${2:my_item});",
+      "\t`uvm_object_utils($1)",
+      "",
+      "\tfunction new(string name = \"$1\");",
+      "\t\tsuper.new(name);",
+      "\tendfunction",
+      "",
+      "\ttask body();",
+      "\t\t$2 req = $2::type_id::create(\"req\");",
+      "\t\tstart_item(req);",
+      "\t\tif (!req.randomize()) `uvm_error(get_type_name(), \"randomize failed\")",
+      "\t\tfinish_item(req);",
+      "\t\t$0",
+      "\tendtask",
+      "endclass : $1"
+    ]
+  },
+  "UVM driver": {
+    "prefix": "uvm_driver",
+    "description": "UVM driver skeleton",
+    "body": [
+      "class ${1:my_driver} extends uvm_driver #(${2:my_item});",
+      "\t`uvm_component_utils($1)",
+      "\tvirtual ${3:my_if} vif;",
+      "",
+      "\tfunction new(string name = \"$1\", uvm_component parent = null);",
+      "\t\tsuper.new(name, parent);",
+      "\tendfunction",
+      "",
+      "\tfunction void build_phase(uvm_phase phase);",
+      "\t\tsuper.build_phase(phase);",
+      "\t\tif (!uvm_config_db#(virtual $3)::get(this, \"\", \"vif\", vif))",
+      "\t\t\t`uvm_fatal(\"NOVIF\", \"virtual interface not set\")",
+      "\tendfunction",
+      "",
+      "\ttask run_phase(uvm_phase phase);",
+      "\t\tforever begin",
+      "\t\t\tseq_item_port.get_next_item(req);",
+      "\t\t\t$0",
+      "\t\t\tseq_item_port.item_done();",
+      "\t\tend",
+      "\tendtask",
+      "endclass : $1"
+    ]
+  },
+  "UVM monitor": {
+    "prefix": "uvm_monitor",
+    "description": "UVM monitor skeleton",
+    "body": [
+      "class ${1:my_monitor} extends uvm_monitor;",
+      "\t`uvm_component_utils($1)",
+      "\tuvm_analysis_port #(${2:my_item}) ap;",
+      "",
+      "\tfunction new(string name = \"$1\", uvm_component parent = null);",
+      "\t\tsuper.new(name, parent);",
+      "\tendfunction",
+      "",
+      "\tfunction void build_phase(uvm_phase phase);",
+      "\t\tsuper.build_phase(phase);",
+      "\t\tap = new(\"ap\", this);",
+      "\tendfunction",
+      "",
+      "\ttask run_phase(uvm_phase phase);",
+      "\t\t$0",
+      "\tendtask",
+      "endclass : $1"
+    ]
+  },
+  "UVM test": {
+    "prefix": "uvm_test",
+    "description": "UVM test skeleton",
+    "body": [
+      "class ${1:my_test} extends uvm_test;",
+      "\t`uvm_component_utils($1)",
+      "",
+      "\tfunction new(string name = \"$1\", uvm_component parent = null);",
+      "\t\tsuper.new(name, parent);",
+      "\tendfunction",
+      "",
+      "\ttask run_phase(uvm_phase phase);",
+      "\t\tphase.raise_objection(this);",
+      "\t\t$0",
+      "\t\tphase.drop_objection(this);",
+      "\tendtask",
+      "endclass : $1"
+    ]
+  },
+  "uvm_info": {
+    "prefix": "uvm_info",
+    "description": "`uvm_info message",
+    "body": [
+      "`uvm_info(${1:get_type_name()}, ${2:\"message\"}, ${3|UVM_LOW,UVM_MEDIUM,UVM_HIGH,UVM_FULL,UVM_DEBUG,UVM_NONE|})"
+    ]
+  },
+  "uvm_error": {
+    "prefix": "uvm_error",
+    "description": "`uvm_error message",
+    "body": [
+      "`uvm_error(${1:get_type_name()}, ${2:\"message\"})"
+    ]
+  },
+  "config_db get": {
+    "prefix": "cfgget",
+    "description": "uvm_config_db get with fatal check",
+    "body": [
+      "if (!uvm_config_db#(${1:type})::get(${2:this}, \"${3:}\", \"${4:name}\", ${5:var}))",
+      "\t`uvm_fatal(\"NOCFG\", \"$4 not set\")"
+    ]
+  },
+  "always_ff": {
+    "prefix": "always_ff",
+    "description": "always_ff block",
+    "body": [
+      "always_ff @(posedge ${1:clk} or negedge ${2:rst_n}) begin",
+      "\tif (!$2) begin",
+      "\t\t$3",
+      "\tend else begin",
+      "\t\t$0",
+      "\tend",
+      "end"
+    ]
+  },
+  "module": {
+    "prefix": "module",
+    "description": "module skeleton",
+    "body": [
+      "module ${1:name} (",
+      "\tinput  logic clk,",
+      "\tinput  logic rst_n$2",
+      ");",
+      "\t$0",
+      "endmodule : $1"
+    ]
+  }
+}

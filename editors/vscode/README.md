@@ -1,4 +1,6 @@
-# UVMCheck Extension for VS Code & Cursor
+# UVMCheck Extension for VS Code, Cursor & Antigravity
+
+<img src="images/uvmcheck.png" width="96" alt="UVMCheck logo">
 
 Real-time, zero-latency SystemVerilog and UVM static analysis in your editor powered by **UVMCheck** and **Slang**.
 
@@ -9,6 +11,8 @@ Real-time, zero-latency SystemVerilog and UVM static analysis in your editor pow
 - **Incremental Linting**: Live diagnostics as you type over Language Server Protocol (`uvmcheck --lsp`).
 - **Project aware**: Compiles the project from `.uvmcheck/config.py` (sources, file lists, include dirs, defines) with your unsaved edits, and applies its waivers and baseline.
 - **Quick fixes**: Apply a rule's fix-it, or waive a finding on its line with a reason.
+- **Syntax highlighting**: Built-in SystemVerilog/Verilog grammar with UVM classes, macros, phases and verbosity constants; no other SV extension needed.
+- **UVM snippets**: `uvm_component`, `uvm_object`, `uvm_sequence_item`, `uvm_sequence`, `uvm_driver`, `uvm_monitor`, `uvm_test`, `uvm_info`, `uvm_error`, `cfgget`, `always_ff`, `module`.
 
 ## Requirements
 
@@ -35,6 +39,20 @@ You can customize UVMCheck behavior via `.vscode/settings.json` or Cursor Settin
 ## Commands
 
 - **`UVMCheck: Restart Language Server`**: Restarts the background LSP daemon and reloads workspace rules.
+
+## Installing
+
+The extension is one `.vsix` file that works in VS Code and in its forks (Cursor, Antigravity, VSCodium, Windsurf).
+
+```bash
+cd editors/vscode
+npm install
+npm run package          # writes uvmcheck-vscode-<version>.vsix
+code --install-extension uvmcheck-vscode-*.vsix      # VS Code
+cursor --install-extension uvmcheck-vscode-*.vsix    # Cursor
+```
+
+In any of these editors you can also use **Extensions > ... > Install from VSIX...**. Cursor and Antigravity read the Open VSX registry rather than the Microsoft marketplace; `npm run publish:openvsx` (with `OVSX_PAT` set) publishes there when you want it listed.
 
 ## Installation for Development
 
