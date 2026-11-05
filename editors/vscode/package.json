@@ -1,7 +1,7 @@
 {
   "name": "uvmcheck-vscode",
   "displayName": "UVMCheck SystemVerilog & UVM Linter",
-  "description": "SystemVerilog and UVM linter with live diagnostics, quick fixes, syntax highlighting and UVM snippets",
+  "description": "SystemVerilog and UVM linter and code browser: live diagnostics, quick fixes, go to definition, outline, completion and UVM snippets",
   "version": "0.2.0",
   "publisher": "mayurkubavat",
   "engines": {
@@ -33,12 +33,12 @@
         "uvmcheck.enable": {
           "type": "boolean",
           "default": true,
-          "description": "Enable or disable UVMCheck real-time linting."
+          "description": "Run the UVMCheck linter (`uvmcheck --lsp`): live diagnostics and quick fixes."
         },
         "uvmcheck.executablePath": {
           "type": "string",
           "default": "uvmcheck",
-          "description": "Path to the uvmcheck executable. Left as `uvmcheck`, the binary bundled with the extension is used, else the one on PATH."
+          "description": "Path to the `uvmcheck` executable. Left as `uvmcheck`, the binary bundled with the extension is used, else the one on PATH."
         },
         "uvmcheck.preset": {
           "type": "string",
@@ -53,6 +53,37 @@
             "smells"
           ],
           "description": "Active rule profile preset."
+        },
+        "uvmcheck.navigation.enable": {
+          "type": "boolean",
+          "default": true,
+          "description": "Run the UVMCheck navigation server (`dv-lsp`): outline, go to definition, references, hover and completion."
+        },
+        "uvmcheck.navigation.serverPath": {
+          "type": "string",
+          "default": "dv-lsp",
+          "description": "Path to the `dv-lsp` executable. Left as `dv-lsp`, the binary bundled with the extension is used, else the one on PATH."
+        },
+        "uvmcheck.navigation.libraryPaths": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra source trees to index for navigation, such as a UVM or VIP install ($VARS and ~ are expanded)."
+        },
+        "uvmcheck.navigation.useUvmHome": {
+          "type": "boolean",
+          "default": true,
+          "description": "Also index $UVM_HOME/src when UVM_HOME is set."
+        },
+        "uvmcheck.navigation.exclude": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Directory names (or path endings) to skip when indexing the workspace, e.g. `sim_build` or `vendor/old_vip`."
         },
         "uvmcheck.trace.server": {
           "type": "string",
@@ -69,7 +100,7 @@
     "commands": [
       {
         "command": "uvmcheck.restartServer",
-        "title": "UVMCheck: Restart Language Server"
+        "title": "UVMCheck: Restart Language Servers"
       }
     ],
     "languages": [
@@ -130,7 +161,8 @@
     "compile": "tsc -p ./",
     "package": "vsce package",
     "watch": "tsc -watch -p ./",
-    "publish:openvsx": "ovsx publish"
+    "publish:openvsx": "ovsx publish",
+    "bundle:local": "sh scripts/bundle-local.sh"
   },
   "devDependencies": {
     "@types/node": "^18.19.0",

@@ -8,84 +8,137 @@ import {
     Executable
 } from 'vscode-languageclient/node';
 
-let client: LanguageClient | undefined;
+// Two servers run side by side on the same files:
+//  - `uvmcheck --lsp` (C++, Slang): lint diagnostics and quick fixes.
+//  - `dv-lsp` (Rust, native front end): outline, symbols, go to definition,
+//    references, hover and completion.
+const clients: LanguageClient[] = [];
 
-export function activate(context: vscode.ExtensionContext) {
-    const config = vscode.workspace.getConfiguration('uvmcheck');
-    if (!config.get<boolean>('enable', true)) {
-        return;
-    }
+const documentSelector = [
+    { scheme: 'file', language: 'systemverilog' },
+    { scheme: 'file', language: 'verilog' }
+];
 
-    const executablePath = resolveExecutable(context, config.get<string>('executablePath', 'uvmcheck'));
-    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-
-    const serverExecutable: Executable = {
-        command: executablePath,
-        args: ['--lsp'],
-        options: {
-            env: process.env,
-            // The server finds .uvmcheck/config.py from the workspace root.
-            cwd: workspaceRoot
-        }
-    };
-
-    const serverOptions: ServerOptions = {
-        run: serverExecutable,
-        debug: serverExecutable
-    };
-
-    const clientOptions: LanguageClientOptions = {
-        documentSelector: [
-            { scheme: 'file', language: 'systemverilog' },
-            { scheme: 'file', language: 'verilog' }
-        ],
-        synchronize: {
-            fileEvents: vscode.workspace.createFileSystemWatcher('**/*.{sv,svh,v}')
-        }
-    };
-
-    client = new LanguageClient(
-        'uvmcheck-lsp',
-        'UVMCheck Language Server',
-        serverOptions,
-        clientOptions
-    );
-
+export async function activate(context: vscode.ExtensionContext) {
     context.subscriptions.push(
         vscode.commands.registerCommand('uvmcheck.restartServer', async () => {
-            if (client) {
-                await client.stop();
-                client.start();
-                vscode.window.showInformationMessage('UVMCheck language server restarted.');
+            await stopAll();
+            startAll(context);
+            vscode.window.showInformationMessage('UVMCheck language servers restarted.');
+        }),
+        vscode.workspace.onDidChangeConfiguration(async e => {
+            if (e.affectsConfiguration('uvmcheck')) {
+                await stopAll();
+                startAll(context);
             }
         })
     );
+    startAll(context);
+}
 
-    client.start();
+function startAll(context: vscode.ExtensionContext) {
+    const config = vscode.workspace.getConfiguration('uvmcheck');
+    const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
+    const watcher = vscode.workspace.createFileSystemWatcher('**/*.{sv,svh,v,vh,svi,svp}');
+    context.subscriptions.push(watcher);
+
+    if (config.get<boolean>('enable', true)) {
+        const exe = resolveExecutable(context, config.get<string>('executablePath', 'uvmcheck'), 'uvmcheck');
+        if (exe) {
+            start(context, 'uvmcheck-lsp', 'UVMCheck Lint', { command: exe, args: ['--lsp'], options: { env: process.env, cwd: workspaceRoot } }, {
+                documentSelector,
+                synchronize: { fileEvents: watcher }
+            });
+        } else {
+            missing('uvmcheck', 'uvmcheck.executablePath', 'lint diagnostics and quick fixes');
+        }
+    }
+
+    if (config.get<boolean>('navigation.enable', true)) {
+        const exe = resolveExecutable(context, config.get<string>('navigation.serverPath', 'dv-lsp'), 'dv-lsp');
+        if (exe) {
+            start(context, 'dv-lsp', 'UVMCheck Navigation', { command: exe, args: [], options: { env: process.env, cwd: workspaceRoot } }, {
+                documentSelector,
+                synchronize: { fileEvents: watcher },
+                initializationOptions: {
+                    libraryPaths: config.get<string[]>('navigation.libraryPaths', []),
+                    exclude: config.get<string[]>('navigation.exclude', []),
+                    useUvmHome: config.get<boolean>('navigation.useUvmHome', true)
+                }
+            });
+        } else {
+            missing('dv-lsp', 'uvmcheck.navigation.serverPath', 'go to definition, outline and completion');
+        }
+    }
+}
+
+function start(context: vscode.ExtensionContext, id: string, name: string, exe: Executable, options: LanguageClientOptions) {
+    const serverOptions: ServerOptions = { run: exe, debug: exe };
+    const client = new LanguageClient(id, name, serverOptions, options);
+    clients.push(client);
+    client.start().catch(err => {
+        vscode.window.showErrorMessage(`${name}: could not start ${exe.command}: ${err}`);
+    });
+}
+
+const warned = new Set<string>();
+
+function missing(binary: string, setting: string, what: string) {
+    if (warned.has(binary)) {
+        return;
+    }
+    warned.add(binary);
+    vscode.window
+        .showWarningMessage(`UVMCheck: \`${binary}\` was not found, so ${what} is off. Build it or set ${setting}.`, 'Open Settings')
+        .then(choice => {
+            if (choice) {
+                vscode.commands.executeCommand('workbench.action.openSettings', setting);
+            }
+        });
 }
 
 /**
  * The binary to run: an explicit path from the settings, else the one bundled
- * with the extension for this platform (bin/<platform>-<arch>/uvmcheck), else
- * `uvmcheck` from PATH.
+ * with the extension for this platform (bin/<platform>-<arch>/<name>), else
+ * <name> from PATH. Undefined when none exists.
  */
-function resolveExecutable(context: vscode.ExtensionContext, configured: string): string {
-    if (configured && configured !== 'uvmcheck') {
-        return configured;
+function resolveExecutable(context: vscode.ExtensionContext, configured: string, name: string): string | undefined {
+    const exe = process.platform === 'win32' ? `${name}.exe` : name;
+    if (configured && configured !== name) {
+        const p = configured.replace(/^~(?=\/|$)/, process.env.HOME ?? '~');
+        const abs = path.isAbsolute(p) ? p : path.join(vscode.workspace.workspaceFolders?.[0]?.uri.fsPath ?? '', p);
+        return isExecutable(abs) ? abs : onPath(p);
     }
-    const exe = process.platform === 'win32' ? 'uvmcheck.exe' : 'uvmcheck';
     const bundled = context.asAbsolutePath(path.join('bin', `${process.platform}-${process.arch}`, exe));
-    try {
-        fs.accessSync(bundled, fs.constants.X_OK);
+    if (isExecutable(bundled)) {
         return bundled;
+    }
+    return onPath(exe);
+}
+
+function isExecutable(p: string): boolean {
+    try {
+        fs.accessSync(p, fs.constants.X_OK);
+        return fs.statSync(p).isFile();
     } catch {
-        return 'uvmcheck';
+        return false;
     }
 }
 
-export function deactivate(): Thenable<void> | undefined {
-    if (!client) {
-        return undefined;
+function onPath(exe: string): string | undefined {
+    for (const dir of (process.env.PATH ?? '').split(path.delimiter)) {
+        if (dir && isExecutable(path.join(dir, exe))) {
+            return path.join(dir, exe);
+        }
     }
-    return client.stop();
+    return undefined;
+}
+
+async function stopAll() {
+    const all = clients.splice(0);
+    await Promise.all(all.map(c => c.stop().catch(() => undefined)));
+}
+
+export function deactivate(): Thenable<void> | undefined {
+    return stopAll();
 }
