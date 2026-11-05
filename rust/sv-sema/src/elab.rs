@@ -61,6 +61,8 @@ pub(crate) struct Elab<'b, 't> {
     /// Errors only elaboration finds, once per node.
     pub diags: Vec<crate::names::Diag>,
     checked: HashSet<NodeRef>,
+    /// `-top` names; empty: every module nothing instantiates.
+    pub top: Vec<String>,
 }
 
 impl<'b, 't> Elab<'b, 't> {
@@ -109,11 +111,18 @@ impl<'b, 't> Elab<'b, 't> {
             out: Vec::new(),
             diags: Vec::new(),
             checked: HashSet::new(),
+            top: Vec::new(),
         }
     }
 
     /// Modules no design unit instantiates (and that need no parameter value).
     pub fn tops(&self) -> Vec<String> {
+        if !self.top.is_empty() {
+            let mut tops: Vec<String> = self.top.iter().filter(|t| self.defs.contains_key(*t)).cloned().collect();
+            tops.sort();
+            tops.dedup();
+            return tops;
+        }
         let b = self.b;
         let mut used = HashSet::new();
         for t in b.trees {

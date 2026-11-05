@@ -38,6 +38,13 @@ pub fn parse_file(path: &Path, opts: Options) -> Tree {
     parse_output(out)
 }
 
+/// Parses files in order as one compilation: a macro defined in one file is
+/// seen by the files after it, as simulators and slang do.
+pub fn parse_files(paths: &[impl AsRef<Path>], opts: Options) -> Vec<Tree> {
+    let mut pp = sv_preproc::Preprocessor::new(opts);
+    paths.iter().map(|p| parse_output(pp.run_file(p.as_ref()))).collect()
+}
+
 /// Preprocesses and parses `src` as if read from a file called `name`.
 pub fn parse_source(src: &str, name: &str, opts: Options) -> Tree {
     let out = sv_preproc::Preprocessor::new(opts).run_source(src, name);

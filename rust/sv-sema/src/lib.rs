@@ -59,7 +59,6 @@ pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>),
         return Err(Error("no sources given".into()));
     }
     let t0 = Instant::now();
-    let mut trees = Vec::with_capacity(files.len());
     for f in &files {
         if !f.exists() {
             return Err(Error(format!(
@@ -67,8 +66,8 @@ pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>),
                 f.display()
             )));
         }
-        trees.push(sv_syntax::parse_file(f, opts.clone()));
     }
+    let trees = sv_syntax::parse_files(&files, opts);
     let parse_ms = t0.elapsed().as_secs_f64() * 1e3;
     let errors = trees
         .iter()
@@ -197,11 +196,18 @@ pub fn hierarchy(trees: &[Tree]) -> Vec<String> {
 
 /// The hierarchy (as [`hierarchy`]) and the errors elaboration finds.
 pub fn elaborate(trees: &[Tree]) -> (Vec<String>, Vec<names::Diag>) {
+    elaborate_tops(trees, &[])
+}
+
+/// [`elaborate`] from the given top modules (`-top`); none: every module
+/// nothing instantiates.
+pub fn elaborate_tops(trees: &[Tree], tops: &[String]) -> (Vec<String>, Vec<names::Diag>) {
     let mut b = Builder::new(trees);
     b.designs = true;
     b.collect_names();
     b.collect();
     let mut e = elab::Elab::new(&b);
+    e.top = tops.to_vec();
     e.run();
     (e.out, e.diags)
 }

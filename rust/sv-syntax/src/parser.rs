@@ -111,6 +111,11 @@ impl<'t> Parser<'t> {
         matches!(self.nth_kind(0), Some(Kind::Identifier | Kind::EscapedIdentifier))
     }
 
+    /// Trivia came before token `n` ahead (macro bodies included).
+    pub(crate) fn space_before(&self, n: usize) -> bool {
+        self.toks.get(self.pos + n).map_or(true, |t| t.space_before)
+    }
+
     /// No trivia between token `n` ahead and the one before it, as in `(*`.
     pub(crate) fn joined(&self, n: usize) -> bool {
         match (self.toks.get(self.pos + n - 1), self.toks.get(self.pos + n)) {

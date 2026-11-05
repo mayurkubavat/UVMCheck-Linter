@@ -198,6 +198,26 @@ const CAST_KEYWORDS: &[&str] = &[
     "string", "signed", "unsigned", "void", "const", "chandle", "event",
 ];
 
+/// The digits after a base: lexed as such, or made by a macro (`32'h`ADDR`,
+/// whose expansion lexes as a number or a name of hex digits).
+/// `1A11_0000` from a macro lexes as `1` and `A11_0000`: take the touching pieces.
+fn based_digits(p: &mut Parser) {
+    let digits = |p: &Parser| match p.nth_kind(0) {
+        Some(Kind::IntegerLiteral) | Some(Kind::Identifier) => {
+            p.nth(0).bytes().all(|c| c.is_ascii_hexdigit() || matches!(c, b'_' | b'x' | b'X' | b'z' | b'Z' | b'?'))
+        }
+        _ => false,
+    };
+    if p.nth_kind(0) == Some(Kind::VectorDigits) {
+        p.bump();
+    } else if digits(p) {
+        p.bump();
+        while digits(p) && !p.space_before(0) {
+            p.bump();
+        }
+    }
+}
+
 fn primary(p: &mut Parser) -> Option<Completed> {
     let m = p.start();
     let k = p.nth_kind(0);
@@ -206,9 +226,7 @@ fn primary(p: &mut Parser) -> Option<Completed> {
             p.bump();
             if p.nth_kind(0) == Some(Kind::IntegerBase) {
                 p.bump();
-                if p.nth_kind(0) == Some(Kind::VectorDigits) {
-                    p.bump();
-                }
+                based_digits(p);
             } else if p.at("'") && p.nth(1) == "(" {
                 // Size cast: `8'(x)`.
                 let c = m.complete(p, Literal).precede(p);
@@ -220,9 +238,7 @@ fn primary(p: &mut Parser) -> Option<Completed> {
         }
         _ if k == Some(Kind::IntegerBase) => {
             p.bump();
-            if p.nth_kind(0) == Some(Kind::VectorDigits) {
-                p.bump();
-            }
+            based_digits(p);
             Some(m.complete(p, Literal))
         }
         _ if is_literal(k) => {

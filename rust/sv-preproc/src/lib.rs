@@ -48,6 +48,8 @@ pub struct PpToken {
     /// macro argument for expanded tokens (slang's "fully original"
     /// location), else the same as `origin`.
     pub written: Origin,
+    /// Whitespace or a comment came before it (in the text or the macro body).
+    pub space_before: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -312,7 +314,7 @@ impl Preprocessor {
         self.push_file(id);
         while let Some(t) = self.next() {
             let written = t.written.unwrap_or(t.origin);
-            self.out.tokens.push(PpToken { kind: t.kind, text: t.text, origin: t.origin, from_macro: t.from_macro, written });
+            self.out.tokens.push(PpToken { kind: t.kind, text: t.text, origin: t.origin, from_macro: t.from_macro, written, space_before: t.space_before });
         }
         if !self.conds.is_empty() {
             self.diag(Origin { file: id, offset: src.len() as u32 }, "missing `endif".into());
@@ -1006,7 +1008,12 @@ impl Preprocessor {
                     continue;
                 }
                 Kind::MacroPaste => {
-                    // a``b: glue the last token out with the next one in.
+                    // a``b: glue the last token out with the next one in. A paste
+                    // that borders whitespace, or ends the body, is dropped (slang).
+                    if t.space_before || body.get(i + 1).map_or(true, |b| b.space_before) || out.is_empty() {
+                        i += 1;
+                        continue;
+                    }
                     let mut next: Vec<T> = Vec::new();
                     if let Some(b) = body.get(i + 1) {
                         match param(&b.text) {

@@ -101,14 +101,14 @@ fn main() -> ExitCode {
             .collect(),
         ..Options::default()
     };
-    let mut trees = Vec::new();
     for s in &list.sources {
         if !s.value.exists() {
             eprintln!("error: cannot read {}", s.value.display());
             return ExitCode::from(2);
         }
-        trees.push(sv_syntax::parse_file(&s.value, opts.clone()));
     }
+    let paths: Vec<_> = list.sources.iter().map(|s| s.value.clone()).collect();
+    let trees = sv_syntax::parse_files(&paths, opts);
     let mut loc = Locator::default();
     for (ix, t) in trees.iter().enumerate() {
         syntax_diagnostics(ix, t, &mut loc, &mut diags);
@@ -116,7 +116,8 @@ fn main() -> ExitCode {
     let scopes = sv_sema::scopes::build(&trees);
     let mut checks = sv_sema::names::check(&trees, &scopes);
     checks.extend(sv_sema::checks::check(&trees, &scopes));
-    let (hier_lines, elab_diags) = sv_sema::elaborate(&trees);
+    let tops: Vec<String> = list.top.iter().map(|t| t.value.clone()).collect();
+    let (hier_lines, elab_diags) = sv_sema::elaborate_tops(&trees, &tops);
     checks.extend(elab_diags);
     checks.extend(sv_sema::bind::check(&trees));
     checks.extend(sv_sema::iclass::check(&trees));

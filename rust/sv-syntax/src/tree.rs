@@ -26,6 +26,8 @@ pub struct Token {
     /// Where the text was written (in a `define body or macro argument for
     /// expanded tokens); see `sv_preproc::PpToken::written`.
     pub written: sv_preproc::Origin,
+    /// Trivia came before it, also inside a macro expansion.
+    pub space_before: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -273,7 +275,15 @@ pub(crate) fn tokens_from(out: &sv_preproc::Output) -> Vec<Token> {
                 trivia_start = last_end[f].min(t.origin.offset);
                 last_end[f] = t.origin.offset + t.text.len() as u32;
             }
-            Token { kind: t.kind, text: t.text.clone(), origin: t.origin, from_macro: t.from_macro, trivia_start, written: t.written }
+            Token {
+                kind: t.kind,
+                text: t.text.clone(),
+                origin: t.origin,
+                from_macro: t.from_macro,
+                trivia_start,
+                written: t.written,
+                space_before: t.space_before,
+            }
         })
         .collect()
 }

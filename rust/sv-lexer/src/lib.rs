@@ -302,7 +302,8 @@ impl<'a> Lexer<'a> {
             while matches!(self.peek(j), b' ' | b'\t') {
                 j += 1;
             }
-            if is_based_digit(self.peek(j)) {
+            // A macro may give the digits: 32'h`ADDR.
+            if is_based_digit(self.peek(j)) || self.peek(j) == b'`' {
                 self.pos += k + 1;
                 self.pending_digits = true;
                 return Kind::IntegerBase;
@@ -350,6 +351,10 @@ impl<'a> Lexer<'a> {
             }
         }
         for p in PUNCT2 {
+            // `:/` followed by `/` or `*` is a colon and a comment (slang).
+            if *p == b":/" && matches!(self.peek(2), b'/' | b'*') {
+                continue;
+            }
             if self.starts_with(p) {
                 self.pos += 2;
                 return Kind::Punct;

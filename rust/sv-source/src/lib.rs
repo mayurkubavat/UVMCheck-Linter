@@ -70,6 +70,9 @@ pub struct UvmRequest {
 #[derive(Clone, Debug, Default)]
 pub struct FileList {
     pub sources: Vec<Item<PathBuf>>,
+    /// C, C++ and object files (`date.c`, `dpi.so`): simulators hand these
+    /// to the C compiler or linker, so they are not SystemVerilog sources.
+    pub foreign: Vec<Item<PathBuf>>,
     pub include_dirs: Vec<Item<PathBuf>>,
     /// Name and optional value, in order; a later define wins.
     pub defines: Vec<Item<(String, Option<String>)>>,
@@ -99,6 +102,12 @@ const SKIP_WITH_VALUE: &[&str] = &[
     "-covfile", "-covtest", "-covworkdir", "-seed", "-svseed", "-snapshot", "-reflib", "-makelib", "-lib",
     "-Mdir", "-P", "-ntb_define", "-ntb_incdir", "-errormax", "-timeout", "-profile",
 ];
+
+/// A C, C++ or object file by its extension.
+pub fn is_foreign(p: &Path) -> bool {
+    let ext = p.extension().and_then(|e| e.to_str()).unwrap_or("").to_ascii_lowercase();
+    matches!(ext.as_str(), "c" | "cc" | "cpp" | "cxx" | "c++" | "o" | "a" | "so" | "dylib" | "dll")
+}
 
 /// Variables for `$VAR` expansion; the process environment by default.
 pub trait Env {
@@ -428,7 +437,11 @@ impl Reader<'_> {
             } else {
                 let p = self.path(&tok, base);
                 self.check_exists(&p, "source file", &origin);
-                self.out.sources.push(item(p));
+                if is_foreign(&p) {
+                    self.out.foreign.push(item(p));
+                } else {
+                    self.out.sources.push(item(p));
+                }
             }
             i += 1;
         }
