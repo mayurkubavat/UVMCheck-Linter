@@ -399,3 +399,28 @@ lists the ones only Slang rejects. Set `UVM_SRC` so UVM tests compile
 949/949 native (Slang 948/949; the one is a clause 22 test), should_fail
 25/75 native against 73/75 Slang (4 more are runtime-only). The 48 gaps are
 semantic checks, closed by phases N1 to N5.
+
+### Phase N1: scopes and name checks
+
+`sv-sema::scopes` builds a scope for every design unit: `$unit`, packages,
+modules, interfaces, programs (nested ones too), classes and subroutines,
+each with the symbols it declares (parameters, type parameters, ports and
+the net or variable each names, nets, variables, typedefs, enum values,
+subroutines, arguments, constraints, covergroups, modports, clocking blocks,
+genvars, sequences, properties, lets, net types, specparams, instances,
+`bind` instances in their target). Generate and statement blocks are
+elaboration's (N4). `dv-build --symbols` prints it as sorted
+`<scope path> <kind> <name>` lines, the form of the Slang reference
+`build/uvmcheck_sym_dump` (tools/sym_dump.cpp, which default-instantiates
+every definition). `tools/sym_gate.py SV_TESTS` and
+`tools/sym_gate.py --repo UVM_SRC` compare the two: 949/949 legal sv-tests
+and 783/783 repo files identical.
+
+`sv-sema::names` checks what needs only the scopes: redefinitions in a
+scope, forward typedefs never defined, typedefs of undeclared types,
+`extern constraint` without a body, overriding `randomize`, `rand_mode` or
+`constraint_mode`, `pure virtual` methods in a non-virtual class, `new` of a
+virtual or interface class, and undefined randsequence productions. Each
+check only reports what it can see for sure. The IEEE gate after N1: legal
+949/949 (no false errors, also none on the repo's 783 files), should_fail
+40/75 native; 33 gaps left, all needing types or expressions (N2, N5).

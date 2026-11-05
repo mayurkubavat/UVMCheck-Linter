@@ -1,16 +1,18 @@
 //! dv-build: the native SystemVerilog builder. Reads compile options and
 //! VCS/Xcelium file lists, parses every source with the native front end
 //! and reports what is wrong, as a compiler would. It grows phase by phase
-//! (see the builder plan): today it checks preprocessing and syntax and
-//! models classes; scopes for every design unit, types, constants,
-//! elaboration and type checking follow.
+//! (see the builder plan): today it checks preprocessing and syntax,
+//! builds a scope for every design unit and checks the names declared in
+//! them; types, constants, elaboration and type checking follow.
 //!
-//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--quiet] <options, e.g. -f top.f FILE...>
+//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--quiet] <options, e.g. -f top.f FILE...>
 //!
 //! Diagnostics go to stdout as `file:line:col: error: message`, then a
 //! summary line `errors N`. --dump also prints the design: one line per
 //! declaration in source order (`module top`, `  class pkt`), the form the
-//! Slang twin prints for the gate (tools/ieee_gate.py).
+//! Slang twin prints for the gate (tools/ieee_gate.py). --symbols prints
+//! the scopes (phase N1): one sorted `<scope path> <kind> <name>` line per
+//! declared symbol, the form of tools/sym_dump.cpp (tools/sym_gate.py).
 //! Exit status: 0 no errors, 1 errors, 2 bad usage or unreadable input.
 
 use std::process::ExitCode;
@@ -28,13 +30,14 @@ struct Diag {
 
 fn main() -> ExitCode {
     let mut dialect = Dialect::Any;
-    let (mut dump, mut quiet) = (false, false);
+    let (mut dump, mut quiet, mut symbols) = (false, false, false);
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
             "--dump" => dump = true,
             "--quiet" => quiet = true,
+            "--symbols" => symbols = true,
             "--dialect" => {
                 dialect = match it.next().as_deref() {
                     Some("vcs") => Dialect::Vcs,
@@ -47,7 +50,9 @@ fn main() -> ExitCode {
                 }
             }
             "-h" | "--help" => {
-                println!("usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--quiet] <options> FILE...");
+                println!(
+                    "usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--quiet] <options> FILE..."
+                );
                 return ExitCode::SUCCESS;
             }
             _ => args.push(a),
@@ -94,6 +99,20 @@ fn main() -> ExitCode {
     for (ix, t) in trees.iter().enumerate() {
         syntax_diagnostics(ix, t, &mut loc, &mut diags);
     }
+    let scopes = sv_sema::scopes::build(&trees);
+    for d in sv_sema::names::check(&trees, &scopes) {
+        let t = &trees[d.tree];
+        let Some((tok, _)) = t.token_bounds(d.node) else {
+            continue;
+        };
+        let l = loc.loc(d.tree, t, tok);
+        let (file, line, column) = match l.expansion {
+            Some((f, line)) => (f, line, 0),
+            None => (l.file, l.line, l.column),
+        };
+        let file = loc.files().get(file as usize).cloned().unwrap_or_default();
+        diags.push(Diag { file, line, column, message: d.message });
+    }
     if !quiet {
         for d in &diags {
             println!("{}:{}:{}: error: {}", d.file, d.line, d.column, d.message);
@@ -102,6 +121,11 @@ fn main() -> ExitCode {
     if dump {
         for t in &trees {
             print_dump(t);
+        }
+    }
+    if symbols {
+        for l in scopes.dump() {
+            println!("{l}");
         }
     }
     println!("errors {}", diags.len());

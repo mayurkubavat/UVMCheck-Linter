@@ -151,6 +151,12 @@ fn port(p: &mut Parser) {
         m.complete(p, Port);
         return;
     }
+    if p.at("{") {
+        // A non-ANSI port made of several nets: `{a, b[1:0]}`.
+        expr(p);
+        m.complete(p, Port);
+        return;
+    }
     p.eat("local");
     p.eat("const");
     if p.at_any(DIRECTIONS) {

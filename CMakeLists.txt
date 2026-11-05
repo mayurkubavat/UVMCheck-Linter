@@ -347,5 +347,7 @@ target_link_libraries(uvmcheck_pp_dump PRIVATE slang::slang)
 # Reference outline from Slang's parser, for checking rust/sv-syntax.
 add_executable(uvmcheck_cst_outline tools/cst_outline.cpp)
 target_link_libraries(uvmcheck_cst_outline PRIVATE slang::slang)
+add_executable(uvmcheck_sym_dump tools/sym_dump.cpp)
+target_link_libraries(uvmcheck_sym_dump PRIVATE slang::slang)
 add_executable(uvmcheck_cst_exprs tools/cst_exprs.cpp)
 target_link_libraries(uvmcheck_cst_exprs PRIVATE slang::slang)

@@ -1,0 +1,94 @@
+//! Scopes and name checks (builder phase N1). The scope dump is checked
+//! against Slang's on sv-tests and the repo by tools/sym_gate.py; these
+//! cases pin the shapes that decide it.
+
+use sv_sema::{names, scopes};
+
+fn trees(src: &str) -> Vec<sv_syntax::Tree> {
+    vec![sv_syntax::parse_source(src, "t.sv", sv_syntax::Options::default())]
+}
+
+fn dump(src: &str) -> Vec<String> {
+    scopes::build(&trees(src)).dump()
+}
+
+fn errors(src: &str) -> Vec<String> {
+    let t = trees(src);
+    names::check(&t, &scopes::build(&t)).into_iter().map(|d| d.message).collect()
+}
+
+#[test]
+fn ansi_ports_name_a_net_or_variable() {
+    let d = dump("module m (input int a, output int b, output [1:0] c, input var logic e, intf.mp p);\nendmodule\ninterface intf; modport mp(); endinterface\n");
+    for l in ["m net a", "m variable b", "m net c", "m variable e", "m port p", "m port a"] {
+        assert!(d.contains(&l.to_string()), "{l} in {d:?}");
+    }
+    assert!(!d.iter().any(|l| l.starts_with("m net p") || l.starts_with("m variable p")));
+}
+
+#[test]
+fn non_ansi_ports_take_their_declarations() {
+    let d =
+        dump("module n (a, b, .d(x), {e1, e2});\n input int a; output b; reg b; input x; input e1, e2;\nendmodule\n");
+    for l in ["n port a", "n port b", "n port d", "n variable a", "n variable b", "n net x", "n net e1"] {
+        assert!(d.contains(&l.to_string()), "{l} in {d:?}");
+    }
+    assert_eq!(d.iter().filter(|l| l.starts_with("n port")).count(), 3);
+}
+
+#[test]
+fn classes_subroutines_and_enums() {
+    let d = dump("package p;\n class c #(type T = int, N = 2);\n  typedef enum {A, B[2]} e_t;\n  rand T r; covergroup cg; endgroup\n  extern function void f();\n  task t(int x); int y; endtask\n endclass\n function void c::f(); endfunction\nendpackage\n");
+    for l in [
+        "$root package p",
+        "p class c",
+        "p.c type_parameter T",
+        "p.c type_parameter N",
+        "p.c enum_value A",
+        "p.c enum_value B0",
+        "p.c enum_value B1",
+        "p.c variable cg",
+        "p.c function f",
+        "p.c.t argument x",
+        "p.c.t variable y",
+    ] {
+        assert!(d.contains(&l.to_string()), "{l} in {d:?}");
+    }
+    // The out-of-block body is the prototype's, not the package's.
+    assert!(!d.contains(&"p function c::f".to_string()));
+}
+
+#[test]
+fn bind_adds_instances_to_its_target() {
+    let d = dump("module t; endmodule\nmodule chk; endmodule\nbind t chk u_chk();\n");
+    assert!(d.contains(&"t instance u_chk".to_string()), "{d:?}");
+}
+
+#[test]
+fn name_checks() {
+    assert_eq!(errors("module m; reg v; wire v; endmodule\n"), ["redefinition of 'v'"]);
+    assert!(errors("module m(a); input a; wire a; endmodule\n").is_empty());
+    assert_eq!(errors("typedef missing_t;\n"), ["forward typedef 'missing_t' is never defined"]);
+    assert_eq!(errors("typedef other_t my_t;\n"), ["unknown type 'other_t'"]);
+    assert!(errors("typedef class c; typedef c c_alias; class c; endclass\n").is_empty());
+    assert_eq!(errors("class a; extern constraint k; endclass\n"), ["extern constraint 'k' has no body"]);
+    assert!(errors("class a; extern constraint k; endclass\nconstraint a::k { }\n").is_empty());
+    assert_eq!(
+        errors("class a; function void randomize(); endfunction endclass\n"),
+        ["'randomize' is a built-in method and cannot be overridden"]
+    );
+    assert_eq!(errors("class a; pure virtual task t; endclass\n").len(), 1);
+    assert!(errors("virtual class a; pure virtual task t; endclass\n").is_empty());
+    assert_eq!(
+        errors("module m; virtual class b; endclass\n b o; initial o = new; endmodule\n"),
+        ["cannot instantiate 'b': it is an abstract or interface class"]
+    );
+    assert!(errors(
+        "module m; virtual class b; endclass\n class c extends b; endclass\n c o; initial o = new; endmodule\n"
+    )
+    .is_empty());
+    assert_eq!(
+        errors("module m; initial randsequence(main) main: first secnd; first: {}; endsequence endmodule\n"),
+        ["unknown production 'secnd'"]
+    );
+}
