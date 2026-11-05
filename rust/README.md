@@ -441,3 +441,21 @@ Not compared: members of parameterized classes (Slang prints a type
 parameter by name or value depending on which specialization it made
 first; N4 checks specializations), the global `s$N`/`e$N` counters, and six
 UVM typedefs whose printed arguments come from Slang's specialization cache.
+
+### Phase N2 slice 2: type checks
+
+`sv-sema::checks` resolves names through the scopes (and the blocks between)
+and rejects: bit-selects of a `real` and `real` indexes, edges of a `real`,
+packed struct member defaults, procedural assignments to nets (also through
+clocking outputs), unparenthesized assignments inside expressions, `return`
+with a value in a void function, `fork ... join`/`join_any` in a function,
+`return` in a fork, enum x/z values on a two-state base, a name after an
+x/z value with none, sized enum values of the wrong width, integers assigned
+to enums and compound assignments to them, parameters that use a specparam,
+`randc` in `solve ... before`, soft constraints and distributions, and
+unimplemented inherited pure constraints. A name it cannot resolve for sure
+(inherited, imported, hierarchical) is never an error. IEEE gate after N2:
+legal 949/949 with no false errors (and none on the repo's 783 files),
+should_fail 60/75 (Slang 73/75); 13 gaps left: interface-class rules (8.26),
+randsequence variables, streams, slice widths, struct array patterns and
+undefined parameters in typedef ranges.

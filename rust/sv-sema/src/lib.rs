@@ -20,6 +20,7 @@ use dv_model::{
 use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
 mod body;
+pub mod checks;
 pub mod names;
 pub mod scopes;
 mod types;

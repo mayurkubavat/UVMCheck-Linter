@@ -105,7 +105,9 @@ fn main() -> ExitCode {
         syntax_diagnostics(ix, t, &mut loc, &mut diags);
     }
     let scopes = sv_sema::scopes::build(&trees);
-    for d in sv_sema::names::check(&trees, &scopes) {
+    let mut checks = sv_sema::names::check(&trees, &scopes);
+    checks.extend(sv_sema::checks::check(&trees, &scopes));
+    for d in checks {
         let t = &trees[d.tree];
         let Some((tok, _)) = t.token_bounds(d.node) else {
             continue;

@@ -148,6 +148,14 @@ pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     out
 }
 
+/// A class's `extends` clause (in its header), if any.
+pub(crate) fn extends(t: &Tree, class: NodeId) -> Option<NodeId> {
+    let header = t.child(class, Header);
+    t.children(class).chain(header.into_iter().flat_map(|h| t.children(h))).find(|&c| {
+        t.kind(c) == Extends && t.token_bounds(c).is_some_and(|(f, _)| &*t.tokens[f as usize].text == "extends")
+    })
+}
+
 fn is_ident_char(c: char) -> bool {
     c.is_ascii_alphanumeric() || c == '_' || c == '$'
 }
@@ -289,7 +297,7 @@ fn abstract_new(
         let Some(a) = up(at) else { return };
         if t.kind(a) == ClassDecl {
             // It may be an inherited member: not ours to judge.
-            if t.child(a, Extends).is_some() || t.children(a).any(|c| t.kind(c) == Extends) {
+            if extends(t, a).is_some() {
                 return;
             }
         }

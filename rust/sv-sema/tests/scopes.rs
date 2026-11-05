@@ -119,3 +119,44 @@ fn types_as_slang_prints_them() {
         assert!(d.contains(&l.to_string()), "{l} in {d:?}");
     }
 }
+
+fn type_errors(src: &str) -> Vec<String> {
+    let t = trees(src);
+    sv_sema::checks::check(&t, &scopes::build(&t)).into_iter().map(|d| d.message).collect()
+}
+
+#[test]
+fn type_checks() {
+    let bad = [
+        "module m; real a; wire b; assign b = a[2]; endmodule\n",
+        "module m; real a; always @(posedge a) ; endmodule\n",
+        "module m; struct packed { bit [3:0] lo = 1; } p; endmodule\n",
+        "module m; wire w; initial w = 1; endmodule\n",
+        "module m; int a, b; initial a = b = 5; endmodule\n",
+        "module m; function void f(); return 1; endfunction endmodule\n",
+        "module m; function int f(); fork join_any return 1; endfunction endmodule\n",
+        "module m; task t; fork return; join_none endtask endmodule\n",
+        "module m; enum bit [1:0] {a = 0, b = 2'bxx} v; endmodule\n",
+        "module m; enum logic [2:0] {a = 4'h2} v; endmodule\n",
+        "module m; typedef enum {a, b} e; initial begin e v; v = 1; end endmodule\n",
+        "module m; typedef enum {a, b} e; initial begin e v; v += 1; end endmodule\n",
+        "module m; specparam d = 5; parameter p = d + 1; endmodule\n",
+        "class c; randc int b; constraint k { soft b > 4; } endclass\n",
+        "virtual class a; pure constraint k; endclass\nclass b extends a; endclass\n",
+    ];
+    for src in bad {
+        assert_eq!(type_errors(src).len(), 1, "{src}: {:?}", type_errors(src));
+    }
+    let good = [
+        "module m; real a[]; real s; initial s = a[0]; endmodule\n",
+        "module m; logic w; initial w = 1; wire x; assign x = w; endmodule\n",
+        "module m; int a, b; initial a = (b = 5); endmodule\n",
+        "module m; function int f(); fork join_none return 1; endfunction endmodule\n",
+        "module m; typedef enum {a, b} e; initial begin e v; v = b; end endmodule\n",
+        "module m; enum logic [1:0] {a = 2'b0x, b = 2'b11} v; endmodule\n",
+        "virtual class a; pure constraint k; endclass\nclass b extends a; constraint k { } endclass\n",
+    ];
+    for src in good {
+        assert!(type_errors(src).is_empty(), "{src}: {:?}", type_errors(src));
+    }
+}
