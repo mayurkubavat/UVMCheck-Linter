@@ -11,7 +11,7 @@
 // statement blocks and compiler-made symbols are left out: elaboration
 // (phase N4) checks those. Lines come out sorted.
 //
-//   uvmcheck_sym_dump [--types] [slang options: +incdir+DIR +define+X -f FILE ...] FILE...
+//   uvmcheck_sym_dump [--types] [--values] [slang options: +incdir+DIR +define+X -f FILE ...] FILE...
 #include <algorithm>
 #include <cstdio>
 #include <string>
@@ -37,6 +37,7 @@ namespace {
 std::vector<std::string> lines;
 
 bool withTypes = false;
+bool withValues = false;
 // Inside a parameterized class, types are left out: slang prints a type
 // parameter by name or by value depending on which specialization it made
 // first. The builder checks those types on specializations (phase N4).
@@ -47,6 +48,11 @@ void put(const std::string& path, const char* kind, std::string_view name) {
 }
 
 // With --types, a value or typedef line ends in ` : <type>`.
+// With --values, a parameter, specparam or enum value line ends in ` = <value>`.
+void valued(const ConstantValue& v) {
+    if (withValues && !inGeneric) lines.back() += " = " + v.toString();
+}
+
 void typed(const std::string& path, const char* kind, const Symbol& m, const Type& t) {
     put(path, kind, m.name);
     if (withTypes && !inGeneric) lines.back() += " : " + t.toString();
@@ -76,7 +82,10 @@ void klass(const std::string& path, const Symbol& sym) {
 
 void member(const std::string& path, const Symbol& m) {
     switch (m.kind) {
-        case SymbolKind::Parameter: typed(path, "parameter", m, m.as<ParameterSymbol>().getType()); break;
+        case SymbolKind::Parameter:
+            typed(path, "parameter", m, m.as<ParameterSymbol>().getType());
+            valued(m.as<ParameterSymbol>().getValue());
+            break;
         case SymbolKind::TypeParameter: put(path, "type_parameter", m.name); break;
         case SymbolKind::Port:
         case SymbolKind::MultiPort:
@@ -100,8 +109,10 @@ void member(const std::string& path, const Symbol& m) {
             // Enum values; a class also carries its base classes' ones.
             auto& w = m.as<TransparentMemberSymbol>().wrapped;
             auto owner = w.getParentScope() ? w.getParentScope()->asSymbol().getParentScope() : nullptr;
-            if (w.kind == SymbolKind::EnumValue && owner == m.getParentScope())
+            if (w.kind == SymbolKind::EnumValue && owner == m.getParentScope()) {
                 put(path, "enum_value", w.name);
+                valued(w.as<EnumValueSymbol>().getValue());
+            }
             break;
         }
         case SymbolKind::Subroutine: {
@@ -133,7 +144,10 @@ void member(const std::string& path, const Symbol& m) {
         case SymbolKind::Property: put(path, "property", m.name); break;
         case SymbolKind::LetDecl: put(path, "let", m.name); break;
         case SymbolKind::NetType: put(path, "nettype", m.name); break;
-        case SymbolKind::Specparam: put(path, "specparam", m.name); break;
+        case SymbolKind::Specparam:
+            put(path, "specparam", m.name);
+            valued(m.as<SpecparamSymbol>().getValue());
+            break;
         case SymbolKind::Instance:
         case SymbolKind::InstanceArray:
         case SymbolKind::UninstantiatedDef:
@@ -156,6 +170,7 @@ int main(int argc, char** argv) {
     std::vector<char*> args;
     for (int i = 0; i < argc; ++i) {
         if (std::string(argv[i]) == "--types") withTypes = true;
+        else if (std::string(argv[i]) == "--values") withValues = true;
         else args.push_back(argv[i]);
     }
     argc = int(args.size());

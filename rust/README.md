@@ -459,3 +459,17 @@ legal 949/949 with no false errors (and none on the repo's 783 files),
 should_fail 60/75 (Slang 73/75); 13 gaps left: interface-class rules (8.26),
 randsequence variables, streams, slice widths, struct array patterns and
 undefined parameters in typedef ranges.
+
+### Phase N3: constants and parameters
+
+`dv-build --values` prints the value of every parameter, localparam,
+specparam and enum value the way slang prints its `ConstantValue`
+(`uvmcheck_sym_dump --values` is the reference; `tools/sym_gate.py
+--values` compares them). Besides expressions, `sv-sema::consteval` runs
+constant functions (13.4.3) on a small interpreter (declarations,
+assignments, `if`, blocks, `for`, `while`, `repeat`, `return`), and
+evaluates concatenations, replications and elements of constant unpacked
+arrays. x and z digits read as 0 only for a two-state target; `'0`/`'1`
+fill the target; `$` and `'{...}` aggregates print as slang prints them.
+Anything it cannot evaluate gives no value, never a wrong one. Value gate:
+sv-tests 949/949, repo 783/783.

@@ -101,7 +101,7 @@ fn int_width(k: &str) -> (u32, bool) {
 }
 
 impl<'t> Builder<'t> {
-    fn toks_of(&self, n: NodeRef) -> Vec<&'t str> {
+    pub(crate) fn toks_of(&self, n: NodeRef) -> Vec<&'t str> {
         self.tokens(n)
             .iter()
             .map(|&t| self.text(n.tree, t))
@@ -364,11 +364,25 @@ impl<'t> Builder<'t> {
             .filter(|c| body_is_expr(self.kind(*c)))
             .collect();
         match self.kind(e) {
-            Literal => literal(&self.toks_of(e)),
+            Literal => {
+                let toks = self.toks_of(e);
+                let text = toks.concat();
+                if !has_xz(&text) {
+                    return literal(&toks);
+                }
+                if !self.allow_xz.get() {
+                    return None;
+                }
+                self.saw_xz.set(true);
+                literal(&[zero_xz(&text).as_str()])
+            }
             NameExpr => {
                 let toks = self.toks_of(e);
                 match toks.as_slice() {
-                    [n] => self.const_named(n, scope, env, depth + 1),
+                    [n] => match self.get_local(n) {
+                        Some(v) => Some(v),
+                        None => self.const_named(n, scope, env, depth + 1),
+                    },
                     _ => None,
                 }
             }
@@ -381,6 +395,8 @@ impl<'t> Builder<'t> {
                 None
             }
             ParenExpr => self.eval(*kids.first()?, scope, env, depth + 1),
+            ConcatExpr => self.eval_concat(e, scope, env, depth + 1),
+            SelectExpr => self.eval_select(e, scope, env, depth + 1),
             PrefixExpr => {
                 let op = *self.own_tokens(e).first()?;
                 let a = self.eval(*kids.first()?, scope, env, depth + 1)?;
@@ -439,7 +455,7 @@ impl<'t> Builder<'t> {
                         };
                         Some(CVal::int(w as i128))
                     }
-                    _ => None,
+                    _ => self.call_const(&name, &args, scope, env, depth + 1),
                 }
             }
             _ => None,
@@ -849,6 +865,163 @@ impl<'t> Builder<'t> {
         s
     }
 
+    /// The value of a parameter, specparam or enum value, as slang prints it.
+    pub(crate) fn symbol_value(
+        &self,
+        y: &crate::scopes::Symbol,
+        scope: usize,
+        env: &Env,
+    ) -> Option<String> {
+        use crate::scopes::SymKind as K;
+        let t = &self.trees[y.tree];
+        let r = |n: NodeId| NodeRef {
+            tree: y.tree,
+            node: n,
+        };
+        if y.kind == K::EnumValue {
+            let dt = y.dtype?;
+            // An all-x value of a four-state enum prints as x.
+            let init = Some(y.node)
+                .and_then(|d| t.children(d).find(|&c| !matches!(t.kind(c), Name | Dim)));
+            if let Some(i) = init {
+                let mut sub = vec![i];
+                let mut k = 0;
+                while k < sub.len() {
+                    sub.extend(t.children(sub[k]));
+                    k += 1;
+                }
+                let based: Vec<String> = sub
+                    .into_iter()
+                    .filter(|&n| t.kind(n) == Literal)
+                    .map(|n| self.toks_of(r(n)).concat())
+                    .filter(|x| x.contains('\''))
+                    .collect();
+                if !based.is_empty() && based.iter().all(|x| all_x(x)) && !self.two_state(r(dt)) {
+                    let (w, sg) = self
+                        .child(r(dt), DataType)
+                        .and_then(|b| self.int_shape(b, scope, env, 0))
+                        .unwrap_or((32, true));
+                    return Some(format!("{w}'{}dx", if sg { "s" } else { "" }));
+                }
+            }
+            let vals = self.enum_values(r(dt), scope, env, 0);
+            return vals
+                .iter()
+                .find(|(n, _)| *n == y.name)
+                .map(|(_, v)| v.show());
+        }
+        let d = if y.kind == K::Specparam {
+            Some(y.node)
+        } else {
+            y.item
+        };
+        let v = d.and_then(|d| t.children(d).find(|&c| !matches!(t.kind(c), Name | Dim)));
+        let Some(v) = v else {
+            return Some("<unset>".into());
+        };
+        let toks = self.toks_of(r(v));
+        let kw = y.dtype.and_then(|d| self.own_tokens(r(d)).first().copied());
+        if let [lit] = toks.as_slice() {
+            if lit.starts_with('"') {
+                if kw == Some("string") {
+                    return Some(lit.to_string());
+                }
+                // A string literal is an integral value, 8 bits a character.
+                let body = &lit[1..lit.len() - 1];
+                let mut val: i128 = 0;
+                for c in body.bytes().take(15) {
+                    val = (val << 8) | c as i128;
+                }
+                let w = (body.len().max(1) * 8) as u32;
+                return Some(
+                    CVal {
+                        w,
+                        s: false,
+                        v: val,
+                    }
+                    .show(),
+                );
+            }
+            if matches!(kw, Some("real" | "shortreal" | "realtime"))
+                || (kw.is_none() && lit.contains('.') && lit.parse::<f64>().is_ok())
+            {
+                return lit.parse::<f64>().ok().map(|f| format!("{f}"));
+            }
+        }
+        let shape = y.dtype.and_then(|d| self.int_shape(r(d), scope, env, 0));
+        match toks.as_slice() {
+            ["$"] => return Some("$".into()),
+            // `'0`, `'1`: every bit of the target.
+            [fill @ ("'0" | "'1")] => {
+                let (w, s) = shape?;
+                let v = if *fill == "'1" { -1 } else { 0 };
+                return Some(CVal { w, s, v }.norm().show());
+            }
+            _ => {}
+        }
+        if t.kind(v) == AssignPattern {
+            return self.aggregate_value(r(v), shape, scope, env);
+        }
+        let two_state = y.dtype.is_some_and(|d| self.two_state(r(d)));
+        let c = self.eval_xz(r(v), scope, env, two_state)?;
+        let c = match shape {
+            Some((w, s)) => c.cast(w, s),
+            None => c,
+        };
+        Some(c.show())
+    }
+
+    /// `eval`, reading x and z digits as 0 only for a two-state target.
+    fn eval_xz(&self, v: NodeRef, scope: usize, env: &Env, two_state: bool) -> Option<CVal> {
+        self.allow_xz.set(two_state);
+        self.saw_xz.set(false);
+        let c = self.eval(v, scope, env, 0);
+        self.allow_xz.set(false);
+        c
+    }
+
+    /// Whether a data type is two-state (`bit`, `int` ... and enums of them).
+    fn two_state(&self, dt: NodeRef) -> bool {
+        let own = self.own_tokens(dt);
+        match own.first().copied() {
+            Some("bit" | "int" | "byte" | "shortint" | "longint") => true,
+            Some("enum") => self.child(dt, DataType).map_or(true, |b| self.two_state(b)),
+            _ => false,
+        }
+    }
+
+    /// A constant unpacked array, `'{a, b, c}`, as slang prints it:
+    /// `[a,b,c]`, each element in the element type.
+    fn aggregate_value(
+        &self,
+        v: NodeRef,
+        shape: Option<(u32, bool)>,
+        scope: usize,
+        env: &Env,
+    ) -> Option<String> {
+        let own = self.own_tokens(v);
+        // Keyed and default patterns are not plain lists.
+        if own.contains(&":") {
+            return None;
+        }
+        let mut out = Vec::new();
+        for e in self
+            .children(v)
+            .into_iter()
+            .filter(|c| body_is_expr(self.kind(*c)))
+        {
+            if self.kind(e) == AssignPattern {
+                return None;
+            }
+            let c = self.eval(e, scope, env, 0)?;
+            out.push(match shape {
+                Some((w, s)) => c.cast(w, s).show(),
+                None => c.show(),
+            });
+        }
+        Some(format!("[{}]", out.join(",")))
+    }
+
     /// The type of a parameter declared without one: its value's.
     pub(crate) fn value_type(&self, v: NodeRef, scope: usize, env: &Env) -> String {
         let toks = self.toks_of(v);
@@ -962,6 +1135,14 @@ impl<'t> Builder<'t> {
     }
 }
 
+pub(crate) fn is_expr(k: SyntaxKind) -> bool {
+    body_is_expr(k)
+}
+
+pub(crate) fn binary_op(op: &str, a: CVal, b: CVal) -> Option<CVal> {
+    binary(op, a, b)
+}
+
 fn body_is_expr(k: SyntaxKind) -> bool {
     matches!(
         k,
@@ -982,6 +1163,45 @@ fn body_is_expr(k: SyntaxKind) -> bool {
 }
 
 /// `4'hA`, `12`, `'1`, `2'sb11` as a value.
+/// A based literal with x, z or ? digits.
+fn has_xz(t: &str) -> bool {
+    match t.find('\'') {
+        Some(i) => t[i + 1..]
+            .trim_start_matches(['s', 'S'])
+            .get(1..)
+            .is_some_and(|d| d.contains(['x', 'X', 'z', 'Z', '?'])),
+        None => false,
+    }
+}
+
+/// A based literal whose digits are all x.
+fn all_x(t: &str) -> bool {
+    match t.find('\'') {
+        Some(i) => t[i + 1..]
+            .trim_start_matches(['s', 'S'])
+            .get(1..)
+            .is_some_and(|d| !d.is_empty() && d.chars().all(|c| matches!(c, 'x' | 'X' | '_'))),
+        None => false,
+    }
+}
+
+fn zero_xz(t: &str) -> String {
+    match t.find('\'') {
+        Some(i) => {
+            let (a, b) = t.split_at(i + 1);
+            let b = b.trim_start_matches(['s', 'S']);
+            let sign = &t[i + 1..t.len() - b.len()];
+            let (base, digits) = b.split_at(b.len().min(1));
+            let digits: String = digits
+                .chars()
+                .map(|c| if "xXzZ?".contains(c) { '0' } else { c })
+                .collect();
+            format!("{a}{sign}{base}{digits}")
+        }
+        None => t.to_string(),
+    }
+}
+
 fn literal(toks: &[&str]) -> Option<CVal> {
     let joined: String = toks.concat().replace('_', "");
     if let Some(i) = joined.find('\'') {

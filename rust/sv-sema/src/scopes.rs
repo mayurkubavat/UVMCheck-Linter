@@ -87,7 +87,8 @@ pub struct Symbol {
     /// declaration itself when the name is a bare token).
     pub tree: usize,
     pub node: NodeId,
-    /// For values and typedefs: the data type written (none when implicit)
+    /// For values and typedefs: the data type written (none when implicit;
+    /// for an enum value, its enum type)
     /// and the node holding the unpacked dimensions (the Declarator, or
     /// the TypedefDecl).
     pub dtype: Option<NodeId>,
@@ -122,6 +123,11 @@ impl Scopes {
 
     /// The dump with ` : <type>` after each symbol that has one (phase N2).
     pub fn dump_with(&self, types: Option<&[Option<String>]>) -> Vec<String> {
+        self.dump_full(types, None)
+    }
+
+    /// The dump with types and ` = <value>` after each value (phase N3).
+    pub fn dump_full(&self, types: Option<&[Option<String>]>, values: Option<&[Option<String>]>) -> Vec<String> {
         let mut v: Vec<String> = self
             .symbols
             .iter()
@@ -131,6 +137,10 @@ impl Scopes {
                 if let Some(Some(t)) = types.map(|t| &t[i]) {
                     l.push_str(" : ");
                     l.push_str(t);
+                }
+                if let Some(Some(v)) = values.map(|v| &v[i]) {
+                    l.push_str(" = ");
+                    l.push_str(v);
                 }
                 l
             })
@@ -679,7 +689,7 @@ impl Walker<'_, '_> {
             match first_tok(t, dt) {
                 Some("enum") => {
                     for d in t.children(dt).filter(|&c| t.kind(c) == Declarator) {
-                        self.enum_value(s, d);
+                        self.enum_value(s, d, dt);
                     }
                     stack.extend(t.children(dt).filter(|&c| t.kind(c) == DataType));
                 }
@@ -690,7 +700,7 @@ impl Walker<'_, '_> {
     }
 
     /// `A`, or `A[2]` (A0, A1) and `A[1:3]` (A1, A2, A3).
-    fn enum_value(&mut self, s: usize, d: NodeId) {
+    fn enum_value(&mut self, s: usize, d: NodeId, enum_type: NodeId) {
         let t = self.t;
         let name = name_of(t, d);
         if let Some(dim) = t.child(d, Dim) {
@@ -703,11 +713,13 @@ impl Walker<'_, '_> {
                 _ => vec![],
             };
             for i in range {
-                self.add(s, SymKind::EnumValue, format!("{name}{i}"), d);
+                let i = self.add(s, SymKind::EnumValue, format!("{name}{i}"), d);
+                self.out.symbols[i].dtype = Some(enum_type);
             }
             return;
         }
-        self.add(s, SymKind::EnumValue, name, d);
+        let i = self.add(s, SymKind::EnumValue, name, d);
+        self.out.symbols[i].dtype = Some(enum_type);
     }
 }
 

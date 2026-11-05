@@ -120,6 +120,27 @@ fn types_as_slang_prints_them() {
     }
 }
 
+#[test]
+fn values_as_slang_prints_them() {
+    let t = trees(
+        "package glb; localparam int arr[3] = '{1, 2, 3}; endpackage\nfunction int clog(int n); int r = 0; for (int i = 1; i < n; i = i * 2) r++; return r; endfunction\nmodule m;\n parameter int A = clog(17);\n parameter logic [7:0] B = {2{4'ha}};\n parameter int C = glb::arr[1] + 1;\n parameter int X = 32'hzz;\n parameter int F = '1;\n parameter logic [31:0] P [1:0] = '{5, 6};\n enum integer {a = 0, b = {32{1'bx}}, c = 1} e;\nendmodule\n",
+    );
+    let s = scopes::build(&t);
+    let (ty, val) = sv_sema::symbol_info(&t, &s);
+    let d = s.dump_full(Some(&ty), Some(&val));
+    for l in [
+        "m parameter A : int = 5",
+        "m parameter B : logic[7:0] = 8'd170",
+        "m parameter C : int = 3",
+        "m parameter X : int = 0",
+        "m parameter F : int = -1",
+        "m parameter P : logic[31:0]$[1:0] = [32'd5,32'd6]",
+        "m enum_value b = 32'sdx",
+    ] {
+        assert!(d.contains(&l.to_string()), "{l} in {d:?}");
+    }
+}
+
 fn type_errors(src: &str) -> Vec<String> {
     let t = trees(src);
     sv_sema::checks::check(&t, &scopes::build(&t)).into_iter().map(|d| d.message).collect()

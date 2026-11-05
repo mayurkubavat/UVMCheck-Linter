@@ -21,6 +21,7 @@ use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
 mod body;
 pub mod checks;
+mod consteval;
 pub mod names;
 pub mod scopes;
 mod types;
@@ -195,6 +196,16 @@ impl Locator {
 /// The type of each value and typedef of the scopes (`None` for other
 /// symbols), as slang prints it: builder phase N2.
 pub fn symbol_types(trees: &[Tree], s: &scopes::Scopes) -> Vec<Option<String>> {
+    symbol_info(trees, s).0
+}
+
+/// Types (as [`symbol_types`]) and the values of parameters, specparams
+/// and enum values as slang prints them (phase N3); `None` where a symbol
+/// has none or it is not evaluated.
+pub fn symbol_info(
+    trees: &[Tree],
+    s: &scopes::Scopes,
+) -> (Vec<Option<String>>, Vec<Option<String>>) {
     use scopes::SymKind as K;
     let mut b = Builder::new(trees);
     b.designs = true;
@@ -248,7 +259,35 @@ pub fn symbol_types(trees: &[Tree], s: &scopes::Scopes) -> Vec<Option<String>> {
         }
         envs.insert(c.scope, Rc::new(m));
     }
-    s.symbols
+    // Not inside a parameterized class (see tools/sym_dump.cpp).
+    let in_generic = |scope: usize| {
+        let mut cur = Some(scope);
+        while let Some(c) = cur {
+            if let ScopeKind::Class(k) = b.scopes[c].kind {
+                if b.classes[k].generic {
+                    return true;
+                }
+            }
+            cur = b.scopes[c].parent;
+        }
+        false
+    };
+    let values = s
+        .symbols
+        .iter()
+        .map(|y| {
+            if !matches!(y.kind, K::Parameter | K::Specparam | K::EnumValue)
+                || in_generic(map[y.scope])
+            {
+                return None;
+            }
+            let scope = map[y.scope];
+            let env = envs.get(&scope).cloned().unwrap_or_else(|| empty.clone());
+            b.symbol_value(y, scope, &env)
+        })
+        .collect();
+    let types = s
+        .symbols
         .iter()
         .map(|y| {
             if !matches!(
@@ -258,15 +297,8 @@ pub fn symbol_types(trees: &[Tree], s: &scopes::Scopes) -> Vec<Option<String>> {
                 return None;
             }
             let scope = map[y.scope];
-            // Not inside a parameterized class (see tools/sym_dump.cpp).
-            let mut cur = Some(scope);
-            while let Some(c) = cur {
-                if let ScopeKind::Class(k) = b.scopes[c].kind {
-                    if b.classes[k].generic {
-                        return None;
-                    }
-                }
-                cur = b.scopes[c].parent;
+            if in_generic(scope) {
+                return None;
             }
             let env = envs.get(&scope).cloned().unwrap_or_else(|| empty.clone());
             let r = |n: NodeId| NodeRef {
@@ -307,7 +339,8 @@ pub fn symbol_types(trees: &[Tree], s: &scopes::Scopes) -> Vec<Option<String>> {
             }
             Some(b.type_string(y.dtype.map(r), y.item.map(r), scope, &env, false))
         })
-        .collect()
+        .collect();
+    (types, values)
 }
 
 /// Models already parsed trees (one per compilation unit).
@@ -439,6 +472,12 @@ struct Builder<'t> {
     /// Also make scopes for modules, interfaces and programs (the builder's
     /// typing, phase N2); the class model leaves them out.
     designs: bool,
+    /// Locals of the constant functions being run (see `consteval`).
+    frames: std::cell::RefCell<Vec<HashMap<String, types::CVal>>>,
+    /// While set, x and z digits read as 0 (a two-state target), and
+    /// `saw_xz` records that one was read.
+    allow_xz: std::cell::Cell<bool>,
+    saw_xz: std::cell::Cell<bool>,
 }
 
 impl<'t> Builder<'t> {
@@ -472,6 +511,9 @@ impl<'t> Builder<'t> {
             chain_cache: Default::default(),
             decl_cache: Default::default(),
             designs: false,
+            frames: Default::default(),
+            allow_xz: Default::default(),
+            saw_xz: Default::default(),
         }
     }
 

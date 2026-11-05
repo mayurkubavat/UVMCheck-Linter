@@ -5,7 +5,7 @@
 //! builds a scope for every design unit and checks the names declared in
 //! them; types, constants, elaboration and type checking follow.
 //!
-//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--quiet] <options, e.g. -f top.f FILE...>
+//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--values] [--quiet] <options, e.g. -f top.f FILE...>
 //!
 //! Diagnostics go to stdout as `file:line:col: error: message`, then a
 //! summary line `errors N`. --dump also prints the design: one line per
@@ -13,7 +13,8 @@
 //! Slang twin prints for the gate (tools/ieee_gate.py). --symbols prints
 //! the scopes (phase N1): one sorted `<scope path> <kind> <name>` line per
 //! declared symbol, the form of tools/sym_dump.cpp (tools/sym_gate.py);
-//! --types adds ` : <type>` to values and typedefs (phase N2).
+//! --types adds ` : <type>` to values and typedefs (phase N2), --values
+//! ` = <value>` to parameters, specparams and enum values (phase N3).
 //! Exit status: 0 no errors, 1 errors, 2 bad usage or unreadable input.
 
 use std::process::ExitCode;
@@ -31,7 +32,7 @@ struct Diag {
 
 fn main() -> ExitCode {
     let mut dialect = Dialect::Any;
-    let (mut dump, mut quiet, mut symbols, mut types) = (false, false, false, false);
+    let (mut dump, mut quiet, mut symbols, mut types, mut values) = (false, false, false, false, false);
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -39,6 +40,10 @@ fn main() -> ExitCode {
             "--dump" => dump = true,
             "--quiet" => quiet = true,
             "--symbols" => symbols = true,
+            "--values" => {
+                symbols = true;
+                values = true;
+            }
             "--types" => {
                 symbols = true;
                 types = true;
@@ -131,8 +136,9 @@ fn main() -> ExitCode {
         }
     }
     if symbols {
-        let tys = types.then(|| sv_sema::symbol_types(&trees, &scopes));
-        for l in scopes.dump_with(tys.as_deref()) {
+        let (tys, vals) = if types || values { sv_sema::symbol_info(&trees, &scopes) } else { Default::default() };
+        let lines = scopes.dump_full(types.then_some(tys.as_slice()), values.then_some(vals.as_slice()));
+        for l in lines {
             println!("{l}");
         }
     }

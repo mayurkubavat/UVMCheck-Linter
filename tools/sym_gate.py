@@ -6,10 +6,11 @@ For every legal sv-tests file (or each file given with --files), runs
 compares the sorted `<scope path> <kind> <name>` lines. Prints per clause
 how many files match, then the most common differing lines (--show=N
 prints the first N differing files in full). --types also compares each
-value's and typedef's type (builder phase N2).
+value's and typedef's type (builder phase N2); --values each parameter's,
+specparam's and enum value's value (phase N3).
 
     cmake --build build --target uvmcheck_sym_dump && cargo build --release -p dv-build   # in rust/
-    UVM_SRC=uvm-core/src tools/sym_gate.py ~/sv-tests [--types] [--show=N] [chapter-8]
+    UVM_SRC=uvm-core/src tools/sym_gate.py ~/sv-tests [--types] [--values] [--show=N] [chapter-8]
     tools/sym_gate.py --repo UVM_SRC [--show=N]      # each repo test and example alone
     tools/sym_gate.py --files [options] FILE...      # one design
 """
@@ -49,10 +50,11 @@ def dump(cmd):
 
 
 TYPES = '--types' in sys.argv
+VALUES = '--values' in sys.argv
 
 
 def compare(args):
-    flag = ['--types'] if TYPES else []
+    flag = (['--types'] if TYPES else []) + (['--values'] if VALUES else [])
     native = dump([DVBUILD, '--quiet', '--symbols', *flag, *args])
     slang = dump([SYMDUMP, *flag, *args])
     n, s = collections.Counter(native), collections.Counter(slang)
