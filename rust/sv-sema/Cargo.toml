@@ -9,6 +9,7 @@ build = "build.rs"
 
 [dependencies]
 sv-syntax = { path = "../sv-syntax" }
+sv-source = { path = "../sv-source" }
 dv-model = { path = "../dv-model", default-features = false }
 
 [dev-dependencies]

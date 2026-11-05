@@ -8,6 +8,7 @@
 //! virtual overrides included), arguments, locals and constraints. Type
 //! strings and method bodies (calls, assignments, timing) are not built yet.
 
+use sv_source::{Dialect, FileList, ProcessEnv};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
@@ -37,37 +38,23 @@ pub fn load<S: AsRef<str>>(args: &[S]) -> Result<Design, Error> {
 
 /// [`load`], also giving back the parsed trees (for syntax-level tools).
 pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>), Error> {
-    let mut opts = Options::default();
-    let mut files = Vec::new();
-    let mut it = args.iter().map(|a| a.as_ref());
-    while let Some(a) = it.next() {
-        if let Some(rest) = a.strip_prefix("+incdir+") {
-            opts.include_dirs
-                .extend(rest.split('+').filter(|s| !s.is_empty()).map(PathBuf::from));
-        } else if let Some(rest) = a.strip_prefix("+define+") {
-            opts.defines
-                .extend(rest.split('+').filter(|s| !s.is_empty()).map(String::from));
-        } else if a == "-I" || a == "--include-directory" {
-            opts.include_dirs.push(PathBuf::from(
-                it.next()
-                    .ok_or_else(|| Error("-I needs a directory".into()))?,
-            ));
-        } else if let Some(d) = a.strip_prefix("-I") {
-            opts.include_dirs.push(PathBuf::from(d));
-        } else if a == "-D" {
-            opts.defines.push(
-                it.next()
-                    .ok_or_else(|| Error("-D needs a macro".into()))?
-                    .to_string(),
-            );
-        } else if let Some(d) = a.strip_prefix("-D") {
-            opts.defines.push(d.to_string());
-        } else if a.starts_with('-') || a.starts_with('+') {
-            // Other tool options mean nothing to the model.
-        } else {
-            files.push(PathBuf::from(a));
-        }
-    }
+    // The options are read as a compiler reads them: -f/-F file lists,
+    // $VAR/${VAR} from the environment, +incdir+, +define+, -I, -D.
+    let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
+    let list = FileList::read_args(args.iter().map(|a| a.as_ref()), &cwd, Dialect::Any, &ProcessEnv);
+    let opts = Options {
+        include_dirs: list.include_dirs.iter().map(|d| d.value.clone()).collect(),
+        defines: list
+            .effective_defines()
+            .into_iter()
+            .map(|(n, v)| match v {
+                Some(v) => format!("{n}={v}"),
+                None => n,
+            })
+            .collect(),
+        ..Options::default()
+    };
+    let files: Vec<PathBuf> = list.sources.iter().map(|s| s.value.clone()).collect();
     if files.is_empty() {
         return Err(Error("no sources given".into()));
     }
