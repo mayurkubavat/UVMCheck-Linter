@@ -9,10 +9,10 @@ use crate::{derives_from, find_method, find_property, is_function_phase, is_task
 
 pub(crate) fn rules() -> Vec<Rule> {
     vec![
-        Rule { id: "UVM-FAC-003", name: "UvmFactoryMissingUtils", run: uvm_factory_missing_utils },
-        Rule { id: "UVM-FAC-002", name: "UvmFactoryMacroMismatch", run: uvm_factory_macro_mismatch },
-        Rule { id: "UVM-PHS-001", name: "UvmMissingSuperPhase", run: uvm_missing_super_phase },
-        Rule { id: "UVM-BAN-003", name: "DirectDoMethodCall", run: direct_do_method_call },
+        Rule { id: "UVM-FAC-003", name: "UvmFactoryMissingUtils", check: crate::Check::Model(uvm_factory_missing_utils) },
+        Rule { id: "UVM-FAC-002", name: "UvmFactoryMacroMismatch", check: crate::Check::Model(uvm_factory_macro_mismatch) },
+        Rule { id: "UVM-PHS-001", name: "UvmMissingSuperPhase", check: crate::Check::Model(uvm_missing_super_phase) },
+        Rule { id: "UVM-BAN-003", name: "DirectDoMethodCall", check: crate::Check::Model(direct_do_method_call) },
     ]
 }
 

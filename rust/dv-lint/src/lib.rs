@@ -1,13 +1,15 @@
-//! UVMCheck's model-based rules, in Rust, over [`dv_model::Design`].
+//! UVMCheck's rules in Rust, over [`dv_model::Design`] and `sv-syntax` trees.
 //!
-//! Each rule is a line-for-line port of its C++ twin under `src/rules/`, which
-//! reads only the model facade. Messages are copied verbatim so findings
-//! compare one to one with `uvmcheck` (see `tools/lint_parity.py`). Any front
-//! end that fills a `Design` (slang or the native sv-sema) can feed them.
+//! Each rule is a line-for-line port of its C++ twin under `src/rules/`.
+//! Model rules read only the class model, so any front end that fills a
+//! `Design` (slang or the native sv-sema) can feed them; syntax rules (see
+//! [`syntax`]) read the native syntax tree. Messages are copied verbatim so
+//! findings compare one to one with `uvmcheck` (see `tools/lint_parity.py`).
 
 use dv_model::{Class, ClassId, Design, Direction, Loc, Method, PhaseKind, Property, TypeShape};
 
 mod factory;
+pub mod syntax;
 mod uvm;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -44,16 +46,15 @@ impl Finding {
     /// File, line and column as uvmcheck reports them: for code from a macro,
     /// the line of the outermost expansion with column 0.
     pub fn position<'d>(&self, d: &'d Design) -> (&'d str, u32, u32) {
+        self.position_in(d.files())
+    }
+
+    /// [`Self::position`] with a file table (index 0 "no file").
+    pub fn position_in<'f>(&self, files: &'f [String]) -> (&'f str, u32, u32) {
+        let name = |f: u32| files.get(f as usize).map(String::as_str).unwrap_or("");
         match self.loc.expansion {
-            Some((file, line)) => (
-                d.file_name(Loc {
-                    file,
-                    ..Loc::default()
-                }),
-                line,
-                0,
-            ),
-            None => (d.file_name(self.loc), self.loc.line, self.loc.column),
+            Some((file, line)) => (name(file), line, 0),
+            None => (name(self.loc.file), self.loc.line, self.loc.column),
         }
     }
 }
@@ -87,11 +88,24 @@ impl Sink {
 
 pub type RuleFn = fn(&Design, &mut Sink);
 
+/// What a rule reads.
+#[derive(Clone, Copy)]
+pub enum Check {
+    Model(RuleFn),
+    Syntax(syntax::SyntaxFn),
+}
+
 /// A ported rule: its id, name and check.
 pub struct Rule {
     pub id: &'static str,
     pub name: &'static str,
-    pub run: RuleFn,
+    pub check: Check,
+}
+
+impl Rule {
+    pub fn is_syntax(&self) -> bool {
+        matches!(self.check, Check::Syntax(_))
+    }
 }
 
 /// Every ported rule, in the order uvmcheck registers them (by id).
@@ -100,76 +114,77 @@ pub fn rules() -> Vec<Rule> {
         Rule {
             id: "SV-OOP-003",
             name: "MissingSuperNew",
-            run: missing_super_new,
+            check: crate::Check::Model(missing_super_new),
         },
         Rule {
             id: "SV-OOP-001",
             name: "NonVirtualMethodOverride",
-            run: non_virtual_method_override,
+            check: crate::Check::Model(non_virtual_method_override),
         },
         Rule {
             id: "SV-OOP-007",
             name: "StaticMemberInUvmComponent",
-            run: static_member_in_uvm_component,
+            check: crate::Check::Model(static_member_in_uvm_component),
         },
         Rule {
             id: "SV-OOP-014",
             name: "SuperNewNotFirstStatement",
-            run: super_new_not_first_statement,
+            check: crate::Check::Model(super_new_not_first_statement),
         },
         Rule {
             id: "SV-OOP-004",
             name: "VariableShadowing",
-            run: variable_shadowing,
+            check: crate::Check::Model(variable_shadowing),
         },
         Rule {
             id: "SV-OOP-005",
             name: "VirtualCallInConstructor",
-            run: virtual_call_in_constructor,
+            check: crate::Check::Model(virtual_call_in_constructor),
         },
         Rule {
             id: "SV-OOP-015",
             name: "VirtualMethodSignatureMismatch",
-            run: virtual_method_signature_mismatch,
+            check: crate::Check::Model(virtual_method_signature_mismatch),
         },
         Rule {
             id: "SV-PRF-001",
             name: "PassArrayByValue",
-            run: pass_array_by_value,
+            check: crate::Check::Model(pass_array_by_value),
         },
         Rule {
             id: "SV-RND-002",
             name: "GlobalRngInClass",
-            run: global_rng_in_class,
+            check: crate::Check::Model(global_rng_in_class),
         },
         Rule {
             id: "SV-RND-018",
             name: "RandomizeInConstructor",
-            run: randomize_in_constructor,
+            check: crate::Check::Model(randomize_in_constructor),
         },
         Rule {
             id: "SV-RND-003",
             name: "RandomizeMissingSuper",
-            run: randomize_missing_super,
+            check: crate::Check::Model(randomize_missing_super),
         },
         Rule {
             id: "SV-STY-001",
             name: "ClassMemberPrefix",
-            run: class_member_prefix,
+            check: crate::Check::Model(class_member_prefix),
         },
         Rule {
             id: "UVM-STY-002",
             name: "ConstraintNameSuffix",
-            run: constraint_name_suffix,
+            check: crate::Check::Model(constraint_name_suffix),
         },
         Rule {
             id: "SV-NAM-001",
             name: "UvmComponentNamingConvention",
-            run: uvm_component_naming_convention,
+            check: crate::Check::Model(uvm_component_naming_convention),
         },
     ];
     v.extend(uvm::rules());
     v.extend(factory::rules());
+    v.extend(syntax::rules());
     v.sort_by_key(|r| r.id);
     v
 }
@@ -177,17 +192,43 @@ pub fn rules() -> Vec<Rule> {
 /// Runs the rules whose ids pass `keep` and returns their findings in a stable
 /// order (file, line, column, rule). As in uvmcheck's DiagnosticEngine, nothing
 /// is reported in the test UVM mock (`uvm_mock.svh`).
+/// Only model rules run here; see [`lint_all`] for syntax rules too.
 pub fn lint(design: &Design, keep: impl Fn(&str) -> bool) -> Vec<Finding> {
+    lint_all(design, &[], keep).1
+}
+
+/// Runs model rules on `design` and syntax rules on `trees` (the trees the
+/// design was built from, or none), returning the file table the findings'
+/// locations index (the design's, plus files only syntax rules reached).
+pub fn lint_all(
+    design: &Design,
+    trees: &[sv_syntax::Tree],
+    keep: impl Fn(&str) -> bool,
+) -> (Vec<String>, Vec<Finding>) {
     let mut sink = Sink::default();
-    for r in rules() {
-        if keep(r.id) {
-            (r.run)(design, &mut sink);
+    let all: Vec<Rule> = rules().into_iter().filter(|r| keep(r.id)).collect();
+    for r in &all {
+        if let Check::Model(run) = r.check {
+            run(design, &mut sink);
         }
     }
+    let mut locator = sv_sema::Locator::new(design.files().to_vec());
+    if all.iter().any(Rule::is_syntax) {
+        for (ix, tree) in trees.iter().enumerate() {
+            let cst = syntax::Cst::new(tree, ix, locator);
+            for r in &all {
+                if let Check::Syntax(run) = r.check {
+                    run(&cst, &mut sink);
+                }
+            }
+            locator = cst.into_locator();
+        }
+    }
+    let files = locator.into_files();
     let mut f = sink.findings;
-    f.retain(|x| !x.position(design).0.contains("uvm_mock.svh"));
-    f.sort_by(|a, b| (a.position(design), a.rule).cmp(&(b.position(design), b.rule)));
-    f
+    f.retain(|x| !x.position_in(&files).0.contains("uvm_mock.svh"));
+    f.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
+    (files, f)
 }
 
 // ---- model helpers with the C++ facade's exact semantics ----

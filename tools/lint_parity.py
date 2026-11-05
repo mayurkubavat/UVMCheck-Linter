@@ -1,15 +1,17 @@
 #!/usr/bin/env python3
-"""Parity of dv-lint (the 27 model rules in Rust) with uvmcheck's C++ rules.
+"""Parity of dv-lint (the ported rules in Rust) with uvmcheck's C++ rules.
 
 For each compile, runs `uvmcheck --preset all --experimental --json` and
 keeps the findings of the ported rules, then runs dv-lint on the native model
-(default) and, with --slang, on the slang-backed one. Findings are compared as
-multisets of (file name, line, column, rule, message).
+(default) and, with --slang, on the slang-backed one (model rules only; syntax
+rules need the native trees). Findings are compared as multisets of (file
+name, line, column, rule, message).
 
     cmake --build build && cmake --build build-model
     cargo build --release -p dv-lint                  # in rust/
     tools/lint_parity.py --repo UVM_SRC [--slang] [--show=N]
     tools/lint_parity.py --uvm UVM_SRC [--slang] [--show=N]
+    tools/lint_parity.py --dir DIR [--show=N]     # each .sv under DIR alone (sv-tests)
     tools/lint_parity.py -- +incdir+DIR FILE...
 """
 import collections, glob, json, os, re, subprocess, sys, tempfile
@@ -20,7 +22,11 @@ UVMCHECK = os.environ.get('UVMCHECK', os.path.join(REPO, 'build', 'uvmcheck'))
 DVLINT = os.environ.get('DV_LINT', os.path.join(REPO, 'rust', 'target', 'release', 'dv-lint'))
 LINE = re.compile(r'^(.*?):(\d+):(\d+): \[(\w+)\] (\S+) \((\w+)\): (.*)$')
 
-RULES = set(subprocess.run([DVLINT, '--list'], capture_output=True, text=True).stdout.split()[0::2])
+KINDS = dict((l.split()[0], l.split()[2]) for l in
+             subprocess.run([DVLINT, '--list'], capture_output=True, text=True).stdout.splitlines())
+RULES = set(KINDS)
+if '--slang' in sys.argv:
+    RULES = {r for r, k in KINDS.items() if k == 'model'}
 
 
 def reference(args):
@@ -65,7 +71,7 @@ def compare(args, slang, show, label):
 def main():
     argv = sys.argv[1:]
     slang, show = False, 0
-    while argv and argv[0].startswith('--') and argv[0] not in ('--repo', '--uvm', '--'):
+    while argv and argv[0].startswith('--') and argv[0] not in ('--repo', '--uvm', '--dir', '--'):
         if argv[0] == '--slang':
             slang = True
         elif argv[0].startswith('--show='):
@@ -77,6 +83,9 @@ def main():
                        + glob.glob(os.path.join(REPO, 'examples/**/*.sv*'), recursive=True))
         cases = [(os.path.relpath(f, REPO), ['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'tests/common'),
                                             '+incdir+' + os.path.dirname(f), f]) for f in files]
+    elif argv[:1] == ['--dir']:
+        files = sorted(glob.glob(os.path.join(argv[1], '**/*.sv'), recursive=True))
+        cases = [(os.path.relpath(f, argv[1]), ['+incdir+' + os.path.dirname(f), f]) for f in files]
     elif argv[:1] == ['--uvm']:
         cases = [('uvm_pkg', ['+incdir+' + argv[1], os.path.join(argv[1], 'uvm_pkg.sv')])]
     else:
@@ -85,8 +94,10 @@ def main():
     findings = missing = extra = 0
     by_rule = collections.Counter()
     fired = collections.Counter()
-    for label, args in cases:
-        r = compare(args, slang, show, label)
+    import concurrent.futures
+    with concurrent.futures.ThreadPoolExecutor(os.cpu_count() or 4) as pool:
+        results = list(pool.map(lambda c: (c[0], compare(c[1], slang, show, c[0])), cases))
+    for label, r in results:
         if r is None:
             noref += 1
             continue

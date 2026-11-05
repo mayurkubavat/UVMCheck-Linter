@@ -15,6 +15,5 @@ slang = ["dv-model/slang"]
 [dependencies]
 dv-model = { path = "../dv-model", default-features = false }
 sv-sema = { path = "../sv-sema" }
-
-[dev-dependencies]
 sv-syntax = { path = "../sv-syntax" }
+

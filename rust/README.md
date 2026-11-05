@@ -323,3 +323,26 @@ inside macro bodies or arguments, plus `` `undef `` of user macros), and the
 class's `typedefs` by name. The C ABI is now version 7. On the native model
 all 783 repo compiles are identical (906 findings) and uvm_pkg.sv keeps only
 the two `s$N` messages; through Slang both are exact.
+
+### Syntax rules (R3 slice 7)
+
+About 150 of the C++ rules still on slang read only the syntax tree (a
+`SyntaxVisitor`, no symbols or types). dv-lint now runs such rules on the
+native sv-syntax trees: `dv_lint::syntax::Cst` gives a rule the tree's nodes
+in source order, parents, direct tokens, slang-style `toString()` text and
+locations numbered like the design's files (`sv_sema::Locator`, shared with
+the model builder). `sv_sema::load_with_trees` hands the trees over, and
+`dv_lint::lint_all` runs model and syntax rules together.
+
+sv-syntax has fewer node kinds than slang, so each port states the slang
+shape it stands for: a case statement's `default` is a direct token, an
+assignment is a `BinaryExpr` whose operator is `=`, `<=` right under an
+expression statement is a nonblocking assignment, and `deassign`/`release`
+are not slang's ProceduralAssignStatement.
+
+The first 13 are SV-COR-006/008/009, SV-DEP-001/002/003/005, SV-DED-009/010,
+SV-DLY-002, SV-RCE-001 and SV-CON-005/007 (44 rules in all). With
+`--slang`, only model rules run. `tools/lint_parity.py --dir DIR` checks each
+`.sv` file under a directory on its own. Measured 2026-11-05: repo 783/783
+(941 findings), uvm_pkg.sv only the two `s$N` messages, and all 1028
+sv-tests files identical. On uvm_pkg.sv all 44 rules take about 23 ms.

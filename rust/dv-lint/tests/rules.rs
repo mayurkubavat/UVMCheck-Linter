@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 31);
+    assert_eq!(r.len(), 44);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 31);
+    assert_eq!(ids.len(), 44);
 }
 
 #[test]
@@ -95,4 +95,41 @@ fn factory_and_phase_rules() {
     assert!(got.contains(&(9, "UVM-FAC-003")), "{got:?}");
     assert!(got.contains(&(9, "UVM-BAN-003")), "{got:?}");
     assert!(!got.contains(&(5, "UVM-FAC-003")), "{got:?}");
+}
+
+#[test]
+fn syntax_rules() {
+    let src = "module m; defparam m.P = 2;\n\
+               always @* casex (a) 1: ; endcase\n\
+               initial begin fork join -> ev; x = #1 y; if (y == y) ; force y = 1; release y; end\n\
+               endmodule\n\
+               program p; endprogram\n\
+               class c; mailbox mb = new; semaphore sem; task t(); sem.get(0); endtask endclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (files, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let got: Vec<_> = found
+        .iter()
+        .map(|f| {
+            let (_, line, col) = f.position_in(&files);
+            (line, col, f.rule)
+        })
+        .collect();
+    for want in [
+        (1, 11, "SV-DEP-002"),
+        (2, 1, "SV-DEP-003"),
+        (2, 11, "SV-COR-009"),
+        (2, 11, "SV-COR-006"),
+        (3, 15, "SV-DED-010"),
+        (3, 25, "SV-RCE-001"),
+        (3, 34, "SV-DLY-002"),
+        (3, 48, "SV-COR-008"),
+        (3, 56, "SV-DEP-005"),
+        (5, 1, "SV-DEP-001"),
+        (6, 23, "SV-CON-007"),
+        (6, 61, "SV-CON-005"),
+    ] {
+        assert!(got.contains(&want), "{want:?} not in {got:?}");
+    }
+    assert_eq!(got.iter().filter(|g| g.2 == "SV-DEP-005").count(), 1, "{got:?}");
 }

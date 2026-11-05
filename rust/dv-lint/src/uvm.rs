@@ -9,67 +9,67 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule {
             id: "UVM-PHS-009",
             name: "ObjectionInNonRunPhase",
-            run: objection_in_non_run_phase,
+            check: crate::Check::Model(objection_in_non_run_phase),
         },
         Rule {
             id: "UVM-OBS-001",
             name: "ObserverStateMutationInWrite",
-            run: observer_state_mutation_in_write,
+            check: crate::Check::Model(observer_state_mutation_in_write),
         },
         Rule {
             id: "RAL-WIRE-001",
             name: "RalPredictorAdapterWiring",
-            run: ral_predictor_adapter_wiring,
+            check: crate::Check::Model(ral_predictor_adapter_wiring),
         },
         Rule {
             id: "UVM-CFG-002",
             name: "UvmConfigDbNullContext",
-            run: uvm_config_db_null_context,
+            check: crate::Check::Model(uvm_config_db_null_context),
         },
         Rule {
             id: "UVM-SEQ-003",
             name: "UvmPSequencerAbuse",
-            run: uvm_p_sequencer_abuse,
+            check: crate::Check::Model(uvm_p_sequencer_abuse),
         },
         Rule {
             id: "UVM-PHS-003",
             name: "UvmPhaseSignatureMismatch",
-            run: uvm_phase_signature_mismatch,
+            check: crate::Check::Model(uvm_phase_signature_mismatch),
         },
         Rule {
             id: "UVM-SEQ-001",
             name: "UvmSequenceDirectVifAccess",
-            run: uvm_sequence_direct_vif_access,
+            check: crate::Check::Model(uvm_sequence_direct_vif_access),
         },
         Rule {
             id: "UVM-SEQ-002",
             name: "UvmSequencePrePostBodyMisuse",
-            run: uvm_sequence_pre_post_body_misuse,
+            check: crate::Check::Model(uvm_sequence_pre_post_body_misuse),
         },
         Rule {
             id: "UVM-PHS-002",
             name: "UvmTimeInFunctionPhase",
-            run: uvm_time_in_function_phase,
+            check: crate::Check::Model(uvm_time_in_function_phase),
         },
         Rule {
             id: "UVM-TLM-001",
             name: "UvmUnconnectedTlmPort",
-            run: uvm_unconnected_tlm_port,
+            check: crate::Check::Model(uvm_unconnected_tlm_port),
         },
         Rule {
             id: "UVM-OBJ-001",
             name: "UvmUnpairedObjection",
-            run: uvm_unpaired_objection,
+            check: crate::Check::Model(uvm_unpaired_objection),
         },
         Rule {
             id: "UVM-VIF-DIR",
             name: "VirtualInterfaceModportDriveInversion",
-            run: virtual_interface_modport_drive_inversion,
+            check: crate::Check::Model(virtual_interface_modport_drive_inversion),
         },
         Rule {
             id: "UVM-VSEQ-001",
             name: "VirtualSequencerWiringChecker",
-            run: virtual_sequencer_wiring_checker,
+            check: crate::Check::Model(virtual_sequencer_wiring_checker),
         },
     ]
 }

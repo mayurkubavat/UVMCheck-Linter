@@ -1,5 +1,5 @@
-//! Runs the ported model rules over a design, built natively (default) or
-//! through slang (`--slang`), and prints findings as uvmcheck does:
+//! Runs the ported rules over a design, built natively (default) or through
+//! slang (`--slang`, model rules only), and prints findings as uvmcheck does:
 //!
 //!     dv-lint [--slang] [--time] [--rule ID]... [--list] <compile options>
 //!
@@ -19,19 +19,20 @@ fn main() {
             "--rule" => only.extend(it.next()),
             "--list" => {
                 for r in dv_lint::rules() {
-                    println!("{} {}", r.id, r.name);
+                    let kind = if r.is_syntax() { "syntax" } else { "model" };
+                    println!("{} {} {}", r.id, r.name, kind);
                 }
                 return;
             }
             _ => args.push(a),
         }
     }
-    let design = if slang {
-        load_slang(&args)
+    let loaded = if slang {
+        load_slang(&args).map(|d| (d, Vec::new()))
     } else {
-        sv_sema::load(&args).map_err(|e| e.to_string())
+        sv_sema::load_with_trees(&args).map_err(|e| e.to_string())
     };
-    let design = match design {
+    let (design, trees) = match loaded {
         Ok(d) => d,
         Err(e) => {
             eprintln!("error: {e}");
@@ -39,7 +40,7 @@ fn main() {
         }
     };
     let t = std::time::Instant::now();
-    let found = dv_lint::lint(&design, |id| {
+    let (files, found) = dv_lint::lint_all(&design, &trees, |id| {
         only.is_empty() || only.iter().any(|o| o == id)
     });
     if time {
@@ -54,7 +55,7 @@ fn main() {
         );
     }
     for f in &found {
-        let (file, line, column) = f.position(&design);
+        let (file, line, column) = f.position_in(&files);
         println!(
             "{}:{}:{}: [{}] {} ({}): {}",
             file,
@@ -68,7 +69,7 @@ fn main() {
         for (loc, note) in &f.related {
             println!(
                 "    note: {}:{}:{}: {}",
-                design.file_name(*loc),
+                files.get(loc.file as usize).map(String::as_str).unwrap_or(""),
                 loc.line,
                 loc.column,
                 note

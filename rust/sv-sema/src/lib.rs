@@ -25,6 +25,11 @@ use SyntaxKind::*;
 
 /// Loads and models a design from compile options, as `Design::load` does.
 pub fn load<S: AsRef<str>>(args: &[S]) -> Result<Design, Error> {
+    load_with_trees(args).map(|(d, _)| d)
+}
+
+/// [`load`], also giving back the parsed trees (for syntax-level tools).
+pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>), Error> {
     let mut opts = Options::default();
     let mut files = Vec::new();
     let mut it = args.iter().map(|a| a.as_ref());
@@ -78,7 +83,7 @@ pub fn load<S: AsRef<str>>(args: &[S]) -> Result<Design, Error> {
     let t1 = Instant::now();
     let design = build(&trees);
     let model_ms = t1.elapsed().as_secs_f64() * 1e3;
-    Ok(Design::from_parts(
+    let design = Design::from_parts(
         design.files().to_vec(),
         design.classes().to_vec(),
         errors,
@@ -88,7 +93,86 @@ pub fn load<S: AsRef<str>>(args: &[S]) -> Result<Design, Error> {
             model_ms,
             copy_ms: 0.0,
         },
-    ))
+    );
+    Ok((design, trees))
+}
+
+/// Turns token positions of parsed trees into [`Loc`]s, numbering files as
+/// they are first seen (index 0 is "no file", as in slang's model). A
+/// locator seeded with a design's files numbers them as that design does.
+pub struct Locator {
+    files: Vec<String>,
+    file_ids: HashMap<(usize, u32), u32>,
+    /// Byte offset of each line start, per (tree, preprocessor file).
+    line_starts: HashMap<(usize, u32), Vec<u32>>,
+}
+
+impl Default for Locator {
+    fn default() -> Self {
+        Locator::new(vec![String::new()])
+    }
+}
+
+impl Locator {
+    pub fn new(files: Vec<String>) -> Self {
+        Locator { files, file_ids: HashMap::new(), line_starts: HashMap::new() }
+    }
+
+    /// File names by index, the table [`Loc::file`] indexes.
+    pub fn files(&self) -> &[String] {
+        &self.files
+    }
+
+    pub fn into_files(self) -> Vec<String> {
+        self.files
+    }
+
+    /// Location of token `tok` of `tree` (index `tree_ix` among the trees
+    /// this locator sees). Code from a macro is placed where its text was
+    /// written, as slang's model does, and also remembers the expansion
+    /// site, where findings on it are reported.
+    pub fn loc(&mut self, tree_ix: usize, tree: &Tree, tok: u32) -> Loc {
+        let Some(token) = tree.tokens.get(tok as usize) else {
+            return Loc::default();
+        };
+        let (written, origin, from_macro) = (token.written, token.origin, token.from_macro);
+        let (file, line, column) = self.position(tree_ix, tree, written);
+        let expansion = from_macro.then(|| {
+            let (f, l, _) = self.position(tree_ix, tree, origin);
+            (f, l)
+        });
+        Loc { file, line, column, expansion }
+    }
+
+    /// Design file index, line and column of a preprocessor origin.
+    pub fn position(&mut self, tree_ix: usize, t: &Tree, o: sv_syntax::Origin) -> (u32, u32, u32) {
+        let key = (tree_ix, o.file);
+        let file = match self.file_ids.get(&key) {
+            Some(&f) => f,
+            None => {
+                let name = t.files[o.file as usize].to_string_lossy().into_owned();
+                let f = match self.files.iter().position(|n| *n == name) {
+                    Some(i) => i as u32,
+                    None => {
+                        self.files.push(name);
+                        (self.files.len() - 1) as u32
+                    }
+                };
+                self.file_ids.insert(key, f);
+                f
+            }
+        };
+        let src = &t.sources[o.file as usize];
+        let off = (o.offset as usize).min(src.len()) as u32;
+        let starts = self.line_starts.entry(key).or_insert_with(|| {
+            std::iter::once(0)
+                .chain(src.bytes().enumerate().filter(|&(_, b)| b == b'\n').map(|(i, _)| i as u32 + 1))
+                .collect()
+        });
+        // The last line start at or before the offset.
+        let line = starts.partition_point(|&s| s <= off);
+        (file, line as u32, off - starts[line - 1] + 1)
+    }
 }
 
 /// Models already parsed trees (one per compilation unit).
@@ -209,10 +293,7 @@ struct Builder<'t> {
     rep_env: HashMap<usize, Env>,
     /// Scope of each class and package node.
     node_scope: HashMap<NodeRef, usize>,
-    files: Vec<String>,
-    file_ids: HashMap<(usize, u32), u32>,
-    /// Byte offset of each line start, per (tree, preprocessor file).
-    line_starts: HashMap<(usize, u32), Vec<u32>>,
+    locator: Locator,
     /// `base_env` of each class with no bindings, as lookups ask it often.
     base_cache: std::cell::RefCell<HashMap<usize, Option<(usize, Env)>>>,
     chain_cache: std::cell::RefCell<HashMap<usize, Rc<Vec<usize>>>>,
@@ -246,10 +327,7 @@ impl<'t> Builder<'t> {
             interfaces: HashMap::new(),
             rep_env: HashMap::new(),
             node_scope: HashMap::new(),
-            // Index 0 is "no file", as in slang's model.
-            files: vec![String::new()],
-            file_ids: HashMap::new(),
-            line_starts: HashMap::new(),
+            locator: Locator::default(),
             base_cache: Default::default(),
             chain_cache: Default::default(),
             decl_cache: Default::default(),
@@ -350,50 +428,11 @@ impl<'t> Builder<'t> {
     }
 
     fn loc(&mut self, tree: usize, tok: u32) -> Loc {
-        let Some(token) = self.trees[tree].tokens.get(tok as usize) else {
-            return Loc::default();
-        };
-        // Code from a macro is placed where its text was written, as
-        // slang's model does, and also remembers the expansion site, where
-        // findings on it are reported.
-        let (written, origin, from_macro) = (token.written, token.origin, token.from_macro);
-        let (file, line, column) = self.position(tree, written);
-        let expansion = from_macro.then(|| {
-            let (f, l, _) = self.position(tree, origin);
-            (f, l)
-        });
-        Loc { file, line, column, expansion }
+        self.locator.loc(tree, &self.trees[tree], tok)
     }
 
-    /// Design file index, line and column of a preprocessor origin.
     fn position(&mut self, tree: usize, o: sv_syntax::Origin) -> (u32, u32, u32) {
-        let t = &self.trees[tree];
-        let key = (tree, o.file);
-        let file = match self.file_ids.get(&key) {
-            Some(&f) => f,
-            None => {
-                let name = t.files[o.file as usize].to_string_lossy().into_owned();
-                let f = match self.files.iter().position(|n| *n == name) {
-                    Some(i) => i as u32,
-                    None => {
-                        self.files.push(name);
-                        (self.files.len() - 1) as u32
-                    }
-                };
-                self.file_ids.insert(key, f);
-                f
-            }
-        };
-        let src = &t.sources[o.file as usize];
-        let off = (o.offset as usize).min(src.len()) as u32;
-        let starts = self.line_starts.entry(key).or_insert_with(|| {
-            std::iter::once(0)
-                .chain(src.bytes().enumerate().filter(|&(_, b)| b == b'\n').map(|(i, _)| i as u32 + 1))
-                .collect()
-        });
-        // The last line start at or before the offset.
-        let line = starts.partition_point(|&s| s <= off);
-        (file, line as u32, off - starts[line - 1] + 1)
+        self.locator.position(tree, &self.trees[tree], o)
     }
 
     fn new_scope(&mut self, kind: ScopeKind, name: &str, parent: Option<usize>) -> usize {
@@ -1395,7 +1434,7 @@ impl<'t> Builder<'t> {
                 out[id].uvm = classify(&chain);
             }
         }
-        let files = std::mem::take(&mut self.files);
+        let files = std::mem::take(&mut self.locator).into_files();
         Design::from_parts(files, out, 0, Timings::default())
     }
 
