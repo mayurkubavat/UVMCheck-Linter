@@ -1,0 +1,13 @@
+[package]
+name = "dv-build"
+description = "The native SystemVerilog builder: read file lists, parse and (as it grows) elaborate a design without Slang"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+dv-model = { path = "../dv-model", default-features = false }
+sv-source = { path = "../sv-source" }
+sv-syntax = { path = "../sv-syntax" }
+sv-sema = { path = "../sv-sema" }

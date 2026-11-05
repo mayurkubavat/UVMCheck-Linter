@@ -10,6 +10,7 @@ For every .sv file under ROOT/tests (an sv-tests checkout), skipping
     cmake --build build --target uvmcheck_cst_outline
     cargo build --release -p sv-syntax --example outline   # in rust/
     tools/cst_parity.py ~/sv-tests [chapter-8]
+    UVM_SRC=uvm-core/src tools/cst_parity.py ~/sv-tests   # the *-uvm tests need it
 
 With --exprs, compares the canonical operator expressions instead
 (uvmcheck_cst_exprs against the Rust outline example's --exprs).
@@ -47,6 +48,8 @@ def main():
         if m:
             args += ['+incdir+' + os.path.join(root, d) for d in m.group(1).split()]
         args += ['+incdir+' + os.path.dirname(f)]
+        if os.environ.get('UVM_SRC'):
+            args += ['+incdir+' + os.environ['UVM_SRC']]
         try:
             a = subprocess.run([slang] + args + [f], capture_output=True, text=True, timeout=20, errors='replace')
             b = subprocess.run([RUST, '--check', '--errors'] + rust_mode + args + [f], capture_output=True, text=True,

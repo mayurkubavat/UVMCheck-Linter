@@ -381,3 +381,21 @@ DataDeclaration); a header port list whose first port is a bare name or
 two `s$N` messages, sv-tests 1027/1028. The one left, `sanity.sv`, is a
 should-fail file where slang's error recovery keeps a `wire` declaration that
 sv-syntax skips with the bad item.
+
+## dv-build (builder phase N0)
+
+The native builder: `dv-build` reads compile options and VCS/Xcelium file
+lists (through sv-source), parses every source with the native front end and
+reports problems as a compiler would (`file:line:col: error: message`, then
+`errors N`; exit 1 on errors). `--dump` prints the declarations in source
+order. Each builder phase (scopes for every design unit, types, constants,
+elaboration, type checking) adds its checks here.
+
+`tools/ieee_gate.py SV_TESTS` runs every sv-tests file through dv-build and
+through uvmcheck (Slang) and reports per IEEE 1800 clause how many legal
+tests each accepts and how many `should_fail` tests each rejects; `--gaps`
+lists the ones only Slang rejects. Set `UVM_SRC` so UVM tests compile
+`uvm_pkg.sv` first, as the sv-tests runner does. Baseline 2026-11-05: legal
+949/949 native (Slang 948/949; the one is a clause 22 test), should_fail
+25/75 native against 73/75 Slang (4 more are runtime-only). The 48 gaps are
+semantic checks, closed by phases N1 to N5.

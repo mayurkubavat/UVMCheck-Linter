@@ -3,6 +3,16 @@
 version = 3
 
 [[package]]
+name = "dv-build"
+version = "0.1.0"
+dependencies = [
+ "dv-model",
+ "sv-sema",
+ "sv-source",
+ "sv-syntax",
+]
+
+[[package]]
 name = "dv-filelist"
 version = "0.1.0"
 dependencies = [
