@@ -424,3 +424,20 @@ virtual or interface class, and undefined randsequence productions. Each
 check only reports what it can see for sure. The IEEE gate after N1: legal
 949/949 (no false errors, also none on the repo's 783 files), should_fail
 40/75 native; 33 gaps left, all needing types or expressions (N2, N5).
+
+### Phase N2 slice 1: the type of every declaration
+
+`sv_sema::symbol_types` gives each net, variable, parameter, argument and
+typedef of the scopes its type as Slang prints it, using the class model's
+type engine (types.rs), which now also has scopes for modules, interfaces
+and programs (`Builder::designs`, header imports, `type` parameters in
+bodies). Parameters declared without a type take their value's; nets of a
+user net type take its data type. `dv-build --types` prints the dump with
+` : <type>`; `build/uvmcheck_sym_dump --types` is the reference and
+`tools/sym_gate.py ... --types` compares them: 943/949 legal sv-tests and
+779/783 repo files identical. The rest need `type(expr)`, constant
+functions or replications (N3), x/z enum values, and `weak_reference`.
+Not compared: members of parameterized classes (Slang prints a type
+parameter by name or value depending on which specialization it made
+first; N4 checks specializations), the global `s$N`/`e$N` counters, and six
+UVM typedefs whose printed arguments come from Slang's specialization cache.

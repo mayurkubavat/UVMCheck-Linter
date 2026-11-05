@@ -117,7 +117,11 @@ impl Default for Locator {
 
 impl Locator {
     pub fn new(files: Vec<String>) -> Self {
-        Locator { files, file_ids: HashMap::new(), line_starts: HashMap::new() }
+        Locator {
+            files,
+            file_ids: HashMap::new(),
+            line_starts: HashMap::new(),
+        }
     }
 
     /// File names by index, the table [`Loc::file`] indexes.
@@ -143,7 +147,12 @@ impl Locator {
             let (f, l, _) = self.position(tree_ix, tree, origin);
             (f, l)
         });
-        Loc { file, line, column, expansion }
+        Loc {
+            file,
+            line,
+            column,
+            expansion,
+        }
     }
 
     /// Design file index, line and column of a preprocessor origin.
@@ -168,13 +177,136 @@ impl Locator {
         let off = (o.offset as usize).min(src.len()) as u32;
         let starts = self.line_starts.entry(key).or_insert_with(|| {
             std::iter::once(0)
-                .chain(src.bytes().enumerate().filter(|&(_, b)| b == b'\n').map(|(i, _)| i as u32 + 1))
+                .chain(
+                    src.bytes()
+                        .enumerate()
+                        .filter(|&(_, b)| b == b'\n')
+                        .map(|(i, _)| i as u32 + 1),
+                )
                 .collect()
         });
         // The last line start at or before the offset.
         let line = starts.partition_point(|&s| s <= off);
         (file, line as u32, off - starts[line - 1] + 1)
     }
+}
+
+/// The type of each value and typedef of the scopes (`None` for other
+/// symbols), as slang prints it: builder phase N2.
+pub fn symbol_types(trees: &[Tree], s: &scopes::Scopes) -> Vec<Option<String>> {
+    use scopes::SymKind as K;
+    let mut b = Builder::new(trees);
+    b.designs = true;
+    b.collect_names();
+    b.collect();
+    let empty: Env = Rc::new(HashMap::new());
+    // The builder scope of each scope: subroutines read their parent's.
+    let mut map = vec![b.unit; s.scopes.len()];
+    for (i, sc) in s.scopes.iter().enumerate() {
+        let parent = sc.parent.map_or(b.unit, |p| map[p]);
+        map[i] = match sc.symbol {
+            Some(y) => {
+                let y = &s.symbols[y];
+                b.node_scope
+                    .get(&NodeRef {
+                        tree: y.tree,
+                        node: y.node,
+                    })
+                    .copied()
+                    .unwrap_or(parent)
+            }
+            None => b.unit,
+        };
+    }
+    let mut nettypes: HashMap<String, NodeRef> = HashMap::new();
+    for (ti, t) in trees.iter().enumerate() {
+        for n in t.preorder() {
+            if t.kind(n) == SyntaxKind::NetTypeDecl {
+                if let Some(nm) = t.child(n, SyntaxKind::Name) {
+                    nettypes.insert(t.bare_text(nm), NodeRef { tree: ti, node: n });
+                }
+            }
+        }
+    }
+    // A class's members are typed in its default specialization: each
+    // type parameter bound to its default.
+    let mut envs: HashMap<usize, Env> = HashMap::new();
+    for c in &b.classes {
+        let mut m = HashMap::new();
+        for (name, is_type, default) in &c.params {
+            if let (true, Some(d)) = (is_type, default) {
+                m.insert(
+                    name.clone(),
+                    Bound {
+                        node: *d,
+                        scope: c.parent,
+                        env: empty.clone(),
+                    },
+                );
+            }
+        }
+        envs.insert(c.scope, Rc::new(m));
+    }
+    s.symbols
+        .iter()
+        .map(|y| {
+            if !matches!(
+                y.kind,
+                K::Net | K::Variable | K::Parameter | K::Argument | K::Typedef
+            ) {
+                return None;
+            }
+            let scope = map[y.scope];
+            // Not inside a parameterized class (see tools/sym_dump.cpp).
+            let mut cur = Some(scope);
+            while let Some(c) = cur {
+                if let ScopeKind::Class(k) = b.scopes[c].kind {
+                    if b.classes[k].generic {
+                        return None;
+                    }
+                }
+                cur = b.scopes[c].parent;
+            }
+            let env = envs.get(&scope).cloned().unwrap_or_else(|| empty.clone());
+            let r = |n: NodeId| NodeRef {
+                tree: y.tree,
+                node: n,
+            };
+            if y.kind == K::Typedef {
+                return y.item.map(|t| b.typedef_target(r(t), scope, &env));
+            }
+            let t = &trees[y.tree];
+            if y.kind == K::Variable && t.kind(y.node) == SyntaxKind::CovergroupDecl {
+                return Some("<unnamed covergroup>".into());
+            }
+            // A net of a user net type has that type's data type.
+            if let Some(dt) = y.dtype {
+                if let Some(&nt) = nettypes.get(t.bare_text(dt).as_str()) {
+                    let ndt = b.child(nt, SyntaxKind::DataType);
+                    return Some(b.type_string(ndt, None, scope, &env, true));
+                }
+            }
+            if y.kind == K::Parameter {
+                let value = y.item.and_then(|d| {
+                    t.children(d)
+                        .find(|&c| !matches!(t.kind(c), SyntaxKind::Name | SyntaxKind::Dim))
+                });
+                if value.is_none()
+                    && y.dtype.is_none()
+                    && matches!(b.scopes[scope].kind, ScopeKind::Class(_))
+                {
+                    // A class parameter with no default: slang's invalid specialization.
+                    return Some("<error>".into());
+                }
+                if y.dtype.is_none() {
+                    if let Some(v) = value {
+                        return Some(b.value_type(r(v), scope, &env));
+                    }
+                }
+            }
+            Some(b.type_string(y.dtype.map(r), y.item.map(r), scope, &env, false))
+        })
+        .collect()
 }
 
 /// Models already parsed trees (one per compilation unit).
@@ -198,6 +330,8 @@ enum ScopeKind {
     Unit,
     Package,
     Class(usize),
+    /// A module, interface or program (only with `Builder::designs`).
+    Design,
 }
 
 struct Scope {
@@ -301,6 +435,9 @@ struct Builder<'t> {
     chain_cache: std::cell::RefCell<HashMap<usize, Rc<Vec<usize>>>>,
     /// Per class, see [`Builder::method_decls`].
     decl_cache: std::cell::RefCell<HashMap<usize, MethodDecls<'t>>>,
+    /// Also make scopes for modules, interfaces and programs (the builder's
+    /// typing, phase N2); the class model leaves them out.
+    designs: bool,
 }
 
 impl<'t> Builder<'t> {
@@ -333,6 +470,7 @@ impl<'t> Builder<'t> {
             base_cache: Default::default(),
             chain_cache: Default::default(),
             decl_cache: Default::default(),
+            designs: false,
         }
     }
 
@@ -485,12 +623,35 @@ impl<'t> Builder<'t> {
                     self.collect_scope(c, s);
                 }
                 ClassDecl => self.collect_class(c, scope),
+                ModuleDecl | InterfaceDecl | ProgramDecl if self.designs => {
+                    let Some((name, _)) = self.name_of(c) else {
+                        continue;
+                    };
+                    let s = self.new_scope(ScopeKind::Design, &name, Some(scope));
+                    self.node_scope.insert(c, s);
+                    if let Some(h) = self.child(c, Header) {
+                        // `module m import p::*; #(...)`
+                        for i in self.children(h) {
+                            if self.kind(i) == ImportDecl {
+                                self.collect_import(i, s);
+                            }
+                        }
+                    }
+                    if let Some(pl) = self.child(c, Header).and_then(|h| self.child(h, ParamList)) {
+                        self.collect_design_params(pl, s);
+                    }
+                    self.collect_scope(c, s);
+                }
+                GenerateRegion if self.designs => self.collect_scope(c, scope),
                 TypedefDecl => {
                     if let Some((name, _)) = self.name_of(c) {
                         self.scopes[scope].typedefs.insert(name, c);
                     }
                 }
                 ImportDecl => self.collect_import(c, scope),
+                ParamDecl if self.designs && self.own_tokens(c).contains(&"type") => {
+                    self.collect_type_params(c, scope)
+                }
                 ParamDecl => self.collect_consts(c, scope),
                 FunctionDecl | TaskDecl => {
                     // `function T C::f(...)`: an out-of-block body.
@@ -530,6 +691,56 @@ impl<'t> Builder<'t> {
                     }
                 }
                 _ => {}
+            }
+        }
+    }
+
+    /// `#(parameter type T = int, U = bit, int N = 1)` of a design unit.
+    fn collect_design_params(&mut self, pl: NodeRef, s: usize) {
+        let mut ty = false;
+        for p in self.children(pl) {
+            if self.kind(p) != ParamDecl {
+                continue;
+            }
+            let own = self.own_tokens(p);
+            if own.contains(&"type") {
+                ty = true;
+            } else if own.iter().any(|t| matches!(*t, "parameter" | "localparam"))
+                || self.child(p, DataType).is_some()
+            {
+                ty = false;
+            }
+            if !ty {
+                self.collect_consts(p, s);
+                continue;
+            }
+            self.collect_type_params(p, s);
+        }
+    }
+
+    /// The names of a `type` parameter declaration, with their defaults.
+    fn collect_type_params(&mut self, p: NodeRef, s: usize) {
+        {
+            if let Some(n) = self.child(p, Name) {
+                if let Some((name, _)) = self
+                    .tokens(n)
+                    .last()
+                    .map(|&t| (self.text(n.tree, t).to_string(), t))
+                {
+                    let d = self.child(p, DataType);
+                    self.scopes[s].type_params.insert(name, d);
+                }
+            }
+            for d in self.children(p) {
+                if self.kind(d) == Declarator {
+                    if let Some((name, _)) = self.name_of(d) {
+                        let v = self
+                            .children(d)
+                            .into_iter()
+                            .find(|c| !matches!(self.kind(*c), Name | Dim));
+                        self.scopes[s].type_params.insert(name, v);
+                    }
+                }
             }
         }
     }
@@ -1322,15 +1533,13 @@ impl<'t> Builder<'t> {
             match self.lookup(path[0], scope, depth)? {
                 Found::Class(c) => self.classes[c].scope,
                 // `typedef C #(T) t;` then `t::x`.
-                Found::Typedef(t, s) => {
-                    match self
-                        .resolve_typedef(t, s, &Env::default(), depth + 1)
-                        .resolved
-                    {
-                        Resolved::Class(c) => self.classes[c].scope,
-                        _ => return None,
-                    }
-                }
+                Found::Typedef(t, s) => match self
+                    .resolve_typedef(t, s, &Env::default(), depth + 1)
+                    .resolved
+                {
+                    Resolved::Class(c) => self.classes[c].scope,
+                    _ => return None,
+                },
                 _ => return None,
             }
         };
@@ -1451,7 +1660,9 @@ impl<'t> Builder<'t> {
         let (_, name_tok) = self.name_of(r).unwrap_or_default();
         let loc = self.loc(r.tree, name_tok);
         let scope = match self.scopes[parent].kind {
-            ScopeKind::Package | ScopeKind::Class(_) => self.scopes[parent].name.clone(),
+            ScopeKind::Package | ScopeKind::Class(_) | ScopeKind::Design => {
+                self.scopes[parent].name.clone()
+            }
             ScopeKind::Unit => String::new(),
         };
         let own = self.own_tokens(r);
@@ -1566,7 +1777,11 @@ impl<'t> Builder<'t> {
         if a.from_macro || b.from_macro || a.origin.file != b.origin.file {
             return Vec::new();
         }
-        let (file, start, end) = (a.origin.file, a.origin.offset, b.origin.offset + b.text.len() as u32);
+        let (file, start, end) = (
+            a.origin.file,
+            a.origin.offset,
+            b.origin.offset + b.text.len() as u32,
+        );
         let uses: Vec<_> = t
             .macro_uses
             .iter()
@@ -1576,7 +1791,15 @@ impl<'t> Builder<'t> {
         uses.into_iter()
             .map(|u| {
                 let (f, line, column) = self.position(r.tree, u.origin);
-                MacroUse { name: u.name.to_string(), loc: Loc { file: f, line, column, expansion: None } }
+                MacroUse {
+                    name: u.name.to_string(),
+                    loc: Loc {
+                        file: f,
+                        line,
+                        column,
+                        expansion: None,
+                    },
+                }
             })
             .collect()
     }
@@ -1749,7 +1972,9 @@ impl<'t> Builder<'t> {
             if !matches!(self.kind(m), FunctionDecl | TaskDecl | MethodPrototype) {
                 continue;
             }
-            let Some((n, _)) = self.name_str(m) else { continue };
+            let Some((n, _)) = self.name_str(m) else {
+                continue;
+            };
             let v = self.own_tokens(m).contains(&"virtual");
             let e = map.entry(n).or_insert((v, false));
             e.1 |= v;

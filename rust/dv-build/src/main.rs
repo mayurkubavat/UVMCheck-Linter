@@ -5,14 +5,15 @@
 //! builds a scope for every design unit and checks the names declared in
 //! them; types, constants, elaboration and type checking follow.
 //!
-//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--quiet] <options, e.g. -f top.f FILE...>
+//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--quiet] <options, e.g. -f top.f FILE...>
 //!
 //! Diagnostics go to stdout as `file:line:col: error: message`, then a
 //! summary line `errors N`. --dump also prints the design: one line per
 //! declaration in source order (`module top`, `  class pkt`), the form the
 //! Slang twin prints for the gate (tools/ieee_gate.py). --symbols prints
 //! the scopes (phase N1): one sorted `<scope path> <kind> <name>` line per
-//! declared symbol, the form of tools/sym_dump.cpp (tools/sym_gate.py).
+//! declared symbol, the form of tools/sym_dump.cpp (tools/sym_gate.py);
+//! --types adds ` : <type>` to values and typedefs (phase N2).
 //! Exit status: 0 no errors, 1 errors, 2 bad usage or unreadable input.
 
 use std::process::ExitCode;
@@ -30,7 +31,7 @@ struct Diag {
 
 fn main() -> ExitCode {
     let mut dialect = Dialect::Any;
-    let (mut dump, mut quiet, mut symbols) = (false, false, false);
+    let (mut dump, mut quiet, mut symbols, mut types) = (false, false, false, false);
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -38,6 +39,10 @@ fn main() -> ExitCode {
             "--dump" => dump = true,
             "--quiet" => quiet = true,
             "--symbols" => symbols = true,
+            "--types" => {
+                symbols = true;
+                types = true;
+            }
             "--dialect" => {
                 dialect = match it.next().as_deref() {
                     Some("vcs") => Dialect::Vcs,
@@ -51,7 +56,7 @@ fn main() -> ExitCode {
             }
             "-h" | "--help" => {
                 println!(
-                    "usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--quiet] <options> FILE..."
+                    "usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--quiet] <options> FILE..."
                 );
                 return ExitCode::SUCCESS;
             }
@@ -124,7 +129,8 @@ fn main() -> ExitCode {
         }
     }
     if symbols {
-        for l in scopes.dump() {
+        let tys = types.then(|| sv_sema::symbol_types(&trees, &scopes));
+        for l in scopes.dump_with(tys.as_deref()) {
             println!("{l}");
         }
     }

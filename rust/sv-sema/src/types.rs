@@ -113,13 +113,16 @@ impl<'t> Builder<'t> {
         let mut parts = Vec::new();
         let mut cur = Some(s);
         while let Some(c) = cur {
-            if self.scopes[c].kind != ScopeKind::Unit {
-                parts.push(self.scopes[c].name.clone());
+            match self.scopes[c].kind {
+                ScopeKind::Unit => {}
+                // slang names a design unit's members hierarchically: `m.t`.
+                ScopeKind::Design => parts.push(format!("{}.", self.scopes[c].name)),
+                _ => parts.push(format!("{}::", self.scopes[c].name)),
             }
             cur = self.scopes[c].parent;
         }
         parts.reverse();
-        parts.iter().map(|p| format!("{p}::")).collect()
+        parts.concat()
     }
 
     // ---- constants ----------------------------------------------------------
@@ -317,7 +320,21 @@ impl<'t> Builder<'t> {
                 Some((a, b)) => {
                     let mut cur = v;
                     let n = (a - b).abs() + 1;
+                    // `C[2]` names C0, C1; `C[3:5]` names C3, C4, C5.
+                    let two = self.child(d, Dim).is_some_and(|dim| {
+                        self.children(dim)
+                            .into_iter()
+                            .filter(|c| body_is_expr(self.kind(*c)))
+                            .count()
+                            == 2
+                    });
+                    let (start, step) = if two {
+                        (a, if b >= a { 1 } else { -1 })
+                    } else {
+                        (0, 1)
+                    };
                     for k in 0..n {
+                        let k = start + k * step;
                         out.push((format!("{name}{k}"), cur));
                         cur = CVal {
                             v: cur.v + 1,
@@ -753,7 +770,7 @@ impl<'t> Builder<'t> {
 
     /// The environment typedefs of class scope `s` are read in: the one
     /// given if it is that class's, else its representative.
-    fn scope_env(&self, s: usize, env: &Env) -> Env {
+    pub(crate) fn scope_env(&self, s: usize, env: &Env) -> Env {
         match self.scopes[s].kind {
             ScopeKind::Class(c) => {
                 if env.is_empty() {
@@ -784,22 +801,39 @@ impl<'t> Builder<'t> {
                         // `C#(T)` inside C itself names the specialization
                         // being printed: its T stands for what T is bound to.
                         let mut b = b.clone();
-                        if b.scope == def.scope {
-                            let toks = self.toks_of(b.node);
-                            if let [n] = toks.as_slice() {
-                                if let Some(next) = b.env.get(*n).cloned() {
-                                    b = next;
-                                }
+                        let toks = self.toks_of(b.node);
+                        if let [n] = toks.as_slice() {
+                            if *default == Some(b.node) && def.params.iter().any(|p| p.0 == *n) {
+                                // A default naming an earlier parameter
+                                // (`RSP = REQ`) prints as that parameter.
+                                s.push_str(&format!("{}{n}", self.scope_path(def.scope)));
+                                continue;
+                            }
+                            if let Some(next) = b.env.get(*n).cloned() {
+                                b = next;
                             }
                         }
                         self.ts(b.node, b.scope, &b.env, false, depth + 1)
                     }
-                    None => default.map_or(String::new(), |d| {
-                        self.ts(d, def.scope, env, false, depth + 1)
+                    None => default.map_or(String::new(), |d| match self.toks_of(d).as_slice() {
+                        // `RSP = REQ` prints as that parameter.
+                        [n] if def.params.iter().any(|p| p.0 == *n) => {
+                            format!("{}{n}", self.scope_path(def.scope))
+                        }
+                        _ => self.ts(d, def.scope, env, false, depth + 1),
                     }),
                 };
                 s.push_str(&printed);
             } else {
+                // A string argument prints as written.
+                if let Some(b) = env.get(name) {
+                    if let [lit] = self.toks_of(b.node).as_slice() {
+                        if lit.starts_with('"') {
+                            s.push_str(lit);
+                            continue;
+                        }
+                    }
+                }
                 let v = self.const_named(name, def.scope, env, depth + 1);
                 match v {
                     Some(v) => s.push_str(&v.show()),
@@ -813,6 +847,56 @@ impl<'t> Builder<'t> {
         }
         s.push(')');
         s
+    }
+
+    /// The type of a parameter declared without one: its value's.
+    pub(crate) fn value_type(&self, v: NodeRef, scope: usize, env: &Env) -> String {
+        let toks = self.toks_of(v);
+        if let [lit] = toks.as_slice() {
+            if lit.starts_with('"') {
+                let n = lit.len().saturating_sub(2).max(1) * 8;
+                return format!("logic[{}:0]", n - 1);
+            }
+            if lit.contains('.')
+                || (lit.contains(['e', 'E']) && !lit.contains('\'') && lit.parse::<f64>().is_ok())
+            {
+                return "real".into();
+            }
+        }
+        match self.eval(v, scope, env, 0) {
+            Some(c) => {
+                let sign = if c.s { " signed" } else { "" };
+                format!("logic{sign}[{}:0]", c.w.max(1) - 1)
+            }
+            None => "logic".into(),
+        }
+    }
+
+    /// The type a typedef names, as slang prints its target: an enum or
+    /// struct carries the typedef's name, anything else is printed as written.
+    pub(crate) fn typedef_target(&self, t: NodeRef, s: usize, env: &Env) -> String {
+        let name = self.name_of(t).map(|n| n.0).unwrap_or_default();
+        let alias = format!("{}{name}", self.scope_path(s));
+        let dims: Vec<NodeRef> = self
+            .children(t)
+            .into_iter()
+            .filter(|c| self.kind(*c) == Dim)
+            .collect();
+        let Some(i) = self.child(t, DataType) else {
+            return "logic".into();
+        };
+        let base = match self.own_tokens(i).first().copied() {
+            Some("enum") if dims.is_empty() => self.enum_string(i, s, env, Some(&alias)),
+            Some("struct" | "union") if dims.is_empty() => {
+                self.struct_string(i, s, env, Some(&alias))
+            }
+            _ => self.ts(i, s, env, false, 0),
+        };
+        if dims.is_empty() {
+            base
+        } else {
+            format!("{base}${}", self.unpacked(&dims, s, env))
+        }
     }
 
     fn enum_string(&self, dt: NodeRef, scope: usize, env: &Env, alias: Option<&str>) -> String {
@@ -834,6 +918,12 @@ impl<'t> Builder<'t> {
         let mut s = kind.to_string();
         if own.contains(&"packed") {
             s.push_str(" packed");
+        }
+        if own.contains(&"tagged") {
+            s.push_str(" tagged");
+        }
+        if own.contains(&"signed") {
+            s.push_str(" signed");
         }
         s.push('{');
         for m in self.children(dt) {

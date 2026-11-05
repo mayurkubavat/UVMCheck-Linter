@@ -5,14 +5,15 @@ For every legal sv-tests file (or each file given with --files), runs
 `dv-build --symbols` and build/uvmcheck_sym_dump on the same options and
 compares the sorted `<scope path> <kind> <name>` lines. Prints per clause
 how many files match, then the most common differing lines (--show=N
-prints the first N differing files in full).
+prints the first N differing files in full). --types also compares each
+value's and typedef's type (builder phase N2).
 
     cmake --build build --target uvmcheck_sym_dump && cargo build --release -p dv-build   # in rust/
-    UVM_SRC=uvm-core/src tools/sym_gate.py ~/sv-tests [--show=N] [chapter-8]
+    UVM_SRC=uvm-core/src tools/sym_gate.py ~/sv-tests [--types] [--show=N] [chapter-8]
     tools/sym_gate.py --repo UVM_SRC [--show=N]      # each repo test and example alone
     tools/sym_gate.py --files [options] FILE...      # one design
 """
-import collections, concurrent.futures, os, subprocess, sys
+import collections, concurrent.futures, os, re, subprocess, sys
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from ieee_gate import DVBUILD, REPO, args_for, header  # noqa: E402
@@ -20,14 +21,40 @@ from ieee_gate import DVBUILD, REPO, args_for, header  # noqa: E402
 SYMDUMP = os.environ.get('SYM_DUMP', os.path.join(REPO, 'build', 'uvmcheck_sym_dump'))
 
 
+# Slang numbers anonymous enums, structs and unions (`e$3`, `s$7`) with
+# counters that span the whole compilation; only the kind is compared.
+ANON = re.compile(r'([eus])\$\d+')
+
+
+# Slang reuses the first specialization made with the same parameter values
+# and prints that one's arguments (`uvm_driver#(uvm_sequence_item,
+# uvm_pkg::uvm_driver::REQ)` for one written with two explicit arguments).
+# These typedefs' types are not compared.
+CACHED_SPECIALIZATIONS = {
+    'uvm_pkg typedef ' + n for n in (
+        'uvm_default_driver_type', 'uvm_default_sequence_type', 'uvm_default_sequencer_param_type',
+        'uvm_default_sequencer_type', 'uvm_id_file_array', 'uvm_id_verbosities_array')
+}
+
+
+def normalize(l):
+    l = ANON.sub(r'\1$', l)
+    head = l.split(' : ', 1)[0]
+    return head if head in CACHED_SPECIALIZATIONS else l
+
+
 def dump(cmd):
     r = subprocess.run(cmd, capture_output=True, text=True, errors='replace', timeout=300)
-    return sorted(l for l in r.stdout.splitlines() if l and not l.startswith('errors '))
+    return sorted(normalize(l) for l in r.stdout.splitlines() if l and not l.startswith('errors '))
+
+
+TYPES = '--types' in sys.argv
 
 
 def compare(args):
-    native = dump([DVBUILD, '--quiet', '--symbols', *args])
-    slang = dump([SYMDUMP, *args])
+    flag = ['--types'] if TYPES else []
+    native = dump([DVBUILD, '--quiet', '--symbols', *flag, *args])
+    slang = dump([SYMDUMP, *flag, *args])
     n, s = collections.Counter(native), collections.Counter(slang)
     return sorted((n - s).elements()), sorted((s - n).elements())
 

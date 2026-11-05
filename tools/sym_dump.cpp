@@ -11,7 +11,7 @@
 // statement blocks and compiler-made symbols are left out: elaboration
 // (phase N4) checks those. Lines come out sorted.
 //
-//   uvmcheck_sym_dump [slang options: +incdir+DIR +define+X -f FILE ...] FILE...
+//   uvmcheck_sym_dump [--types] [slang options: +incdir+DIR +define+X -f FILE ...] FILE...
 #include <algorithm>
 #include <cstdio>
 #include <string>
@@ -36,8 +36,20 @@ namespace {
 
 std::vector<std::string> lines;
 
+bool withTypes = false;
+// Inside a parameterized class, types are left out: slang prints a type
+// parameter by name or by value depending on which specialization it made
+// first. The builder checks those types on specializations (phase N4).
+int inGeneric = 0;
+
 void put(const std::string& path, const char* kind, std::string_view name) {
     lines.push_back(path + " " + kind + " " + std::string(name));
+}
+
+// With --types, a value or typedef line ends in ` : <type>`.
+void typed(const std::string& path, const char* kind, const Symbol& m, const Type& t) {
+    put(path, kind, m.name);
+    if (withTypes && !inGeneric) lines.back() += " : " + t.toString();
 }
 
 void scope(const std::string& path, const Scope& s);
@@ -54,13 +66,17 @@ void klass(const std::string& path, const Symbol& sym) {
         // With a parameter that has no default, the members that don't depend on one.
         auto t = g->getDefaultSpecialization(*sym.getParentScope());
         if (!t) t = &g->getInvalidSpecialization();
-        if (t->isClass()) scope(join(path, sym.name), t->getCanonicalType().as<ClassType>());
+        if (t->isClass()) {
+            ++inGeneric;
+            scope(join(path, sym.name), t->getCanonicalType().as<ClassType>());
+            --inGeneric;
+        }
     }
 }
 
 void member(const std::string& path, const Symbol& m) {
     switch (m.kind) {
-        case SymbolKind::Parameter: put(path, "parameter", m.name); break;
+        case SymbolKind::Parameter: typed(path, "parameter", m, m.as<ParameterSymbol>().getType()); break;
         case SymbolKind::TypeParameter: put(path, "type_parameter", m.name); break;
         case SymbolKind::Port:
         case SymbolKind::MultiPort:
@@ -68,16 +84,16 @@ void member(const std::string& path, const Symbol& m) {
             if (!m.name.empty()) put(path, "port", m.name);
             break;
         case SymbolKind::Net:
-            if (!m.as<NetSymbol>().isImplicit) put(path, "net", m.name);
+            if (!m.as<NetSymbol>().isImplicit) typed(path, "net", m, m.as<NetSymbol>().getType());
             break;
         case SymbolKind::Variable:
         case SymbolKind::ClassProperty: {
             auto& v = m.as<VariableSymbol>();
-            if (!v.flags.has(VariableFlags::CompilerGenerated)) put(path, "variable", m.name);
+            if (!v.flags.has(VariableFlags::CompilerGenerated)) typed(path, "variable", m, v.getType());
             break;
         }
         case SymbolKind::TypeAlias: {
-            put(path, "typedef", m.name);
+            typed(path, "typedef", m, m.as<TypeAliasType>().targetType.getType());
             break;
         }
         case SymbolKind::TransparentMember: {
@@ -100,7 +116,7 @@ void member(const std::string& path, const Symbol& m) {
             put(path, s.subroutineKind == SubroutineKind::Task ? "task" : "function", m.name);
             break;
         }
-        case SymbolKind::FormalArgument: put(path, "argument", m.name); break;
+        case SymbolKind::FormalArgument: typed(path, "argument", m, m.as<FormalArgumentSymbol>().getType()); break;
         case SymbolKind::ClassType:
         case SymbolKind::GenericClassDef: klass(path, m); break;
         case SymbolKind::ConstraintBlock: put(path, "constraint", m.name); break;
@@ -136,6 +152,14 @@ void scope(const std::string& path, const Scope& s) {
 } // namespace
 
 int main(int argc, char** argv) {
+    // --types: also print each value's and typedef's type (phase N2).
+    std::vector<char*> args;
+    for (int i = 0; i < argc; ++i) {
+        if (std::string(argv[i]) == "--types") withTypes = true;
+        else args.push_back(argv[i]);
+    }
+    argc = int(args.size());
+    argv = args.data();
     driver::Driver drv;
     drv.addStandardArgs();
     if (!drv.parseCommandLine(argc, argv) || !drv.processOptions() || !drv.parseAllSources()) return 2;

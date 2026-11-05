@@ -92,3 +92,30 @@ fn name_checks() {
         ["unknown production 'secnd'"]
     );
 }
+
+fn types(src: &str) -> Vec<String> {
+    let t = trees(src);
+    let s = scopes::build(&t);
+    let ty = sv_sema::symbol_types(&t, &s);
+    s.dump_with(Some(&ty)).into_iter().filter(|l| l.contains(" : ")).collect()
+}
+
+#[test]
+fn types_as_slang_prints_them() {
+    let d = types(
+        "package q; typedef int t; endpackage\nmodule m import q::*; #(parameter W = 8, type T = bit) (input [3:0] a, output int b);\n typedef enum {A, B} e_t;\n localparam S = \"ab\";\n t x; e_t e; T y; nettype logic [7:0] n_t; n_t n;\nendmodule\n",
+    );
+    for l in [
+        "m parameter W : logic signed[31:0]",
+        "m net a : logic[3:0]",
+        "m variable b : int",
+        "m typedef e_t : enum{A=32'sd0,B=32'sd1}m.e_t",
+        "m parameter S : logic[15:0]",
+        "m variable x : q::t",
+        "m variable e : m.e_t",
+        "m variable y : m.T",
+        "m net n : logic[7:0]",
+    ] {
+        assert!(d.contains(&l.to_string()), "{l} in {d:?}");
+    }
+}

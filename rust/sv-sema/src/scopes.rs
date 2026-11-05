@@ -87,6 +87,11 @@ pub struct Symbol {
     /// declaration itself when the name is a bare token).
     pub tree: usize,
     pub node: NodeId,
+    /// For values and typedefs: the data type written (none when implicit)
+    /// and the node holding the unpacked dimensions (the Declarator, or
+    /// the TypedefDecl).
+    pub dtype: Option<NodeId>,
+    pub item: Option<NodeId>,
 }
 
 /// A scope: the design root, `$unit`, a design unit, class or subroutine.
@@ -112,10 +117,23 @@ pub const UNIT: usize = 1;
 impl Scopes {
     /// The Slang-reference form: one sorted `<path> <kind> <name>` line per symbol.
     pub fn dump(&self) -> Vec<String> {
+        self.dump_with(None)
+    }
+
+    /// The dump with ` : <type>` after each symbol that has one (phase N2).
+    pub fn dump_with(&self, types: Option<&[Option<String>]>) -> Vec<String> {
         let mut v: Vec<String> = self
             .symbols
             .iter()
-            .map(|s| format!("{} {} {}", self.scopes[s.scope].path, s.kind.as_str(), s.name))
+            .enumerate()
+            .map(|(i, s)| {
+                let mut l = format!("{} {} {}", self.scopes[s.scope].path, s.kind.as_str(), s.name);
+                if let Some(Some(t)) = types.map(|t| &t[i]) {
+                    l.push_str(" : ");
+                    l.push_str(t);
+                }
+                l
+            })
             .collect();
         v.sort();
         v
@@ -248,8 +266,14 @@ impl Walker<'_, '_> {
         if name.starts_with('\\') {
             name.remove(0);
         }
-        self.out.symbols.push(Symbol { scope, kind, name, tree: self.ix, node });
+        self.out.symbols.push(Symbol { scope, kind, name, tree: self.ix, node, dtype: None, item: None });
         self.out.symbols.len() - 1
+    }
+
+    fn add_typed(&mut self, scope: usize, kind: SymKind, name: String, dtype: Option<NodeId>, item: NodeId) {
+        let i = self.add(scope, kind, name, item);
+        self.out.symbols[i].dtype = dtype;
+        self.out.symbols[i].item = Some(item);
     }
 
     fn open(&mut self, parent: usize, kind: SymKind, name: String, node: NodeId) -> usize {
@@ -327,7 +351,9 @@ impl Walker<'_, '_> {
                 self.enum_values(scope, n);
                 let name = name_of(t, n);
                 if !name.is_empty() {
-                    self.add(scope, SymKind::Typedef, name, n);
+                    let i = self.add(scope, SymKind::Typedef, name, n);
+                    self.out.symbols[i].dtype = t.child(n, DataType);
+                    self.out.symbols[i].item = Some(n);
                 }
             }
             DataDecl => self.data_decl(scope, n, ctx),
@@ -401,6 +427,8 @@ impl Walker<'_, '_> {
                                 name: t.bare_text(nm),
                                 tree: self.ix,
                                 node: nm,
+                                dtype: None,
+                                item: None,
                             })
                             .collect();
                         self.binds.push((t.bare_text(target), inst));
@@ -459,7 +487,7 @@ impl Walker<'_, '_> {
                 for d in t.children(c).filter(|&d| t.kind(d) == Declarator) {
                     let name = name_of(t, d);
                     if !declared.contains(&name) {
-                        self.add(s, kind, name, d);
+                        self.add_typed(s, kind, name, t.child(c, DataType), d);
                     }
                 }
                 continue;
@@ -515,6 +543,7 @@ impl Walker<'_, '_> {
         // Direction and kind carried from the previous port.
         let mut dir = "inout";
         let mut kind = SymKind::Net;
+        let mut cur_dt = None;
         for p in t.children(pl).filter(|&c| t.kind(c) == Port) {
             let tk = toks(t, p);
             let dt = t.child(p, DataType);
@@ -538,6 +567,7 @@ impl Walker<'_, '_> {
             let net_kw = tk.iter().any(|x| NET_TYPES.contains(x));
             let var_kw = tk.contains(&"var");
             if new_dir.is_some() || dt.is_some() || net_kw || var_kw {
+                cur_dt = dt;
                 if let Some(d) = new_dir {
                     dir = d;
                 }
@@ -549,7 +579,7 @@ impl Walker<'_, '_> {
                     SymKind::Net
                 };
             }
-            self.add(s, kind, name, d);
+            self.add_typed(s, kind, name, cur_dt, d);
         }
     }
 
@@ -580,6 +610,9 @@ impl Walker<'_, '_> {
                 Name => {
                     self.add(s, kind, t.bare_text(c), c);
                 }
+                Declarator if !ty => {
+                    self.add_typed(s, kind, name_of(t, c), t.child(n, DataType), c);
+                }
                 Declarator => {
                     self.add(s, kind, name_of(t, c), c);
                 }
@@ -605,7 +638,7 @@ impl Walker<'_, '_> {
         for d in t.children(n).filter(|&c| t.kind(c) == Declarator) {
             let name = name_of(t, d);
             if !name.is_empty() {
-                self.add(s, kind, name, d);
+                self.add_typed(s, kind, name, t.child(n, DataType), d);
             }
         }
     }
@@ -613,10 +646,16 @@ impl Walker<'_, '_> {
     fn subroutine(&mut self, s: usize, n: NodeId) {
         let t = self.t;
         if let Some(pl) = t.child(n, PortList) {
+            // A port with no direction or type takes the previous one's.
+            let mut cur_dt = None;
             for p in t.children(pl).filter(|&c| t.kind(c) == Port) {
                 self.enum_values(s, p);
+                let dt = t.child(p, DataType);
+                if dt.is_some() || toks(t, p).iter().any(|x| DIRECTIONS.contains(x) || *x == "var") {
+                    cur_dt = dt;
+                }
                 if let Some(d) = t.child(p, Declarator) {
-                    self.add(s, SymKind::Argument, name_of(t, d), d);
+                    self.add_typed(s, SymKind::Argument, name_of(t, d), cur_dt, d);
                 }
             }
         }
