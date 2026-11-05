@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 44);
+    assert_eq!(r.len(), 61);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 44);
+    assert_eq!(ids.len(), 61);
 }
 
 #[test]
@@ -132,4 +132,25 @@ fn syntax_rules() {
         assert!(got.contains(&want), "{want:?} not in {got:?}");
     }
     assert_eq!(got.iter().filter(|g| g.2 == "SV-DEP-005").count(), 1, "{got:?}");
+}
+
+#[test]
+fn syntax_rules_batch_two() {
+    let src = "package foo; endpackage\n\
+               interface bus; endinterface\n\
+               module m(a); input a; wire w; reg r; endmodule\n\
+               class c; covergroup cg @(posedge k); cp: coverpoint x { bins d = default; } cross cp; endgroup\n\
+               static constraint sk { x > 0; }\n\
+               task int t(); assert (x); disable fork; wait (0); void'(randomize() with {}); phase.jump(p); endtask endclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let got: Vec<_> = found.iter().map(|f| f.rule).collect();
+    for want in [
+        "SV-NAM-002", "SV-NAM-003", "SV-DEP-006", "SV-BAN-001", "SV-COV-015", "SV-COV-009", "SV-COV-008",
+        "SV-RND-009", "SV-TYP-010", "SVA-LBL-001", "SV-CON-010", "SV-CON-004", "SV-RND-014", "UVM-PHS-007",
+    ] {
+        assert!(got.contains(&want), "{want} not in {got:?}");
+    }
+    assert_eq!(got.iter().filter(|r| **r == "SV-BAN-001").count(), 2, "{got:?}");
 }

@@ -346,3 +346,15 @@ SV-DLY-002, SV-RCE-001 and SV-CON-005/007 (44 rules in all). With
 `.sv` file under a directory on its own. Measured 2026-11-05: repo 783/783
 (941 findings), uvm_pkg.sv only the two `s$N` messages, and all 1028
 sv-tests files identical. On uvm_pkg.sv all 44 rules take about 23 ms.
+
+Slice 8 (2026-11-05) added 17 more syntax rules (`syntax2.rs`): SV-NAM-002/003,
+SV-TYP-010, SVA-LBL-001, SV-RND-009/014, SV-COV-003/007/008/009/014/015,
+SV-CON-004/010, UVM-PHS-007, SV-BAN-001 and SV-DEP-006 (61 rules in all).
+Slang shapes they stand for: a declaration with a direction is a
+PortDeclaration and one inside a struct type a StructUnionMember (not a
+DataDeclaration); a header port list whose first port is a bare name or
+`.x(...)` is non-ANSI; `x.randomize() with {...}` is a call with a
+`WithClause`. Measured: repo 783/783 (1004 findings), uvm_pkg.sv only the
+two `s$N` messages, sv-tests 1027/1028. The one left, `sanity.sv`, is a
+should-fail file where slang's error recovery keeps a `wire` declaration that
+sv-syntax skips with the bad item.
