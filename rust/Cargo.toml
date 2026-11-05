@@ -3,7 +3,7 @@
 # and is the one crate that changes when the front end does.
 [workspace]
 resolver = "2"
-members = ["sv-lexer", "sv-preproc", "sv-syntax", "sv-sema", "dv-lint", "sv-source", "sv-slang", "dv-model", "dv-map", "dv-filelist"]
+members = ["sv-lexer", "sv-preproc", "sv-syntax", "sv-sema", "dv-lint", "sv-source", "sv-slang", "dv-model", "dv-map", "dv-filelist", "dv-lsp"]
 
 [workspace.package]
 version = "0.1.0"

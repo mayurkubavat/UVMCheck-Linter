@@ -42,6 +42,29 @@ rust/target/release/dv-map --bench 5 -- +incdir+$UVM/src $UVM/src/uvm_pkg.sv
 `--bench` prints the per-stage cost (parse, elaborate, model build, copy into
 Rust), which is the R0 gate: the Rust side must add under 10% to the C++ load.
 
+## dv-lsp
+
+A language server for code browsing on the native front end (sv-syntax, no
+Slang): document outline, workspace symbols, go to definition / declaration /
+type definition, references, highlights, hover (declaration plus its doc
+comment) and completion (scope names with inherited class members, `obj.` and
+`Class::`/`pkg::` members, `` ` `` macros, `$` system tasks, `type_id::`).
+Lint diagnostics and quick fixes stay with `uvmcheck --lsp`; the VS Code
+extension (editors/vscode) runs both.
+
+```sh
+cargo build --release -p dv-lsp
+rust/target/release/dv-lsp --index $UVM_HOME/src   # 170 files in ~50 ms
+```
+
+Every `.sv/.svh/.v/.vh` file under the workspace is indexed on its own
+(includes are not followed, so positions stay in the file that wrote them),
+in parallel, and re-indexed on each edit. `initializationOptions` take
+`libraryPaths` (extra trees such as UVM; `$UVM_HOME/src` is added by itself)
+and `exclude` (directory names). Name resolution is by scope (locals, class
+members through `extends`, file level, imported packages), then by name across
+the workspace; references are textual matches of the name.
+
 ## dv-filelist
 
 ```sh

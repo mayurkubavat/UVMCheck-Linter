@@ -21,6 +21,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dv-lsp"
+version = "0.1.0"
+dependencies = [
+ "sv-syntax",
+]
+
+[[package]]
 name = "dv-map"
 version = "0.1.0"
 dependencies = [
