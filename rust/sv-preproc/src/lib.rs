@@ -68,6 +68,9 @@ pub struct Output {
     /// Uses of defined macros written in the source text (not inside
     /// another expansion), in order: Slang's top-level macro references.
     pub macro_uses: Vec<MacroUse>,
+    /// The `timescale unit in force from a token index on, as a power of
+    /// ten femtoseconds (1ns is 6). The first entry is at token 0.
+    pub timescales: Vec<(u32, i32)>,
 }
 
 /// A macro used in the source text: its name without the backtick and the
@@ -145,6 +148,8 @@ pub struct Preprocessor {
     line_starts: HashMap<u32, Vec<u32>>,
     /// Inside `expand`: directives met now are in macro arguments.
     expanding: u32,
+    /// The `timescale unit in force (see `Output::timescales`).
+    time_unit: i32,
 }
 
 const STANDARD_MACROS: &[(&str, &str)] = &[
@@ -261,6 +266,7 @@ impl Preprocessor {
             just_opened: false,
             line_starts: HashMap::new(),
             expanding: 0,
+            time_unit: DEFAULT_TIME_UNIT,
         };
         if pp.opts.max_include_depth == 0 {
             pp.opts.max_include_depth = 1024;
@@ -312,6 +318,7 @@ impl Preprocessor {
     pub fn run_source(&mut self, src: &str, name: &str) -> Output {
         let id = self.add_file(PathBuf::from(name), src);
         self.push_file(id);
+        self.out.timescales.push((0, self.time_unit));
         while let Some(t) = self.next() {
             let written = t.written.unwrap_or(t.origin);
             self.out.tokens.push(PpToken { kind: t.kind, text: t.text, origin: t.origin, from_macro: t.from_macro, written, space_before: t.space_before });
@@ -549,8 +556,12 @@ impl Preprocessor {
                 let rest = self.rest_of_line();
                 if rest.iter().all(|t| t.kind != Kind::Directive) {
                     let spec: String = rest.iter().map(|t| &*t.text).collect();
-                    if let Some(msg) = timescale_error(&spec) {
-                        self.diag(d.origin, msg);
+                    match timescale_unit(&spec) {
+                        Ok(u) => {
+                            self.time_unit = u;
+                            self.out.timescales.push((self.out.tokens.len() as u32, u));
+                        }
+                        Err(msg) => self.diag(d.origin, msg),
                     }
                 }
             }
@@ -1147,7 +1158,12 @@ fn includable(p: &Path) -> bool {
 
 /// Checks `1ns / 1ps`: magnitudes 1, 10 or 100, precision no coarser than
 /// the unit.
-fn timescale_error(spec: &str) -> Option<String> {
+/// 1ns, as a power of ten femtoseconds.
+pub const DEFAULT_TIME_UNIT: i32 = 6;
+
+/// The unit of a `timescale spec as a power of ten femtoseconds, or why
+/// the spec is invalid.
+fn timescale_unit(spec: &str) -> Result<i32, String> {
     const UNITS: &[&str] = &["fs", "ps", "ns", "us", "ms", "s"];
     let value = |s: &str| -> Option<i32> {
         let digits = s.find(|c: char| !c.is_ascii_digit())?;
@@ -1161,12 +1177,12 @@ fn timescale_error(spec: &str) -> Option<String> {
         Some(unit * 3 + mag)
     };
     let Some((unit, prec)) = spec.split_once('/') else {
-        return Some("`timescale needs unit / precision".into());
+        return Err("`timescale needs unit / precision".into());
     };
     match (value(unit), value(prec)) {
-        (Some(u), Some(p)) if p > u => Some("`timescale precision is coarser than its unit".into()),
-        (Some(_), Some(_)) => None,
-        _ => Some(format!("invalid `timescale {spec}")),
+        (Some(u), Some(p)) if p > u => Err("`timescale precision is coarser than its unit".into()),
+        (Some(u), Some(_)) => Ok(u),
+        _ => Err(format!("invalid `timescale {spec}")),
     }
 }
 

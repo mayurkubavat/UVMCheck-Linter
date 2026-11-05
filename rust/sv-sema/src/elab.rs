@@ -17,6 +17,7 @@
 //! A parameter whose value cannot be evaluated is left out, and so is
 //! anything under a generate condition or loop bound that cannot be.
 
+use super::packed::Ty;
 use super::types::CVal;
 use super::*;
 
@@ -267,19 +268,30 @@ impl<'b, 't> Elab<'b, 't> {
             *b.inst.borrow_mut() = vals.clone();
             let shape = dt.and_then(|t| b.int_shape(t, scope, &empty, 0));
             let (text, val) = match over.get(&name).filter(|_| overridable) {
-                Some(o) => match o.val {
+                Some(o) => match o.val.clone().filter(|_| shape.is_some() || dt.is_none()) {
                     Some(v) => {
                         let v = match shape {
-                            Some((w, s)) => v.cast(w, s),
+                            Some((w, s)) => {
+                                // Sized by this parameter's type (IEEE 11.6).
+                                *b.inst.borrow_mut() = (*o.vals).clone();
+                                let c = b.eval_ctx(o.node, w, s, o.scope, &o.env, 0);
+                                *b.inst.borrow_mut() = vals.clone();
+                                c.unwrap_or_else(|| v.cast(w, s))
+                            }
                             None => v,
                         };
                         (Some(v.show()), Some(v))
                     }
-                    // A string or real: printed as written there.
+                    // A string, real or assignment pattern: evaluated
+                    // there, for this parameter's type.
                     None => {
                         *b.inst.borrow_mut() = (*o.vals).clone();
-                        let text = b.value_text(dt, o.node, o.scope, &o.env);
-                        (text, None)
+                        let val = dt.and_then(|t| b.eval_typed(o.node, Ty::of(t, scope), o.scope, &o.env, 0));
+                        let text = match &val {
+                            Some(v) => Some(v.show()),
+                            None => b.value_text(dt, o.node, o.scope, &o.env),
+                        };
+                        (text, val)
                     }
                 },
                 None => {
@@ -288,10 +300,21 @@ impl<'b, 't> Elab<'b, 't> {
                         Some(v) => {
                             let text = b.value_text(dt, v, scope, &empty);
                             let two = dt.is_some_and(|t| b.two_state(t));
-                            let val = b.eval_xz(v, scope, &empty, two).map(|c| match shape {
-                                Some((w, s)) => c.cast(w, s),
-                                None => c,
-                            });
+                            let val = match dt {
+                                Some(t) if b.kind(v) == AssignPattern => {
+                                    b.eval_typed(v, Ty::of(t, scope), scope, &empty, 0)
+                                }
+                                _ => b.eval_xz(v, scope, &empty, two).map(|c| match shape {
+                                    Some((w, s)) if c.w < w => {
+                                        b.allow_xz.set(two);
+                                        let x = b.eval_ctx(v, w, s, scope, &empty, 0).unwrap_or_else(|| c.cast(w, s));
+                                        b.allow_xz.set(false);
+                                        x
+                                    }
+                                    Some((w, s)) => c.cast(w, s),
+                                    None => c,
+                                }),
+                            };
                             (text, val)
                         }
                         None => (None, None),
@@ -353,6 +376,11 @@ impl<'b, 't> Elab<'b, 't> {
                     *construct += 1;
                     self.loop_gen(c, path, scope, vals, depth, *construct);
                 }
+                // A bare `begin ... end` among module items is a generate block.
+                GenerateBlock => {
+                    *construct += 1;
+                    self.block(c, None, path, scope, vals, depth, *construct);
+                }
                 IfGenerate | CaseGenerate => {
                     *construct += 1;
                     let n = *construct;
@@ -383,7 +411,7 @@ impl<'b, 't> Elab<'b, 't> {
         if b.kind(c) == IfGenerate {
             let kids = b.children(c);
             let cond = self.eval(*kids.first()?, scope, vals)?;
-            if cond.v != 0 {
+            if cond.is_true() {
                 return kids.get(1).copied();
             }
             let e = kids.into_iter().find(|k| b.kind(*k) == ElseClause)?;
@@ -506,14 +534,14 @@ impl<'b, 't> Elab<'b, 't> {
         let mut v = vals.clone();
         let Some(mut i) = self.eval(init, scope, &v).map(|x| x.cast(32, true)) else { return };
         for _ in 0..MAX_ITER {
-            v.insert(var.clone(), Some(i));
+            v.insert(var.clone(), Some(i.clone()));
             match self.eval(cond, scope, &v) {
-                Some(x) if x.v != 0 => {}
+                Some(x) if x.is_true() => {}
                 _ => return,
             }
             // The genvar is a parameter of each block.
             let before = self.out.len();
-            self.block(body, Some(i.v), path, scope, &v, depth, construct);
+            self.block(body, Some(i.i()), path, scope, &v, depth, construct);
             if self.out.len() > before {
                 let head = self.out[before].clone();
                 if let Some(name) = head.strip_prefix(&format!("{path} generate ")) {
@@ -531,12 +559,12 @@ impl<'b, 't> Elab<'b, 't> {
     /// The genvar's next value: `i++`, `i--`, `i = e`, `i += e` ...
     fn step(&self, s: NodeRef, var: &str, scope: usize, vals: &Vals) -> Option<CVal> {
         let b = self.b;
-        let cur = (*vals.get(var)?)?;
+        let cur = vals.get(var)?.clone()?;
         let kids = b.children(s);
         let op = *b.own_tokens(s).first()?;
         let v = match (b.kind(s), op) {
-            (PostfixExpr | PrefixExpr, "++") => CVal { v: cur.v + 1, ..cur },
-            (PostfixExpr | PrefixExpr, "--") => CVal { v: cur.v - 1, ..cur },
+            (PostfixExpr | PrefixExpr, "++") => cur.bump(1),
+            (PostfixExpr | PrefixExpr, "--") => cur.bump(-1),
             (BinaryExpr, "=") => self.eval(*kids.get(1)?, scope, vals)?,
             (BinaryExpr, op) => {
                 let r = self.eval(*kids.get(1)?, scope, vals)?;
@@ -639,12 +667,12 @@ impl<'b, 't> Elab<'b, 't> {
                     if own.iter().any(|t| matches!(*t, "+:" | "-:")) {
                         if let Some(&w) = b.children(n).last() {
                             if let Some(v) = self.eval(w, scope, vals) {
-                                if v.v <= 0 {
+                                if v.i() <= 0 {
                                     self.checked.insert(n);
                                     self.diags.push(crate::names::Diag {
                                         tree: n.tree,
                                         node: w.node,
-                                        message: format!("indexed part-select width must be positive, not {}", v.v),
+                                        message: format!("indexed part-select width must be positive, not {}", v.i()),
                                     });
                                 }
                             }

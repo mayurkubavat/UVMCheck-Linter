@@ -20,11 +20,13 @@ use dv_model::{
 };
 use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
+pub mod bigint;
 pub mod bind;
 mod body;
 pub mod checks;
 mod consteval;
 mod elab;
+mod packed;
 pub mod iclass;
 pub mod names;
 pub mod scopes;
@@ -487,6 +489,8 @@ struct Builder<'t> {
     designs: bool,
     /// Locals of the constant functions being run (see `consteval`).
     frames: std::cell::RefCell<Vec<HashMap<String, types::CVal>>>,
+    /// The declared types of those locals (with "" for the return value).
+    ftypes: std::cell::RefCell<Vec<HashMap<String, packed::Ty>>>,
     /// While set, x and z digits read as 0 (a two-state target), and
     /// `saw_xz` records that one was read.
     allow_xz: std::cell::Cell<bool>,
@@ -528,6 +532,7 @@ impl<'t> Builder<'t> {
             decl_cache: Default::default(),
             designs: false,
             frames: Default::default(),
+            ftypes: Default::default(),
             allow_xz: Default::default(),
             saw_xz: Default::default(),
             inst: Default::default(),

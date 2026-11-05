@@ -4,84 +4,118 @@
 
 use super::*;
 
-/// A constant integer: its width, signedness and value (two-state).
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) use super::bigint::Int;
+
+/// A constant integer: its width, signedness and value (two-state), of any
+/// width. The value is kept normalized: below 2^w when unsigned, and in
+/// -2^(w-1) .. 2^(w-1) when signed.
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CVal {
     pub w: u32,
     pub s: bool,
-    pub v: i128,
+    pub v: Int,
 }
 
+/// How deep constant evaluation may nest (expressions, calls), so a
+/// constant defined by itself gives up.
+pub(crate) const MAX_EVAL_DEPTH: usize = 200;
+
+/// slang abbreviates a value with more active bits than this.
+const ABBREVIATE_BITS: u32 = 128;
+
 impl CVal {
+    pub fn new(w: u32, s: bool, v: impl Into<Int>) -> CVal {
+        CVal { w, s, v: v.into() }.norm()
+    }
+
     pub fn int(v: i128) -> CVal {
-        CVal { w: 32, s: true, v }.norm()
+        CVal::new(32, true, v)
+    }
+
+    pub fn bool(b: bool) -> CVal {
+        CVal::new(1, false, b as i128)
+    }
+
+    /// The value as an index or count (saturating beyond i128).
+    pub fn i(&self) -> i128 {
+        self.v.low_i128()
+    }
+
+    pub fn is_true(&self) -> bool {
+        !self.v.is_zero()
     }
 
     /// Truncated to the width, sign-extended if signed.
     pub fn norm(self) -> CVal {
-        let w = self.w.clamp(1, 128);
-        let mut v = self.v;
-        if w < 128 {
-            let mask = (1i128 << w) - 1;
-            v &= mask;
-            if self.s && (v >> (w - 1)) & 1 == 1 {
-                v -= 1i128 << w;
+        let v = self.v.trunc(self.w.max(1), self.s);
+        CVal { w: self.w, s: self.s, v }
+    }
+
+    pub fn cast(&self, w: u32, s: bool) -> CVal {
+        CVal { w, s, v: self.v.clone() }.norm()
+    }
+
+    /// The value plus a small step, in the same type.
+    pub fn bump(&self, d: i128) -> CVal {
+        CVal { w: self.w, s: self.s, v: self.v.add(&Int::from(d)) }.norm()
+    }
+
+    /// slang's SVInt::writeTo: an optional `-`, the base, the digits;
+    /// over 128 active bits, decimal cut to its leading digits with
+    /// `...e<n>`.
+    fn write(&self, radix: u32, mut with_base: bool) -> String {
+        let neg = self.s && self.v.is_neg();
+        let mag = if neg { self.v.neg() } else { self.v.clone() };
+        let mut radix = radix;
+        let active = mag.active_bits();
+        if active > ABBREVIATE_BITS {
+            with_base = true;
+            radix = 10;
+        }
+        let mut out = String::new();
+        if neg {
+            out.push('-');
+        }
+        if with_base {
+            out.push_str(&self.w.to_string());
+            out.push('\'');
+            if self.s {
+                out.push('s');
             }
+            out.push(match radix {
+                2 => 'b',
+                8 => 'o',
+                10 => 'd',
+                _ => 'h',
+            });
         }
-        CVal {
-            w: self.w,
-            s: self.s,
-            v,
+        if radix == 10 && active > ABBREVIATE_BITS {
+            let exp = (((active - ABBREVIATE_BITS) as f64 / std::f64::consts::LOG2_10).ceil() as u32).max(5);
+            out.push_str(&mag.div_pow10(exp).digits(10));
+            out.push_str(&format!("...e{exp}"));
+        } else {
+            out.push_str(&mag.digits(radix));
         }
-    }
-
-    pub fn cast(self, w: u32, s: bool) -> CVal {
-        CVal { w, s, v: self.v }.norm()
-    }
-
-    fn digits(&self, radix: u32) -> String {
-        let mut v = self.v.unsigned_abs();
-        if self.s && self.v < 0 {
-            v = self.v.unsigned_abs();
-        } else if self.v < 0 {
-            // Unsigned values wider than i128 holds: shown by their low bits.
-            v = self.v as u128;
-        }
-        if v == 0 {
-            return "0".into();
-        }
-        let mut out = Vec::new();
-        while v > 0 {
-            out.push(std::char::from_digit((v % radix as u128) as u32, radix).unwrap());
-            v /= radix as u128;
-        }
-        out.iter().rev().collect()
+        out
     }
 
     /// slang's default form: binary below 8 unsigned bits, decimal up to
     /// 32 bits or signed, hex above; a plain number for a signed 32-bit
     /// decimal.
     pub fn show(&self) -> String {
-        let (radix, b) = if self.w < 8 && !self.s {
-            (2, 'b')
+        let radix = if self.w < 8 && !self.s {
+            2
         } else if self.w <= 32 || self.s {
-            (10, 'd')
+            10
         } else {
-            (16, 'h')
+            16
         };
-        let neg = if self.s && self.v < 0 { "-" } else { "" };
-        if radix == 10 && self.w == 32 && self.s {
-            return format!("{neg}{}", self.digits(10));
-        }
-        let s = if self.s { "s" } else { "" };
-        format!("{neg}{}'{s}{b}{}", self.w, self.digits(radix))
+        self.write(radix, !(radix == 10 && self.w == 32 && self.s))
     }
 
     /// Always decimal with its size, as enum values print.
     pub fn show_dec(&self) -> String {
-        let neg = if self.s && self.v < 0 { "-" } else { "" };
-        let s = if self.s { "s" } else { "" };
-        format!("{neg}{}'{s}d{}", self.w, self.digits(10))
+        self.write(10, true)
     }
 }
 
@@ -135,7 +169,7 @@ impl<'t> Builder<'t> {
         env: &Env,
         depth: usize,
     ) -> Option<(u32, bool)> {
-        if depth > 16 {
+        if depth > MAX_EVAL_DEPTH {
             return None;
         }
         let own = self.own_tokens(dt);
@@ -167,7 +201,15 @@ impl<'t> Builder<'t> {
                     if self.child(t, Dim).is_some() {
                         return None;
                     }
-                    return self.int_shape(inner, s, env, depth + 1);
+                    let (mut w, sg) = self.int_shape(inner, s, env, depth + 1)?;
+                    // `pkg::t [N-1:0]`: the use site's own packed dimensions.
+                    for d in self.children(dt) {
+                        if self.kind(d) == Dim {
+                            let (a, b) = self.dim_range(d, scope, env)?;
+                            w = w.checked_mul((a - b).unsigned_abs() as u32 + 1)?;
+                        }
+                    }
+                    return Some((w, sg));
                 }
             }
             if matches!(own.first(), Some(&"struct" | &"union")) && own.contains(&"packed") {
@@ -224,6 +266,10 @@ impl<'t> Builder<'t> {
         Some((w, s))
     }
 
+    pub(crate) fn lookup_type_pub(&self, dt: NodeRef, scope: usize) -> Option<Found> {
+        self.lookup_type(dt, scope)
+    }
+
     fn lookup_type(&self, dt: NodeRef, scope: usize) -> Option<Found> {
         let toks = self.toks_of(dt);
         let path: Vec<&str> = toks
@@ -249,10 +295,10 @@ impl<'t> Builder<'t> {
         let own = self.own_tokens(d);
         match exprs.as_slice() {
             [a, b] if own.contains(&":") => Some((
-                self.eval(*a, scope, env, 0)?.v,
-                self.eval(*b, scope, env, 0)?.v,
+                self.eval(*a, scope, env, 0)?.i(),
+                self.eval(*b, scope, env, 0)?.i(),
             )),
-            [n] if !own.contains(&":") => Some((0, self.eval(*n, scope, env, 0)?.v - 1)),
+            [n] if !own.contains(&":") => Some((0, self.eval(*n, scope, env, 0)?.i() - 1)),
             _ => None,
         }
     }
@@ -267,7 +313,10 @@ impl<'t> Builder<'t> {
                     (Some(b), ScopeKind::Class(_)) => {
                         self.eval(b.node, b.scope, &b.env, depth + 1)?
                     }
-                    _ => self.eval(val?, s, env, depth + 1)?,
+                    _ => match dt {
+                        Some(d) => return self.eval_typed(val?, packed::Ty::of(d, s), s, env, depth + 1),
+                        None => self.eval(val?, s, env, depth + 1)?,
+                    },
                 };
                 return Some(
                     match dt.and_then(|d| self.int_shape(d, s, env, depth + 1)) {
@@ -354,14 +403,14 @@ impl<'t> Builder<'t> {
         depth: usize,
     ) -> Vec<(String, CVal)> {
         let mut out = Vec::new();
-        if depth > 16 {
+        if depth > MAX_EVAL_DEPTH {
             return out;
         }
         let (w, s) = self
             .child(dt, DataType)
             .and_then(|b| self.int_shape(b, scope, env, depth + 1))
             .unwrap_or((32, true));
-        let mut next = CVal { w, s, v: 0 };
+        let mut next = CVal::new(w, s, 0i128);
         for d in self.children(dt) {
             if self.kind(d) != Declarator {
                 continue;
@@ -401,18 +450,15 @@ impl<'t> Builder<'t> {
                     };
                     for k in 0..n {
                         let k = start + k * step;
+                        let after = cur.bump(1);
                         out.push((format!("{name}{k}"), cur));
-                        cur = CVal {
-                            v: cur.v + 1,
-                            ..cur
-                        }
-                        .norm();
+                        cur = after;
                     }
                     next = cur;
                 }
                 None => {
+                    next = v.bump(1);
                     out.push((name, v));
-                    next = CVal { v: v.v + 1, ..v }.norm();
                 }
             }
         }
@@ -421,7 +467,7 @@ impl<'t> Builder<'t> {
 
     /// The value of a constant expression.
     pub(crate) fn eval(&self, e: NodeRef, scope: usize, env: &Env, depth: usize) -> Option<CVal> {
-        if depth > 48 {
+        if depth > MAX_EVAL_DEPTH {
             return None;
         }
         let kids: Vec<NodeRef> = self
@@ -432,6 +478,11 @@ impl<'t> Builder<'t> {
         match self.kind(e) {
             Literal => {
                 let toks = self.toks_of(e);
+                if let [lit] = toks.as_slice() {
+                    if lit.starts_with('"') {
+                        return string_value(lit);
+                    }
+                }
                 let text = toks.concat();
                 if !has_xz(&text) {
                     return literal(&toks);
@@ -449,7 +500,7 @@ impl<'t> Builder<'t> {
                         if let Some(v) = self.get_local(n) {
                             return Some(v);
                         }
-                        let here = self.inst.borrow().get(*n).copied();
+                        let here = self.inst.borrow().get(*n).cloned();
                         match here {
                             Some(v) => v,
                             None => self.const_named(n, scope, env, depth + 1),
@@ -479,14 +530,16 @@ impl<'t> Builder<'t> {
                         let (w, s) = int_width(kw);
                         Some(a.cast(w, s))
                     }
-                    _ if matches!(self.kind(target), NameExpr | ScopedExpr) => {
+                    _ if matches!(self.kind(target), NameExpr | ScopedExpr)
+                        && self.int_shape(target, scope, env, depth + 1).is_some() =>
+                    {
                         let (w, s) = self.int_shape(target, scope, env, depth + 1)?;
                         Some(a.cast(w, s))
                     }
                     // `8'(x)`, `(W)'(x)`
                     _ => {
-                        let n = self.eval(target, scope, env, depth + 1)?.v;
-                        if !(1..=128).contains(&n) {
+                        let n = self.eval(target, scope, env, depth + 1)?.i();
+                        if !(1..=1 << 24).contains(&n) {
                             return None;
                         }
                         Some(a.cast(n as u32, a.s))
@@ -494,34 +547,51 @@ impl<'t> Builder<'t> {
                 }
             }
             ConcatExpr => self.eval_concat(e, scope, env, depth + 1),
-            SelectExpr => self.eval_select(e, scope, env, depth + 1),
+            SelectExpr => self
+                .eval_select(e, scope, env, depth + 1)
+                .or_else(|| self.eval_packed_select(e, scope, env, depth + 1)),
+            MemberExpr => self.eval_packed_select(e, scope, env, depth + 1),
             PrefixExpr => {
                 let op = *self.own_tokens(e).first()?;
                 let a = self.eval(*kids.first()?, scope, env, depth + 1)?;
                 Some(match op {
-                    "-" => CVal { v: -a.v, ..a }.norm(),
+                    "-" => CVal { v: a.v.neg(), ..a }.norm(),
                     "+" => a,
-                    "~" => CVal { v: !a.v, ..a }.norm(),
-                    "!" => CVal {
-                        w: 1,
-                        s: false,
-                        v: (a.v == 0) as i128,
-                    },
+                    "~" => CVal { v: a.v.not(), ..a }.norm(),
+                    "!" => CVal::bool(!a.is_true()),
                     _ => return None,
                 })
             }
             BinaryExpr => {
                 let op = *self.own_tokens(e).first()?;
-                let a = self.eval(*kids.first()?, scope, env, depth + 1)?;
-                let b = self.eval(*kids.get(1)?, scope, env, depth + 1)?;
+                let (l, r) = (*kids.first()?, *kids.get(1)?);
+                let a = self.eval(l, scope, env, depth + 1)?;
+                let b = self.eval(r, scope, env, depth + 1)?;
+                // Operands sized to each other (IEEE 11.6.1): a narrower
+                // one is evaluated again in the wider context.
+                if is_context_op(op) && (a.w != b.w || a.s != b.s) {
+                    let (w, s) = (a.w.max(b.w), a.s && b.s);
+                    let a = if a.w < w || a.s != s { self.eval_ctx(l, w, s, scope, env, depth + 1)? } else { a };
+                    let b = if b.w < w || b.s != s { self.eval_ctx(r, w, s, scope, env, depth + 1)? } else { b };
+                    return binary(op, a, b);
+                }
                 binary(op, a, b)
             }
             CondExpr => {
                 let c = self.eval(*kids.first()?, scope, env, depth + 1)?;
-                let a = self.eval(*kids.get(1)?, scope, env, depth + 1)?;
-                let b = self.eval(*kids.get(2)?, scope, env, depth + 1)?;
-                let (w, s) = (a.w.max(b.w), a.s && b.s);
-                Some(if c.v != 0 { a } else { b }.cast(w, s))
+                let (l, r) = (*kids.get(1)?, *kids.get(2)?);
+                let (pick, other) = if c.is_true() { (l, r) } else { (r, l) };
+                let v = self.eval(pick, scope, env, depth + 1)?;
+                // The branch not taken only sizes the result (and may not
+                // evaluate, as in `vec ? w / f(cfg) : 1`).
+                let (w, s) = match self.eval(other, scope, env, depth + 1) {
+                    Some(o) => (v.w.max(o.w), v.s && o.s),
+                    None => (v.w, v.s),
+                };
+                if v.w < w {
+                    return self.eval_ctx(pick, w, s, scope, env, depth + 1);
+                }
+                Some(v.cast(w, s))
             }
             CallExpr => {
                 let callee = *self.children(e).first()?;
@@ -539,11 +609,9 @@ impl<'t> Builder<'t> {
                 match name.as_str() {
                     "$clog2" => {
                         let a = self.eval(*args.first()?, scope, env, depth + 1)?;
-                        let mut r = 0;
-                        while (1i128 << r) < a.v {
-                            r += 1;
-                        }
-                        Some(CVal::int(r))
+                        // Bits to hold a-1 (0 for a <= 1).
+                        let m = a.v.trunc(a.w, false).sub(&Int::from(1));
+                        Some(CVal::int(if m.is_neg() { 0 } else { m.active_bits() as i128 }))
                     }
                     "$bits" => {
                         let a = *args.first()?;
@@ -637,7 +705,7 @@ impl<'t> Builder<'t> {
                     .find(|c| body_is_expr(self.kind(*c)))
                     .and_then(|e| self.eval(e, scope, env, 0))
                 {
-                    Some(v) => format!("$:{}", v.v),
+                    Some(v) => format!("$:{}", v.i()),
                     None => inner.concat(),
                 },
                 _ => {
@@ -1026,6 +1094,45 @@ impl<'t> Builder<'t> {
         self.value_text(y.dtype.map(r), r(v), scope, env)
     }
 
+    /// A time literal (`300ps`) in the time unit of its design unit: its
+    /// `timeunit`, else the `timescale before it, else 1ns.
+    pub(crate) fn time_value(&self, lit_node: NodeRef, lit: &str) -> Option<f64> {
+        let t = self.tree(lit_node);
+        let split = lit.find(|c: char| c.is_ascii_alphabetic())?;
+        let num: f64 = lit[..split].replace('_', "").parse().ok()?;
+        let exp = time_exp(&lit[split..])?;
+        let first = t.token_bounds(lit_node.node)?.0;
+        // The top-level item that holds the literal.
+        let unit_node = t.children(t.root).find(|&c| t.token_bounds(c).is_some_and(|(a, b)| a <= first && first <= b));
+        let mut unit = None;
+        if let Some(u) = unit_node {
+            let mut stack = vec![u];
+            while let Some(n) = stack.pop() {
+                stack.extend(t.children(n));
+                if t.kind(n) == TimeunitDecl {
+                    let toks = self.toks_of(NodeRef { tree: lit_node.tree, node: n });
+                    if toks.first() == Some(&"timeunit") {
+                        unit = toks.get(1).and_then(|x| {
+                            let sp = x.find(|c: char| c.is_ascii_alphabetic())?;
+                            let mag = match &x[..sp] {
+                                "1" => 0,
+                                "10" => 1,
+                                "100" => 2,
+                                _ => return None,
+                            };
+                            Some(time_exp(&x[sp..])? + mag)
+                        });
+                    }
+                }
+            }
+        }
+        let at = unit_node.and_then(|u| t.token_bounds(u)).map_or(first, |b| b.0);
+        let unit = unit.unwrap_or_else(|| {
+            t.timescales.iter().take_while(|(i, _)| *i <= at).last().map_or(DEFAULT_TIME_UNIT, |x| x.1)
+        });
+        Some(num * 10f64.powi(exp - unit))
+    }
+
     /// A constant's value as slang prints it: `v` in a declaration of type
     /// `dtype` (`None`: implicit) in `scope`.
     pub(crate) fn value_text(
@@ -1050,23 +1157,36 @@ impl<'t> Builder<'t> {
                 }
                 // A string literal is an integral value, 8 bits a character.
                 let body = &lit[1..lit.len() - 1];
-                let mut val: i128 = 0;
-                for c in body.bytes().take(15) {
-                    val = (val << 8) | c as i128;
+                let mut val = Int::from(0);
+                for c in body.bytes() {
+                    val = val.shl(8).or(&Int::from(c as i128));
                 }
                 let w = (body.len().max(1) * 8) as u32;
-                return Some(
-                    CVal {
-                        w,
-                        s: false,
-                        v: val,
-                    }
-                    .show(),
-                );
+                let c = CVal::new(w, false, val);
+                let c = match dtype.and_then(|d| self.int_shape(d, scope, env, 0)) {
+                    Some((w, s)) => c.cast(w, s),
+                    None => c,
+                };
+                return Some(c.show());
             }
-            if matches!(kw, Some("real" | "shortreal" | "realtime"))
-                || (kw.is_none() && lit.contains('.') && lit.parse::<f64>().is_ok())
-            {
+            let tk = t.token_bounds(v).map(|(i, _)| t.tokens[i as usize].kind);
+            let real = match tk {
+                Some(sv_syntax::TokenKind::TimeLiteral) => self.time_value(r(v), lit),
+                Some(sv_syntax::TokenKind::RealLiteral) => lit.replace('_', "").parse::<f64>().ok(),
+                _ => None,
+            };
+            if let Some(f) = real {
+                let shape = dtype.and_then(|d| self.int_shape(d, scope, env, 0));
+                return match shape {
+                    // A real into an integral type rounds half away from zero.
+                    Some((w, s)) if !matches!(kw, Some("real" | "shortreal" | "realtime")) => {
+                        let i = f.round();
+                        (i.abs() < 1e38).then(|| CVal::new(w, s, i as i128).show())
+                    }
+                    _ => Some(format!("{f}")),
+                };
+            }
+            if matches!(kw, Some("real" | "shortreal" | "realtime")) {
                 return lit.parse::<f64>().ok().map(|f| format!("{f}"));
             }
         }
@@ -1076,12 +1196,20 @@ impl<'t> Builder<'t> {
             // `'0`, `'1`: every bit of the target.
             [fill @ ("'0" | "'1")] => {
                 let (w, s) = shape?;
-                let v = if *fill == "'1" { -1 } else { 0 };
-                return Some(CVal { w, s, v }.norm().show());
+                let v: i128 = if *fill == "'1" { -1 } else { 0 };
+                return Some(CVal::new(w, s, v).show());
             }
             _ => {}
         }
         if t.kind(v) == AssignPattern {
+            // A packed struct or array is one integer.
+            if let Some(d) = dtype.filter(|_| !self.unpacked_decl(r(v))) {
+                if let Some(c) = self.eval_typed(r(v), packed::Ty::of(d, scope), scope, env, 0) {
+                    if self.width(packed::Ty::of(d, scope), env, 0).is_some() && self.packed_aggregate(d, scope, env) {
+                        return Some(c.show());
+                    }
+                }
+            }
             return self.aggregate_value(r(v), shape, scope, env);
         }
         let two_state = dtype.is_some_and(|d| self.two_state(d));
@@ -1107,6 +1235,13 @@ impl<'t> Builder<'t> {
         }
         let c = self.eval_xz(r(v), scope, env, two_state)?;
         let c = match shape {
+            Some((w, s)) if c.w < w => {
+                // Sized by the target (IEEE 11.6).
+                self.allow_xz.set(two_state);
+                let x = self.eval_ctx(r(v), w, s, scope, env, 0);
+                self.allow_xz.set(false);
+                x.unwrap_or_else(|| c.cast(w, s))
+            }
             Some((w, s)) => c.cast(w, s),
             None => c,
         };
@@ -1287,6 +1422,43 @@ pub(crate) fn is_expr(k: SyntaxKind) -> bool {
     body_is_expr(k)
 }
 
+/// A string literal as an integral value: 8 bits a character, the first
+/// one highest (IEEE 1800 5.9).
+fn string_value(lit: &str) -> Option<CVal> {
+    let body = lit.strip_prefix('"')?.strip_suffix('"')?;
+    let mut bytes = Vec::new();
+    let mut it = body.bytes();
+    while let Some(c) = it.next() {
+        if c != b'\\' {
+            bytes.push(c);
+            continue;
+        }
+        bytes.push(match it.next()? {
+            b'n' => b'\n',
+            b't' => b'\t',
+            b'\\' => b'\\',
+            b'"' => b'"',
+            b'v' => 0x0b,
+            b'f' => 0x0c,
+            b'a' => 0x07,
+            _ => return None,
+        });
+    }
+    let mut v = Int::from(0);
+    for c in &bytes {
+        v = v.shl(8).or(&Int::from(*c as i128));
+    }
+    Some(CVal::new((bytes.len().max(1) * 8) as u32, false, v))
+}
+
+/// Binary operators whose operands are sized to each other.
+fn is_context_op(op: &str) -> bool {
+    matches!(
+        op,
+        "+" | "-" | "*" | "/" | "%" | "&" | "|" | "^" | "~^" | "^~" | "==" | "!=" | "===" | "!==" | "<" | "<=" | ">" | ">="
+    )
+}
+
 pub(crate) fn binary_op(op: &str, a: CVal, b: CVal) -> Option<CVal> {
     binary(op, a, b)
 }
@@ -1369,71 +1541,75 @@ fn literal(toks: &[&str]) -> Option<CVal> {
             'h' => 16,
             '0' | '1' if size.is_empty() => {
                 // `'0` / `'1`: all bits, here taken as one.
-                return Some(CVal {
-                    w: 1,
-                    s: false,
-                    v: (b == '1') as i128,
-                });
+                return Some(CVal::bool(b == '1'));
             }
             _ => return None,
         };
-        let v = i128::from_str_radix(&digits.to_ascii_lowercase(), radix).ok()?;
-        let w = if size.is_empty() {
-            32
-        } else {
-            size.parse().ok()?
-        };
-        return Some(CVal { w, s: signed, v }.norm());
+        let v = Int::parse_radix(&digits.to_ascii_lowercase(), radix)?;
+        let w = if size.is_empty() { 32 } else { size.parse().ok()? };
+        return Some(CVal::new(w, signed, v));
     }
-    joined.parse::<i128>().ok().map(CVal::int)
+    if joined.is_empty() || !joined.bytes().all(|c| c.is_ascii_digit()) {
+        return None;
+    }
+    // An unsized decimal is a 32-bit signed integer (wider if it must be).
+    let v = Int::parse_radix(&joined, 10)?;
+    let w = (v.active_bits() + 1).max(32);
+    Some(CVal::new(w, true, v))
 }
 
 fn binary(op: &str, a: CVal, b: CVal) -> Option<CVal> {
     let w = a.w.max(b.w);
     let s = a.s && b.s;
-    let bool_ = |x: bool| CVal {
-        w: 1,
-        s: false,
-        v: x as i128,
-    };
     let (x, y) = (a.cast(w, s).v, b.cast(w, s).v);
     let r = match op {
-        "+" => x + y,
-        "-" => x - y,
-        "*" => x * y,
-        "/" => x.checked_div(y)?,
-        "%" => x.checked_rem(y)?,
-        "**" => x.checked_pow(u32::try_from(y).ok()?)?,
-        "&" => x & y,
-        "|" => x | y,
-        "^" => x ^ y,
+        "+" => x.add(&y),
+        "-" => x.sub(&y),
+        "*" => x.mul(&y),
+        "/" => x.divrem(&y)?.0,
+        "%" => x.divrem(&y)?.1,
+        "**" => {
+            let e = u32::try_from(b.i()).ok()?;
+            // The result has the left operand's type.
+            return Some(CVal { w: a.w, s: a.s, v: a.v.pow(e.min(a.w.max(64) + 1)) }.norm());
+        }
+        "&" => x.and(&y),
+        "|" => x.or(&y),
+        "^" => x.xor(&y),
+        "~^" | "^~" => x.xor(&y).not(),
         "<<" | "<<<" => {
-            return Some(
-                CVal {
-                    v: a.v << b.v.clamp(0, 127),
-                    ..a
-                }
-                .norm(),
-            )
+            let n = b.i().clamp(0, a.w as i128 + 1) as u32;
+            return Some(CVal { v: a.v.shl(n), ..a }.norm());
         }
         ">>" | ">>>" => {
-            return Some(
-                CVal {
-                    v: a.v >> b.v.clamp(0, 127),
-                    ..a
-                }
-                .norm(),
-            )
+            let n = b.i().clamp(0, a.w as i128 + 1) as u32;
+            return Some(CVal { v: a.v.shr(n), ..a }.norm());
         }
-        "==" | "===" => return Some(bool_(x == y)),
-        "!=" | "!==" => return Some(bool_(x != y)),
-        "<" => return Some(bool_(x < y)),
-        "<=" => return Some(bool_(x <= y)),
-        ">" => return Some(bool_(x > y)),
-        ">=" => return Some(bool_(x >= y)),
-        "&&" => return Some(bool_(x != 0 && y != 0)),
-        "||" => return Some(bool_(x != 0 || y != 0)),
+        "==" | "===" => return Some(CVal::bool(x == y)),
+        "!=" | "!==" => return Some(CVal::bool(x != y)),
+        "<" => return Some(CVal::bool(x < y)),
+        "<=" => return Some(CVal::bool(x <= y)),
+        ">" => return Some(CVal::bool(x > y)),
+        ">=" => return Some(CVal::bool(x >= y)),
+        "&&" => return Some(CVal::bool(!x.is_zero() && !y.is_zero())),
+        "||" => return Some(CVal::bool(!x.is_zero() || !y.is_zero())),
         _ => return None,
     };
-    Some(CVal { w, s, v: r }.norm())
+    Some(CVal::new(w, s, r))
+}
+
+/// 1ns, the time unit without a `timescale, as a power of ten femtoseconds.
+const DEFAULT_TIME_UNIT: i32 = 6;
+
+/// A time unit suffix as a power of ten femtoseconds.
+fn time_exp(u: &str) -> Option<i32> {
+    Some(match u {
+        "fs" => 0,
+        "ps" => 3,
+        "ns" => 6,
+        "us" => 9,
+        "ms" => 12,
+        "s" => 15,
+        _ => return None,
+    })
 }

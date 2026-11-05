@@ -56,13 +56,14 @@ fn defparam_bind_and_type_parameters() {
 }
 
 #[test]
-fn unknown_values_are_left_out_not_guessed() {
-    // `M` is overridden with a string: whatever depends on it has no
-    // value here, rather than the one its declaration would give.
+fn string_overrides_are_integral_values() {
+    // `M` is overridden with a string: 8 bits a character, and `N` follows.
     let h = hier(
         "module s #(parameter M = 0, localparam N = M + 1) (); endmodule\nmodule t; s #(.M(\"ab\")) i(); endmodule\n",
     );
-    assert!(!h.iter().any(|l| l.starts_with("t.i parameter N")), "{h:?}");
+    for l in ["t.i parameter M = 16'd24930", "t.i parameter N = 32'd24931"] {
+        assert!(h.contains(&l.to_string()), "{l} in {h:?}");
+    }
 }
 
 #[test]

@@ -8,7 +8,8 @@
 //! `++`, `--`), `if`/`else`, blocks, `for`, `while`, `repeat` and
 //! `return`. Anything else gives up (no value), never a wrong one.
 
-use super::types::CVal;
+use super::packed::Ty;
+use super::types::{CVal, Int};
 use super::*;
 
 /// How a statement ended.
@@ -30,7 +31,7 @@ impl Builder<'_> {
         env: &Env,
         depth: usize,
     ) -> Option<CVal> {
-        if depth > 32 || self.frames.borrow().len() > 16 {
+        if depth > types::MAX_EVAL_DEPTH || self.frames.borrow().len() > 16 {
             return None;
         }
         let decl = self.function_decl(name, scope)?;
@@ -41,6 +42,7 @@ impl Builder<'_> {
         let vals: Vec<CVal> = args.iter().map(|&a| self.eval(a, scope, env, depth + 1)).collect::<Option<_>>()?;
         let fscope = self.decl_scope(decl).unwrap_or(scope);
         let mut frame: HashMap<String, CVal> = HashMap::new();
+        let mut types: HashMap<String, Ty> = HashMap::new();
         let mut k = 0;
         let mut ports: Vec<(String, Option<NodeRef>)> = Vec::new();
         if let Some(pl) = self.child(decl, PortList) {
@@ -72,20 +74,29 @@ impl Builder<'_> {
             }
         }
         for (n, dt) in ports {
-            let v = *vals.get(k)?;
+            let v = vals.get(k)?.clone();
             k += 1;
+            if let Some(d) = dt {
+                types.insert(n.clone(), Ty::of(d, fscope));
+            }
             frame.insert(n, self.fit(v, dt, fscope, env));
         }
         let ret_dt = self.child(decl, ReturnType).and_then(|r| self.child(r, DataType));
         let (fname, _) = self.name_of(decl)?;
+        if let Some(d) = ret_dt {
+            types.insert(fname.clone(), Ty::of(d, fscope));
+            types.insert(String::new(), Ty::of(d, fscope));
+        }
         frame.insert(fname.clone(), self.fit(CVal::int(0), ret_dt, fscope, env));
         self.frames.borrow_mut().push(frame);
+        self.ftypes.borrow_mut().push(types);
         let mut steps = 0;
         let flow = self.exec_list(&self.children(body), fscope, env, depth + 1, &mut steps);
+        self.ftypes.borrow_mut().pop();
         let frame = self.frames.borrow_mut().pop()?;
         let v = match flow? {
             Flow::Return(Some(v)) => v,
-            _ => *frame.get(&fname)?,
+            _ => frame.get(&fname)?.clone(),
         };
         Some(self.fit(v, ret_dt, fscope, env))
     }
@@ -165,7 +176,7 @@ impl Builder<'_> {
     }
 
     pub(crate) fn get_local(&self, name: &str) -> Option<CVal> {
-        self.frames.borrow().last()?.get(name).copied()
+        self.frames.borrow().last()?.get(name).cloned()
     }
 
     fn exec(&self, st: NodeRef, scope: usize, env: &Env, depth: usize, steps: &mut usize) -> Option<Flow> {
@@ -186,11 +197,15 @@ impl Builder<'_> {
                     }
                     let (n, _) = self.name_of(d)?;
                     let init = self.children(d).into_iter().find(|c| !matches!(self.kind(*c), Name | Dim));
-                    let v = match init {
-                        Some(e) => self.eval(e, scope, env, depth + 1)?,
-                        None => CVal::int(0),
+                    let v = match (init, dt) {
+                        (Some(e), Some(d)) => self.eval_typed(e, Ty::of(d, scope), scope, env, depth + 1)?,
+                        (Some(e), None) => self.eval(e, scope, env, depth + 1)?,
+                        (None, _) => CVal::int(0),
                     };
                     let v = self.fit(v, dt, scope, env);
+                    if let Some(d) = dt {
+                        self.ftypes.borrow_mut().last_mut()?.insert(n.clone(), Ty::of(d, scope));
+                    }
                     self.frames.borrow_mut().last_mut()?.insert(n, v);
                 }
                 Some(Flow::Next)
@@ -201,7 +216,13 @@ impl Builder<'_> {
                 Some(Flow::Next)
             }
             ReturnStmt => match self.children(st).first() {
-                Some(&e) => Some(Flow::Return(Some(self.eval(e, scope, env, depth + 1)?))),
+                Some(&e) => {
+                    let ret = self.ftypes.borrow().last().and_then(|t| t.get("").copied());
+                    Some(Flow::Return(Some(match ret {
+                        Some(t) => self.eval_typed(e, t, scope, env, depth + 1)?,
+                        None => self.eval(e, scope, env, depth + 1)?,
+                    })))
+                }
                 None => Some(Flow::Return(None)),
             },
             SeqBlock => self.exec_list(&self.children(st), scope, env, depth, steps),
@@ -209,7 +230,7 @@ impl Builder<'_> {
             IfStmt => {
                 let kids = self.children(st);
                 let cond = self.eval(*kids.first()?, scope, env, depth + 1)?;
-                if cond.v != 0 {
+                if cond.is_true() {
                     self.exec(*kids.get(1)?, scope, env, depth, steps)
                 } else {
                     match kids.iter().find(|k| self.kind(**k) == ElseClause) {
@@ -219,8 +240,74 @@ impl Builder<'_> {
                 }
             }
             LoopStmt => self.exec_loop(st, scope, env, depth, steps),
+            CaseStmt => self.exec_case(st, scope, env, depth, steps),
             _ => None,
         }
+    }
+
+    /// `case`, `casez`, `casex` (not `case inside`): the first item whose
+    /// label matches, else `default`.
+    fn exec_case(&self, st: NodeRef, scope: usize, env: &Env, depth: usize, steps: &mut usize) -> Option<Flow> {
+        let t = self.tree(st);
+        let own = self.own_tokens(st);
+        let kw = *own.iter().find(|k| matches!(**k, "case" | "casez" | "casex"))?;
+        if own.contains(&"inside") || own.contains(&"matches") {
+            return None;
+        }
+        let mut sel: Option<NodeRef> = None;
+        let mut labels: Vec<NodeRef> = Vec::new();
+        let mut is_default = false;
+        let mut items: Vec<(Vec<NodeRef>, bool, NodeRef)> = Vec::new();
+        let mut opened = 0;
+        for c in &t.node(st.node).children {
+            match *c {
+                sv_syntax::Child::Token(i) => match &*t.tokens[i as usize].text {
+                    "(" => opened += 1,
+                    "default" => is_default = true,
+                    _ => {}
+                },
+                sv_syntax::Child::Node(n) => {
+                    let r = NodeRef { tree: st.tree, node: n };
+                    if sel.is_none() && opened > 0 {
+                        sel = Some(r);
+                    } else if types::is_expr(self.kind(r)) {
+                        labels.push(r);
+                    } else {
+                        items.push((std::mem::take(&mut labels), std::mem::take(&mut is_default), r));
+                    }
+                }
+            }
+        }
+        let v = self.eval(sel?, scope, env, depth + 1)?;
+        let mut default = None;
+        for (labels, dflt, body) in items {
+            if dflt {
+                default = Some(body);
+            }
+            for l in labels {
+                if self.case_match(kw, &v, l, scope, env, depth)? {
+                    return self.exec(body, scope, env, depth, steps);
+                }
+            }
+        }
+        match default {
+            Some(b) => self.exec(b, scope, env, depth, steps),
+            None => Some(Flow::Next),
+        }
+    }
+
+    fn case_match(&self, kw: &str, v: &CVal, label: NodeRef, scope: usize, env: &Env, depth: usize) -> Option<bool> {
+        if kw != "case" && self.kind(label) == Literal {
+            let text = self.toks_of(label).concat();
+            if let Some((val, care)) = wild_literal(&text, kw == "casex") {
+                let w = v.w.max(val.w);
+                let x = v.cast(w, false).v.and(&care.cast(w, false).v);
+                let y = val.cast(w, false).v.and(&care.cast(w, false).v);
+                return Some(x == y);
+            }
+        }
+        let l = self.eval(label, scope, env, depth + 1)?;
+        Some(types::binary_op("==", v.clone(), l)?.is_true())
     }
 
     /// An expression evaluated for its effect: an assignment or `i++`.
@@ -231,11 +318,18 @@ impl Builder<'_> {
                 let op = *self.own_tokens(e).first()?;
                 let lhs = *kids.first()?;
                 let rhs = *kids.get(1)?;
+                if matches!(self.kind(lhs), MemberExpr | SelectExpr) {
+                    return self.assign_into(lhs, rhs, op, scope, env, depth);
+                }
                 if self.kind(lhs) != NameExpr {
                     return None;
                 }
                 let name = self.toks_of(lhs).concat();
-                let r = self.eval(rhs, scope, env, depth + 1)?;
+                let ty = self.ftypes.borrow().last().and_then(|t| t.get(&name).copied());
+                let r = match ty {
+                    Some(t) if op == "=" => self.eval_typed(rhs, t, scope, env, depth + 1)?,
+                    _ => self.eval(rhs, scope, env, depth + 1)?,
+                };
                 let v = if op == "=" {
                     r
                 } else {
@@ -255,7 +349,7 @@ impl Builder<'_> {
                     "--" => -1,
                     _ => return None,
                 };
-                self.set_local(&name, CVal { v: cur.v + d, ..cur }.norm())
+                self.set_local(&name, cur.bump(d))
             }
             _ => None,
         }
@@ -294,7 +388,7 @@ impl Builder<'_> {
                         return None;
                     }
                     if let Some(&c) = parts[1].first() {
-                        if self.eval(c, scope, env, depth + 1)?.v == 0 {
+                        if !self.eval(c, scope, env, depth + 1)?.is_true() {
                             break;
                         }
                     }
@@ -310,7 +404,7 @@ impl Builder<'_> {
             "while" => {
                 let cond = *parts[0].first()?;
                 let body = *parts[1].first()?;
-                while self.eval(cond, scope, env, depth + 1)?.v != 0 {
+                while self.eval(cond, scope, env, depth + 1)?.is_true() {
                     *steps += 1;
                     if *steps > MAX_STEPS {
                         return None;
@@ -322,7 +416,7 @@ impl Builder<'_> {
                 Some(Flow::Next)
             }
             "repeat" => {
-                let n = self.eval(*parts[0].first()?, scope, env, depth + 1)?.v;
+                let n = self.eval(*parts[0].first()?, scope, env, depth + 1)?.i();
                 let body = *parts[1].first()?;
                 for _ in 0..n.clamp(0, MAX_STEPS as i128) {
                     if let r @ Flow::Return(_) = self.exec(body, scope, env, depth, steps)? {
@@ -340,35 +434,36 @@ impl Builder<'_> {
         let kids = self.children(e);
         let own = self.own_tokens(e);
         if kids.len() == 2 && !own.contains(&",") && self.kind(kids[1]) == ConcatExpr {
-            let n = self.eval(kids[0], scope, env, depth + 1)?.v;
+            let n = self.eval(kids[0], scope, env, depth + 1)?.i();
             let inner = self.eval_concat(kids[1], scope, env, depth + 1)?;
-            if !(0..=128).contains(&n) || inner.w as i128 * n > 128 {
+            if !(0..=1 << 20).contains(&n) || inner.w as i128 * n > 1 << 24 {
                 return None;
             }
-            let mut v: i128 = 0;
+            let part = inner.v.trunc(inner.w, false);
+            let mut v = Int::from(0);
             for _ in 0..n {
-                v = (v << inner.w) | (inner.v & mask(inner.w));
+                v = v.shl(inner.w).or(&part);
             }
-            return Some(CVal { w: (inner.w as i128 * n).max(1) as u32, s: false, v }.norm());
+            return Some(CVal::new((inner.w as i128 * n).max(1) as u32, false, v));
         }
         let mut w = 0u32;
-        let mut v: i128 = 0;
+        let mut v = Int::from(0);
         for k in kids {
             let x = self.eval(k, scope, env, depth + 1)?;
-            w += x.w;
-            if w > 128 {
-                return None;
-            }
-            v = (v << x.w) | (x.v & mask(x.w));
+            w = w.checked_add(x.w)?;
+            v = v.shl(x.w).or(&x.v.trunc(x.w, false));
         }
-        Some(CVal { w: w.max(1), s: false, v }.norm())
+        Some(CVal::new(w.max(1), false, v))
     }
 
     /// `arr[i]` of a constant unpacked array parameter (`'{...}`).
     pub(crate) fn eval_select(&self, e: NodeRef, scope: usize, env: &Env, depth: usize) -> Option<CVal> {
         let kids = self.children(e);
         let base = *kids.first()?;
-        let idx = self.eval(*kids.get(1)?, scope, env, depth + 1)?.v;
+        if self.own_tokens(e).iter().any(|t| matches!(*t, ":" | "+:" | "-:")) {
+            return None;
+        }
+        let idx = self.eval(*kids.get(1)?, scope, env, depth + 1)?.i();
         let toks = self.toks_of(base);
         let (name, mut s) = match toks.as_slice() {
             [n] => (*n, scope),
@@ -382,17 +477,14 @@ impl Builder<'_> {
             }
             s = self.scopes[s].parent?;
         };
+        // Integral and packed constants: see `eval_packed_select`.
         if self.kind(val) != AssignPattern {
-            // A bit-select of an integral constant.
-            let v = self.eval(base, scope, env, depth + 1)?;
-            if idx < 0 || idx >= v.w as i128 {
-                return None;
-            }
-            return Some(CVal { w: 1, s: false, v: (v.v >> idx) & 1 });
+            return None;
         }
-        let elems: Vec<NodeRef> = self.children(val).into_iter().filter(|c| types::is_expr(self.kind(*c))).collect();
         // The declarator's first unpacked dimension decides the order.
         let decl = self.children(self.decl_of_const(name, decl_scope)?).into_iter().find(|d| self.kind(*d) == Dim);
+        decl?;
+        let elems: Vec<NodeRef> = self.children(val).into_iter().filter(|c| types::is_expr(self.kind(*c))).collect();
         let pos = match decl.and_then(|d| self.dim_range(d, decl_scope, env)) {
             Some((l, r)) if self.children(decl?).into_iter().filter(|c| types::is_expr(self.kind(*c))).count() == 2 => {
                 let p = if l >= r { l - idx } else { idx - l };
@@ -401,8 +493,10 @@ impl Builder<'_> {
             _ => idx,
         };
         let el = *elems.get(usize::try_from(pos).ok()?)?;
-        let v = self.eval(el, decl_scope, env, depth + 1)?;
-        Some(self.fit(v, dt, decl_scope, env))
+        match dt {
+            Some(d) => self.eval_typed(el, Ty::of(d, decl_scope), decl_scope, env, depth + 1),
+            None => self.eval(el, decl_scope, env, depth + 1),
+        }
     }
 
     /// The Declarator of a constant in a scope.
@@ -421,10 +515,36 @@ impl Builder<'_> {
     }
 }
 
-fn mask(w: u32) -> i128 {
-    if w >= 127 {
-        -1
-    } else {
-        (1i128 << w) - 1
+/// A based literal with wildcard digits (`3'b1??`; with x as well for
+/// `casex`): its value and the mask of bits that must match.
+fn wild_literal(text: &str, x_too: bool) -> Option<(CVal, CVal)> {
+    let text = text.replace('_', "");
+    let (size, rest) = text.split_at(text.find('\'')?);
+    let rest = rest[1..].trim_start_matches(['s', 'S']);
+    let mut chars = rest.chars();
+    let bits = match chars.next()?.to_ascii_lowercase() {
+        'b' => 1,
+        'o' => 3,
+        'h' => 4,
+        _ => return None,
+    };
+    let digits: Vec<char> = chars.collect();
+    let wild = |c: char| matches!(c, 'z' | 'Z' | '?') || (x_too && matches!(c, 'x' | 'X'));
+    if !digits.iter().any(|c| wild(*c)) {
+        return None;
     }
+    let (mut v, mut care) = (Int::from(0), Int::from(0));
+    let full = Int::from((1i128 << bits) - 1);
+    for c in digits {
+        v = v.shl(bits);
+        care = care.shl(bits);
+        if wild(c) {
+            continue;
+        }
+        let d = if matches!(c, 'x' | 'X') { 0 } else { c.to_digit(16)? };
+        v = v.or(&Int::from(d as i128));
+        care = care.or(&full);
+    }
+    let w = if size.is_empty() { 32 } else { size.parse().ok()? };
+    Some((CVal::new(w, false, v), CVal::new(w, false, care)))
 }
