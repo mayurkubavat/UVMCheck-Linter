@@ -118,6 +118,8 @@ fn main() -> ExitCode {
     checks.extend(sv_sema::checks::check(&trees, &scopes));
     let (hier_lines, elab_diags) = sv_sema::elaborate(&trees);
     checks.extend(elab_diags);
+    checks.extend(sv_sema::bind::check(&trees));
+    checks.extend(sv_sema::iclass::check(&trees));
     for d in checks {
         let t = &trees[d.tree];
         let Some((tok, _)) = t.token_bounds(d.node) else {

@@ -494,3 +494,23 @@ also fixed the parser for pasted `/``* *``/` comments in macros, typed
 ports and parameters with packed dimensions, attributes on port
 connections and doubly parenthesized implications. IEEE gate after N4:
 should_fail 61/75.
+
+### Phase N5: binding and class rules
+
+`sv-sema::bind` rejects identifiers that name nothing, as values or as
+types. A name must be declared in an enclosing class (or a class it
+extends, not one it implements: 8.26.3), design unit, package it imports,
+or the compilation unit; out-of-block methods and constraints see their
+class. It is lenient where it cannot be exact: a name declared anywhere in
+an enclosing design unit counts, a scope with an unknown base class or
+package is not checked, and names the hierarchy may resolve (called
+subroutines, the first name of a dotted path, bind, defparam) are left
+alone; implicit nets, `foreach` variables, pattern variables and `with`
+iterators count as declared. `sv-sema::iclass` checks interface classes:
+`implements` of a type parameter or of a class defined later, methods and
+type names inherited with conflicting definitions (also through two
+specializations of one class), and `C::x` of a parameterized class without
+`#()` (8.25.1). `checks` adds streams wider than their target and
+C-like flattened array patterns. IEEE gate after N5: should_fail 73/75,
+the same as Slang, legal 948/949 (the one rejected file Slang rejects too),
+and no false error on the repo or PULP common_cells.

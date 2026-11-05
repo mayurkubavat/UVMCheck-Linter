@@ -19,10 +19,12 @@ use dv_model::{
 };
 use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
+pub mod bind;
 mod body;
 pub mod checks;
 mod consteval;
 mod elab;
+pub mod iclass;
 pub mod names;
 pub mod scopes;
 mod types;

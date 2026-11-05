@@ -128,6 +128,62 @@ pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     out
 }
 
+/// Width of an integral type written with literal bounds only.
+fn literal_width(t: &Tree, dt: NodeId) -> Option<u64> {
+    let tk = toks(t, dt);
+    let mut w: u64 = match tk.first().copied()? {
+        "int" | "integer" => 32,
+        "shortint" => 16,
+        "longint" => 64,
+        "byte" => 8,
+        "bit" | "logic" | "reg" => 1,
+        _ => return None,
+    };
+    for d in t.children(dt) {
+        if t.kind(d) != Dim {
+            return None;
+        }
+        let (a, b) = literal_range(t, d)?;
+        w = w.checked_mul(a.abs_diff(b) + 1)?;
+    }
+    Some(w)
+}
+
+/// `[a:b]` or `[n]` with literal numbers.
+fn literal_range(t: &Tree, d: NodeId) -> Option<(i64, i64)> {
+    let tk = toks(t, d);
+    let nums: Vec<i64> = t
+        .children(d)
+        .map(|c| (t.kind(c) == Literal).then(|| t.bare_text(c).parse::<i64>().ok()).flatten())
+        .collect::<Option<_>>()?;
+    match (nums.as_slice(), tk.contains(&":")) {
+        ([a, b], true) => Some((*a, *b)),
+        ([n], false) if *n > 0 => Some((0, n - 1)),
+        _ => None,
+    }
+}
+
+/// `'{a, b, c}` for an unpacked array with another number of elements
+/// (10.10, 5.10: no C-like flattening).
+fn array_pattern(t: &Tree, n: NodeId, parent: &[u32], err: &mut impl FnMut(NodeId, String)) {
+    let Some(d) = up(parent, n) else { return };
+    if t.kind(d) != Declarator {
+        return;
+    }
+    let Some(dim) = t.children(d).find(|&c| t.kind(c) == Dim) else { return };
+    let Some((a, b)) = literal_range(t, dim) else { return };
+    let own = toks(t, n);
+    if own.contains(&":") || own.len() != t.children(n).count() + 1 {
+        // Keyed, `default:`, or a replication `'{n{...}}`.
+        return;
+    }
+    let count = t.children(n).count() as u64;
+    let want = a.abs_diff(b) + 1;
+    if count != want {
+        err(n, format!("array '{}' has {want} elements, not {count}", name_of(t, d)));
+    }
+}
+
 fn parents(t: &Tree) -> Vec<u32> {
     let mut parent = vec![u32::MAX; t.nodes.len()];
     for n in t.preorder() {
@@ -144,6 +200,60 @@ fn up(parent: &[u32], n: NodeId) -> Option<NodeId> {
 }
 
 impl Ctx<'_> {
+    /// A streaming concatenation assigned to a narrower integral target (11.4.14).
+    fn stream_into(&self, ix: usize, t: &Tree, n: NodeId, parent: &[u32], err: &mut impl FnMut(NodeId, String)) {
+        let Some(p) = up(parent, n) else { return };
+        let target = match t.kind(p) {
+            Declarator if t.children(p).last() == Some(n) => {
+                if t.child(p, Dim).is_some() {
+                    return;
+                }
+                let Some(dd) = up(parent, p) else { return };
+                t.child(dd, DataType).and_then(|dt| literal_width(t, dt))
+            }
+            BinaryExpr if toks(t, p).first() == Some(&"=") && t.children(p).nth(1) == Some(n) => {
+                let Some(lhs) = t.children(p).next() else { return };
+                self.name_decl(ix, t, lhs, parent)
+                    .filter(|d| !d.array)
+                    .and_then(|d| d.dtype.and_then(|dt| literal_width(&self.trees[d.tree], dt)))
+            }
+            _ => None,
+        };
+        let Some(target) = target else { return };
+        // The operands: in the inner `{...}`, after any slice size.
+        let mut width: u64 = 0;
+        let kids: Vec<NodeId> = t.children(n).collect();
+        let ops: Vec<NodeId> = {
+            // Children after the second `{`: the node list holds the slice
+            // size (if any) first.
+            let mut braces = 0;
+            let mut out = Vec::new();
+            for c in &t.node(n).children {
+                match c {
+                    Child::Token(i) if &*t.tokens[*i as usize].text == "{" => braces += 1,
+                    Child::Node(x) if braces >= 2 => out.push(*x),
+                    _ => {}
+                }
+            }
+            out
+        };
+        let _ = kids;
+        for o in ops {
+            let w = match t.kind(o) {
+                NameExpr => self
+                    .name_decl(ix, t, o, parent)
+                    .filter(|d| !d.array)
+                    .and_then(|d| d.dtype.and_then(|dt| literal_width(&self.trees[d.tree], dt))),
+                _ => None,
+            };
+            let Some(w) = w else { return };
+            width += w;
+        }
+        if width > target {
+            err(n, format!("stream of {width} bits is wider than its {target}-bit target"));
+        }
+    }
+
     /// The declaration a simple name at `at` refers to.
     fn resolve(&self, ix: usize, t: &Tree, at: NodeId, name: &str, parent: &[u32]) -> Option<Decl> {
         let mut cur = Some(at);
@@ -271,6 +381,10 @@ impl Ctx<'_> {
             }
             DataType if first_tok(t, n) == Some("enum") => self.enum_decl(t, n, &mut err),
             ExprStmt => self.assignment(ix, t, n, parent, &mut err),
+            ConcatExpr if matches!(toks(t, n).get(1).copied(), Some("<<" | ">>")) => {
+                self.stream_into(ix, t, n, parent, &mut err)
+            }
+            AssignPattern => array_pattern(t, n, parent, &mut err),
             Declarator => {
                 // `e v = 1;`
                 let Some(p) = up(parent, n) else { return };
