@@ -25,6 +25,12 @@ mod g_readability;
 mod g_readability2;
 mod g_style;
 mod g_style2;
+mod g_random;
+mod g_random_bug;
+mod g_random_dist;
+mod g_random_oop;
+mod g_random_sema;
+mod g_random_types;
 pub mod syntax;
 mod syntax2;
 mod syntax3;
@@ -228,6 +234,11 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_style2::rules());
     v.extend(g_readability::rules());
     v.extend(g_readability2::rules());
+    v.extend(g_random::rules());
+    v.extend(g_random_oop::rules());
+    v.extend(g_random_bug::rules());
+    v.extend(g_random_dist::rules());
+    v.extend(g_random_types::rules());
     v.sort_by_key(|r| r.id);
     v
 }

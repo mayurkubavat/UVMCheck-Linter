@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 252);
+    assert_eq!(r.len(), 287);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 252);
+    assert_eq!(ids.len(), 287);
 }
 
 #[test]
@@ -434,4 +434,42 @@ fn concurrency_sva_coverage_rules() {
         let got = found.iter().filter(|f| f.rule == id).count();
         assert_eq!(got, want, "{id}");
     }
+}
+
+#[test]
+fn group_e_random_and_correctness_rules() {
+    let src = "class beat; rand bit [7:0] data; endclass\n\
+               class item;\n\
+               localparam int MAX = 200;\n\
+               rand bit [3:0] mode; rand int len; rand int unsigned d;\n\
+               randc bit [31:0] wide; randc bit flag;\n\
+               rand beat beats[];\n\
+               real util; int unsigned bytes, cycles;\n\
+               constraint c1 { mode -> len > 10; }\n\
+               constraint c2 { d dist { 0 := 50, [1:MAX] := 50 }; }\n\
+               constraint c3 { solve mode before d; }\n\
+               function new(int len = 1);\n\
+               len = len;\n\
+               srandom(7);\n\
+               endfunction\n\
+               function void f(int a, int b);\n\
+               util = bytes / cycles;\n\
+               if (util == 1.5) a = 1;\n\
+               if (a == 1) b = 1; else if (a == 1) b = 2;\n\
+               g(b, a);\n\
+               endfunction\n\
+               function void g(int a, int b); endfunction\n\
+               endclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
+    for id in [
+        "SV-RND-019", "SV-RND-025", "SV-RND-026", "SV-RND-006", "SV-RND-017", "SV-RND-023", "SV-BUG-003", "SV-TST-001",
+        "SV-BUG-005", "SV-BUG-006", "SV-BUG-002", "SV-BUG-007",
+    ] {
+        assert_eq!(count(id), 1, "{id}: {found:?}");
+    }
+    let hint = found.iter().find(|f| f.rule == "SV-BUG-003").unwrap();
+    assert!(hint.message.contains("write 'this.len = len;'"), "{}", hint.message);
 }
