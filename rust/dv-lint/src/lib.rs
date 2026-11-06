@@ -93,11 +93,17 @@ impl Sink {
 
 pub type RuleFn = fn(&Design, &mut Sink);
 
+/// A rule that reads the class model and the syntax trees together (the
+/// C++ rules that walk slang's AST of method bodies): it gets every tree at
+/// once, numbered as the design numbers files.
+pub type MixedFn = fn(&Design, &[syntax::Cst], &mut Sink);
+
 /// What a rule reads.
 #[derive(Clone, Copy)]
 pub enum Check {
     Model(RuleFn),
     Syntax(syntax::SyntaxFn),
+    Mixed(MixedFn),
 }
 
 /// A ported rule: its id, name and check.
@@ -109,7 +115,7 @@ pub struct Rule {
 
 impl Rule {
     pub fn is_syntax(&self) -> bool {
-        matches!(self.check, Check::Syntax(_))
+        matches!(self.check, Check::Syntax(_) | Check::Mixed(_))
     }
 }
 
@@ -223,6 +229,7 @@ pub fn lint_all(
         }
     }
     let mut locator = sv_sema::Locator::new(design.files().to_vec());
+    let mixed = all.iter().any(|r| matches!(r.check, Check::Mixed(_)));
     if all.iter().any(Rule::is_syntax) {
         for (ix, tree) in trees.iter().enumerate() {
             let cst = syntax::Cst::new(tree, ix, locator);
@@ -231,10 +238,29 @@ pub fn lint_all(
                     run(&cst, &mut sink);
                 }
             }
+            if mixed {
+                // Number every file of the tree now, so that the trees of
+                // the mixed pass below share one file table.
+                for f in 0..tree.files.len() as u32 {
+                    cst.loc_at(sv_syntax::Origin { file: f, offset: 0 });
+                }
+            }
             locator = cst.into_locator();
         }
     }
     let files = locator.into_files();
+    if mixed {
+        let csts: Vec<syntax::Cst> = trees
+            .iter()
+            .enumerate()
+            .map(|(ix, t)| syntax::Cst::new(t, ix, sv_sema::Locator::new(files.clone())))
+            .collect();
+        for r in &all {
+            if let Check::Mixed(run) = r.check {
+                run(design, &csts, &mut sink);
+            }
+        }
+    }
     let mut f = sink.findings;
     f.retain(|x| !x.position_in(&files).0.contains("uvm_mock.svh"));
     f.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
