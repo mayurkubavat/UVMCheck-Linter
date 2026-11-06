@@ -211,16 +211,58 @@ fn rand_vars(ctx: &Ctx, c: &Cst, e: NodeId) -> Vec<(ClassId, String)> {
     out
 }
 
-/// A class's constraint blocks written in it: (name, block).
-fn constraint_blocks(c: &Cst, decl: NodeId) -> Vec<(String, NodeId)> {
-    c.items(decl)
-        .into_iter()
-        .filter(|&x| c.kind(x) == ConstraintDecl)
-        .filter_map(|x| {
-            let name = c.tree.child(x, Name).map(|n| c.tree.bare_text(n)).unwrap_or_default();
-            Some((name, c.tree.child(x, ConstraintBlock)?))
-        })
-        .collect()
+/// A class's constraint blocks, in member order: (name, tree, block). A
+/// prototype (`constraint c;`) has its out-of-block body.
+fn constraint_blocks<'a, 't>(ix: &Index<'a, 't>, c: &'a Cst<'t>, decl: NodeId) -> Vec<(String, &'a Cst<'t>, NodeId)> {
+    let cname = c.tree.child(decl, Name).map(|n| c.tree.bare_text(n)).unwrap_or_default();
+    let mut out = Vec::new();
+    for x in c.items(decl) {
+        let name = c.tree.child(x, Name).map(|n| c.tree.bare_text(n)).unwrap_or_default();
+        match c.kind(x) {
+            ConstraintDecl => {
+                if let Some(b) = c.tree.child(x, ConstraintBlock) {
+                    out.push((name, c, b));
+                }
+            }
+            ConstraintPrototype => {
+                let full = format!("{cname}::{name}");
+                let body = ix.csts.iter().find_map(|k| {
+                    k.nodes(ConstraintDecl)
+                        .into_iter()
+                        .find(|&n| k.tree.child(n, Name).is_some_and(|nm| k.tree.bare_text(nm) == full))
+                        .and_then(|n| k.tree.child(n, ConstraintBlock))
+                        .map(|b| (k, b))
+                });
+                if let Some((k, b)) = body {
+                    out.push((name, k, b));
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// The routine body around a node holds a syntax error or an unknown
+/// macro: slang marks the whole body bad and does not visit it.
+fn in_bad_body(c: &Cst, n: NodeId) -> bool {
+    let mut p = c.parent(n);
+    while let Some(x) = p {
+        if c.kind(x) == Body {
+            let Some((a, b)) = c.tree.token_bounds(x) else { return false };
+            if c.tree.errors.iter().any(|e| e.token >= a && e.token <= b) {
+                return true;
+            }
+            let (ta, tb) = (&c.tree.tokens[a as usize], &c.tree.tokens[b as usize]);
+            if ta.from_macro || tb.from_macro || ta.origin.file != tb.origin.file {
+                return false;
+            }
+            let (f, lo, hi) = (ta.origin.file, ta.origin.offset, tb.origin.offset);
+            return c.tree.pp_diagnostics.iter().any(|d| d.origin.file == f && d.origin.offset >= lo && d.origin.offset <= hi);
+        }
+        p = c.parent(x);
+    }
+    false
 }
 
 fn soft_constraint_shadowing(d: &Design, csts: &[Cst], out: &mut Sink) {
@@ -238,11 +280,11 @@ fn soft_constraint_shadowing(d: &Design, csts: &[Cst], out: &mut Sink) {
             }
             let Some((bc, bdecl)) = ix.decl(b.loc) else { continue };
             let bctx = Ctx { d, cls: b, m: None, td: Some(&ix.typedefs) };
-            for (_, blk) in constraint_blocks(bc, bdecl) {
+            for (_, bk, blk) in constraint_blocks(&ix, bc, bdecl) {
                 let mut es = Vec::new();
-                soft_exprs(bc, blk, &mut es);
+                soft_exprs(bk, blk, &mut es);
                 for e in es {
-                    for v in rand_vars(&bctx, bc, e) {
+                    for v in rand_vars(&bctx, bk, e) {
                         inherited.entry(v).or_insert_with(|| b.name.clone());
                     }
                 }
@@ -250,12 +292,12 @@ fn soft_constraint_shadowing(d: &Design, csts: &[Cst], out: &mut Sink) {
         }
         let ctx = Ctx { d, cls, m: None, td: Some(&ix.typedefs) };
         let mut seen: HashMap<(ClassId, String), usize> = HashMap::new();
-        let blocks = constraint_blocks(c, decl);
-        for (bi, (_, blk)) in blocks.iter().enumerate() {
+        let blocks = constraint_blocks(&ix, c, decl);
+        for (bi, &(_, bk, blk)) in blocks.iter().enumerate() {
             let mut es = Vec::new();
-            soft_exprs(c, *blk, &mut es);
+            soft_exprs(bk, blk, &mut es);
             for e in es {
-                for v in rand_vars(&ctx, c, e) {
+                for v in rand_vars(&ctx, bk, e) {
                     let other = if let Some(b) = inherited.get(&v) {
                         format!("base class '{b}'")
                     } else if let Some(&s) = seen.get(&v).filter(|&&s| s != bi) {
@@ -276,7 +318,7 @@ fn soft_constraint_shadowing(d: &Design, csts: &[Cst], out: &mut Sink) {
 is hidden from the reader. Keep one soft default and override it with a hard constraint.",
                             v.1
                         ),
-                        c.loc_of(e),
+                        bk.loc_of(e),
                     );
                     break;
                 }
@@ -294,7 +336,7 @@ is hidden from the reader. Keep one soft default and override it with a hard con
                 continue;
             }
             let Some(blk) = c.tree.child(n, WithClause).and_then(|w| c.tree.child(w, ConstraintBlock)) else { continue };
-            if in_library(d, c, n) {
+            if in_library(d, c, n) || in_bad_body(c, n) {
                 continue;
             }
             let mut es = Vec::new();
@@ -315,7 +357,7 @@ constraint, so readers cannot tell what value they will get. Drop 'soft'."
 }
 
 /// Inside a library class or uvm_pkg, or written in a library file.
-fn in_library(d: &Design, c: &Cst, n: NodeId) -> bool {
+pub(crate) fn in_library(d: &Design, c: &Cst, n: NodeId) -> bool {
     let f = d.file_name(c.loc_of(n));
     if f.contains("uvm_mock.svh") || f.contains("uvm_pkg.sv") {
         return true;

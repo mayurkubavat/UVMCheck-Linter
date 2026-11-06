@@ -83,7 +83,9 @@ fn user_routines<'a, 'd, 't>(d: &'d Design, ix: &Index<'a, 't>) -> Vec<Routine<'
     for c in ix.csts {
         for decl in free_routines(d, c) {
             // Out-of-block method bodies are the class's.
-            if c.tree.child(decl, Name).is_some_and(|n| c.tree.bare_text(n).contains("::")) {
+            if crate::g_meth_gotcha::in_library(d, c, decl)
+                || c.tree.child(decl, Name).is_some_and(|n| c.tree.bare_text(n).contains("::"))
+            {
                 continue;
             }
             let Some(body) = c.tree.child(decl, Body) else { continue };

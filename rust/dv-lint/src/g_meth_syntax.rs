@@ -124,7 +124,11 @@ impl<'t> Files<'t> {
             let line = lx.rest_of_line(i);
             match lx.text(i) {
                 "`define" if !line.is_empty() => {
-                    self.macros.insert(lx.text(line.start).to_string(), (f as u32, i));
+                    let name = lx.text(line.start);
+                    if DIRECTIVES.contains(&name) {
+                        continue;
+                    }
+                    self.macros.insert(name.to_string(), (f as u32, i));
                 }
                 "`undef" if !line.is_empty() => {
                     self.macros.remove(lx.text(line.start));
@@ -173,6 +177,38 @@ impl<'t> Files<'t> {
 fn live(tree: &Tree, f: u32, off: u32) -> bool {
     !tree.skipped.iter().any(|&(sf, s, e)| sf == f && s < off && off < e)
 }
+
+/// A conditional directive (token `i` of file `f`) was seen by the
+/// preprocessor. A skipped range runs from the first branch not taken, so a
+/// later `elsif, `else or `endif of the same conditional inside it is
+/// live; one of a conditional nested in skipped text is not.
+fn live_conditional(tree: &Tree, lx: &Lexed, f: u32, i: usize) -> bool {
+    let off = lx.toks[i].1;
+    let closes = matches!(lx.text(i), "`elsif" | "`else" | "`endif");
+    tree.skipped.iter().filter(|&&(sf, s, e)| sf == f && s < off && off < e).all(|&(_, s, _)| {
+        let Ok(j) = lx.toks.binary_search_by_key(&s, |t| t.1) else { return false };
+        let mut depth = 1;
+        for k in j + 1..i {
+            if lx.toks[k].0 != Kind::Directive {
+                continue;
+            }
+            match lx.text(k) {
+                "`ifdef" | "`ifndef" => depth += 1,
+                "`endif" => depth -= 1,
+                _ => {}
+            }
+        }
+        closes && depth == 1
+    })
+}
+
+/// Compiler directive names, which cannot be defined as macros.
+const DIRECTIVES: &[&str] = &[
+    "define", "undef", "undefineall", "ifdef", "ifndef", "elsif", "else", "endif", "include", "timescale", "default_nettype",
+    "resetall", "celldefine", "endcelldefine", "unconnected_drive", "nounconnected_drive", "line", "pragma",
+    "begin_keywords", "end_keywords", "__FILE__", "__LINE__", "default_decay_time", "default_trireg_strength",
+    "delay_mode_distributed", "delay_mode_path", "delay_mode_unit", "delay_mode_zero", "protect", "endprotect",
+];
 
 /// A token of a tree written in a user file (not made by a macro).
 fn user_tok(c: &Cst, fs: &Files, t: u32) -> bool {
@@ -288,6 +324,8 @@ fn define_for_constant(_: &Design, csts: &[Cst], out: &mut Sink) {
             match k {
                 Kind::IntegerLiteral | Kind::IntegerBase | Kind::RealLiteral | Kind::TimeLiteral => numbers += 1,
                 Kind::StringLiteral | Kind::TripleQuotedString => strings += 1,
+                // An unterminated string is still a string literal to slang.
+                Kind::Unknown if t.starts_with('"') => strings += 1,
                 // slang lexes the digits after a base as an identifier, or
                 // as a number and then an identifier when they start with a
                 // digit and go on with letters.
@@ -415,7 +453,7 @@ fn ifdef_in_reusable_class(_: &Design, csts: &[Cst], out: &mut Sink) {
                 if at < from || at >= to {
                     continue;
                 }
-                if k != Kind::Directive || !matches!(lx.text(i), "`ifdef" | "`ifndef" | "`elsif") || !live(c.tree, f, at) {
+                if k != Kind::Directive || !matches!(lx.text(i), "`ifdef" | "`ifndef" | "`elsif") || !live_conditional(c.tree, lx, f, i) {
                     continue;
                 }
                 if !seen.insert((f, at)) {
