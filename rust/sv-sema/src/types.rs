@@ -960,14 +960,21 @@ impl<'t> Builder<'t> {
                 }
             }
         }
-        let found = match path.len() {
+        let mut found = match path.len() {
             0 => None,
             1 => self.lookup(path[0], scope, depth + 1),
             _ => self.lookup_path(&path, scope, depth + 1),
         };
+        // A specialization's identity sees typedefs local to a block.
+        if found.is_none() && path.len() == 1 && self.keying.get() {
+            found = self.block_typedef(path[0], dt).map(|t| Found::Typedef(t, scope));
+        }
         match found {
             Some(Found::Class(c)) => {
                 let args = self.bind_args(c, dt, scope, env);
+                if self.keying.get() {
+                    return self.class_key_at(c, &args, depth + 1);
+                }
                 self.class_string(c, &args, depth + 1)
             }
             Some(Found::Typedef(t, s)) => {
@@ -1126,6 +1133,70 @@ impl<'t> Builder<'t> {
             }
             _ => Env::default(),
         }
+    }
+
+    /// A specialization's identity: its name and its arguments with every
+    /// typedef and parameter resolved (what slang compares, unlike the
+    /// printed form, where `C::T` stands for whatever T is bound to).
+    pub(crate) fn class_key(&self, c: usize, env: &Env) -> String {
+        let was = self.keying.replace(true);
+        let k = self.class_key_at(c, env, 0);
+        self.keying.set(was);
+        k
+    }
+
+    fn class_key_at(&self, c: usize, env: &Env, depth: usize) -> String {
+        let def = &self.classes[c];
+        let mut s = format!("{}@{}:{}", def.name, def.scope, def.params.len());
+        if !def.generic || depth > 24 {
+            return s;
+        }
+        s.push_str("#(");
+        let env = &self.complete_env(c, env);
+        for (k, (name, is_type, default)) in def.params.iter().enumerate() {
+            if k > 0 {
+                s.push(',');
+            }
+            if *is_type {
+                let printed = match env.get(name) {
+                    Some(b) => self.ts(b.node, b.scope, &b.env, true, depth + 1),
+                    None => default.map_or(String::new(), |d| self.ts(d, def.scope, env, true, depth + 1)),
+                };
+                s.push_str(&printed);
+            } else {
+                if let Some(b) = env.get(name) {
+                    if let [lit] = self.toks_of(b.node).as_slice() {
+                        if lit.starts_with('"') {
+                            s.push_str(lit);
+                            continue;
+                        }
+                    }
+                }
+                match self.const_named(name, def.scope, env, depth + 1) {
+                    Some(v) => {
+                        let shown = v.show();
+                        // A string parameter holds a string, whatever
+                        // integral form the value was computed in.
+                        let is_string = self.scopes[def.scope]
+                            .consts
+                            .get(name)
+                            .and_then(|(dt, _)| *dt)
+                            .is_some_and(|dt| self.own_tokens(dt).first() == Some(&"string"));
+                        match is_string.then(|| string_of(&v)).flatten() {
+                            Some(lit) => s.push_str(&lit),
+                            None => s.push_str(&shown),
+                        }
+                    }
+                    None => {
+                        if let Some(d) = default {
+                            s.push_str(&self.tree(*d).bare_text(d.node));
+                        }
+                    }
+                }
+            }
+        }
+        s.push(')');
+        s
     }
 
     /// `name#(args)` for a specialization, `name` otherwise.
@@ -1912,4 +1983,22 @@ fn time_exp(u: &str) -> Option<i32> {
         "s" => 15,
         _ => return None,
     })
+}
+
+/// The string literal a value's bytes spell (NULs dropped).
+fn string_of(v: &CVal) -> Option<String> {
+    if !v.known() {
+        return None;
+    }
+    let bits = v.bits_v();
+    let n = v.w.div_ceil(8);
+    let mut out = String::from("\"");
+    for k in (0..n).rev() {
+        let b = bits.bits(k * 8, 8).to_i128()? as u8;
+        if b != 0 {
+            out.push(b as char);
+        }
+    }
+    out.push('"');
+    Some(out)
 }

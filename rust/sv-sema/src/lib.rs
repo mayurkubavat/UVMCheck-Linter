@@ -381,6 +381,20 @@ pub fn symbol_info(
 }
 
 /// Models already parsed trees (one per compilation unit).
+/// How many specializations slang elaborates for each parameterized
+/// class, the default one included, by (tree, class declaration node).
+/// Classes in modules, interfaces and programs count too.
+pub fn spec_counts(trees: &[Tree]) -> HashMap<(usize, sv_syntax::NodeId), usize> {
+    let mut b = Builder::new(trees);
+    b.designs = true;
+    b.collect_names();
+    b.collect();
+    b.spec_counts
+        .iter()
+        .map(|(&c, &n)| ((b.classes[c].node.tree, b.classes[c].node.node), n))
+        .collect()
+}
+
 pub fn build(trees: &[Tree]) -> Design {
     let mut b = Builder::new(trees);
     b.collect_names();
@@ -479,6 +493,16 @@ struct TypeInfo {
     args: Env,
 }
 
+type SpecSets = HashMap<usize, std::collections::BTreeMap<String, (String, Env)>>;
+
+struct SpecUse {
+    r: NodeRef,
+    scope: usize,
+    head: String,
+    owner: Option<usize>,
+    dependent: Option<usize>,
+}
+
 struct Builder<'t> {
     trees: &'t [Tree],
     scopes: Vec<Scope>,
@@ -498,6 +522,11 @@ struct Builder<'t> {
     /// The specialization slang reads a parameterized class's members
     /// from: the one that prints first, as its type arguments.
     rep_env: HashMap<usize, Env>,
+    /// Set while [`Self::class_key`] prints: class types print canonically.
+    keying: std::cell::Cell<bool>,
+    /// Typedefs declared in blocks and routines, by name: tree, the
+    /// block's token bounds, the declaration's first token, the decl.
+    block_typedefs: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>>,
     /// Specializations slang elaborates per generic class (default included).
     spec_counts: HashMap<usize, usize>,
     /// Scope of each class and package node.
@@ -548,6 +577,8 @@ impl<'t> Builder<'t> {
             sub_names: HashSet::new(),
             interfaces: HashMap::new(),
             rep_env: HashMap::new(),
+            keying: Default::default(),
+            block_typedefs: HashMap::new(),
             spec_counts: HashMap::new(),
             node_scope: HashMap::new(),
             locator: Locator::default(),
@@ -1160,10 +1191,12 @@ impl<'t> Builder<'t> {
     /// For each specialized generic class, the specialization that prints
     /// first (slang reads the definition's members from that one).
     fn representatives(&mut self) {
+        self.collect_block_typedefs();
         // Every specialization by its printed form. Uses inside a generic
         // class that depend on its parameters specialize once per
         // specialization of that class, so this runs to a fixpoint.
-        let mut specs: HashMap<usize, std::collections::BTreeMap<String, Env>> = HashMap::new();
+        // Keyed by the canonical form (bindings resolved through typedefs
+        // and parameters), holding the printed form and the bindings.
         let mut uses = Vec::new();
         for tree in 0..self.trees.len() {
             let regions = self.regions(tree);
@@ -1191,12 +1224,6 @@ impl<'t> Builder<'t> {
                 }
                 let scope = Self::scope_at(&regions, first, self.unit);
                 let owner = self.generic_owner(scope);
-                if let Some(g) = owner {
-                    // Code inside an unspecialized generic is never elaborated.
-                    if !self.used_names.contains(&self.classes[g].name) {
-                        continue;
-                    }
-                }
                 // The enclosing generic class (innermost first) whose
                 // parameters the use depends on.
                 let mut dependent = None;
@@ -1210,31 +1237,174 @@ impl<'t> Builder<'t> {
                         .parent
                         .and_then(|_| self.generic_owner(self.classes[g].parent));
                 }
-                uses.push((r, scope, head.to_string(), dependent));
+                uses.push(SpecUse {
+                    r,
+                    scope,
+                    head: head.to_string(),
+                    owner,
+                    dependent,
+                });
             }
         }
-        for _round in 0..6 {
+        // Representatives come from the named specializations only.
+        let specs = self.spec_fixpoint(&uses, false);
+        // The engine also elaborates each definition's default
+        // specialization, and the uses inside it, so counts run the
+        // fixpoint again seeded with the defaults.
+        let full = self.spec_fixpoint(&uses, true);
+        if let Ok(only) = std::env::var("SV_SPECS_LIST") {
+            for (c, m) in &full {
+                if self.classes[*c].name == only {
+                    for (k, (shown, _)) in m {
+                        eprintln!("{k}  =>  {shown}");
+                    }
+                }
+            }
+        }
+        for c in 0..self.classes.len() {
+            if self.classes[c].generic {
+                self.spec_counts.insert(c, full.get(&c).map_or(0, |m| m.len()));
+            }
+        }
+        self.rep_env = specs
+            .into_iter()
+            .filter_map(|(c, m)| m.into_values().min_by(|a, b| a.0.cmp(&b.0)).map(|(_, env)| (c, env)))
+            .collect();
+        self.chain_cache.borrow_mut().clear();
+    }
+
+    fn collect_block_typedefs(&mut self) {
+        let mut out: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>> = HashMap::new();
+        for (ti, t) in self.trees.iter().enumerate() {
+            let mut stack = vec![t.root];
+            while let Some(n) = stack.pop() {
+                let in_block = !matches!(
+                    t.kind(n),
+                    ClassDecl | PackageDecl | ModuleDecl | InterfaceDecl | ProgramDecl
+                ) && n != t.root;
+                for c in t.children(n) {
+                    if in_block && t.kind(c) == TypedefDecl {
+                        let (Some(nm), Some((lo, hi)), Some((at, _))) =
+                            (t.child(c, Name), t.token_bounds(n), t.token_bounds(c))
+                        else {
+                            continue;
+                        };
+                        out.entry(t.bare_text(nm))
+                            .or_default()
+                            .push((ti, lo, hi, at, NodeRef { tree: ti, node: c }));
+                    }
+                    stack.push(c);
+                }
+            }
+        }
+        self.block_typedefs = out;
+    }
+
+    /// A typedef declared earlier in a block around `at`, innermost first.
+    pub(crate) fn block_typedef(&self, name: &str, at: NodeRef) -> Option<NodeRef> {
+        let first = self.trees[at.tree].token_range(at.node).first().copied()?;
+        self.block_typedefs
+            .get(name)?
+            .iter()
+            .filter(|(t, lo, hi, decl, _)| *t == at.tree && *lo <= first && first <= *hi && *decl < first)
+            .min_by_key(|(_, lo, hi, _, _)| hi - lo)
+            .map(|x| x.4)
+    }
+
+    /// `env` with every unbound parameter of `c` bound to its default; a
+    /// default sees the parameters before it (`type RSP = REQ`).
+    fn complete_env(&self, c: usize, env: &Env) -> Env {
+        let mut full: HashMap<String, Bound> = (**env).clone();
+        for (name, _, d) in &self.classes[c].params {
+            if full.contains_key(name) {
+                continue;
+            }
+            if let Some(d) = d {
+                let prev = std::rc::Rc::new(full.clone());
+                full.insert(
+                    name.clone(),
+                    Bound {
+                        node: *d,
+                        scope: self.classes[c].scope,
+                        env: prev,
+                    },
+                );
+            }
+        }
+        std::rc::Rc::new(full)
+    }
+
+    /// Specializations reachable from the uses, to a fixpoint, keyed by
+    /// the canonical form and holding the printed form and bindings. With
+    /// `defaults`, every generic's default specialization is a seed and
+    /// code in any generic with one is elaborated.
+    fn spec_fixpoint(&self, uses: &[SpecUse], defaults: bool) -> SpecSets {
+        let mut specs: SpecSets = HashMap::new();
+        if defaults {
+            for c in 0..self.classes.len() {
+                if self.classes[c].generic && self.classes[c].params.iter().all(|p| p.2.is_some()) {
+                    let env = self.complete_env(c, &Env::default());
+                    let key = self.class_key(c, &env);
+                    let shown = self.print_class(c, &env, 0);
+                    specs.entry(c).or_default().insert(key, (shown, env));
+                }
+            }
+        }
+        for _round in 0..32 {
             let mut changed = false;
-            for (r, scope, head, dependent) in &uses {
-                let envs: Vec<Env> = match dependent {
+            for u in uses {
+                if let Some(g) = u.owner {
+                    // Code inside an unspecialized generic is never elaborated.
+                    let live = self.used_names.contains(&self.classes[g].name) || (defaults && specs.contains_key(&g));
+                    if !live {
+                        continue;
+                    }
+                }
+                let envs: Vec<Env> = match u.dependent {
                     None => vec![Env::default()],
                     Some(g) => specs
-                        .get(g)
-                        .map(|m| m.values().cloned().collect())
+                        .get(&g)
+                        .map(|m| m.values().map(|v| v.1.clone()).collect())
                         .unwrap_or_default(),
                 };
                 for env in envs {
-                    let info = self.resolve_env(*r, *scope, &env, 0);
+                    let mut info = self.resolve_env(u.r, u.scope, &env, 0);
+                    // `C #(..)::member` specializes C.
+                    let named = matches!(info.resolved, Resolved::Class(c) if self.classes[c].name == u.head);
+                    if defaults && !named && self.child(u.r, ParamList).is_some() {
+                        let toks = self.own_tokens(u.r);
+                        let at = toks.iter().position(|t| *t == u.head.as_str());
+                        let path: Vec<&str> = toks[..at.map_or(0, |a| a + 1)]
+                            .iter()
+                            .copied()
+                            .filter(|t| *t != "::")
+                            .collect();
+                        let found = match path.len() {
+                            0 => None,
+                            1 => self.lookup(path[0], u.scope, 0),
+                            _ => self.lookup_path(&path, u.scope, 0),
+                        };
+                        if let Some(Found::Class(c)) = found {
+                            info.args = self.bind_args(c, u.r, u.scope, &env);
+                            info.resolved = Resolved::Class(c);
+                        }
+                    }
                     let Resolved::Class(c) = info.resolved else {
                         continue;
                     };
-                    if self.classes[c].name != *head || !self.classes[c].generic {
+                    if self.classes[c].name != u.head || !self.classes[c].generic {
                         continue;
                     }
-                    let key = self.print_class(c, &info.args, 0);
+                    let key = self.class_key(c, &info.args);
                     let m = specs.entry(c).or_default();
-                    if m.len() < 64 && !m.contains_key(&key) {
-                        m.insert(key, info.args);
+                    if m.len() < 256 && !m.contains_key(&key) {
+                        let shown = self.print_class(c, &info.args, 0);
+                        let env = if defaults {
+                            self.complete_env(c, &info.args)
+                        } else {
+                            info.args
+                        };
+                        m.insert(key, (shown, env));
                         changed = true;
                     }
                 }
@@ -1243,27 +1413,7 @@ impl<'t> Builder<'t> {
                 break;
             }
         }
-        // The engine also elaborates each definition's default
-        // specialization, which may equal one already named.
-        for c in 0..self.classes.len() {
-            if !self.classes[c].generic {
-                continue;
-            }
-            let named = specs.get(&c);
-            let mut n = named.map_or(0, |m| m.len());
-            if self.classes[c].params.iter().all(|p| p.2.is_some()) {
-                let default = self.print_class(c, &Env::default(), 0);
-                if !named.is_some_and(|m| m.contains_key(&default)) {
-                    n += 1;
-                }
-            }
-            self.spec_counts.insert(c, n);
-        }
-        self.rep_env = specs
-            .into_iter()
-            .filter_map(|(c, m)| m.into_iter().next().map(|(_, env)| (c, env)))
-            .collect();
-        self.chain_cache.borrow_mut().clear();
+        specs
     }
 
     /// Whether a type use depends on a parameter of generic class `g`,
@@ -1424,12 +1574,14 @@ impl<'t> Builder<'t> {
         for (name, is_type, default) in &self.classes[c].params {
             if *is_type && !full.contains_key(name) {
                 if let Some(d) = default {
+                    // A default sees the parameters before it.
+                    let prev = std::rc::Rc::new(full.clone());
                     full.insert(
                         name.clone(),
                         Bound {
                             node: *d,
                             scope: parent,
-                            env: Env::default(),
+                            env: prev,
                         },
                     );
                 }

@@ -316,6 +316,46 @@ pub fn lint_all(
     (files, f)
 }
 
+/// Visits of each generic class's body, one line per class, by the syntax
+/// engine and by the model: `<syntax count> <name>@<file>:<line> <model count>`.
+pub fn spec_report(design: &Design, trees: &[sv_syntax::Tree]) -> Vec<String> {
+    let mut locator = sv_sema::Locator::new(design.files().to_vec());
+    let mut rows = Vec::new();
+    for (ix, t) in trees.iter().enumerate() {
+        let cst = syntax::Cst::new(t, ix, locator);
+        for (node, k) in g_design_spec::spec_counts(&cst) {
+            let Some(nm) = cst.tree.child(sv_syntax::NodeId(node), sv_syntax::SyntaxKind::Name) else {
+                continue;
+            };
+            let Some(tok) = cst.first_tok(nm) else {
+                continue;
+            };
+            rows.push((k, cst.tree.bare_text(nm), cst.loc(tok), ix, sv_syntax::NodeId(node)));
+        }
+        locator = cst.into_locator();
+    }
+    let files = locator.into_files();
+    let base = |f: u32| {
+        files
+            .get(f as usize)
+            .map(|p| p.rsplit('/').next().unwrap_or("").to_string())
+            .unwrap_or_default()
+    };
+    let _ = design;
+    let model = sv_sema::spec_counts(trees);
+    let mut out: Vec<String> = rows
+        .into_iter()
+        .map(|(k, name, l, ix, node)| {
+            let m = model.get(&(ix, node)).map(|m| m.to_string()).unwrap_or("-".into());
+            // A class from a macro is where the macro is used, as slang says.
+            let (f, line) = l.expansion.unwrap_or((l.file, l.line));
+            format!("{k} {name}@{}:{line} {m}", base(f))
+        })
+        .collect();
+    out.sort();
+    out
+}
+
 // ---- model helpers with the C++ facade's exact semantics ----
 
 pub(crate) fn find_method<'a>(c: &'a Class, name: &str) -> Option<&'a Method> {

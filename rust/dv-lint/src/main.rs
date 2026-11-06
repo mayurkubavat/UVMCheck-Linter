@@ -9,6 +9,7 @@ use dv_model::Design;
 fn main() {
     let mut slang = false;
     let mut time = false;
+    let mut specs = false;
     let mut only: Vec<String> = Vec::new();
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
@@ -16,6 +17,7 @@ fn main() {
         match a.as_str() {
             "--slang" => slang = true,
             "--time" => time = true,
+            "--specs" => specs = true,
             "--rule" => only.extend(it.next()),
             "--list" => {
                 for r in dv_lint::rules() {
@@ -39,6 +41,13 @@ fn main() {
             std::process::exit(2);
         }
     };
+    if specs {
+        // How often the AST walk visits each generic class (`name@file:line`).
+        for l in dv_lint::spec_report(&design, &trees) {
+            println!("{l}");
+        }
+        return;
+    }
     let t = std::time::Instant::now();
     let (files, found) = dv_lint::lint_all(&design, &trees, |id| {
         only.is_empty() || only.iter().any(|o| o == id)
