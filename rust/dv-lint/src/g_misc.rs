@@ -36,6 +36,8 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "SV-PRF-003", name: "DynArrayIncrementalResizeInLoop", check: Mixed(ast_resize_in_loop) },
         Rule { id: "SV-ERR-003", name: "ProcessTerminationInClass", check: Syntax(termination_in_class) },
         Rule { id: "UVM-TST-002", name: "FixedDelayBeforeDrop", check: Syntax(fixed_delay_before_drop) },
+        Rule { id: "SV-PRF-009", name: "NbaOnClassProperty", check: Mixed(ast_nba_on_property) },
+        Rule { id: "SV-PRF-008", name: "QueueSlicePopFirst", check: Mixed(ast_queue_slice) },
     ]
 }
 
@@ -1213,6 +1215,8 @@ ast_rules! {
     ast_unshielded_format => unshielded_format,
     ast_zero_delay => zero_delay,
     ast_resize_in_loop => resize_in_loop,
+    ast_nba_on_property => nba_on_property,
+    ast_queue_slice => queue_slice,
 }
 
 /// The default value of each formal of the subroutines named `name` in the
@@ -1237,4 +1241,333 @@ fn formals(c: &Cst, name: &str) -> Vec<Option<NodeId>> {
         }
     }
     Vec::new()
+}
+
+// ---- names, resolved as slang binds them (within one tree) ----
+
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+enum DeclKind {
+    /// A method or block local, a loop variable.
+    Local,
+    Arg,
+    /// A class property.
+    Prop,
+    /// A module, interface, package or `$unit` variable or port.
+    Other,
+}
+
+/// A declared value: what it is, its declarator (the identity slang's
+/// symbol has) and its data type.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+struct Decl {
+    kind: DeclKind,
+    item: NodeId,
+    dtype: Option<NodeId>,
+}
+
+fn declarators_named(c: &Cst, decl: NodeId, name: &str) -> Option<NodeId> {
+    kids(c, decl).into_iter().find(|&d| {
+        c.kind(d) == Declarator && c.tree.child(d, Name).is_some_and(|x| c.tree.bare_text(x) == name)
+    })
+}
+
+fn find_in_items(c: &Cst, scope: NodeId, name: &str, kind: DeclKind) -> Option<Decl> {
+    for item in kids(c, scope) {
+        if c.kind(item) != DataDecl {
+            continue;
+        }
+        if let Some(d) = declarators_named(c, item, name) {
+            return Some(Decl { kind, item: d, dtype: c.tree.child(item, DataType) });
+        }
+    }
+    None
+}
+
+fn class_named(c: &Cst, name: &str) -> Option<NodeId> {
+    c.nodes(ClassDecl)
+        .into_iter()
+        .find(|&k| c.tree.child(k, Name).is_some_and(|x| c.tree.bare_text(x) == name))
+}
+
+/// The class `k` extends, by name, within the tree.
+fn base_class(c: &Cst, k: NodeId) -> Option<NodeId> {
+    let e = c.tree.child(k, Extends).or_else(|| c.tree.child(c.tree.child(k, Header)?, Extends))?;
+    let dt = kids(c, e).into_iter().next()?;
+    let toks = c.tree.token_range(dt);
+    let end = toks.iter().position(|&t| c.text_of(t) == "#").unwrap_or(toks.len());
+    let name = c.text_of(*toks[..end].last()?);
+    class_named(c, name).filter(|&b| b != k)
+}
+
+/// A property of class `k` or a base of it.
+fn class_property(c: &Cst, k: NodeId, name: &str) -> Option<Decl> {
+    let mut cur = Some(k);
+    let mut guard = 0;
+    while let Some(x) = cur {
+        if let Some(d) = find_in_items(c, x, name, DeclKind::Prop) {
+            return Some(d);
+        }
+        guard += 1;
+        if guard > 32 {
+            break;
+        }
+        cur = base_class(c, x);
+    }
+    None
+}
+
+/// What `name`, used at node `at`, refers to.
+fn resolve(c: &Cst, at: NodeId, name: &str) -> Option<Decl> {
+    let mut cur = c.parent(at);
+    while let Some(n) = cur {
+        match c.kind(n) {
+            SeqBlock | ParBlock | Body => {
+                if let Some(d) = find_in_items(c, n, name, DeclKind::Local) {
+                    return Some(d);
+                }
+            }
+            LoopStmt => {
+                if let Some(d) = find_in_items(c, n, name, DeclKind::Local) {
+                    return Some(d);
+                }
+                if c.keyword(n).is_some_and(|t| c.text_of(t) == "foreach")
+                    && c.toks(n).skip_while(|&t| c.text_of(t) != "[").any(|t| c.text_of(t) == name)
+                {
+                    return Some(Decl { kind: DeclKind::Local, item: n, dtype: None });
+                }
+            }
+            FunctionDecl | TaskDecl => {
+                if let Some(list) = c.tree.child(n, PortList) {
+                    for p in kids(c, list) {
+                        if c.kind(p) == Port {
+                            if let Some(d) = declarators_named(c, p, name) {
+                                return Some(Decl { kind: DeclKind::Arg, item: d, dtype: c.tree.child(p, DataType) });
+                            }
+                        }
+                    }
+                }
+                // `function T C::f`: the body sees C's members.
+                if let Some(nm) = c.tree.child(n, Name) {
+                    let toks = c.tree.token_range(nm);
+                    if toks.len() >= 3 && c.text_of(toks[toks.len() - 2]) == "::" {
+                        if let Some(k) = class_named(c, c.text_of(toks[toks.len() - 3])) {
+                            if let Some(d) = class_property(c, k, name) {
+                                return Some(d);
+                            }
+                        }
+                    }
+                }
+            }
+            ClassDecl => {
+                if let Some(d) = class_property(c, n, name) {
+                    return Some(d);
+                }
+            }
+            ModuleDecl | InterfaceDecl | ProgramDecl | PackageDecl | SourceFile => {
+                if let Some(d) = find_in_items(c, n, name, DeclKind::Other) {
+                    return Some(d);
+                }
+                if let Some(list) = c.tree.child(n, Header).and_then(|h| c.tree.child(h, PortList)) {
+                    for p in kids(c, list) {
+                        if c.kind(p) == Port {
+                            if let Some(d) = declarators_named(c, p, name) {
+                                return Some(Decl { kind: DeclKind::Other, item: d, dtype: c.tree.child(p, DataType) });
+                            }
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        cur = c.parent(n);
+    }
+    None
+}
+
+/// The type name a data type spells (`pkt`, `p::pkt`, `pkt#(8)`), through
+/// one typedef in the tree.
+fn type_head<'t>(c: &Cst<'t>, dt: NodeId) -> Option<&'t str> {
+    let toks = c.tree.token_range(dt);
+    let end = toks.iter().position(|&t| c.text_of(t) == "#").unwrap_or(toks.len());
+    let head = *toks[..end].last()?;
+    is_ident(c, head).then(|| c.text_of(head))
+}
+
+fn typedef_named(c: &Cst, name: &str) -> Option<NodeId> {
+    c.nodes(TypedefDecl)
+        .into_iter()
+        .find(|&t| c.tree.child(t, Name).is_some_and(|x| c.tree.bare_text(x) == name))
+}
+
+/// The declared type is a class handle.
+fn is_class_type(c: &Cst, d: &Decl) -> bool {
+    let Some(dt) = d.dtype else { return false };
+    if c.toks(dt).any(|t| c.text_of(t) == "virtual") || c.kind(d.item) != Declarator {
+        return false;
+    }
+    if c.tree.child(d.item, Dim).is_some() {
+        return false;
+    }
+    let mut name = match type_head(c, dt) {
+        Some(n) => n,
+        None => return false,
+    };
+    for _ in 0..4 {
+        if class_named(c, name).is_some() {
+            return true;
+        }
+        let Some(t) = typedef_named(c, name) else { return false };
+        if c.tree.child(t, Dim).is_some() {
+            return false;
+        }
+        match c.tree.child(t, DataType).and_then(|x| type_head(c, x)) {
+            Some(n) if n != name => name = n,
+            _ => return false,
+        }
+    }
+    false
+}
+
+/// `getSymbolReference()` of an assignment's left side.
+fn symbol_ref(c: &Cst, n: NodeId) -> Option<(Decl, String)> {
+    let n = unparen(c, n);
+    match c.kind(n) {
+        NameExpr => {
+            let t = c.first_tok(n)?;
+            if !is_ident(c, t) {
+                return None;
+            }
+            let name = c.text_of(t);
+            resolve(c, n, name).map(|d| (d, name.to_string()))
+        }
+        SelectExpr => symbol_ref(c, kids(c, n).first().copied()?),
+        MemberExpr => {
+            let base = kids(c, n).first().copied()?;
+            let member = last_tok(c, n)?;
+            let mname = c.text_of(member).to_string();
+            let b = unparen(c, base);
+            if c.kind(b) == NameExpr && c.first_tok(b).is_some_and(|t| matches!(c.text_of(t), "this" | "super")) {
+                let mut cur = c.parent(n);
+                while let Some(x) = cur {
+                    if c.kind(x) == ClassDecl {
+                        let start = if c.text_of(c.first_tok(b)?) == "super" { base_class(c, x)? } else { x };
+                        return class_property(c, start, &mname).map(|d| (d, mname));
+                    }
+                    if matches!(c.kind(x), FunctionDecl | TaskDecl) {
+                        if let Some(nm) = c.tree.child(x, Name) {
+                            let toks = c.tree.token_range(nm);
+                            if toks.len() >= 3 && c.text_of(toks[toks.len() - 2]) == "::" {
+                                let k = class_named(c, c.text_of(toks[toks.len() - 3]))?;
+                                return class_property(c, k, &mname).map(|d| (d, mname));
+                            }
+                        }
+                    }
+                    cur = c.parent(x);
+                }
+                return None;
+            }
+            let (bd, _) = symbol_ref(c, b)?;
+            if is_class_type(c, &bd) {
+                // A member of a class handle: the property itself.
+                let dt = bd.dtype?;
+                let k = class_named(c, type_head(c, dt)?)
+                    .or_else(|| {
+                        let t = typedef_named(c, type_head(c, dt)?)?;
+                        class_named(c, type_head(c, c.tree.child(t, DataType)?)?)
+                    })?;
+                return class_property(c, k, &mname).map(|d| (d, mname));
+            }
+            None
+        }
+        _ => None,
+    }
+}
+
+fn assignment_op<'t>(c: &Cst<'t>, n: NodeId) -> &'t str {
+    if c.kind(n) != BinaryExpr {
+        return "";
+    }
+    c.toks(n).next().map(|t| c.text_of(t)).unwrap_or("")
+}
+
+fn nba_on_property(c: &Cst, a: &Ast, s: &mut Sink) {
+    for n in c.nodes(BinaryExpr) {
+        if assignment_op(c, n) != "<=" || !c.parent(n).is_some_and(|p| c.kind(p) == ExprStmt) {
+            continue;
+        }
+        let Some(&lhs) = kids(c, n).first() else { continue };
+        let Some((d, name)) = symbol_ref(c, lhs) else { continue };
+        if d.kind != DeclKind::Prop {
+            continue;
+        }
+        let Some(at) = c.first_tok(lhs) else { continue };
+        s.add(
+            "SV-PRF-009",
+            "NbaOnClassProperty",
+            Severity::Warning,
+            format!(
+                "Non-blocking assignment ('<=') targeting class property '{name}'. \
+                 Unlike static module/interface registers, class instances reside on the dynamic heap. \
+                 Performing non-blocking assignments on class members forces the simulation kernel to allocate \
+                 dynamic event descriptors in the NBA event queue, causing severe scheduler queue thrashing. \
+                 Replace with blocking assignment ('=')."
+            ),
+            c.loc(at),
+        );
+        a.again(s, c, n);
+    }
+}
+
+/// The declared type is a queue (`T q[$]`, or a typedef of one).
+fn is_queue(c: &Cst, d: &Decl) -> bool {
+    let first_dim = |x: NodeId| c.tree.child(x, Dim).map(|dim| c.tree.bare_text(dim));
+    if c.kind(d.item) != Declarator {
+        return false;
+    }
+    if let Some(dim) = first_dim(d.item) {
+        return dim == "[$]" || dim.starts_with("[$:");
+    }
+    let Some(dt) = d.dtype else { return false };
+    let Some(name) = type_head(c, dt) else { return false };
+    typedef_named(c, name)
+        .and_then(first_dim)
+        .is_some_and(|dim| dim == "[$]" || dim.starts_with("[$:"))
+}
+
+fn queue_slice(c: &Cst, a: &Ast, s: &mut Sink) {
+    for n in c.nodes(BinaryExpr) {
+        if assignment_op(c, n) != "=" {
+            continue;
+        }
+        let k = kids(c, n);
+        let [lhs, rhs] = k[..] else { continue };
+        let Some((d, name)) = symbol_ref(c, lhs) else { continue };
+        if !is_queue(c, &d) {
+            continue;
+        }
+        let rhs = unparen(c, rhs);
+        if c.kind(rhs) != SelectExpr || c.tok(rhs, ":").is_none() {
+            continue;
+        }
+        let Some(&value) = kids(c, rhs).first() else { continue };
+        if symbol_ref(c, value).map(|x| x.0) != Some(d) {
+            continue;
+        }
+        let text = source_text(c, rhs);
+        if !(text.contains("1:$") || text.contains("1 : $")) {
+            continue;
+        }
+        let Some(at) = c.first_tok(lhs) else { continue };
+        s.add(
+            "SV-PRF-008",
+            "QueueSlicePopFirst",
+            Severity::Warning,
+            format!(
+                "Queue slicing '{name} = {name}[1:$]' duplicates the entire remaining queue into newly allocated memory. \
+                 Use in-place 'void'({name}.pop_front())' or 'item = {name}.pop_front()' for O(1) pointer adjustment."
+            ),
+            c.loc(at),
+        );
+        a.again(s, c, n);
+    }
 }
