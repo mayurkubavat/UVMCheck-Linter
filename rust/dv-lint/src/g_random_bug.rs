@@ -39,7 +39,23 @@ fn self_assignment(c: &Cst, s: &mut Sink) {
         }
         let (r, _) = strip_conv(c, r);
         let name = c.tree.bare_text(l);
-        if name.is_empty() || name != c.tree.bare_text(r) || !matches!(c.kind(r), NameExpr | MemberExpr) {
+        // slang binds `this.x` and `super.x` to the member itself.
+        fn member(t: &str) -> &str {
+            let mut t = t;
+            while let Some(r) = t.strip_prefix("this.").or_else(|| t.strip_prefix("super.")) {
+                t = r;
+            }
+            t
+        }
+        let rname = c.tree.bare_text(r);
+        // A plain name next to `this.x` is the member only when no formal
+        // or local of the routine takes the name.
+        let plain_is_member = |t: &str| member(t) != t || !routine_declares(c, n, t);
+        if name.is_empty()
+            || member(&name) != member(&rname)
+            || (name != rname && !(plain_is_member(&name) && plain_is_member(&rname)))
+            || !matches!(c.kind(r), NameExpr | MemberExpr)
+        {
             continue;
         }
         if !ast_ok(c, n) {
@@ -64,6 +80,26 @@ fn self_assignment(c: &Cst, s: &mut Sink) {
 
 /// `name` at `n` names a formal argument of the routine around it (and no
 /// local of its body).
+/// The routine around `n` declares `name` as a formal or a local.
+fn routine_declares(c: &Cst, n: NodeId, name: &str) -> bool {
+    let mut x = n;
+    while let Some(p) = c.parent(x) {
+        if matches!(c.kind(p), FunctionDecl | TaskDecl) {
+            let declares = |kind, holder: Option<NodeId>| {
+                holder.is_some_and(|h| {
+                    c.tree
+                        .children(h)
+                        .filter(|&d| c.kind(d) == kind)
+                        .any(|d| declarators(c, d).iter().any(|(_, v, _)| v == name))
+                })
+            };
+            return declares(DataDecl, c.tree.child(p, Body)) || declares(Port, c.tree.child(p, PortList));
+        }
+        x = p;
+    }
+    false
+}
+
 fn is_formal(c: &Cst, n: NodeId, name: &str) -> bool {
     let mut x = n;
     while let Some(p) = c.parent(x) {
