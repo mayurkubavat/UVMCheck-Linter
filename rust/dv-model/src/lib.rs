@@ -613,7 +613,7 @@ impl Design {
             }
         };
         let compile_errors = unsafe { ffi::uvmcheck_design_compile_errors(d) };
-        Ok(Design { files, classes, compile_errors, timings })
+        Ok(Design { files, classes, compile_errors, timings, specializations: Vec::new() })
     }
 
     pub fn classes(&self) -> &[Class] {
