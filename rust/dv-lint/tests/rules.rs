@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 129);
+    assert_eq!(r.len(), 148);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 129);
+    assert_eq!(ids.len(), 148);
 }
 
 #[test]
@@ -352,4 +352,32 @@ fn mirror_set_on_element_select() {
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |r| r == "RAL-ACC-001");
     assert_eq!(found.len(), 1);
     assert!(found[0].message.starts_with("Direct mirror update 'reg.set(...)'"));
+}
+
+#[test]
+fn group_g_rules() {
+    let dir = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/g_misc");
+    let mut files: Vec<_> = std::fs::read_dir(dir)
+        .unwrap()
+        .map(|e| e.unwrap().path())
+        .filter(|p| p.extension().is_some_and(|x| x == "sv" || x == "svh"))
+        .collect();
+    files.sort();
+    let mut found = Vec::new();
+    for p in files {
+        let tree = sv_syntax::parse_file(&p, Default::default());
+        let d = sv_sema::build(std::slice::from_ref(&tree));
+        found.extend(dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true).1.into_iter().map(|f| f.rule));
+    }
+    let count = |id: &str| found.iter().filter(|r| **r == id).count();
+    for id in [
+        "DPI-TYP-001", "SV-LOC-001", "SV-PRF-011", "SV-PRF-013", "SV-SYS-001", "SV-DED-005", "SV-DED-006",
+        "SV-DED-011", "SV-MOD-001", "SV-MAC-001", "SV-ERR-003", "UVM-TST-002", "PORT-PTH-001", "SEC-LOG-001",
+        "SV-PRF-005", "SV-PRF-004", "SV-PRF-003", "SV-PRF-009", "SV-PRF-008",
+    ] {
+        assert!(count(id) >= 1, "{id}");
+    }
+    // One NBA per specialization-free class site plus the module one; the
+    // interface member and the local are not class properties.
+    assert_eq!(count("SV-PRF-009"), 7);
 }

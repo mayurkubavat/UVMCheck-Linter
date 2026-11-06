@@ -242,16 +242,8 @@ fn in_clocked_loop(c: &Cst, fork: NodeId) -> bool {
         let kw = c.keyword(p).map(|t| c.text_of(t)).unwrap_or("");
         match c.kind(p) {
             ProceduralBlock if kw == "always_ff" => return true,
-            ProceduralBlock if kw == "always" => {
-                if has_edge_outside_fork(c, p) {
-                    return true;
-                }
-            }
-            LoopStmt | DoWhileStmt => {
-                if has_edge_outside_fork(c, p) {
-                    return true;
-                }
-            }
+            ProceduralBlock if kw == "always" && has_edge_outside_fork(c, p) => return true,
+            LoopStmt | DoWhileStmt if has_edge_outside_fork(c, p) => return true,
             _ => {}
         }
         cur = c.parent(p);
@@ -581,8 +573,9 @@ fn unit_pollution(c: &Cst, s: &mut Sink) {
 }
 
 fn header_macro_leak(c: &Cst, s: &mut Sink) {
-    let Some(first) = c.first_tok(c.tree.root) else { return };
-    let file = c.tree.tokens[first as usize].origin.file;
+    // A file of directives only has just the end-of-file token, which slang
+    // places in the file itself.
+    let file = c.first_tok(c.tree.root).map_or(0, |t| c.tree.tokens[t as usize].origin.file);
     let Some(path) = c.tree.files.get(file as usize) else { return };
     let full = std::fs::canonicalize(path).unwrap_or_else(|_| path.clone());
     let full = full.to_string_lossy().to_string();
@@ -1008,9 +1001,12 @@ fn is_library_class(c: &Cst, cls: NodeId) -> bool {
     path.contains("uvm_mock.svh") || path.contains("uvm_pkg.sv")
 }
 
+/// A class declaration, its name and its methods' (declaration, name).
+type ClassMethods = (NodeId, String, Vec<(NodeId, String)>);
+
 /// The user classes of the tree with their methods' declarations (in-class
 /// bodies and out-of-block `C::m` bodies; no pure or DPI ones).
-fn user_class_methods(c: &Cst) -> Vec<(NodeId, String, Vec<(NodeId, String)>)> {
+fn user_class_methods(c: &Cst) -> Vec<ClassMethods> {
     let mut out = Vec::new();
     let classes: Vec<NodeId> = c.nodes(ClassDecl).into_iter().filter(|&k| !is_library_class(c, k)).collect();
     let mut by_name: HashMap<String, usize> = HashMap::new();
@@ -1215,7 +1211,6 @@ ast_rules! {
     ast_unshielded_format => unshielded_format,
     ast_zero_delay => zero_delay,
     ast_resize_in_loop => resize_in_loop,
-    ast_nba_on_property => nba_on_property,
     ast_queue_slice => queue_slice,
 }
 
@@ -1490,7 +1485,34 @@ fn assignment_op<'t>(c: &Cst<'t>, n: NodeId) -> &'t str {
     c.toks(n).next().map(|t| c.text_of(t)).unwrap_or("")
 }
 
-fn nba_on_property(c: &Cst, a: &Ast, s: &mut Sink) {
+fn in_class(c: &Cst, n: NodeId) -> bool {
+    let mut cur = c.parent(n);
+    while let Some(x) = cur {
+        if c.kind(x) == ClassDecl {
+            return true;
+        }
+        cur = c.parent(x);
+    }
+    false
+}
+
+/// Slang skips a body it rejects, so only a non-blocking assignment the
+/// model kept (its body compiles) is reported; the model holds no module code.
+fn ast_nba_on_property(d: &Design, csts: &[Cst], s: &mut Sink) {
+    let kept: HashSet<(u32, u32, u32)> = d
+        .classes()
+        .iter()
+        .flat_map(|k| k.methods.iter())
+        .flat_map(|m| m.assignments.iter())
+        .filter(|x| x.is_non_blocking)
+        .map(|x| (x.loc.file, x.loc.line, x.loc.column))
+        .collect();
+    for c in csts {
+        nba_on_property(c, &Ast::new(d, c), &kept, s);
+    }
+}
+
+fn nba_on_property(c: &Cst, a: &Ast, kept: &HashSet<(u32, u32, u32)>, s: &mut Sink) {
     for n in c.nodes(BinaryExpr) {
         if assignment_op(c, n) != "<=" || !c.parent(n).is_some_and(|p| c.kind(p) == ExprStmt) {
             continue;
@@ -1501,6 +1523,10 @@ fn nba_on_property(c: &Cst, a: &Ast, s: &mut Sink) {
             continue;
         }
         let Some(at) = c.first_tok(lhs) else { continue };
+        let l = c.loc(at);
+        if in_class(c, n) && !kept.contains(&(l.file, l.line, l.column)) {
+            continue;
+        }
         s.add(
             "SV-PRF-009",
             "NbaOnClassProperty",
