@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 84);
+    assert_eq!(r.len(), 92);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 84);
+    assert_eq!(ids.len(), 92);
 }
 
 #[test]
@@ -250,5 +250,28 @@ fn syntax_rules_batch_five() {
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
     for id in ["PORT-PRP-001", "UVM-CFG-003", "UVM-CFG-004", "UVM-TLM-002", "UVM-STR-005", "SV-LSP-001", "SV-OCP-001", "SV-STR-001"] {
         assert_eq!(count(id), 1, "{id}");
+    }
+}
+
+#[test]
+fn syntax_rules_batch_six() {
+    let src = "module m(input clk, rst, a, b, c);\n\
+               property p2(x); @(posedge clk) 0 |=> b; endproperty\n\
+               assert property (@(posedge clk) disable iff (rst) a |-> b);\n\
+               covergroup cg @(posedge clk); cpa: coverpoint a; cpb: coverpoint b { bins b0 = {0}; }\n\
+               cpc: coverpoint c { bins b1 = {1}; }\n\
+               x: cross cpa, cpb, cpc; y: cross cpb, cpc { ignore_bins i = binsof(cpb); } endgroup\n\
+               endmodule\n\
+               class k; rand int q[];\n\
+               constraint k1 { q.size() < 10; }\n\
+               function void build_phase(uvm_phase phase); s.start(sqr); endfunction\n\
+               task t(); s.start(null); endtask\n\
+               endclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
+    for id in ["SV-COV-006", "SV-COV-010", "SV-COV-012", "UVM-PHS-004", "SVA-VAC-001", "SVA-RST-001", "SV-PRF-012", "UVM-SEQ-012"] {
+        assert!(count(id) >= 1, "{id}");
     }
 }
