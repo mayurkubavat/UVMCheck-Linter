@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 76);
+    assert_eq!(r.len(), 84);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 76);
+    assert_eq!(ids.len(), 84);
 }
 
 #[test]
@@ -226,4 +226,29 @@ fn syntax_rules_batch_four() {
     // A replication is not slang's ConcatenationExpression.
     assert_eq!(count("SV-PRF-010"), 1);
     assert_eq!(count("SV-CON-012"), 1);
+}
+
+#[test]
+fn syntax_rules_batch_five() {
+    let src = "class b; endclass\n\
+               class d extends b;\n\
+               function void f();\n\
+               $fsdbDumpvars;\n\
+               uvm_config_db#(int)::set(null, \"*\", \"x\", 1);\n\
+               uvm_config_db#(int)::get(this, \"\", \"x\", x);\n\
+               // a comment before a void cast\n\
+               void'(uvm_config_db#(int)::get(this, \"\", \"x\", x));\n\
+               port.try_get(p);\n\
+               p = c::type_id::create(\"c\", null);\n\
+               c1.constraint_mode(0);\n\
+               if ($cast(a, b)) ; else if ($cast(a, y)) ; else if ($cast(a, z)) ;\n\
+               a = {<< {b}}; a = {>> byte {b}};\n\
+               endfunction endclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
+    for id in ["PORT-PRP-001", "UVM-CFG-003", "UVM-CFG-004", "UVM-TLM-002", "UVM-STR-005", "SV-LSP-001", "SV-OCP-001", "SV-STR-001"] {
+        assert_eq!(count(id), 1, "{id}");
+    }
 }
