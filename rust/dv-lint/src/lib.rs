@@ -12,6 +12,7 @@ mod factory;
 pub mod syntax;
 mod syntax2;
 mod syntax3;
+mod syntax4;
 mod uvm;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -189,6 +190,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(syntax::rules());
     v.extend(syntax2::rules());
     v.extend(syntax3::rules());
+    v.extend(syntax4::rules());
     v.sort_by_key(|r| r.id);
     v
 }

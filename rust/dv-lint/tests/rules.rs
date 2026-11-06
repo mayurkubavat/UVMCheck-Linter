@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 71);
+    assert_eq!(r.len(), 76);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 71);
+    assert_eq!(ids.len(), 76);
 }
 
 #[test]
@@ -203,4 +203,27 @@ fn syntax_rules_batch_three_b() {
     // The body comment once per expansion.
     assert_eq!(todo.len(), 4, "{todo:?}");
     assert!(todo.iter().all(|m| !m.contains("dropped") && !m.contains("not taken")), "{todo:?}");
+}
+
+#[test]
+fn syntax_rules_batch_four() {
+    let src = "module m; int q[$]; string s; int a, b, i;\n\
+               initial begin\n\
+               if ((a == 1) & b) a = 1;\n\
+               if ((a = 1)) ;\n\
+               for (i = 0; i < 3; i++) begin\n\
+               // a comment before the change\n\
+               i += 1; s = {s, \"x\"}; s = {2{s}}; end\n\
+               foreach (q[n]) fork q[n] = 1; join_none\n\
+               end endmodule\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
+    assert_eq!(count("SV-COR-005"), 1);
+    assert_eq!(count("SV-COR-007"), 1);
+    assert_eq!(count("SV-COR-011"), 1);
+    // A replication is not slang's ConcatenationExpression.
+    assert_eq!(count("SV-PRF-010"), 1);
+    assert_eq!(count("SV-CON-012"), 1);
 }
