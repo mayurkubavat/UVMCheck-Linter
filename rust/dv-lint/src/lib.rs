@@ -12,6 +12,11 @@ mod factory;
 mod g_uvm;
 mod g_uvm2;
 mod g_misc;
+mod g_design;
+mod g_design_class;
+mod g_design_metrics;
+mod g_design_spec;
+mod g_design_types;
 pub mod syntax;
 mod syntax2;
 mod syntax3;
@@ -207,6 +212,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_uvm::rules());
     v.extend(g_uvm2::rules());
     v.extend(g_misc::rules());
+    v.extend(g_design::rules());
     v.sort_by_key(|r| r.id);
     v
 }
