@@ -1283,6 +1283,10 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
         "foreach" => {
             p.bump();
             group(p);
+            // IEEE 1800 12.7.3: a foreach body is a statement, not a null one.
+            if p.at(";") {
+                p.error("expected statement".into());
+            }
             statement_or_missing(p);
             LoopStmt
         }
