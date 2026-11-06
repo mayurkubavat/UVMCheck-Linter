@@ -64,6 +64,15 @@ pub(crate) struct Elab<'b, 't> {
     checked: HashSet<NodeRef>,
     /// `-top` names; empty: every module nothing instantiates.
     pub top: Vec<String>,
+    /// Generate items some instance takes, the branches of the `if` and
+    /// `case` generates decided in some instance, and the definitions
+    /// elaborated.
+    taken: HashSet<NodeRef>,
+    considered: HashSet<NodeRef>,
+    reached: HashSet<NodeRef>,
+    /// What no instance elaborates: generate items no instance takes, and
+    /// definitions that need parameter values and that nothing instantiates.
+    pub skipped: Vec<NodeRef>,
 }
 
 impl<'b, 't> Elab<'b, 't> {
@@ -113,6 +122,10 @@ impl<'b, 't> Elab<'b, 't> {
             diags: Vec::new(),
             checked: HashSet::new(),
             top: Vec::new(),
+            taken: HashSet::new(),
+            considered: HashSet::new(),
+            reached: HashSet::new(),
+            skipped: Vec::new(),
         }
     }
 
@@ -167,6 +180,64 @@ impl<'b, 't> Elab<'b, 't> {
             self.instance(&top, &top, &Overrides::new(), Vec::new(), Rc::new(HashMap::new()), 0);
         }
         self.out.sort();
+        let mut skipped: Vec<NodeRef> = self.considered.difference(&self.taken).copied().collect();
+        for d in self.defs.values() {
+            if !self.reached.contains(&d.decl) && self.needs_params(d.decl) {
+                skipped.push(d.decl);
+            }
+        }
+        skipped.sort_by_key(|r| (r.tree, r.node.0));
+        self.skipped = skipped;
+    }
+
+    /// The items of an `if` (with its `else if` chain) or `case` generate.
+    fn branches(&self, c: NodeRef, out: &mut Vec<NodeRef>) {
+        let b = self.b;
+        let kids = b.children(c);
+        if b.kind(c) == IfGenerate {
+            out.extend(kids.get(1).copied());
+            if let Some(e) = kids.iter().find(|k| b.kind(**k) == ElseClause) {
+                if let Some(&item) = b.children(*e).first() {
+                    if b.kind(item) == IfGenerate {
+                        self.branches(item, out);
+                    } else {
+                        out.push(item);
+                    }
+                }
+            }
+            return;
+        }
+        let t = b.tree(c);
+        let mut after_colon = false;
+        for ch in &t.node(c.node).children {
+            match *ch {
+                sv_syntax::Child::Token(i) => after_colon |= &*t.tokens[i as usize].text == ":",
+                sv_syntax::Child::Node(n) if after_colon => {
+                    out.push(NodeRef { tree: c.tree, node: n });
+                    after_colon = false;
+                }
+                _ => {}
+            }
+        }
+    }
+
+    /// Every condition, selector and label of the construct evaluates.
+    fn decided(&self, c: NodeRef, scope: usize, vals: &Vals) -> bool {
+        let b = self.b;
+        let kids = b.children(c);
+        if b.kind(c) == IfGenerate {
+            let Some(cond) = kids.first().and_then(|k| self.eval(*k, scope, vals)) else { return false };
+            if cond.is_true() {
+                return true;
+            }
+            return match kids.iter().find(|k| b.kind(**k) == ElseClause).and_then(|e| b.children(*e).first().copied()) {
+                Some(i) if b.kind(i) == IfGenerate => self.decided(i, scope, vals),
+                _ => true,
+            };
+        }
+        let mut items = Vec::new();
+        self.branches(c, &mut items);
+        kids.iter().filter(|k| !items.contains(k)).all(|k| self.eval(*k, scope, vals).is_some())
     }
 
     /// One instance of definition `def` at `path`.
@@ -196,6 +267,7 @@ impl<'b, 't> Elab<'b, 't> {
     fn instance_body(&mut self, def: &str, path: &str, over: &Overrides, depth: usize) {
         let Some(d) = self.defs.get(def) else { return };
         let (decl, scope) = (d.decl, d.scope);
+        self.reached.insert(decl);
         let b = self.b;
         let mut vals = Vals::new();
         // Header parameters: `#(parameter A = 1, int B = 2, localparam C = 3)`.
@@ -382,6 +454,11 @@ impl<'b, 't> Elab<'b, 't> {
                 IfGenerate | CaseGenerate => {
                     *construct += 1;
                     let n = *construct;
+                    if self.decided(c, scope, vals) {
+                        let mut all = Vec::new();
+                        self.branches(c, &mut all);
+                        self.considered.extend(all);
+                    }
                     let mut item = self.choose(c, scope, vals);
                     // `if (a) if (b) ...`: a nested construct with no
                     // block of its own belongs to this one.
@@ -394,6 +471,7 @@ impl<'b, 't> Elab<'b, 't> {
                         }
                     }
                     if let Some(item) = item {
+                        self.taken.insert(item);
                         self.block(item, None, path, scope, vals, depth, n);
                     }
                 }
@@ -479,7 +557,7 @@ impl<'b, 't> Elab<'b, 't> {
     ) {
         let b = self.b;
         let (label, items) = if b.kind(item) == GenerateBlock {
-            (self.label(item), b.children(item).into_iter().filter(|k| b.kind(*k) != EndLabel).collect())
+            (self.label(item), b.children(item).into_iter().filter(|k| !matches!(b.kind(*k), EndLabel | StmtLabel)).collect())
         } else {
             (None, vec![item])
         };
@@ -495,7 +573,7 @@ impl<'b, 't> Elab<'b, 't> {
 
     fn label(&self, block: NodeRef) -> Option<String> {
         let b = self.b;
-        let l = b.child(block, EndLabel)?;
+        let l = b.child(block, StmtLabel).or_else(|| b.child(block, EndLabel))?;
         b.own_tokens(l).last().map(|s| s.to_string()).filter(|s| *s != ":")
     }
 

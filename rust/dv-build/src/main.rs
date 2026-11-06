@@ -5,7 +5,7 @@
 //! builds a scope for every design unit and checks the names declared in
 //! them; types, constants, elaboration and type checking follow.
 //!
-//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--values] [--hier] [--quiet] <options, e.g. -f top.f FILE...>
+//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--cst] [--symbols] [--types] [--values] [--hier] [--quiet] <options, e.g. -f top.f FILE...>
 //!
 //! Diagnostics go to stdout as `file:line:col: error: message`, then a
 //! summary line `errors N`. --dump also prints the design: one line per
@@ -35,12 +35,14 @@ struct Diag {
 fn main() -> ExitCode {
     let mut dialect = Dialect::Any;
     let (mut dump, mut quiet, mut symbols, mut types, mut values) = (false, false, false, false, false);
+    let mut cst = false;
     let mut hier = false;
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         match a.as_str() {
             "--dump" => dump = true,
+            "--cst" => cst = true,
             "--quiet" => quiet = true,
             "--symbols" => symbols = true,
             "--hier" => hier = true,
@@ -65,7 +67,7 @@ fn main() -> ExitCode {
             }
             "-h" | "--help" => {
                 println!(
-                    "usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--symbols] [--types] [--values] [--hier] [--quiet] <options> FILE..."
+                    "usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--cst] [--symbols] [--types] [--values] [--hier] [--quiet] <options> FILE..."
                 );
                 return ExitCode::SUCCESS;
             }
@@ -117,10 +119,22 @@ fn main() -> ExitCode {
     let mut checks = sv_sema::names::check(&trees, &scopes);
     checks.extend(sv_sema::checks::check(&trees, &scopes));
     let tops: Vec<String> = list.top.iter().map(|t| t.value.clone()).collect();
-    let (hier_lines, elab_diags) = sv_sema::elaborate_tops(&trees, &tops);
+    let elab = sv_sema::elaborate_full(&trees, &tops);
+    let (hier_lines, elab_diags) = (elab.hierarchy, elab.diags);
     checks.extend(elab_diags);
-    checks.extend(sv_sema::bind::check(&trees));
+    // Names in what no instance elaborates are not checked (as in slang).
+    let skipped: Vec<(usize, u32, u32)> = elab
+        .skipped
+        .iter()
+        .filter_map(|&(tr, n)| trees[tr].token_bounds(n).map(|(a, b)| (tr, a, b)))
+        .collect();
+    checks.extend(sv_sema::bind::check(&trees).into_iter().filter(|d| {
+        let Some((a, _)) = trees[d.tree].token_bounds(d.node) else { return true };
+        !skipped.iter().any(|&(tr, s, e)| tr == d.tree && s <= a && a <= e)
+    }));
     checks.extend(sv_sema::iclass::check(&trees));
+    checks.extend(sv_sema::udp::check(&trees));
+    checks.extend(sv_sema::sva::check(&trees));
     for d in checks {
         let t = &trees[d.tree];
         let Some((tok, _)) = t.token_bounds(d.node) else {
@@ -142,6 +156,11 @@ fn main() -> ExitCode {
     if dump {
         for t in &trees {
             print_dump(t);
+        }
+    }
+    if cst {
+        for t in &trees {
+            print_cst(t, t.root, 0);
         }
     }
     if hier {
@@ -186,6 +205,23 @@ fn syntax_diagnostics(ix: usize, t: &Tree, loc: &mut Locator, out: &mut Vec<Diag
 }
 
 /// Declarations in source order, indented by nesting.
+/// The whole syntax tree: one node per line with its own tokens.
+fn print_cst(t: &Tree, n: sv_syntax::NodeId, depth: usize) {
+    let own: Vec<&str> = t
+        .node(n)
+        .children
+        .iter()
+        .filter_map(|c| match c {
+            sv_syntax::Child::Token(i) => Some(&*t.tokens[*i as usize].text),
+            sv_syntax::Child::Node(_) => None,
+        })
+        .collect();
+    println!("{}{:?} {}", "  ".repeat(depth), t.kind(n), own.join(" "));
+    for c in t.children(n) {
+        print_cst(t, c, depth + 1);
+    }
+}
+
 fn print_dump(t: &Tree) {
     let entries = sv_syntax::outline(t);
     let mut depth_of = std::collections::HashMap::new();

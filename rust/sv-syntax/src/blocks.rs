@@ -139,6 +139,19 @@ pub(crate) fn port_list(p: &mut Parser) {
 fn port(p: &mut Parser) {
     let m = p.start();
     attributes(p);
+    if p.at("default") && matches!(p.nth(1), "," | ")") {
+        // 1800-2023 `function new(int a, default);`
+        p.bump();
+        m.complete(p, Port);
+        return;
+    }
+    if p.at(".") && p.nth(1) == "*" {
+        // `module m(.*);`
+        p.bump();
+        p.bump();
+        m.complete(p, Port);
+        return;
+    }
     if p.at(".") {
         // `.name(expr)`
         p.bump();
@@ -420,6 +433,16 @@ fn expr_or_dist(p: &mut Parser) {
     let m = p.start();
     expr_with(p, NO_IMPLICATION);
     if p.at("dist") {
+        dist_list(p);
+        m.complete(p, ExprOrDist);
+    } else {
+        m.abandon(p);
+    }
+}
+
+/// `dist { range := w, ... }` after an expression.
+pub(crate) fn dist_list(p: &mut Parser) {
+    {
         p.bump();
         let d = p.start();
         p.expect("{");
@@ -439,9 +462,6 @@ fn expr_or_dist(p: &mut Parser) {
         }
         p.expect("}");
         d.complete(p, RangeList);
-        m.complete(p, ExprOrDist);
-    } else {
-        m.abandon(p);
     }
 }
 
@@ -732,6 +752,14 @@ fn bins_select_primary(p: &mut Parser) {
         p.expect(")");
     } else {
         expr_bp(p, 12, Flags::default());
+        if p.eat("matches") {
+            expr(p);
+        }
+        return;
+    }
+    // `binsof(a) with (a > 2) [matches n]`
+    if p.eat("with") {
+        crate::grammar::paren_expr(p);
         if p.eat("matches") {
             expr(p);
         }

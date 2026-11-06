@@ -30,6 +30,8 @@ mod packed;
 pub mod iclass;
 pub mod names;
 pub mod scopes;
+pub mod sva;
+pub mod udp;
 mod types;
 use SyntaxKind::*;
 
@@ -204,6 +206,19 @@ pub fn elaborate(trees: &[Tree]) -> (Vec<String>, Vec<names::Diag>) {
 /// [`elaborate`] from the given top modules (`-top`); none: every module
 /// nothing instantiates.
 pub fn elaborate_tops(trees: &[Tree], tops: &[String]) -> (Vec<String>, Vec<names::Diag>) {
+    let e = elaborate_full(trees, tops);
+    (e.hierarchy, e.diags)
+}
+
+/// What elaboration finds: the hierarchy lines, errors, and the nodes no
+/// instance elaborates (whose name errors slang does not report).
+pub struct Elaborated {
+    pub hierarchy: Vec<String>,
+    pub diags: Vec<names::Diag>,
+    pub skipped: Vec<(usize, sv_syntax::NodeId)>,
+}
+
+pub fn elaborate_full(trees: &[Tree], tops: &[String]) -> Elaborated {
     let mut b = Builder::new(trees);
     b.designs = true;
     b.collect_names();
@@ -211,7 +226,8 @@ pub fn elaborate_tops(trees: &[Tree], tops: &[String]) -> (Vec<String>, Vec<name
     let mut e = elab::Elab::new(&b);
     e.top = tops.to_vec();
     e.run();
-    (e.out, e.diags)
+    let skipped = e.skipped.iter().map(|r| (r.tree, r.node)).collect();
+    Elaborated { hierarchy: e.out, diags: e.diags, skipped }
 }
 
 /// Types (as [`symbol_types`]) and the values of parameters, specparams

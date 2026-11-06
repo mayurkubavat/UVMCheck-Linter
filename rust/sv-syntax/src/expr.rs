@@ -363,7 +363,7 @@ fn postfix(p: &mut Parser, mut lhs: Completed) -> Completed {
                 lhs = m.complete(p, ScopedExpr);
             }
             // `a[*2]`, `a[->1]`, `a[=3]`: a repetition, not a select.
-            "[" if matches!(p.nth(1), "*" | "->" | "=") => return lhs,
+            "[" if matches!(p.nth(1), "*" | "->" | "=") || (p.nth(1) == "+" && p.nth(2) == "]") => return lhs,
             "[" => {
                 let m = lhs.precede(p);
                 p.bump();
@@ -503,8 +503,19 @@ pub(crate) fn arg_list(p: &mut Parser) {
 
 /// An argument; checker and sequence actuals may be edge events.
 fn arg_value(p: &mut Parser) {
-    if p.at_any(&["posedge", "negedge", "edge"]) {
+    if p.at("default") && matches!(p.nth(1), "," | ")") {
+        // 1800-2023 `super.new(default)`, `extends Base(default)`
         p.bump();
+        return;
+    }
+    if p.at("@") {
+        // `$past(x,,, @(posedge clk))`
+        timing_control(p);
+        return;
+    }
+    if crate::assertions::arg_is_sequence(p) {
+        crate::assertions::property_expr(p);
+        return;
     }
     type_or_expr(p);
 }
@@ -604,6 +615,11 @@ pub(crate) fn pattern(p: &mut Parser) {
         if !p.eat("*") {
             p.bump();
         }
+    } else if p.at("(") && matches!(p.nth(1), "." | "tagged" | "'{") {
+        // `tagged Jmp (tagged JmpU .a)`
+        p.bump();
+        pattern(p);
+        p.expect(")");
     } else if p.at("tagged") {
         p.bump();
         p.bump();

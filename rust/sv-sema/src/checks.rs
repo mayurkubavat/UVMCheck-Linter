@@ -48,6 +48,10 @@ fn name_of(t: &Tree, n: NodeId) -> String {
 }
 
 const ASSIGN_OPS: &[&str] = &["=", "<=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "<<<=", ">>>="];
+pub(crate) fn is_assign_op(s: &str) -> bool {
+    ASSIGN_OPS.contains(&s)
+}
+
 const REAL_TYPES: &[&str] = &["real", "shortreal", "realtime"];
 const PROCEDURAL: &[&str] = &["initial", "always", "always_ff", "always_comb", "always_latch", "final"];
 

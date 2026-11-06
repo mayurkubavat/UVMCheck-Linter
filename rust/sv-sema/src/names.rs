@@ -52,7 +52,7 @@ const BUILTIN_METHODS: &[&str] = &["randomize", "rand_mode", "constraint_mode"];
 
 pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     let mut out = Vec::new();
-    redeclarations(scopes, &mut out);
+    redeclarations(trees, scopes, &mut out);
     let mut types: HashSet<String> = STD_TYPES.iter().map(|s| s.to_string()).collect();
     // Classes by name: whether each declaration may be instantiated.
     let mut classes: HashMap<String, Vec<bool>> = HashMap::new();
@@ -176,7 +176,7 @@ fn parents(t: &Tree) -> Vec<u32> {
 
 /// A name declared twice in one scope. A port and its net or variable
 /// share a name; `$unit` is checked per file.
-fn redeclarations(s: &Scopes, out: &mut Vec<Diag>) {
+fn redeclarations(trees: &[Tree], s: &Scopes, out: &mut Vec<Diag>) {
     let mut seen: HashMap<(usize, usize, &str), Vec<usize>> = HashMap::new();
     for (i, sym) in s.symbols.iter().enumerate() {
         if sym.scope == ROOT || sym.name.is_empty() {
@@ -190,7 +190,28 @@ fn redeclarations(s: &Scopes, out: &mut Vec<Diag>) {
         if ids.len() < 2 {
             continue;
         }
-        let ports = ids.iter().filter(|&&i| s.symbols[i].kind == SymKind::Port).count();
+        // A non-ANSI port list may name a port twice: `module m(a, a);`.
+        let bare = |i: usize| {
+            let sym = &s.symbols[i];
+            trees[sym.tree].token_bounds(sym.node).is_some_and(|(a, b)| a == b)
+        };
+        let port_ids: Vec<usize> = ids.iter().copied().filter(|&i| s.symbols[i].kind == SymKind::Port).collect();
+        let ids: Vec<usize> = if port_ids.len() > 1 && port_ids.iter().all(|&i| bare(i)) {
+            ids.iter().copied().filter(|i| !port_ids[1..].contains(i)).collect()
+        } else {
+            ids.clone()
+        };
+        if ids.len() < 2 {
+            continue;
+        }
+        // A function's `input i;` and its `logic [1:0] i;`.
+        let ports = ids
+            .iter()
+            .filter(|&&i| {
+                let sym = &s.symbols[i];
+                sym.kind == SymKind::Port || (sym.kind == SymKind::Argument && sym.dtype.is_none())
+            })
+            .count();
         let internal = ids.iter().filter(|&&i| matches!(s.symbols[i].kind, SymKind::Net | SymKind::Variable)).count();
         if ids.len() == 2 && ports == 1 && internal == 1 {
             continue;

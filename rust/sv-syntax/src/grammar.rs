@@ -162,7 +162,7 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
         if head == "class" {
             return Some(class_decl(p, q));
         }
-        if p.at("extern") && matches!(head, "module" | "macromodule" | "interface" | "program") {
+        if p.at("extern") && matches!(head, "module" | "macromodule" | "interface" | "program" | "primitive") {
             to_semi(p);
             return Some(OtherItem);
         }
@@ -224,7 +224,8 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
         "specparam" => crate::misc::specparam(p),
         "nettype" => crate::misc::nettype(p),
         "alias" => crate::misc::net_alias(p),
-        "$fatal" | "$error" | "$warning" | "$info" => {
+        // `$static_assert` is a Slang extension, accepted as an item.
+        "$fatal" | "$error" | "$warning" | "$info" | "$static_assert" => {
             expr(p);
             p.expect(";");
             ElabTask
@@ -306,7 +307,7 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
             statement(p);
             ProceduralBlock
         }
-        "assert" | "assume" | "cover" | "restrict" | "expect" => statement_body(p),
+        "assert" | "assume" | "cover" | "restrict" | "expect" => assertion_item(p),
         "for" if ctx != Ctx::Class => {
             p.bump();
             p.expect("(");
@@ -371,7 +372,7 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
                 p.bump();
                 p.bump();
                 l.complete(p, StmtLabel);
-                return Some(statement_body(p));
+                return Some(assertion_item(p));
             }
             if GATES.contains(&p.cur()) {
                 gate_instantiation(p);
@@ -394,14 +395,30 @@ fn item_body(p: &mut Parser, ctx: Ctx) -> Option<SyntaxKind> {
     Some(k)
 }
 
+/// An assertion among module items.
+fn assertion_item(p: &mut Parser) -> SyntaxKind {
+    if p.at("expect") || matches!(p.nth(1), "property" | "sequence") {
+        crate::assertions::concurrent_assertion_in(p, true);
+        return ConcurrentAssert;
+    }
+    statement_body(p)
+}
+
 /// True at an end keyword of an enclosing construct other than `own`.
 fn at_foreign_end(p: &Parser, own: &str) -> bool {
     p.at_any(END_KEYWORDS) && !p.at(own) && !matches!(p.cur(), "end" | "endcase")
 }
 
 fn generate_block(p: &mut Parser) {
-    if p.at("begin") {
+    if p.at("begin") || (p.at_ident() && p.nth(1) == ":" && p.nth(2) == "begin") {
         let m = p.start();
+        // `label : begin ... end`
+        if !p.at("begin") {
+            let l = p.start();
+            p.bump();
+            p.bump();
+            l.complete(p, StmtLabel);
+        }
         generate_block_inner(p);
         m.complete(p, GenerateBlock);
     } else if !item(p, Ctx::Generate) {
@@ -480,9 +497,10 @@ fn find_method_name(p: &Parser) -> Option<(usize, usize)> {
     let limit = i + 400;
     loop {
         match p.text_at(i) {
-            "(" | ";" | "" => break,
+            // `,` and `)` end a modport's `task t` with no ports.
+            "(" | ";" | "" | "," | ")" => break,
             "#" if p.text_at(i + 1) == "(" => i = skip_group_at(p, i + 1),
-            "[" => i = skip_group_at(p, i),
+            "[" | "{" => i = skip_group_at(p, i),
             _ => i += 1,
         }
         if i > limit {
@@ -494,8 +512,8 @@ fn find_method_name(p: &Parser) -> Option<(usize, usize)> {
         return None;
     }
     let mut s = end - 1;
-    // Walk back over `scope ::` pairs.
-    while s >= p.pos() + 2 && p.text_at(s - 1) == "::" {
+    // Walk back over `scope ::` pairs (and an interface port's `i.`).
+    while s >= p.pos() + 2 && matches!(p.text_at(s - 1), "::" | ".") {
         let mut t = s - 2;
         if p.text_at(t) == ")" {
             // `C#(T)::f`: back to the matching `(` and its `#`.
@@ -577,6 +595,10 @@ pub(crate) fn subroutine(p: &mut Parser, q: usize, proto: bool) -> SyntaxKind {
     }
     if p.at("(") {
         crate::blocks::port_list(p);
+    }
+    if proto && p.at_any(&[",", ")"]) {
+        // A modport's `import task t(int a), ...`.
+        return MethodPrototype;
     }
     p.expect(";");
     if proto {
@@ -762,6 +784,14 @@ pub(crate) fn is_decl_start(p: &Parser) -> bool {
         // `var x = 1;`, `const x = 1;`: no type.
         return true;
     }
+    if p.text_at(j) == "." && ident_at(p, j + 1) && ident_at(p, j + 2) {
+        // `I.mp x;`
+        return true;
+    }
+    if p.text_at(j) == "#" && p.text_at(j + 1) != "(" && ident_at(p, j + 2) {
+        // A user nettype with a delay: `nt #3 b;`.
+        return true;
+    }
     while p.text_at(j) == "[" {
         j = skip_group_at(p, j);
     }
@@ -775,6 +805,10 @@ fn is_instantiation(p: &Parser) -> bool {
         return false;
     }
     let mut j = i + 1;
+    // `pkg::checker_name inst (...)`
+    while p.text_at(j) == "::" && ident_at(p, j + 1) {
+        j += 2;
+    }
     if p.text_at(j) == "#" {
         if p.text_at(j + 1) == "(" {
             j = skip_group_at(p, j + 1);
@@ -883,6 +917,11 @@ pub(crate) fn data_type(p: &mut Parser) {
                     }
                     break;
                 }
+                // A non-ANSI interface port `I.mp x;`.
+                if p.at(".") && ident_at(p, p.pos() + 1) && ident_at(p, p.pos() + 2) {
+                    p.bump();
+                    p.bump();
+                }
             } else {
                 p.error(format!("expected a data type, found `{}`", p.cur()));
             }
@@ -945,6 +984,9 @@ pub(crate) fn data_decl(p: &mut Parser) {
         // `var x = 1;`, `input a;`: implicit type.
     } else {
         data_type(p);
+        if p.at("#") {
+            timing_control(p);
+        }
     }
     loop {
         declarator(p);
@@ -1033,6 +1075,10 @@ fn strength(p: &mut Parser) {
 fn instantiation(p: &mut Parser) {
     let t = p.start();
     p.bump();
+    while p.at("::") {
+        p.bump();
+        name_token(p);
+    }
     if p.at("#") && p.nth(1) == "(" {
         param_values(p);
     } else if p.at("#") {
@@ -1356,7 +1402,13 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
             crate::assertions::let_decl(p);
             LetDecl
         }
+        "nettype" => crate::misc::nettype(p),
         _ => {
+            // A checker instance in procedural code.
+            if is_instantiation(p) {
+                instantiation(p);
+                return Instantiation;
+            }
             if is_decl_start(p) {
                 data_decl(p);
                 return DataDecl;

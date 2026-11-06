@@ -69,3 +69,16 @@ fn stream_width_and_array_patterns() {
     );
     assert_eq!(e, ["stream of 64 bits is wider than its 32-bit target", "array 's2' has 2 elements, not 4"]);
 }
+
+#[test]
+fn names_declared_by_enum_ranges_patterns_and_crosses() {
+    let e = errors(
+        "class B #(type T = int); endclass\n\
+         module m;\n typedef enum { A[2], C[3:4] } e1;\n int j = A1 + C4;\n\
+         class K extends B #(enum {KA, KB}); endclass\n localparam int x = KB;\n\
+         struct {int a; real b;} s;\n initial begin static int b = s matches '{a:.i, b:.r} ? i : 0; end\n\
+         covergroup cg; coverpoint j; X: cross j, j { function CrossQueueType f(); endfunction } endgroup\n\
+         int bad = A2;\nendmodule\n",
+    );
+    assert_eq!(e, ["use of undeclared identifier 'A2'"]);
+}

@@ -48,6 +48,8 @@ const BUILTINS: &[&str] = &[
     "index",
     "randomize",
     "new",
+    // The queue type a cross's functions return (19.6.1.3).
+    "CrossQueueType",
 ];
 
 type Names = Rc<HashSet<String>>;
@@ -76,6 +78,8 @@ struct Binder<'a> {
     /// `None` when it cannot be known.
     visible: std::cell::RefCell<HashMap<At, Option<Names>>>,
     own: std::cell::RefCell<HashMap<At, Own>>,
+    /// How often each identifier occurs in the design.
+    uses: HashMap<String, usize>,
 }
 
 fn is_scope(k: SyntaxKind) -> bool {
@@ -122,7 +126,15 @@ pub fn check(trees: &[Tree]) -> Vec<Diag> {
         global: BUILTINS.iter().map(|s| s.to_string()).collect(),
         visible: Default::default(),
         own: Default::default(),
+        uses: HashMap::new(),
     };
+    for t in trees {
+        for tok in &t.tokens {
+            if matches!(tok.kind, Kind::Identifier | Kind::EscapedIdentifier) {
+                *b.uses.entry(norm(&tok.text).to_string()).or_default() += 1;
+            }
+        }
+    }
     for (ix, t) in trees.iter().enumerate() {
         for n in t.preorder() {
             let k = t.kind(n);
@@ -189,12 +201,36 @@ impl Binder<'_> {
                 if let Some(name) = t.child(n, Name).and_then(|x| last_ident(t, x)) {
                     names.insert(name);
                 }
+                // `class C extends B #(enum {X, Y})`: the enum's names are here.
+                if k == ClassDecl {
+                    if let Some(ext) = crate::names::extends(t, n) {
+                        stack.push(ext);
+                    }
+                }
                 continue;
             }
             match k {
                 Name => {
                     if let Some(x) = last_ident(t, n) {
                         names.insert(x);
+                    }
+                }
+                // `enum { A[2], B[3:4] }`: A0, A1, B3, B4.
+                Declarator if t.child(n, Dim).is_some() && t.child(n, Name).is_some() => {
+                    if let (Some(x), Some(d)) = (t.child(n, Name).and_then(|x| last_ident(t, x)), t.child(n, Dim)) {
+                        let nums: Vec<i64> = t
+                            .token_range(d)
+                            .iter()
+                            .filter_map(|&i| t.tokens[i as usize].text.replace('_', "").parse().ok())
+                            .collect();
+                        let range = match nums[..] {
+                            [n] => Some((0, n - 1)),
+                            [a, b] => Some((a.min(b), a.max(b))),
+                            _ => None,
+                        };
+                        if let Some((lo, hi)) = range.filter(|(lo, hi)| hi - lo < 4096) {
+                            names.extend((lo..=hi).map(|i| format!("{x}{i}")));
+                        }
                     }
                 }
                 EndLabel | StmtLabel | GenvarDecl => names.extend(ident_tokens(t, n).map(|x| x.to_string())),
@@ -207,6 +243,16 @@ impl Binder<'_> {
                     if toks_have(t, n, "matches")
                         || t.token_range(n).iter().any(|&i| &*t.tokens[i as usize].text == "matches") =>
                 {
+                    let r = t.token_range(n);
+                    for w in r.windows(2) {
+                        let (a, b) = (&t.tokens[w[0] as usize], &t.tokens[w[1] as usize]);
+                        if &*a.text == "." && matches!(b.kind, Kind::Identifier | Kind::EscapedIdentifier) {
+                            names.insert(norm(&b.text).to_string());
+                        }
+                    }
+                }
+                // `s matches '{a:.i} ? i : 0`
+                _ if toks_have(t, n, "matches") => {
                     let r = t.token_range(n);
                     for w in r.windows(2) {
                         let (a, b) = (&t.tokens[w[0] as usize], &t.tokens[w[1] as usize]);
@@ -359,6 +405,10 @@ impl Binder<'_> {
         let t = &self.trees[ix];
         let k = t.kind(n);
         let scope = if is_scope(k) { At { tree: ix, node: n } } else { scope };
+        if k == ClassDecl && self.unused_generic(t, n) {
+            // Slang checks a parameterized class only where it is specialized.
+            return;
+        }
         match k {
             // Resolved elsewhere, or names of something else.
             BindDirective | Attribute | SpecifyBlock | DisableStmt | UdpDecl | ConfigDecl | WithClause
@@ -476,6 +526,16 @@ impl Binder<'_> {
         for c in t.children(n) {
             self.walk(ix, c, scope, out);
         }
+    }
+
+    /// A class with parameters whose name occurs only in its declaration.
+    fn unused_generic(&self, t: &Tree, n: NodeId) -> bool {
+        if t.child(n, Header).and_then(|h| t.child(h, ParamList)).is_none() {
+            return false;
+        }
+        let Some(name) = t.child(n, Name).and_then(|x| last_ident(t, x)) else { return false };
+        let own = t.token_range(n).iter().filter(|&&i| norm(&t.tokens[i as usize].text) == name).count();
+        self.uses.get(&name).copied().unwrap_or(0) <= own
     }
 
     /// [`Binder::walk`] with a fixed set of visible names (an out-of-block

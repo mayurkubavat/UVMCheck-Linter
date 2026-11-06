@@ -85,6 +85,12 @@ fn operand(p: &mut Parser) -> bool {
             }
             property_expr(p);
         }
+        "posedge" | "negedge" | "edge" => {
+            p.bump();
+            if !operand(p) {
+                p.error("expected an expression".into());
+            }
+        }
         "strong" | "weak" if p.nth(1) == "(" => {
             p.bump();
             p.bump();
@@ -140,9 +146,13 @@ fn operand(p: &mut Parser) -> bool {
         "(" if is_paren_sequence(p) => {
             p.bump();
             property_expr(p);
-            // Match items: `(a, x = y, n++)`.
+            // Match items: `(a, x = y, n++)`; an event list's `(e1, e2 iff c)`.
             while p.eat(",") {
-                expr_with(p, ASSIGNABLE);
+                if arg_is_sequence(p) {
+                    property_expr(p);
+                } else {
+                    expr_with(p, ASSIGNABLE);
+                }
             }
             p.expect(")");
         }
@@ -151,10 +161,57 @@ fn operand(p: &mut Parser) -> bool {
                 m.abandon(p);
                 return false;
             }
+            if p.at("dist") {
+                crate::blocks::dist_list(p);
+            }
         }
     }
     m.complete(p, SequenceExpr);
     true
+}
+
+/// Lookahead: an argument up to its `,` or `)` is a sequence, property
+/// or event expression (a sequence or checker instance's actual).
+pub(crate) fn arg_is_sequence(p: &Parser) -> bool {
+    if p.at_any(&["posedge", "negedge", "edge", "@", "##"]) || p.at_any(PROP_UNARY) && p.nth(1) != "(" {
+        return true;
+    }
+    let mut i = p.pos();
+    let mut depth = 0i32;
+    loop {
+        let t = p.text_at(i);
+        match t {
+            "" | ";" => return false,
+            "(" | "{" | "'{" => {
+                if depth == 0
+                    && t == "("
+                    && !matches!(p.text_at(i.wrapping_sub(1)), "'" | "#")
+                    && !matches!(p.kind_at(i.wrapping_sub(1)), Some(sv_lexer::Kind::Identifier | sv_lexer::Kind::SystemIdentifier))
+                    && paren_sequence_at(p, i, 0)
+                {
+                    return true;
+                }
+                depth += 1;
+            }
+            "[" => {
+                if depth == 0 && (matches!(p.text_at(i + 1), "*" | "->" | "=") || p.text_at(i + 1) == "+" && p.text_at(i + 2) == "]") {
+                    return true;
+                }
+                depth += 1;
+            }
+            ")" | "]" | "}" => {
+                if depth == 0 {
+                    return false;
+                }
+                depth -= 1;
+            }
+            "," if depth == 0 => return false,
+            "##" | "@" | "|->" | "|=>" | "#-#" | "#=#" | "dist" if depth == 0 => return true,
+            _ if depth == 0 && SEQ_BINARY.contains(&t) && p.kind_at(i) == Some(sv_lexer::Kind::Keyword) => return true,
+            _ => {}
+        }
+        i += 1;
+    }
 }
 
 /// `[*n]`, `[*n:m]`, `[*]`, `[+]`, `[->n]`, `[=n:$]` after an operand.
@@ -241,6 +298,12 @@ fn paren_sequence_at(p: &Parser, open: usize, nest: u32) -> bool {
 /// `assert property (spec) action`, `cover sequence (...)`, `expect (...)`,
 /// with the keyword at the cursor.
 pub(crate) fn concurrent_assertion(p: &mut Parser) {
+    concurrent_assertion_in(p, false);
+}
+
+/// [`concurrent_assertion`]; as a module item (`item`), an `else` after
+/// an empty pass statement belongs to an enclosing generate `if`.
+pub(crate) fn concurrent_assertion_in(p: &mut Parser, item: bool) {
     p.bump();
     p.eat("property");
     p.eat("sequence");
@@ -248,8 +311,12 @@ pub(crate) fn concurrent_assertion(p: &mut Parser) {
     property_spec(p);
     p.expect(")");
     if !p.at("else") {
+        let empty = p.at(";");
         if !statement(p) {
             p.error("expected a statement".into());
+        }
+        if empty && item {
+            return;
         }
     }
     if p.at("else") {
@@ -459,6 +526,10 @@ pub(crate) fn bind(p: &mut Parser) {
     }
     let t = p.start();
     name_token(p);
+    while p.at("::") {
+        p.bump();
+        name_token(p);
+    }
     if p.at("#") && p.nth(1) == "(" {
         crate::expr::param_values(p);
     }
