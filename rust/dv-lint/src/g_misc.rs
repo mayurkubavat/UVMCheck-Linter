@@ -858,25 +858,32 @@ fn int_value(c: &Cst, n: NodeId) -> Option<u128> {
 }
 
 fn unshielded_format(c: &Cst, a: &Ast, s: &mut Sink) {
-    fn walk(c: &Cst, a: &Ast, n: NodeId, guard: usize, s: &mut Sink) {
+    fn walk(c: &Cst, a: &Ast, t: &Formals, n: NodeId, guard: usize, s: &mut Sink) {
         let mut guard = guard;
         if c.kind(n) == IfStmt
-            && kids(c, n).first().is_some_and(|&cond| source_text(c, cond).contains("uvm_report_enabled"))
+            && c.tree.children(n).next().is_some_and(|cond| source_text(c, cond).contains("uvm_report_enabled"))
         {
             guard += 1;
         }
-        if guard == 0 {
+        // Only a call named like uvm_info/uvm_warning can fire: test the
+        // name before building the call site's arguments.
+        let named = c.kind(n) == CallExpr
+            && c.tree.children(n).next().is_some_and(|callee| {
+                let t = c.last_text(callee);
+                ["uvm_report_info", "uvm_info", "uvm_report_warning", "uvm_warning"].iter().any(|w| t.contains(w))
+            });
+        if guard == 0 && named {
             if let Some(call) = call_site(c, n) {
-                if check(c, &call, s) {
+                if check(c, t, &call, s) {
                     a.again(s, c, n);
                 }
             }
         }
-        for k in kids(c, n) {
-            walk(c, a, k, guard, s);
+        for k in c.tree.children(n) {
+            walk(c, a, t, k, guard, s);
         }
     }
-    fn check(c: &Cst, call: &CallSite, s: &mut Sink) -> bool {
+    fn check(c: &Cst, table: &Formals, call: &CallSite, s: &mut Sink) -> bool {
         let n = &call.name;
         let info_or_warning = ["uvm_report_info", "uvm_info", "uvm_report_warning", "uvm_warning"]
             .iter()
@@ -885,7 +892,7 @@ fn unshielded_format(c: &Cst, a: &Ast, s: &mut Sink) {
             return false;
         }
         // slang's arguments() has one per formal, defaults filled in.
-        let ports = formals(c, n);
+        let ports = table.get(n.as_str()).cloned().unwrap_or_default();
         if ports.len().max(call.args.len()) < 2 {
             return false;
         }
@@ -920,7 +927,7 @@ fn unshielded_format(c: &Cst, a: &Ast, s: &mut Sink) {
         );
         true
     }
-    walk(c, a, c.tree.root, 0, s);
+    walk(c, a, &formals(c), c.tree.root, 0, s);
 }
 
 fn zero_delay(c: &Cst, a: &Ast, s: &mut Sink) {
@@ -1216,26 +1223,30 @@ ast_rules! {
 
 /// The default value of each formal of the subroutines named `name` in the
 /// tree (the first declaration found), `None` for a formal without one.
-fn formals(c: &Cst, name: &str) -> Vec<Option<NodeId>> {
+/// For each subroutine name, the default of each formal: the first
+/// function, then task, then prototype of that name in the tree.
+type Formals<'t> = HashMap<&'t str, Vec<Option<NodeId>>>;
+
+fn formals<'t>(c: &Cst<'t>) -> Formals<'t> {
+    let mut out = HashMap::new();
     for kind in [FunctionDecl, TaskDecl, MethodPrototype] {
         for n in c.nodes(kind) {
             let Some(nm) = c.tree.child(n, Name) else { continue };
-            if c.last_text(nm) != name {
-                continue;
-            }
-            let Some(list) = c.tree.child(n, PortList) else { return Vec::new() };
-            return kids(c, list)
-                .into_iter()
-                .filter(|&p| c.kind(p) == Port)
-                .map(|p| {
-                    let d = c.tree.child(p, Declarator)?;
-                    let eq = c.tok(d, "=")?;
-                    c.node_after(d, eq)
-                })
-                .collect();
+            out.entry(c.last_text(nm)).or_insert_with(|| {
+                let Some(list) = c.tree.child(n, PortList) else { return Vec::new() };
+                c.tree
+                    .children(list)
+                    .filter(|&p| c.kind(p) == Port)
+                    .map(|p| {
+                        let d = c.tree.child(p, Declarator)?;
+                        let eq = c.tok(d, "=")?;
+                        c.node_after(d, eq)
+                    })
+                    .collect()
+            });
         }
     }
-    Vec::new()
+    out
 }
 
 // ---- names, resolved as slang binds them (within one tree) ----
@@ -1567,20 +1578,21 @@ fn queue_slice(c: &Cst, a: &Ast, s: &mut Sink) {
         }
         let k = kids(c, n);
         let [lhs, rhs] = k[..] else { continue };
-        let Some((d, name)) = symbol_ref(c, lhs) else { continue };
-        if !is_queue(c, &d) {
-            continue;
-        }
+        // Cheap shape test first: symbol lookups are costly.
         let rhs = unparen(c, rhs);
         if c.kind(rhs) != SelectExpr || c.tok(rhs, ":").is_none() {
             continue;
         }
-        let Some(&value) = kids(c, rhs).first() else { continue };
-        if symbol_ref(c, value).map(|x| x.0) != Some(d) {
-            continue;
-        }
         let text = source_text(c, rhs);
         if !(text.contains("1:$") || text.contains("1 : $")) {
+            continue;
+        }
+        let Some((d, name)) = symbol_ref(c, lhs) else { continue };
+        if !is_queue(c, &d) {
+            continue;
+        }
+        let Some(&value) = kids(c, rhs).first() else { continue };
+        if symbol_ref(c, value).map(|x| x.0) != Some(d) {
             continue;
         }
         let Some(at) = c.first_tok(lhs) else { continue };
