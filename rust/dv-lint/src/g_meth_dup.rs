@@ -511,6 +511,7 @@ fn repeated_string_literal(d: &Design, csts: &[Cst], out: &mut Sink) {
     for c in csts {
         // Routine bodies, and module, interface and program items.
         let mut regions: Vec<NodeId> = Vec::new();
+        let mut taken: HashSet<NodeId> = HashSet::new();
         for n in c.nodes_of(&[FunctionDecl, TaskDecl, ModuleDecl, InterfaceDecl, ProgramDecl]) {
             let r = if matches!(c.kind(n), FunctionDecl | TaskDecl) {
                 let Some(b) = c.tree.child(n, Body) else { continue };
@@ -521,7 +522,10 @@ fn repeated_string_literal(d: &Design, csts: &[Cst], out: &mut Sink) {
             } else {
                 n
             };
-            if !regions.iter().any(|&o| c.subtree(o).contains(&r)) {
+            // Skip a region inside one already taken (an ancestor of it).
+            let inside = std::iter::successors(Some(r), |&x| c.parent(x)).any(|a| taken.contains(&a));
+            if !inside {
+                taken.insert(r);
                 regions.push(r);
             }
         }
