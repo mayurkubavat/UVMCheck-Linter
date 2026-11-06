@@ -395,6 +395,73 @@ pub fn spec_counts(trees: &[Tree]) -> HashMap<(usize, sv_syntax::NodeId), usize>
         .collect()
 }
 
+/// The specializations slang elaborates (see [`spec_counts`]) with their
+/// bindings, for rules that look at what a type names in each of them.
+pub struct SpecModel<'t> {
+    b: Builder<'t>,
+    regions: Vec<Vec<(u32, u32, usize)>>,
+}
+
+impl<'t> SpecModel<'t> {
+    pub fn new(trees: &'t [Tree]) -> Self {
+        let mut b = Builder::new(trees);
+        b.designs = true;
+        b.collect_names();
+        b.collect();
+        let regions = (0..trees.len()).map(|t| b.regions(t)).collect();
+        SpecModel { b, regions }
+    }
+
+    /// The class declaration (tree, node) a type node names, once per
+    /// specialization of the generic class around it (once outside one);
+    /// `None` where it names no class.
+    pub fn class_per_spec(&self, tree: usize, dt: sv_syntax::NodeId) -> Vec<Option<(usize, sv_syntax::NodeId)>> {
+        self.per_spec(tree, dt, false)
+    }
+
+    /// Like [`Self::class_per_spec`], over only the specializations the
+    /// design names, where slang reports diagnostics.
+    pub fn class_per_named_spec(&self, tree: usize, dt: sv_syntax::NodeId) -> Vec<Option<(usize, sv_syntax::NodeId)>> {
+        self.per_spec(tree, dt, true)
+    }
+
+    fn per_spec(&self, tree: usize, dt: sv_syntax::NodeId, named: bool) -> Vec<Option<(usize, sv_syntax::NodeId)>> {
+        let b = &self.b;
+        let r = NodeRef { tree, node: dt };
+        let Some(&first) = b.trees[tree].token_range(dt).first() else {
+            return Vec::new();
+        };
+        let scope = Builder::scope_at(&self.regions[tree], first, b.unit);
+        let envs: Vec<Env> = match b.generic_owner(scope) {
+            None => vec![Env::default()],
+            Some(g) => if named { &b.named_sets } else { &b.spec_sets }
+                .get(&g)
+                .map(|m| m.values().map(|v| v.1.clone()).collect())
+                .unwrap_or_default(),
+        };
+        envs.iter()
+            .map(|env| match b.resolve_env(r, scope, env, 0).resolved {
+                Resolved::Class(c) => Some((b.classes[c].node.tree, b.classes[c].node.node)),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// How many specializations the generic class around a node has (1
+    /// outside one).
+    pub fn visits(&self, tree: usize, n: sv_syntax::NodeId) -> usize {
+        let b = &self.b;
+        let Some(&first) = b.trees[tree].token_range(n).first() else {
+            return 1;
+        };
+        let scope = Builder::scope_at(&self.regions[tree], first, b.unit);
+        match b.generic_owner(scope) {
+            None => 1,
+            Some(g) => b.spec_counts.get(&g).copied().unwrap_or(0),
+        }
+    }
+}
+
 pub fn build(trees: &[Tree]) -> Design {
     let mut b = Builder::new(trees);
     b.collect_names();
@@ -529,6 +596,11 @@ struct Builder<'t> {
     block_typedefs: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>>,
     /// Specializations slang elaborates per generic class (default included).
     spec_counts: HashMap<usize, usize>,
+    /// Those specializations' bindings, keyed by identity.
+    spec_sets: SpecSets,
+    /// Only the specializations the design names (slang suppresses
+    /// diagnostics in default ones and in what they elaborate).
+    named_sets: SpecSets,
     /// Scope of each class and package node.
     node_scope: HashMap<NodeRef, usize>,
     locator: Locator,
@@ -580,6 +652,8 @@ impl<'t> Builder<'t> {
             keying: Default::default(),
             block_typedefs: HashMap::new(),
             spec_counts: HashMap::new(),
+            spec_sets: HashMap::new(),
+            named_sets: HashMap::new(),
             node_scope: HashMap::new(),
             locator: Locator::default(),
             base_cache: Default::default(),
@@ -1266,6 +1340,8 @@ impl<'t> Builder<'t> {
                 self.spec_counts.insert(c, full.get(&c).map_or(0, |m| m.len()));
             }
         }
+        self.spec_sets = full;
+        self.named_sets = specs.clone();
         self.rep_env = specs
             .into_iter()
             .filter_map(|(c, m)| m.into_values().min_by(|a, b| a.0.cmp(&b.0)).map(|(_, env)| (c, env)))

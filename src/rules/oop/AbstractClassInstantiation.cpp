@@ -13,8 +13,11 @@ public:
     explicit AbstractClassVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
     void handle(const slang::ast::NewClassExpression& expr) {
-        if (!expr.isSuperClass && expr.type->isClass()) {
-            const auto& clsType = expr.type->as<slang::ast::ClassType>();
+        // The canonical type: a typedef or type parameter names an alias,
+        // which is not itself a ClassType.
+        const auto& type = expr.type->getCanonicalType();
+        if (!expr.isSuperClass && type.isClass()) {
+            const auto& clsType = type.as<slang::ast::ClassType>();
             if (clsType.isAbstract) {
                 diags.addViolation(
                     "SV-OOP-013",

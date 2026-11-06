@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 338);
+    assert_eq!(r.len(), 339);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 338);
+    assert_eq!(ids.len(), 339);
 }
 
 #[test]
@@ -532,4 +532,24 @@ fn identical_branches_and_mismatched_fields() {
     let bug4 = of("SV-BUG-004");
     assert_eq!(bug4.len(), 1, "{found:?}");
     assert!(bug4[0].1.contains("field 'data' is paired with 'r.addr'"), "{}", bug4[0].1);
+}
+
+#[test]
+fn virtual_class_new_only_in_named_specializations() {
+    let src = "virtual class base; endclass\n\
+               class leaf extends base; endclass\n\
+               class maker #(type T = base);\n\
+               function T make(); T o; o = new(); return o; endfunction\n\
+               endclass\n\
+               module top;\n\
+               base b;\n\
+               maker #(leaf) m;\n\
+               initial b = new();\n\
+               endmodule\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let lines: Vec<u32> = found.iter().filter(|f| f.rule == "SV-OOP-013").map(|f| f.loc.line).collect();
+    // The default specialization (T = base) is not reported, as in slang.
+    assert_eq!(lines, vec![9], "{found:?}");
 }

@@ -32,6 +32,11 @@ pub(crate) fn rules() -> Vec<Rule> {
             name: "MismatchedFieldInCopyCompare",
             check: Syntax(mismatched_field),
         },
+        Rule {
+            id: "SV-OOP-013",
+            name: "AbstractClassInstantiation",
+            check: Syntax(abstract_new),
+        },
     ]
 }
 
@@ -539,5 +544,134 @@ fn mismatched_field(c: &Cst, s: &mut Sink) {
                 }
             }
         }
+    }
+}
+
+// ---- SV-OOP-013 ----
+
+/// The declared type of the variable a name stands for at `at`: a formal
+/// or local of the routine around it, a property of the class around it
+/// (or a class it extends), else a declaration of an enclosing scope.
+pub(crate) fn declared_type(c: &Cst, classes: &Classes, at: NodeId, name: &str) -> Option<NodeId> {
+    let mut x = at;
+    while let Some(p) = c.parent(x) {
+        match c.kind(p) {
+            FunctionDecl | TaskDecl => {
+                for d in crate::g_design::subtree(c, p) {
+                    if matches!(c.kind(d), DataDecl | Port) && declarators(c, d).iter().any(|(_, v, _)| v == name) {
+                        return c.tree.child(d, DataType);
+                    }
+                }
+                // `function C::f`: the members of C.
+                let full = decl_name(c, p);
+                if let Some((cls, _)) = full.rsplit_once("::") {
+                    if let Some(k) = classes.find(cls) {
+                        if let Some(t) = class_property(classes, k, name) {
+                            return t;
+                        }
+                    }
+                }
+            }
+            ClassDecl => {
+                let k = classes.list.iter().position(|k| k.node == p)?;
+                if let Some(t) = class_property(classes, k, name) {
+                    return t;
+                }
+            }
+            SeqBlock | ParBlock | ModuleDecl | InterfaceDecl | ProgramDecl | PackageDecl | SourceFile => {
+                for d in kids(c, p) {
+                    if c.kind(d) == DataDecl && declarators(c, d).iter().any(|(_, v, _)| v == name) {
+                        return c.tree.child(d, DataType);
+                    }
+                }
+            }
+            _ => {}
+        }
+        x = p;
+    }
+    None
+}
+
+fn class_property(classes: &Classes, i: usize, name: &str) -> Option<Option<NodeId>> {
+    let mut cur = Some(i);
+    for _ in 0..64 {
+        let k = cur?;
+        if let Some(p) = classes.list[k].props.iter().find(|p| p.name == name) {
+            return Some(p.ty);
+        }
+        cur = classes.base(k);
+    }
+    None
+}
+
+/// The type a `new` constructs: the declared type of what it is assigned
+/// to (`x = new`, `T x = new`).
+fn new_target(c: &Cst, classes: &Classes, n: NodeId) -> Option<NodeId> {
+    let p = c.parent(n)?;
+    match c.kind(p) {
+        BinaryExpr if op(c, p) == "=" && kids(c, p).get(1) == Some(&n) => {
+            let lhs = unparen(c, *kids(c, p).first()?);
+            match c.kind(lhs) {
+                NameExpr => {
+                    let toks: Vec<u32> = c.toks(lhs).collect();
+                    let [t] = toks[..] else { return None };
+                    declared_type(c, classes, n, c.text_of(t))
+                }
+                MemberExpr => {
+                    let base = c.tree.children(lhs).next()?;
+                    if c.kind(base) != NameExpr || c.tree.bare_text(base) != "this" {
+                        return None;
+                    }
+                    let (_, last) = c.tree.token_bounds(lhs)?;
+                    let k = classes.enclosing(c, n)?;
+                    class_property(classes, k, c.text_of(last))?
+                }
+                _ => None,
+            }
+        }
+        Declarator => {
+            let d = c.parent(p)?;
+            (c.kind(d) == DataDecl).then(|| c.tree.child(d, DataType)).flatten()
+        }
+        _ => None,
+    }
+}
+
+/// slang's NewVirtualClass error, once per location (diagnostics of every
+/// specialization are merged by location).
+fn abstract_new(c: &Cst, s: &mut Sink) {
+    let news = c.nodes(NewExpr);
+    if news.is_empty() {
+        return;
+    }
+    let classes = Classes::new(c);
+    let trees = std::slice::from_ref(c.tree);
+    let mut model: Option<sv_sema::SpecModel> = None;
+    for n in news {
+        // `new[n]`, `new obj` (a copy) and `super.new` call no constructor.
+        if c.toks(n).any(|t| c.text_of(t) == "[") || c.tree.child(n, ArgList).is_none() && kids(c, n).len() > 0 {
+            continue;
+        }
+        if c.parent(n).is_some_and(|p| c.kind(p) == MemberExpr) {
+            continue;
+        }
+        let Some(dt) = new_target(c, &classes, n) else { continue };
+        let m = model.get_or_insert_with(|| sv_sema::SpecModel::new(trees));
+        let any_virtual = m.class_per_named_spec(0, dt).into_iter().flatten().any(|(_, cls)| {
+            c.toks(cls).any(|t| c.text_of(t) == "virtual") && c.toks(cls).any(|t| c.text_of(t) == "class")
+        });
+        if !any_virtual {
+            continue;
+        }
+        let Some(at) = c.first_tok(n) else { continue };
+        s.add(
+            "SV-OOP-013",
+            "AbstractClassInstantiation",
+            Severity::Error,
+            "Cannot instantiate abstract (virtual) class via 'new()'. In SystemVerilog (IEEE 1800 § 8.21), virtual \
+             classes cannot have direct instances; instantiate a concrete derived class instead."
+                .to_string(),
+            c.loc(at),
+        );
     }
 }
