@@ -38,6 +38,7 @@ mod g_meth_dup;
 mod g_meth_gotcha;
 mod g_meth_model;
 mod g_meth_pattern;
+mod g_meth_string;
 mod g_meth_syntax;
 mod g_methodology;
 pub mod syntax;
