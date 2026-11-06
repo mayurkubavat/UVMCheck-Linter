@@ -165,7 +165,7 @@ fn include_guard(c: &Cst, s: &mut Sink) {
     let (file, loc) = match t.tokens.first() {
         Some(tok) if tok.from_macro => return,
         Some(tok) => (tok.origin.file, c.loc(0)),
-        None if !t.sources.is_empty() => (0, at(c, 0, t.sources[0].len())),
+        None if !t.mains.is_empty() => (t.mains[0], at(c, t.mains[0], t.sources[t.mains[0] as usize].len())),
         None => return,
     };
     let path = full_path(&t.files[file as usize]);
@@ -191,10 +191,10 @@ fn include_guard(c: &Cst, s: &mut Sink) {
 /// UVM-BAN-001/002 scan the main file of each tree (not included files)
 /// line by line.
 fn banned_macros(c: &Cst, s: &mut Sink, field: bool) {
-    if c.tree.sources.is_empty() {
+    let Some(&main) = c.tree.mains.first() else {
         return;
-    }
-    let mut text = c.tree.sources[0].to_string();
+    };
+    let mut text = c.tree.sources[main as usize].to_string();
     text.push('\0');
     let mut offset = 0;
     while offset < text.len() {
@@ -215,7 +215,7 @@ fn banned_macros(c: &Cst, s: &mut Sink, field: bool) {
                          Field macros introduce severe simulation overhead (3x-10x execution drag), uncontrollable deep copying, \
                          and opaque compile errors. Implement explicit 'do_copy', 'do_compare', and 'do_print' methods instead."
                             .into(),
-                        at(c, 0, offset + h),
+                        at(c, main, offset + h),
                     );
                 }
             } else if let Some(h) = line.find("`uvm_do") {
@@ -231,7 +231,7 @@ fn banned_macros(c: &Cst, s: &mut Sink, field: bool) {
                          It obscures the sequence-driver protocol handshake and conceals transaction randomization. \
                          Use explicit driver handshake: 'start_item(req)' -> 'assert(req.randomize())' -> 'finish_item(req)'."
                             .into(),
-                        at(c, 0, offset + h),
+                        at(c, main, offset + h),
                     );
                 }
             }

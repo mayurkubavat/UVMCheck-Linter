@@ -67,6 +67,8 @@ pub struct Tree {
     pub skipped: Vec<(u32, u32, u32)>,
     /// `timescale units by token index (see `sv_preproc::Output`).
     pub timescales: Vec<(u32, i32)>,
+    /// The files read as compilation inputs (not included), in order.
+    pub mains: Vec<u32>,
     /// Per node: its first token and token count when its tokens are one
     /// contiguous run (always, for trees the parser builds); `None` makes
     /// `token_range` walk the node instead.

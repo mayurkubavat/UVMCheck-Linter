@@ -25,6 +25,9 @@ pub struct Cst<'t> {
     /// Files earlier trees of the compile read: slang does not read an
     /// include-guarded header again.
     pub prior_files: std::rc::Rc<std::collections::HashSet<std::path::PathBuf>>,
+    /// Every tree of the compile (this one at `ix`), for checks that see
+    /// names other files declare.
+    pub all: &'t [Tree],
 }
 
 const NO_PARENT: u32 = u32::MAX;
@@ -38,7 +41,12 @@ impl<'t> Cst<'t> {
                 parent[c.0 as usize] = n.0;
             }
         }
-        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default() }
+        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default(), all: std::slice::from_ref(tree) }
+    }
+
+    /// This tree's index in [`Self::all`].
+    pub fn index(&self) -> usize {
+        if self.all.len() == 1 { 0 } else { self.ix }
     }
 
     /// Gives back the locator, with any files this tree added.

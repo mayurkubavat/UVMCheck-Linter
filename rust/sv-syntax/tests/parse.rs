@@ -476,3 +476,19 @@ fn token_ranges_match_a_walk() {
         assert_eq!(t.token_bounds(id), want.first().map(|&f| (f, *want.last().unwrap())));
     }
 }
+
+#[test]
+fn single_unit_reads_files_into_one_tree() {
+    let dir = std::env::temp_dir().join(format!("sv_unit_{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let a = dir.join("a.sv");
+    let b = dir.join("b.sv");
+    std::fs::write(&a, "`define W 8\ntypedef logic [`W-1:0] byte_t;\n").unwrap();
+    std::fs::write(&b, "module m; byte_t x; endmodule\n").unwrap();
+    let t = sv_syntax::parse_unit(&[&a, &b], Default::default());
+    assert!(t.errors.is_empty(), "{:?}", t.errors);
+    assert_eq!(t.mains, vec![0, 1]);
+    assert_eq!(t.files.len(), 2);
+    assert!(t.tokens.iter().any(|k| k.origin.file == 1 && &*k.text == "byte_t"));
+    std::fs::remove_dir_all(&dir).ok();
+}

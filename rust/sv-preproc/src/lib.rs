@@ -74,6 +74,8 @@ pub struct Output {
     /// Text of conditional branches not taken: a file and the byte range
     /// from the directive that starts skipping to the one that ends it.
     pub skipped: Vec<(u32, u32, u32)>,
+    /// The files given to the preprocessor (not included ones), in order.
+    pub mains: Vec<u32>,
 }
 
 /// A macro used in the source text: its name without the backtick and the
@@ -320,6 +322,7 @@ impl Preprocessor {
     /// defined so far stay defined, as in a single compilation unit.
     pub fn run_source(&mut self, src: &str, name: &str) -> Output {
         let id = self.add_file(PathBuf::from(name), src);
+        self.out.mains.push(id);
         self.push_file(id);
         self.out.timescales.push((0, self.time_unit));
         while let Some(t) = self.next() {
@@ -334,6 +337,27 @@ impl Preprocessor {
         out.files = self.paths.clone();
         out.sources = self.sources.clone();
         out
+    }
+
+    /// Preprocesses files in order into one token stream: one compilation
+    /// unit, as slang's `--single-unit` reads a file list.
+    pub fn run_files(&mut self, paths: &[impl AsRef<Path>]) -> Output {
+        let mut all = Output::default();
+        for p in paths {
+            let mut out = self.run_file(p.as_ref());
+            let base = all.tokens.len() as u32;
+            all.tokens.append(&mut out.tokens);
+            all.diagnostics.append(&mut out.diagnostics);
+            all.macro_uses.append(&mut out.macro_uses);
+            all.skipped.append(&mut out.skipped);
+            all.mains.append(&mut out.mains);
+            all.timescales.extend(out.timescales.into_iter().map(|(t, u)| (t + base, u)));
+            all.files = out.files;
+            all.sources = out.sources;
+        }
+        all.files = self.paths.clone();
+        all.sources = self.sources.clone();
+        all
     }
 
     fn add_file(&mut self, path: PathBuf, src: &str) -> u32 {

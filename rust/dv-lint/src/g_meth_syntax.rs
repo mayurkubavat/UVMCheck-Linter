@@ -585,7 +585,7 @@ fn file_class_name_mismatch(_: &Design, csts: &[Cst], out: &mut Sink) {
         // Only `include'd user files: the class files of a package.
         let file_of = |t: u32| -> Option<String> {
             let tok = &c.tree.tokens[t as usize];
-            (!tok.from_macro && tok.origin.file != 0 && fs.user(tok.origin.file)).then(|| fs.path(tok.origin.file))
+            (!tok.from_macro && !c.tree.mains.contains(&tok.origin.file) && fs.user(tok.origin.file)).then(|| fs.path(tok.origin.file))
         };
         for n in c.nodes_of(&[ClassDecl, ModuleDecl, InterfaceDecl, ProgramDecl, PackageDecl]) {
             let Some(first) = c.first_tok(n) else { continue };

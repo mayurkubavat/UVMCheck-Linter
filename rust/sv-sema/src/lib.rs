@@ -48,8 +48,15 @@ pub fn load<S: AsRef<str>>(args: &[S]) -> Result<Design, Error> {
 pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>), Error> {
     // The options are read as a compiler reads them: -f/-F file lists,
     // $VAR/${VAR} from the environment, +incdir+, +define+, -I, -D.
+    // `--single-unit` reads every file into one compilation unit and tree.
+    let single = args.iter().any(|a| a.as_ref() == "--single-unit");
     let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
-    let list = FileList::read_args(args.iter().map(|a| a.as_ref()), &cwd, Dialect::Any, &ProcessEnv);
+    let list = FileList::read_args(
+        args.iter().map(|a| a.as_ref()).filter(|a| *a != "--single-unit"),
+        &cwd,
+        Dialect::Any,
+        &ProcessEnv,
+    );
     let opts = Options {
         include_dirs: list.include_dirs.iter().map(|d| d.value.clone()).collect(),
         defines: list
@@ -75,7 +82,11 @@ pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>),
             )));
         }
     }
-    let trees = sv_syntax::parse_files(&files, opts);
+    let trees = if single {
+        vec![sv_syntax::parse_unit(&files, opts)]
+    } else {
+        sv_syntax::parse_files(&files, opts)
+    };
     let parse_ms = t0.elapsed().as_secs_f64() * 1e3;
     let errors = trees
         .iter()

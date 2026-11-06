@@ -36,26 +36,66 @@ thread_local! {
     static CACHE: RefCell<Vec<(usize, usize, Rc<Info>)>> = const { RefCell::new(Vec::new()) };
 }
 
+/// What the whole compile says: sv-sema's diagnostics by tree (the
+/// nodes), and the names every other tree declares at its top.
+struct Whole {
+    diags: std::collections::HashMap<usize, Vec<sv_syntax::NodeId>>,
+    declared: HashSet<String>,
+}
+
+thread_local! {
+    static WHOLE: RefCell<Option<((usize, usize), Rc<Whole>)>> = const { RefCell::new(None) };
+}
+
+fn whole(c: &Cst) -> Rc<Whole> {
+    let all = c.all;
+    let key = (all.as_ptr() as usize, all.len());
+    if let Some(w) = WHOLE.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
+        return w;
+    }
+    let scopes = sv_sema::scopes::build(all);
+    let mut diags = sv_sema::names::check(all, &scopes);
+    diags.extend(sv_sema::bind::check(all));
+    diags.extend(sv_sema::checks::check(all, &scopes));
+    diags.extend(sv_sema::order::check(all, &scopes));
+    diags.extend(sv_sema::calls::check(all));
+    diags.extend(sv_sema::typed::check(all, &scopes));
+    let mut by_tree: std::collections::HashMap<usize, Vec<sv_syntax::NodeId>> = Default::default();
+    for d in diags {
+        by_tree.entry(d.tree).or_default().push(d.node);
+    }
+    let mut declared = HashSet::new();
+    if all.len() > 1 {
+        for t in all {
+            for p in t.preorder() {
+                if t.kind(p) == DataType {
+                    continue;
+                }
+                for n in t.children(p).filter(|&n| t.kind(n) == Name) {
+                    declared.insert(t.bare_text(n));
+                }
+            }
+        }
+    }
+    let w = Rc::new(Whole { diags: by_tree, declared });
+    WHOLE.with(|k| *k.borrow_mut() = Some((key, w.clone())));
+    w
+}
+
 pub(crate) fn info(c: &Cst) -> Rc<Info> {
     let key = (c.tree as *const Tree as usize, c.tree.tokens.len());
     if let Some(i) = CACHE.with(|k| k.borrow().iter().find(|e| (e.0, e.1) == key).map(|e| e.2.clone())) {
         return i;
     }
-    let trees = std::slice::from_ref(c.tree);
-    let scopes = sv_sema::scopes::build(trees);
-    let mut diags = sv_sema::names::check(trees, &scopes);
-    diags.extend(sv_sema::bind::check(trees));
-    diags.extend(sv_sema::checks::check(trees, &scopes));
-    diags.extend(sv_sema::order::check(trees, &scopes));
-    diags.extend(sv_sema::calls::check(trees));
-    diags.extend(sv_sema::typed::check(trees, &scopes));
+    let all = whole(c);
+    let diags = all.diags.get(&c.index()).map(|v| &v[..]).unwrap_or(&[]);
     let mut bad = Vec::new();
     let mut poisoned = HashSet::new();
-    for d in &diags {
-        let Some(range) = c.tree.token_bounds(d.node) else { continue };
+    for &node in diags {
+        let Some(range) = c.tree.token_bounds(node) else { continue };
         // `ShadowItem x;` with ShadowItem unknown: x has an error type,
         // which makes the expressions that use x bad, not the declaration.
-        let mut n = d.node;
+        let mut n = node;
         let mut typed_decl = false;
         while let Some(p) = c.parent(n) {
             if matches!(c.kind(p), DataDecl | Port) && c.kind(n) == DataType {
@@ -76,7 +116,7 @@ pub(crate) fn info(c: &Cst) -> Rc<Info> {
             bad.push(range);
         }
     }
-    let mut declared: HashSet<String> = HashSet::new();
+    let mut declared: HashSet<String> = all.declared.clone();
     for n in c.tree.preorder() {
         match c.kind(n) {
             Name if c.parent(n).is_some_and(|p| c.kind(p) != DataType) => {

@@ -286,6 +286,7 @@ pub fn lint_all(
         for (ix, tree) in trees.iter().enumerate() {
             let mut cst = syntax::Cst::new(tree, ix, locator);
             cst.prior_files = std::rc::Rc::new(prior.clone());
+            cst.all = trees;
             prior.extend(tree.files.iter().cloned());
             for r in &all {
                 if let Check::Syntax(run) = r.check {
@@ -307,7 +308,11 @@ pub fn lint_all(
         let csts: Vec<syntax::Cst> = trees
             .iter()
             .enumerate()
-            .map(|(ix, t)| syntax::Cst::new(t, ix, sv_sema::Locator::new(files.clone())))
+            .map(|(ix, t)| {
+                let mut c = syntax::Cst::new(t, ix, sv_sema::Locator::new(files.clone()));
+                c.all = trees;
+                c
+            })
             .collect();
         for r in &all {
             if let Check::Mixed(run) = r.check {

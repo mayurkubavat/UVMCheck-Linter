@@ -442,11 +442,7 @@ fn time_exp(s: &str) -> i32 {
 
 /// The files given to the compiler (not included ones): the tree's first.
 fn main_files(c: &Cst) -> Vec<u32> {
-    if c.tree.sources.is_empty() {
-        Vec::new()
-    } else {
-        vec![0]
-    }
+    c.tree.mains.clone()
 }
 
 fn timescale_precision(c: &Cst, s: &mut Sink) {

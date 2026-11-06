@@ -45,6 +45,12 @@ pub fn parse_files(paths: &[impl AsRef<Path>], opts: Options) -> Vec<Tree> {
     paths.iter().map(|p| parse_output(pp.run_file(p.as_ref()))).collect()
 }
 
+/// Parses files in order as one compilation unit and one tree (slang's
+/// `--single-unit`): `$unit` declarations are shared too.
+pub fn parse_unit(paths: &[impl AsRef<Path>], opts: Options) -> Tree {
+    parse_output(sv_preproc::Preprocessor::new(opts).run_files(paths))
+}
+
 /// Preprocesses and parses `src` as if read from a file called `name`.
 pub fn parse_source(src: &str, name: &str, opts: Options) -> Tree {
     let out = sv_preproc::Preprocessor::new(opts).run_source(src, name);
@@ -61,7 +67,7 @@ pub fn parse_output(out: sv_preproc::Output) -> Tree {
     drop(p);
     let (nodes, root) = parser::build(events);
     let mut tree =
-        Tree { tokens, nodes, root, files: out.files, sources: out.sources, errors, pp_diagnostics: out.diagnostics, macro_uses: out.macro_uses, skipped: out.skipped, timescales: out.timescales, spans: Vec::new() };
+        Tree { tokens, nodes, root, files: out.files, sources: out.sources, errors, pp_diagnostics: out.diagnostics, macro_uses: out.macro_uses, skipped: out.skipped, timescales: out.timescales, mains: out.mains, spans: Vec::new() };
     tree.compute_spans();
     let mut more = checks::run(&tree);
     tree.errors.append(&mut more);
