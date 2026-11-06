@@ -701,7 +701,7 @@ fn dead_store(c: &Cst, s: &mut Sink) {
 /// `n` is in a subroutine or procedural block whose statements hold a
 /// syntax error: slang binds the body as invalid and its AST walk
 /// (VisitFlags::AllGood) skips all of it.
-fn in_bad_body(c: &Cst, n: NodeId) -> bool {
+pub(crate) fn in_bad_body(c: &Cst, n: NodeId) -> bool {
     let Some(d) = ancestors_or_self(c, n)
         .find(|&x| matches!(c.kind(x), FunctionDecl | TaskDecl | ProceduralBlock))
     else {

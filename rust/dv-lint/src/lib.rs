@@ -17,6 +17,7 @@ mod g_design_class;
 mod g_design_metrics;
 mod g_design_spec;
 mod g_design_types;
+mod g_bug;
 mod g_c_support;
 mod g_concurrency;
 mod g_sva_cov;
@@ -250,6 +251,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_random_dist::rules());
     v.extend(g_random_types::rules());
     v.extend(g_methodology::rules());
+    v.extend(g_bug::rules());
     v.sort_by_key(|r| r.id);
     v
 }

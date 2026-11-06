@@ -924,7 +924,7 @@ fn time_in_action(c: &Cst, s: &mut Sink) {
 /// How often `swe::UserCodeVisitor` reaches a node: never in library code,
 /// once per module instance, and once for a parameterized class (its
 /// default specialization only).
-fn user_code_times(c: &Cst, n: NodeId) -> usize {
+pub(crate) fn user_code_times(c: &Cst, n: NodeId) -> usize {
     if is_library(c, n) {
         return 0;
     }

@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 336);
+    assert_eq!(r.len(), 338);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 336);
+    assert_eq!(ids.len(), 338);
 }
 
 #[test]
@@ -506,4 +506,30 @@ fn methodology_rules_group_a() {
     assert_eq!(at("SV-CPL-001").len(), 1);
     assert_eq!(at("SV-CNS-005").len(), 1);
     assert_eq!(at("SV-RND-027").len(), 1);
+}
+
+#[test]
+fn identical_branches_and_mismatched_fields() {
+    let src = "class item;\n\
+               bit [31:0] addr, data;\n\
+               function void do_copy(item r);\n\
+               addr = r.addr;\n\
+               data = r.addr;\n\
+               endfunction\n\
+               function int pick(bit s, int a, int b);\n\
+               if (s) begin a = a + b; return a; end\n\
+               else begin a = a + b; return a; end\n\
+               endfunction\n\
+               endclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let of = |id: &str| found.iter().filter(|f| f.rule == id).map(|f| (f.loc.line, f.message.clone())).collect::<Vec<_>>();
+    let bug1 = of("SV-BUG-001");
+    assert_eq!(bug1.len(), 1, "{found:?}");
+    assert_eq!(bug1[0].0, 9);
+    assert!(bug1[0].1.contains("branch at line 8"), "{}", bug1[0].1);
+    let bug4 = of("SV-BUG-004");
+    assert_eq!(bug4.len(), 1, "{found:?}");
+    assert!(bug4[0].1.contains("field 'data' is paired with 'r.addr'"), "{}", bug4[0].1);
 }
