@@ -31,6 +31,11 @@ mod g_random_dist;
 mod g_random_oop;
 mod g_random_sema;
 mod g_random_types;
+mod g_meth_body;
+mod g_meth_body2;
+mod g_meth_model;
+mod g_meth_syntax;
+mod g_methodology;
 pub mod syntax;
 mod syntax2;
 mod syntax3;
@@ -239,6 +244,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_random_bug::rules());
     v.extend(g_random_dist::rules());
     v.extend(g_random_types::rules());
+    v.extend(g_methodology::rules());
     v.sort_by_key(|r| r.id);
     v
 }
