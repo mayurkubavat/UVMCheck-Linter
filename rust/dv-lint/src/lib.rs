@@ -34,6 +34,7 @@ mod g_random_types;
 mod g_meth_body;
 mod g_meth_body2;
 mod g_meth_config;
+mod g_meth_dup;
 mod g_meth_gotcha;
 mod g_meth_model;
 mod g_meth_pattern;

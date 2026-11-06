@@ -27,6 +27,7 @@ pub(crate) fn rules() -> Vec<Rule> {
     v.extend(crate::g_meth_config::rules());
     v.extend(crate::g_meth_gotcha::rules());
     v.extend(crate::g_meth_syntax::rules());
+    v.extend(crate::g_meth_dup::rules());
     v
 }
 
