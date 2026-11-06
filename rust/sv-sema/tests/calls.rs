@@ -192,3 +192,42 @@ fn class_rules() {
         ],
     );
 }
+
+fn typed_errors(src: &str) -> Vec<String> {
+    let t = sv_syntax::parse_source(src, "t.sv", sv_syntax::Options::default());
+    assert!(t.errors.is_empty(), "syntax errors: {:?}", t.errors);
+    let t = vec![t];
+    let scopes = sv_sema::scopes::build(&t);
+    sv_sema::typed::check(&t, &scopes).into_iter().map(|d| d.message).collect()
+}
+
+#[test]
+fn typed_members_and_method_arguments() {
+    let src = "package p; int x; endpackage\n\
+         module m; typedef enum {A, B} e_t; e_t e; int q[$]; int aa[string]; int d[]; string s;\n\
+         typedef struct packed { logic foo; logic bar; } st_t; st_t st;\n\
+         class C; int x; endclass C c;\n\
+         function int f(int a, int b = 1); endfunction\n\
+         initial begin\n\
+         e = e.next(); e = e.next(2); q.insert(0, 1); void'(aa.num()); void'(s.substr(0, 1));\n\
+         st.foo = 1; c.x = 1; void'(c.randomize()); void'(f(1)); void'(f(1, 2)); void'(p::x);\n\
+         begin int e; e = 1; end\n\
+         e = e.first(1); void'(q.pop_front(1)); q.push_back(); void'(aa.exists()); d.delete(1);\n\
+         st.foi = 1; c.y = 1; void'(f()); void'(p::z);\n\
+         end endmodule\n";
+    let e = typed_errors(src);
+    assert_eq!(
+        e,
+        [
+            "too many arguments for 'first'; expected 0 but 1 were provided",
+            "too many arguments for 'pop_front'; expected 0 but 1 were provided",
+            "too few arguments for 'push_back'; expected 1 but 0 were provided",
+            "too few arguments for 'exists'; expected 1 but 0 were provided",
+            "too many arguments for 'delete'; expected 0 but 1 were provided",
+            "no member named 'foi' in 'struct packed{logic foo;logic bar;}m.s$1'",
+            "no member named 'y' in class 'C'",
+            "too few arguments for 'f'; expected 1 but 0 were provided",
+            "no member named 'z' in package 'p'",
+        ]
+    );
+}

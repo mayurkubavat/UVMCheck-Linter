@@ -35,6 +35,7 @@ pub mod order;
 pub mod scopes;
 pub mod sva;
 pub mod udp;
+pub mod typed;
 mod types;
 use SyntaxKind::*;
 
