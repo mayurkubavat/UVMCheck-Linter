@@ -145,3 +145,50 @@ fn top_level_interface_ports() {
         ]
     );
 }
+
+fn class_errors(src: &str) -> Vec<String> {
+    let t = sv_syntax::parse_source(src, "t.sv", sv_syntax::Options::default());
+    assert!(t.errors.is_empty(), "syntax errors: {:?}", t.errors);
+    sv_sema::classes::check(&[t]).into_iter().map(|d| d.message).collect()
+}
+
+#[test]
+fn legal_classes_have_no_errors() {
+    let e = class_errors(
+        "class A; static int n; int p; static int w = $bits(p);\n\
+         static function int get; int p; p = n; return p; endfunction\n\
+         virtual function void f(int a, output int b); endfunction\n\
+         extern function int g(); endclass\n\
+         function int A::g(); return p; endfunction\n\
+         class B extends A; function void f(int a, output int b); super.f(a, b); endfunction endclass\n\
+         class C #(type T = int, int N); endclass\n\
+         module m #(parameter int P) (); parameter int Q = 1; localparam R = 2; endmodule\n",
+    );
+    assert!(e.is_empty(), "{e:?}");
+}
+
+#[test]
+fn class_rules() {
+    let e = class_errors(
+        "class A; int p; static int s = p; function void f; super.f(); endfunction\n\
+         virtual function int v(output int x); endfunction virtual task w(int a); endtask\n\
+         extern function int g(); endclass\n\
+         function real A::g(); endfunction\n\
+         function real A::g(); endfunction\n\
+         class B extends A; function int v(input int x); endfunction task w; endtask endclass\n\
+         module m #(localparam int L) (); localparam x; parameter type T; endmodule\n",
+    );
+    assert_has(
+        &e,
+        &[
+            "invalid use of non-static class property 'p'",
+            "class 'A' does not have a super class",
+            "return type 'real' of method 'g' does not match 'int' declared in its prototype",
+            "redefinition of 'A::g'",
+            "direction of virtual method argument 'x' differs from the direction given in its superclass method",
+            "virtual method 'w' has different number of arguments from its superclass method",
+            "local parameter is missing an initializer",
+            "parameter declaration is missing an initializer",
+        ],
+    );
+}

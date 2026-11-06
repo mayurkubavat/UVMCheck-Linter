@@ -25,6 +25,7 @@ pub mod bind;
 pub mod calls;
 mod body;
 pub mod checks;
+pub mod classes;
 mod consteval;
 mod elab;
 mod packed;
