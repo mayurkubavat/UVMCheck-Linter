@@ -282,8 +282,11 @@ pub fn lint_all(
     let mut locator = sv_sema::Locator::new(design.files().to_vec());
     let mixed = all.iter().any(|r| matches!(r.check, Check::Mixed(_)));
     if all.iter().any(Rule::is_syntax) {
+        let mut prior: std::collections::HashSet<std::path::PathBuf> = Default::default();
         for (ix, tree) in trees.iter().enumerate() {
-            let cst = syntax::Cst::new(tree, ix, locator);
+            let mut cst = syntax::Cst::new(tree, ix, locator);
+            cst.prior_files = std::rc::Rc::new(prior.clone());
+            prior.extend(tree.files.iter().cloned());
             for r in &all {
                 if let Check::Syntax(run) = r.check {
                     run(&cst, &mut sink);

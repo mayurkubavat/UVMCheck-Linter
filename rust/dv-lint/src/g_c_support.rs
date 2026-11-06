@@ -265,6 +265,9 @@ pub(crate) fn span_text(c: &Cst, a: u32, b: u32) -> String {
         let tok = &c.tree.tokens[t as usize];
         if !tok.from_macro {
             s.push_str(tok_trivia(c, t));
+        } else if t != a && tok.space_before {
+            // slang keeps a macro body's trivia on the expanded tokens.
+            s.push(' ');
         }
         s.push_str(&tok.text);
     }

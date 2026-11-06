@@ -43,14 +43,23 @@ pub(crate) fn rules() -> Vec<Rule> {
 /// again by slang.
 fn buffers<'t>(c: &Cst<'t>) -> impl Iterator<Item = (u32, String)> + 't {
     let t = c.tree;
+    let prior = c.prior_files.clone();
     let mut used = vec![false; t.sources.len()];
+    // Lexed here (not only written there, as macro bodies are).
+    let mut lexed = vec![false; t.sources.len()];
     for tok in &t.tokens {
         used[tok.origin.file as usize] = true;
         used[tok.written.file as usize] = true;
+        lexed[tok.origin.file as usize] = true;
     }
     (0..t.sources.len() as u32).filter_map(move |f| {
         let again = t.files[..f as usize].contains(&t.files[f as usize]);
         if again && !used[f as usize] && guarded(&t.sources[f as usize]) {
+            return None;
+        }
+        // A file an earlier tree of the compile read that this tree takes
+        // no token from: carried along, not read again.
+        if prior.contains(&t.files[f as usize]) && !lexed[f as usize] {
             return None;
         }
         let mut s = t.sources[f as usize].to_string();

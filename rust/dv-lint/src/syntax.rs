@@ -22,6 +22,9 @@ pub struct Cst<'t> {
     pre: Vec<NodeId>,
     parent: Vec<u32>,
     locator: RefCell<Locator>,
+    /// Files earlier trees of the compile read: slang does not read an
+    /// include-guarded header again.
+    pub prior_files: std::rc::Rc<std::collections::HashSet<std::path::PathBuf>>,
 }
 
 const NO_PARENT: u32 = u32::MAX;
@@ -35,7 +38,7 @@ impl<'t> Cst<'t> {
                 parent[c.0 as usize] = n.0;
             }
         }
-        Cst { tree, ix, pre, parent, locator: RefCell::new(locator) }
+        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default() }
     }
 
     /// Gives back the locator, with any files this tree added.
