@@ -17,6 +17,9 @@ mod g_design_class;
 mod g_design_metrics;
 mod g_design_spec;
 mod g_design_types;
+mod g_c_support;
+mod g_concurrency;
+mod g_sva_cov;
 pub mod syntax;
 mod syntax2;
 mod syntax3;
@@ -213,6 +216,8 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_uvm2::rules());
     v.extend(g_misc::rules());
     v.extend(g_design::rules());
+    v.extend(g_concurrency::rules());
+    v.extend(g_sva_cov::rules());
     v.sort_by_key(|r| r.id);
     v
 }

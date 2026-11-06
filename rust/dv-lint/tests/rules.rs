@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 185);
+    assert_eq!(r.len(), 222);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 185);
+    assert_eq!(ids.len(), 222);
 }
 
 #[test]
@@ -380,4 +380,58 @@ fn group_g_rules() {
     // One NBA per specialization-free class site plus the module one; the
     // interface member and the local are not class properties.
     assert_eq!(count("SV-PRF-009"), 7);
+}
+
+/// Group C (concurrency, SVA, coverage): each rule fires on its repo fixture
+/// as often as the C++ rule does.
+#[test]
+fn concurrency_sva_coverage_rules() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests");
+    let cases = [
+        ("SV-CNC-002", "concurrency/SV-CNC-002", 1),
+        ("SV-CNC-003", "concurrency/SV-CNC-003", 2),
+        ("SV-CNC-004", "concurrency/SV-CNC-004", 2),
+        ("SV-CON-006", "concurrency/SV-CON-006", 1),
+        ("SV-CON-008", "concurrency/SV-CON-008", 1),
+        ("SV-CON-009", "concurrency/SV-CON-009", 1),
+        ("SV-CON-011", "concurrency/SV-CON-011", 1),
+        ("SV-CON-014", "concurrency/SV-CON-014", 3),
+        ("SV-CON-015", "concurrency/SV-CON-015", 3),
+        ("SV-COV-001", "coverage/SV-COV-001", 1),
+        ("SV-COV-002", "coverage/SV-COV-002", 1),
+        ("SV-COV-004", "coverage/SV-COV-004", 1),
+        ("SV-COV-005", "coverage/SV-COV-005", 1),
+        ("SV-COV-011", "coverage/SV-COV-011", 1),
+        ("SV-COV-013", "coverage/SV-COV-013", 1),
+        ("SV-COV-016", "coverage/SV-COV-016", 1),
+        ("SV-COV-017", "coverage/SV-COV-017", 1),
+        ("SV-DLY-003", "concurrency/SV-DLY-003", 1),
+        ("SV-DLY-004", "concurrency/SV-DLY-004", 1),
+        ("SV-DRV-001", "rtl_tb_bridge/SV-DRV-001", 1),
+        ("SV-EVT-001", "concurrency/SV-EVT-001", 1),
+        ("SV-FOR-001", "concurrency/SV-FOR-001", 1),
+        ("SV-INT-001", "rtl_tb_bridge/SV-INT-001", 1),
+        ("SV-IPC-001", "concurrency/SV-IPC-001", 1),
+        ("SV-RSC-001", "concurrency/SV-RSC-001", 3),
+        ("SV-RSC-002", "concurrency/SV-RSC-002", 1),
+        ("SV-SVA-001", "sva/SV-SVA-001", 1),
+        ("SV-SVA-002", "sva/SV-SVA-002", 1),
+        ("SV-SVA-003", "sva/SV-SVA-003", 1),
+        ("SV-SVA-005", "sva/SV-SVA-005", 1),
+        ("SV-THR-001", "concurrency/SV-THR-001", 1),
+        ("SV-THR-002", "concurrency/SV-THR-002", 1),
+        ("SV-THR-003", "concurrency/SV-THR-003", 1),
+        ("SVA-ACT-001", "sva/SVA-ACT-001", 1),
+        ("SVA-ACT-002", "sva/SVA-ACT-002", 1),
+        ("SVA-ACT-003", "sva/SVA-ACT-003", 4),
+        ("SVA-CTX-001", "sva/SVA-CTX-001", 1),
+    ];
+    for (id, dir, want) in cases {
+        let opts = sv_syntax::Options { include_dirs: vec![root.join("common")], ..Default::default() };
+        let tree = sv_syntax::parse_file(&root.join("rules").join(dir).join("bad.sv"), opts);
+        let d = sv_sema::build(std::slice::from_ref(&tree));
+        let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+        let got = found.iter().filter(|f| f.rule == id).count();
+        assert_eq!(got, want, "{id}");
+    }
 }
