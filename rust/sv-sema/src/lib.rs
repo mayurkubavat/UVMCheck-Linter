@@ -84,7 +84,8 @@ pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>),
     let t1 = Instant::now();
     let design = build(&trees);
     let model_ms = t1.elapsed().as_secs_f64() * 1e3;
-    let design = Design::from_parts(
+    let counts = design.specialization_counts().to_vec();
+    let mut design = Design::from_parts(
         design.files().to_vec(),
         design.classes().to_vec(),
         errors,
@@ -95,6 +96,7 @@ pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>),
             copy_ms: 0.0,
         },
     );
+    design.set_specializations(counts);
     Ok((design, trees))
 }
 
@@ -496,6 +498,8 @@ struct Builder<'t> {
     /// The specialization slang reads a parameterized class's members
     /// from: the one that prints first, as its type arguments.
     rep_env: HashMap<usize, Env>,
+    /// Specializations slang elaborates per generic class (default included).
+    spec_counts: HashMap<usize, usize>,
     /// Scope of each class and package node.
     node_scope: HashMap<NodeRef, usize>,
     locator: Locator,
@@ -544,6 +548,7 @@ impl<'t> Builder<'t> {
             sub_names: HashSet::new(),
             interfaces: HashMap::new(),
             rep_env: HashMap::new(),
+            spec_counts: HashMap::new(),
             node_scope: HashMap::new(),
             locator: Locator::default(),
             base_cache: Default::default(),
@@ -1238,6 +1243,22 @@ impl<'t> Builder<'t> {
                 break;
             }
         }
+        // The engine also elaborates each definition's default
+        // specialization, which may equal one already named.
+        for c in 0..self.classes.len() {
+            if !self.classes[c].generic {
+                continue;
+            }
+            let named = specs.get(&c);
+            let mut n = named.map_or(0, |m| m.len());
+            if self.classes[c].params.iter().all(|p| p.2.is_some()) {
+                let default = self.print_class(c, &Env::default(), 0);
+                if !named.is_some_and(|m| m.contains_key(&default)) {
+                    n += 1;
+                }
+            }
+            self.spec_counts.insert(c, n);
+        }
         self.rep_env = specs
             .into_iter()
             .filter_map(|(c, m)| m.into_iter().next().map(|(_, env)| (c, env)))
@@ -1729,7 +1750,13 @@ impl<'t> Builder<'t> {
             }
         }
         let files = std::mem::take(&mut self.locator).into_files();
-        Design::from_parts(files, out, 0, Timings::default())
+        let counts = order
+            .iter()
+            .map(|c| self.spec_counts.get(c).map_or(1, |&n| n as u32))
+            .collect();
+        let mut d = Design::from_parts(files, out, 0, Timings::default());
+        d.set_specializations(counts);
+        d
     }
 
     fn make_class(&mut self, c: usize, id: ClassId, ids: &[ClassId]) -> Class {

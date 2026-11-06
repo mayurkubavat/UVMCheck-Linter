@@ -329,6 +329,9 @@ pub struct Design {
     classes: Vec<Class>,
     compile_errors: u32,
     timings: Timings,
+    /// How many specializations of each class slang elaborates (by id);
+    /// empty when the front end does not say.
+    specializations: Vec<u32>,
 }
 
 /// Owns a C design and frees it on every exit path.
@@ -364,7 +367,25 @@ fn id(v: u32) -> Option<ClassId> {
 impl Design {
     /// A design built by another front end (the native one in sv-sema).
     pub fn from_parts(files: Vec<String>, classes: Vec<Class>, compile_errors: u32, timings: Timings) -> Design {
-        Design { files, classes, compile_errors, timings }
+        Design { files, classes, compile_errors, timings, specializations: Vec::new() }
+    }
+
+    /// Sets [`Self::specializations`] for every class, by id.
+    pub fn set_specializations(&mut self, counts: Vec<u32>) {
+        self.specializations = counts;
+    }
+
+    /// How many times slang's AST walk visits the body of class `id`: once
+    /// per specialization of a parameterized class (its default one and
+    /// each distinct one the design names), once for any other class. 1
+    /// when the front end does not count them.
+    pub fn specializations(&self, id: ClassId) -> u32 {
+        self.specializations.get(id as usize).copied().unwrap_or(1)
+    }
+
+    /// Every class's [`Self::specializations`], by id (empty when unknown).
+    pub fn specialization_counts(&self) -> &[u32] {
+        &self.specializations
     }
 
     /// Loads a design through slang (libuvmcheck_model) from compile options as given to `uvmcheck`, e.g.
