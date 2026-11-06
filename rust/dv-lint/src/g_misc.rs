@@ -7,13 +7,14 @@
 //! (slang binds names, sv-syntax does not, so each says how it resolves
 //! one). Messages are verbatim.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use sv_syntax::{NodeId, SyntaxKind};
 
 use crate::syntax::Cst;
-use crate::Check::Syntax;
+use crate::Check::{Mixed, Syntax};
 use crate::{Rule, Severity, Sink};
+use dv_model::Design;
 use SyntaxKind::*;
 
 pub(crate) fn rules() -> Vec<Rule> {
@@ -28,6 +29,13 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "SV-DED-011", name: "EmptyTaskOrFunction", check: Syntax(empty_routine) },
         Rule { id: "SV-MOD-001", name: "GlobalUnitPollution", check: Syntax(unit_pollution) },
         Rule { id: "SV-MAC-001", name: "HeaderMacroLeak", check: Syntax(header_macro_leak) },
+        Rule { id: "PORT-PTH-001", name: "HardcodedHostPaths", check: Mixed(ast_hardcoded_paths) },
+        Rule { id: "SEC-LOG-001", name: "PlaintextKeyInLogs", check: Mixed(ast_plaintext_key) },
+        Rule { id: "SV-PRF-005", name: "UnshieldedVerbosityFormatEval", check: Mixed(ast_unshielded_format) },
+        Rule { id: "SV-PRF-004", name: "ProceduralZeroDelay", check: Mixed(ast_zero_delay) },
+        Rule { id: "SV-PRF-003", name: "DynArrayIncrementalResizeInLoop", check: Mixed(ast_resize_in_loop) },
+        Rule { id: "SV-ERR-003", name: "ProcessTerminationInClass", check: Syntax(termination_in_class) },
+        Rule { id: "UVM-TST-002", name: "FixedDelayBeforeDrop", check: Syntax(fixed_delay_before_drop) },
     ]
 }
 
@@ -623,4 +631,610 @@ fn header_macro_leak(c: &Cst, s: &mut Sink) {
             c.loc_at(sv_syntax::Origin { file, offset: off as u32 }),
         );
     }
+}
+
+// ---- calls, as slang's AST sees them ----
+
+/// A call: `f(...)`, `o.m(...)`, `p::f(...)`, or a bare `$name` (slang
+/// calls system subroutines written without parentheses).
+struct CallSite {
+    node: NodeId,
+    /// `getSubroutineName()`: the last name of the callee.
+    name: String,
+    /// Ordered arguments as written (slang's `arguments()` for system calls).
+    args: Vec<Option<NodeId>>,
+}
+
+fn call_args(c: &Cst, call: NodeId) -> Vec<Option<NodeId>> {
+    let Some(list) = c.tree.child(call, ArgList) else { return Vec::new() };
+    let mut out = vec![None];
+    for k in c.kids(list) {
+        match *k {
+            sv_syntax::Child::Token(t) if c.text_of(t) == "," => out.push(None),
+            sv_syntax::Child::Node(a) => {
+                *out.last_mut().unwrap() = if c.kind(a) == Arg { c.tree.children(a).next() } else { Some(a) }
+            }
+            _ => {}
+        }
+    }
+    if out.len() == 1 && out[0].is_none() {
+        out.clear();
+    }
+    out
+}
+
+fn call_site(c: &Cst, n: NodeId) -> Option<CallSite> {
+    match c.kind(n) {
+        CallExpr => {
+            let callee = kids(c, n).first().copied()?;
+            if c.kind(callee) == CallExpr {
+                return None; // `x.m(..) with ..`: the inner call is the site
+            }
+            let name = c.last_text(callee).to_string();
+            Some(CallSite { node: n, name, args: call_args(c, n) })
+        }
+        NameExpr => {
+            let t = c.first_tok(n)?;
+            if c.tree.tokens[t as usize].kind != sv_lexer::Kind::SystemIdentifier {
+                return None;
+            }
+            if matches!(c.text_of(t), "$" | "$root" | "$unit") {
+                return None;
+            }
+            let p = c.parent(n);
+            if p.is_some_and(|p| matches!(c.kind(p), CallExpr | MemberExpr | ScopedExpr) && kids(c, p).first() == Some(&n)) {
+                return None;
+            }
+            Some(CallSite { node: n, name: c.text_of(t).to_string(), args: Vec::new() })
+        }
+        _ => None,
+    }
+}
+
+fn calls_in(c: &Cst, root: NodeId) -> Vec<CallSite> {
+    subtree(c, root).into_iter().filter_map(|n| call_site(c, n)).collect()
+}
+
+/// slang's `toString()`: each token with its leading trivia (one space for
+/// a macro-made token that had any).
+fn source_text(c: &Cst, n: NodeId) -> String {
+    let mut s = String::new();
+    for t in c.tree.token_range(n) {
+        let tok = &c.tree.tokens[t as usize];
+        if !tok.from_macro {
+            s.push_str(c.tree.trivia(t));
+        } else if tok.space_before {
+            s.push(' ');
+        }
+        s.push_str(&tok.text);
+    }
+    s
+}
+
+/// `swe::exprText`: tokens joined, any trivia between two of them one space.
+fn norm_text(c: &Cst, n: NodeId) -> String {
+    let mut s = String::new();
+    for t in c.tree.token_range(n) {
+        let tok = &c.tree.tokens[t as usize];
+        let spaced = if tok.from_macro { tok.space_before } else { !c.tree.trivia(t).is_empty() };
+        if !s.is_empty() && spaced {
+            s.push(' ');
+        }
+        s.push_str(&tok.text);
+    }
+    s
+}
+
+/// A string literal's value (`"a\\tb"` -> `a<tab>b`).
+fn string_value(c: &Cst, n: NodeId) -> Option<String> {
+    if c.kind(n) != Literal {
+        return None;
+    }
+    let (a, b) = c.tree.token_bounds(n)?;
+    if a != b {
+        return None;
+    }
+    let raw = c.text_of(a);
+    let inner = raw.strip_prefix('"')?.strip_suffix('"')?;
+    let mut out = String::new();
+    let mut it = inner.chars();
+    while let Some(ch) = it.next() {
+        if ch != '\\' {
+            out.push(ch);
+            continue;
+        }
+        match it.next() {
+            Some('n') => out.push('\n'),
+            Some('t') => out.push('\t'),
+            Some('\\') => out.push('\\'),
+            Some('"') => out.push('"'),
+            Some('v') => out.push('\x0b'),
+            Some('f') => out.push('\x0c'),
+            Some('a') => out.push('\x07'),
+            Some(o) => {
+                out.push('\\');
+                out.push(o);
+            }
+            None => out.push('\\'),
+        }
+    }
+    Some(out)
+}
+
+/// The node through parentheses (slang binds no parenthesized expression).
+fn unparen(c: &Cst, mut n: NodeId) -> NodeId {
+    while c.kind(n) == ParenExpr {
+        match kids(c, n).first() {
+            Some(&x) => n = x,
+            None => break,
+        }
+    }
+    n
+}
+
+fn hardcoded_paths(c: &Cst, a: &Ast, s: &mut Sink) {
+    for n in subtree(c, c.tree.root) {
+        let Some(call) = call_site(c, n) else { continue };
+        let name = call.name.strip_prefix('$').unwrap_or(&call.name);
+        if !matches!(name, "readmemh" | "readmemb" | "writememh" | "writememb" | "fopen") {
+            continue;
+        }
+        let Some(Some(arg)) = call.args.first().copied() else { continue };
+        let arg = unparen(c, arg);
+        let Some(path) = string_value(c, arg) else { continue };
+        let b = path.as_bytes();
+        let unix = path.starts_with('/');
+        let win = b.len() >= 3 && b[0].is_ascii_alphabetic() && b[1] == b':' && (b[2] == b'\\' || b[2] == b'/');
+        if !(unix || win) {
+            continue;
+        }
+        let Some(at) = c.first_tok(arg) else { continue };
+        s.add(
+            "PORT-PTH-001",
+            "HardcodedHostPaths",
+            Severity::Error,
+            format!(
+                "Hardcoded absolute host filesystem path '{path}' in system task '${name}'. \
+                 Absolute paths break regression portability across Linux CI/CD containers and regression clouds. \
+                 Use relative paths or parameterize the path via '$value$plusargs(\"path=%s\", ...)'."
+            ),
+            c.loc(at),
+        );
+        a.again(s, c, n);
+    }
+}
+
+fn plaintext_key(c: &Cst, a: &Ast, s: &mut Sink) {
+    for n in subtree(c, c.tree.root) {
+        let Some(call) = call_site(c, n) else { continue };
+        let name = call.name.strip_prefix('$').unwrap_or(&call.name);
+        if !matches!(name, "sformatf" | "display" | "write" | "writeh") || call.args.len() < 2 {
+            continue;
+        }
+        let Some(Some(fmt)) = call.args.first().copied() else { continue };
+        let Some(fmt) = string_value(c, unparen(c, fmt)) else { continue };
+        if !fmt.contains('%') {
+            continue;
+        }
+        for arg in call.args.iter().skip(1).copied().flatten() {
+            let text = source_text(c, arg);
+            let low = text.to_lowercase();
+            if !["key", "secret", "seed", "token", "priv_"].iter().any(|w| low.contains(w)) {
+                continue;
+            }
+            // The text keeps the parentheses; the location is inside them.
+            let Some(at) = c.first_tok(unparen(c, arg)) else { continue };
+            s.add(
+                "SEC-LOG-001",
+                "PlaintextKeyInLogs",
+                Severity::Warning,
+                format!(
+                    "Potential plaintext logging of sensitive cryptographic asset '{text}' via ${name}(). Printing keys, seeds, or root-of-trust secrets in simulation \
+                     transcripts violates hardware security standards (ISO/SAE 21434 / Common Criteria). \
+                     Mask or omit sensitive secrets from regression logs."
+                ),
+                c.loc(at),
+            );
+            a.again(s, c, n);
+        }
+    }
+}
+
+/// An integer literal's value, when it is one (`300`, `'d300`, `12'h12c`).
+fn int_value(c: &Cst, n: NodeId) -> Option<u128> {
+    if c.kind(n) != Literal {
+        return None;
+    }
+    let toks = c.tree.token_range(n);
+    let text: String = toks.iter().map(|&t| c.text_of(t)).collect::<String>().replace('_', "");
+    let digits = match text.find('\'') {
+        None => return text.parse().ok(),
+        Some(i) => &text[i + 1..],
+    };
+    let digits = digits.trim_start_matches(['s', 'S']);
+    let (radix, rest) = match digits.chars().next()? {
+        'd' | 'D' => (10, &digits[1..]),
+        'h' | 'H' => (16, &digits[1..]),
+        'o' | 'O' => (8, &digits[1..]),
+        'b' | 'B' => (2, &digits[1..]),
+        _ => return None,
+    };
+    u128::from_str_radix(rest, radix).ok()
+}
+
+fn unshielded_format(c: &Cst, a: &Ast, s: &mut Sink) {
+    fn walk(c: &Cst, a: &Ast, n: NodeId, guard: usize, s: &mut Sink) {
+        let mut guard = guard;
+        if c.kind(n) == IfStmt
+            && kids(c, n).first().is_some_and(|&cond| source_text(c, cond).contains("uvm_report_enabled"))
+        {
+            guard += 1;
+        }
+        if guard == 0 {
+            if let Some(call) = call_site(c, n) {
+                if check(c, &call, s) {
+                    a.again(s, c, n);
+                }
+            }
+        }
+        for k in kids(c, n) {
+            walk(c, a, k, guard, s);
+        }
+    }
+    fn check(c: &Cst, call: &CallSite, s: &mut Sink) -> bool {
+        let n = &call.name;
+        let info_or_warning = ["uvm_report_info", "uvm_info", "uvm_report_warning", "uvm_warning"]
+            .iter()
+            .any(|w| n.contains(w));
+        if !info_or_warning {
+            return false;
+        }
+        // slang's arguments() has one per formal, defaults filled in.
+        let ports = formals(c, n);
+        if ports.len().max(call.args.len()) < 2 {
+            return false;
+        }
+        let Some(msg) = call.args.get(1).copied().flatten() else { return false };
+        if !source_text(c, msg).contains("$sformatf") {
+            return false;
+        }
+        // The verbosity: written, or the formal's default. An enum
+        // constant bound to an int formal is a conversion with no syntax,
+        // so in practice only a plain decimal literal counts.
+        let verb = call.args.get(2).copied().flatten().or_else(|| ports.get(2).copied().flatten());
+        let high = verb.is_some_and(|v| {
+            let v = unparen(c, v);
+            let toks = c.tree.token_range(v);
+            c.kind(v) == Literal && toks.len() == 1 && c.text_of(toks[0]).bytes().all(|b| b.is_ascii_digit() || b == b'_')
+                && int_value(c, v).is_some_and(|x| x > 200)
+        });
+        if !high {
+            return false;
+        }
+        let Some(at) = c.first_tok(msg) else { return false };
+        s.add(
+            "SV-PRF-005",
+            "UnshieldedVerbosityFormatEval",
+            Severity::Warning,
+            "Calling $sformatf inside uvm_info/warning with high verbosity without checking 'uvm_report_enabled'. \
+             Because macro/subroutine arguments evaluate eagerly, expensive string formatting and heap allocations execute \
+             on every transaction even when messages are suppressed by simulation verbosity. \
+             Wrap call in 'if (uvm_report_enabled(...))' or use `uvm_info_begin/end."
+                .into(),
+            c.loc(at),
+        );
+        true
+    }
+    walk(c, a, c.tree.root, 0, s);
+}
+
+fn zero_delay(c: &Cst, a: &Ast, s: &mut Sink) {
+    for n in c.nodes(TimedStmt) {
+        let Some(tc) = c.tree.child(n, TimingControl) else { continue };
+        let Some(hash) = c.tok(tc, "#") else { continue };
+        let Some(expr) = kids(c, tc).first().copied() else { continue };
+        let expr = unparen(c, expr);
+        let zero = int_value(c, expr) == Some(0) || source_text(c, expr) == "0";
+        if !zero {
+            continue;
+        }
+        let at = c.first_tok(n).unwrap_or(hash);
+        s.add(
+            "SV-PRF-004",
+            "ProceduralZeroDelay",
+            Severity::Warning,
+            "Procedural delay '#0' reschedules the process into the Inactive simulation region. \
+             Cascades of #0 delays cause delta-cycle thrashing, inflate event engine queues, and mask underlying race conditions. \
+             Use non-blocking assignments (<=), clocking block skews, or explicit event synchronization instead."
+                .into(),
+            c.loc(at),
+        );
+        a.again(s, c, n);
+    }
+}
+
+fn resize_in_loop(c: &Cst, a: &Ast, s: &mut Sink) {
+    for n in c.nodes(NewExpr) {
+        // `new [n](init)`: the size, then the array to copy.
+        if c.tok(n, "[").is_none() || c.tok(n, "(").is_none() {
+            continue;
+        }
+        let mut cur = c.parent(n);
+        let mut in_loop = false;
+        while let Some(p) = cur {
+            let kw = c.keyword(p).map(|t| c.text_of(t)).unwrap_or("");
+            if (c.kind(p) == LoopStmt && matches!(kw, "for" | "foreach" | "while")) || c.kind(p) == DoWhileStmt {
+                in_loop = true;
+                break;
+            }
+            cur = c.parent(p);
+        }
+        if !in_loop {
+            continue;
+        }
+        let Some(at) = c.first_tok(n) else { continue };
+        s.add(
+            "SV-PRF-003",
+            "DynArrayIncrementalResizeInLoop",
+            Severity::Warning,
+            "Dynamic array resize 'new[...](existing_array)' invoked inside a loop. \
+             Incrementally resizing dynamic arrays creates an O(N^2) heap reallocation and element-copying bottleneck. \
+             Pre-allocate the full array with 'new[size]' before the loop, or use a SystemVerilog queue ([$])."
+                .into(),
+            c.loc(at),
+        );
+        a.again(s, c, n);
+    }
+}
+
+// ---- class methods (swe::userClasses / swe::classMethods) ----
+
+/// `swe::isLibrarySymbol` for a class: in package uvm_pkg, named uvm_*
+/// (or inside such a class), or declared in uvm_pkg.sv or uvm_mock.svh.
+fn is_library_class(c: &Cst, cls: NodeId) -> bool {
+    let mut cur = Some(cls);
+    while let Some(n) = cur {
+        let name = c.tree.child(n, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();
+        if (c.kind(n) == PackageDecl && name == "uvm_pkg") || (c.kind(n) == ClassDecl && name.starts_with("uvm_")) {
+            return true;
+        }
+        cur = c.parent(n);
+    }
+    let Some(t) = c.tree.child(cls, Name).and_then(|x| c.first_tok(x)) else { return false };
+    let file = c.tree.tokens[t as usize].origin.file;
+    let path = c.tree.files.get(file as usize).map(|p| p.to_string_lossy().to_string()).unwrap_or_default();
+    path.contains("uvm_mock.svh") || path.contains("uvm_pkg.sv")
+}
+
+/// The user classes of the tree with their methods' declarations (in-class
+/// bodies and out-of-block `C::m` bodies; no pure or DPI ones).
+fn user_class_methods(c: &Cst) -> Vec<(NodeId, String, Vec<(NodeId, String)>)> {
+    let mut out = Vec::new();
+    let classes: Vec<NodeId> = c.nodes(ClassDecl).into_iter().filter(|&k| !is_library_class(c, k)).collect();
+    let mut by_name: HashMap<String, usize> = HashMap::new();
+    for &k in &classes {
+        let name = c.tree.child(k, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();
+        let mut methods = Vec::new();
+        for item in kids(c, k) {
+            if matches!(c.kind(item), FunctionDecl | TaskDecl) {
+                let m = c.tree.child(item, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();
+                methods.push((item, m));
+            }
+        }
+        by_name.entry(name.clone()).or_insert(out.len());
+        out.push((k, name, methods));
+    }
+    for n in c.nodes(FunctionDecl).into_iter().chain(c.nodes(TaskDecl)) {
+        let Some(name) = c.tree.child(n, Name) else { continue };
+        let toks = c.tree.token_range(name);
+        if toks.len() < 3 || c.text_of(toks[toks.len() - 2]) != "::" {
+            continue;
+        }
+        let class = c.text_of(toks[toks.len() - 3]);
+        if let Some(&i) = by_name.get(class) {
+            out[i].2.push((n, c.text_of(toks[toks.len() - 1]).to_string()));
+        }
+    }
+    out
+}
+
+fn termination_in_class(c: &Cst, s: &mut Sink) {
+    for (_, class, methods) in user_class_methods(c) {
+        for (m, name) in methods {
+            let Some(body) = c.tree.child(m, Body) else { continue };
+            for call in calls_in(c, body) {
+                if !matches!(call.name.as_str(), "$finish" | "$stop" | "$exit") {
+                    continue;
+                }
+                let Some(at) = c.first_tok(call.node) else { continue };
+                s.add(
+                    "SV-ERR-003",
+                    "ProcessTerminationInClass",
+                    Severity::Warning,
+                    format!(
+                        "{} in {class}::{name} ends the simulation without the check and report phases or the UVM \
+                         summary, so regression scripts may read the log as a pass. Use `uvm_fatal \
+                         to abort, or drop objections to end the test.",
+                        call.name
+                    ),
+                    c.loc(at),
+                );
+            }
+        }
+    }
+}
+
+/// `swe::isConstantExpr` on syntax: literals, and operators on them (a
+/// parameter name is constant too).
+fn is_constant(c: &Cst, n: NodeId, params: &HashSet<String>) -> bool {
+    let n = unparen(c, n);
+    match c.kind(n) {
+        Literal => true,
+        NameExpr => c.first_tok(n).is_some_and(|t| params.contains(c.text_of(t))),
+        BinaryExpr => kids(c, n).iter().all(|&k| is_constant(c, k, params)),
+        PrefixExpr => kids(c, n).iter().all(|&k| is_constant(c, k, params)),
+        _ => false,
+    }
+}
+
+fn is_drop_stmt(c: &Cst, n: NodeId) -> bool {
+    c.kind(n) == ExprStmt
+        && kids(c, n).first().and_then(|&e| call_site(c, e)).is_some_and(|k| k.name == "drop_objection")
+}
+
+fn fixed_delay_before_drop(c: &Cst, s: &mut Sink) {
+    let params: HashSet<String> = c
+        .nodes(ParamDecl)
+        .into_iter()
+        .flat_map(|p| kids(c, p))
+        .filter(|&d| c.kind(d) == Declarator)
+        .filter_map(|d| c.tree.child(d, Name).map(|x| c.tree.bare_text(x)))
+        .collect();
+    let report = |t: NodeId, s: &mut Sink| {
+        let Some(tc) = c.tree.child(t, TimingControl) else { return };
+        let Some(e) = kids(c, tc).first().copied() else { return };
+        let Some(at) = c.first_tok(t) else { return };
+        s.add(
+            "UVM-TST-002",
+            "FixedDelayBeforeDrop",
+            Severity::Warning,
+            format!(
+                "Fixed delay '{}' before drop_objection() guesses how long the testbench needs to drain. It is flaky \
+                 when traffic grows and wastes time when it shrinks. Use the objection drain time \
+                 (phase.phase_done.set_drain_time) or phase_ready_to_end() in the scoreboard.",
+                norm_text(c, e)
+            ),
+            c.loc(at),
+        );
+    };
+    let fixed = |t: NodeId| {
+        c.tree.child(t, TimingControl).is_some_and(|tc| {
+            c.tok(tc, "#").is_some() && kids(c, tc).first().is_some_and(|&e| is_constant(c, e, &params))
+        })
+    };
+    for (_, _, methods) in user_class_methods(c) {
+        for (m, _) in methods {
+            let Some(body) = c.tree.child(m, Body) else { continue };
+            for n in subtree(c, body) {
+                if c.kind(n) == TimedStmt {
+                    let inner = kids(c, n).get(1).copied();
+                    if inner.is_some_and(|x| is_drop_stmt(c, x)) && fixed(n) {
+                        report(n, s);
+                    }
+                }
+                if matches!(c.kind(n), Body | SeqBlock | ParBlock) {
+                    let items: Vec<NodeId> = c.items(n).into_iter().filter(|&x| c.kind(x) != DataDecl).collect();
+                    for w in items.windows(2) {
+                        let t = w[0];
+                        if c.kind(t) != TimedStmt || !is_drop_stmt(c, w[1]) || !fixed(t) {
+                            continue;
+                        }
+                        if kids(c, t).get(1).is_some_and(|&x| c.kind(x) == EmptyStmt) {
+                            report(t, s);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+// ---- how often slang's AST walk visits code ----
+
+/// The engine walks the elaborated AST, so code in a parameterized class
+/// is visited once per specialization. Maps each class declaration of a
+/// tree to that count.
+pub(crate) struct Ast {
+    visits: HashMap<NodeId, u32>,
+}
+
+impl Ast {
+    fn new(d: &Design, c: &Cst) -> Ast {
+        let by_loc: HashMap<(u32, u32, u32), u32> = d
+            .classes()
+            .iter()
+            .filter(|k| k.is_parameterized)
+            .map(|k| ((k.loc.file, k.loc.line, k.loc.column), d.specializations(k.id)))
+            .collect();
+        let mut visits = HashMap::new();
+        if !by_loc.is_empty() {
+            for n in c.nodes(ClassDecl) {
+                let Some(t) = c.tree.child(n, Name).and_then(|x| c.first_tok(x)) else { continue };
+                let l = c.loc(t);
+                if let Some(&k) = by_loc.get(&(l.file, l.line, l.column)) {
+                    visits.insert(n, k);
+                }
+            }
+        }
+        Ast { visits }
+    }
+
+    /// Visits of node `n`: the product over the classes around it.
+    fn times(&self, c: &Cst, n: NodeId) -> u32 {
+        let mut k = 1;
+        let mut cur = Some(n);
+        while let Some(x) = cur {
+            if let Some(&v) = self.visits.get(&x) {
+                k *= v;
+            }
+            cur = c.parent(x);
+        }
+        k
+    }
+
+    /// Repeats the finding just added for each further visit of `n`.
+    fn again(&self, s: &mut Sink, c: &Cst, n: NodeId) {
+        let k = self.times(c, n);
+        if k == 0 {
+            s.findings.pop();
+            return;
+        }
+        if let Some(last) = s.findings.last().cloned() {
+            for _ in 1..k {
+                s.findings.push(last.clone());
+            }
+        }
+    }
+}
+
+macro_rules! ast_rules {
+    ($($wrap:ident => $f:ident),* $(,)?) => {
+        $(fn $wrap(d: &Design, csts: &[Cst], s: &mut Sink) {
+            for c in csts {
+                $f(c, &Ast::new(d, c), s);
+            }
+        })*
+    };
+}
+
+ast_rules! {
+    ast_hardcoded_paths => hardcoded_paths,
+    ast_plaintext_key => plaintext_key,
+    ast_unshielded_format => unshielded_format,
+    ast_zero_delay => zero_delay,
+    ast_resize_in_loop => resize_in_loop,
+}
+
+/// The default value of each formal of the subroutines named `name` in the
+/// tree (the first declaration found), `None` for a formal without one.
+fn formals(c: &Cst, name: &str) -> Vec<Option<NodeId>> {
+    for kind in [FunctionDecl, TaskDecl, MethodPrototype] {
+        for n in c.nodes(kind) {
+            let Some(nm) = c.tree.child(n, Name) else { continue };
+            if c.last_text(nm) != name {
+                continue;
+            }
+            let Some(list) = c.tree.child(n, PortList) else { return Vec::new() };
+            return kids(c, list)
+                .into_iter()
+                .filter(|&p| c.kind(p) == Port)
+                .map(|p| {
+                    let d = c.tree.child(p, Declarator)?;
+                    let eq = c.tok(d, "=")?;
+                    c.node_after(d, eq)
+                })
+                .collect();
+        }
+    }
+    Vec::new()
 }
