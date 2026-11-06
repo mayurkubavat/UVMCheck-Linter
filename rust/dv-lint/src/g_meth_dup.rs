@@ -35,7 +35,13 @@ pub(crate) type NormToken = (String, bool);
 /// slang gives the literal of a `__FILE__ or `__LINE__ in a body a
 /// location of its own, outside the expansion.
 fn from_macro_body(c: &Cst, t: &sv_syntax::Token) -> bool {
-    if !t.from_macro || t.from_arg {
+    !t.from_arg && in_define(c, t)
+}
+
+/// Written in a define body (or made by an expansion), not in the text a
+/// macro was used in: slang's fully original location is not the use's.
+fn in_define(c: &Cst, t: &sv_syntax::Token) -> bool {
+    if !t.from_macro || (t.written.file == t.origin.file && t.written.offset > t.origin.offset) {
         return false;
     }
     let src = c.tree.sources.get(t.written.file as usize).map(|s| &s[t.written.offset as usize..]).unwrap_or("");
@@ -214,7 +220,7 @@ fn statement_lists(c: &Cst, routine: usize, body: NodeId, home: u32, out: &mut V
         let written_here = items.iter().any(|&x| {
             c.first_tok(x).is_some_and(|t| {
                 let tok = &c.tree.tokens[t as usize];
-                let w = if from_macro_body(c, tok) { tok.written } else { tok.origin };
+                let w = if in_define(c, tok) { tok.written } else { tok.origin };
                 w.file == home
             })
         });
@@ -541,10 +547,12 @@ fn repeated_string_literal(d: &Design, csts: &[Cst], out: &mut Sink) {
                     }
                 }
             }
-            let lits = sub.iter().filter(|&&n| c.kind(n) == Literal).filter_map(|&n| c.first_tok(n));
-            for t in lits {
+            let lits = sub.iter().filter(|&&n| c.kind(n) == Literal).filter_map(|&n| c.first_tok(n).map(|t| (n, t)));
+            for (lit, t) in lits {
                 let tok = &c.tree.tokens[t as usize];
-                if tok.kind != Kind::StringLiteral || skip.contains(&t) || from_macro_body(c, tok) {
+                // slang's AST does not visit attribute values.
+                let in_attr = || std::iter::successors(c.parent(lit), |&x| c.parent(x)).any(|a| c.kind(a) == Attribute);
+                if tok.kind != Kind::StringLiteral || skip.contains(&t) || in_define(c, tok) || in_attr() {
                     continue;
                 }
                 let w = if tok.from_macro { tok.written } else { tok.origin };
