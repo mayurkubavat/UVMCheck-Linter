@@ -237,7 +237,10 @@ pub(crate) fn derives(d: &Design, c: ClassId, base: ClassId) -> bool {
     d.ancestors(c).any(|a| a.id == base)
 }
 
-pub(crate) fn key(l: Loc) -> (u32, u32, u32, Option<(u32, u32)>) {
+/// A location as a map key.
+pub(crate) type LocKey = (u32, u32, u32, Option<(u32, u32)>);
+
+pub(crate) fn key(l: Loc) -> LocKey {
     (l.file, l.line, l.column, l.expansion)
 }
 
@@ -247,7 +250,7 @@ pub(crate) fn key(l: Loc) -> (u32, u32, u32, Option<(u32, u32)>) {
 /// (the location the model gives classes and methods).
 pub(crate) struct Index<'a, 't> {
     pub csts: &'a [Cst<'t>],
-    decls: HashMap<(u32, u32, u32, Option<(u32, u32)>), (usize, NodeId)>,
+    decls: HashMap<LocKey, (usize, NodeId)>,
     pub typedefs: Typedefs,
 }
 

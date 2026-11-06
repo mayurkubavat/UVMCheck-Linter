@@ -10,6 +10,7 @@ use sv_lexer::Kind;
 use sv_syntax::{NodeId, Origin};
 
 use crate::g_meth_body::is_stmt;
+use crate::g_meth_gotcha::{bad_body, free_routine_names, routine_class};
 use crate::g_methodology::{class_methods, derives, role, role_name, user_classes, Index};
 use crate::syntax::Cst;
 use crate::Check::Mixed;
@@ -506,12 +507,16 @@ fn repeated_string_literal(d: &Design, csts: &[Cst], out: &mut Sink) {
     let mut generated = Generated::new(d, csts);
     let mut seen = HashSet::new();
     let mut uses: Vec<(String, Loc)> = Vec::new();
+    let free = free_routine_names(csts);
     for c in csts {
         // Routine bodies, and module, interface and program items.
         let mut regions: Vec<NodeId> = Vec::new();
         for n in c.nodes_of(&[FunctionDecl, TaskDecl, ModuleDecl, InterfaceDecl, ProgramDecl]) {
             let r = if matches!(c.kind(n), FunctionDecl | TaskDecl) {
                 let Some(b) = c.tree.child(n, Body) else { continue };
+                if bad_body(d, c, b, routine_class(d, c, n), &free) {
+                    continue;
+                }
                 b
             } else {
                 n

@@ -511,9 +511,11 @@ fn container_of(c: &Cst, n: NodeId) -> Container {
 }
 
 /// Type nodes that start with this keyword, written in user files.
+/// A cast's type (`integer'(x)`) is a name here.
 fn user_types(c: &Cst, fs: &Files, kw: &str) -> Vec<(NodeId, u32)> {
-    c.nodes(DataType)
+    c.nodes_of(&[DataType, NameExpr])
         .into_iter()
+        .filter(|&n| c.kind(n) == DataType || c.parent(n).is_some_and(|p| c.kind(p) == CastExpr))
         .filter_map(|n| {
             let t = c.keyword(n)?;
             (c.text_of(t) == kw && c.first_tok(n) == Some(t) && user_tok(c, fs, t)).then_some((n, t))

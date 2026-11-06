@@ -2,7 +2,7 @@
 //! constraints that shadow each other, virtual interfaces in checkers,
 //! sequencers from config_db and config knob budgets.
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use dv_model::{Class, ClassId, Design};
 use sv_syntax::NodeId;
@@ -243,22 +243,84 @@ fn constraint_blocks<'a, 't>(ix: &Index<'a, 't>, c: &'a Cst<'t>, decl: NodeId) -
     out
 }
 
-/// The routine body around a node holds a syntax error or an unknown
-/// macro: slang marks the whole body bad and does not visit it.
-fn in_bad_body(c: &Cst, n: NodeId) -> bool {
+/// Routine names a plain call can reach outside classes: free functions
+/// and tasks, and DPI imports.
+pub(crate) fn free_routine_names(csts: &[Cst]) -> HashSet<String> {
+    let mut out = HashSet::new();
+    for c in csts {
+        for n in c.nodes_of(&[FunctionDecl, TaskDecl, DpiImport]) {
+            let mut p = c.parent(n);
+            let mut in_class = false;
+            while let Some(x) = p {
+                in_class |= c.kind(x) == ClassDecl;
+                p = c.parent(x);
+            }
+            let Some(name) = c.tree.child(n, Name).map(|x| c.tree.bare_text(x)) else { continue };
+            if !in_class && !name.contains("::") {
+                out.insert(name);
+            }
+        }
+    }
+    out
+}
+
+/// The class of the routine that declares `decl`: the class around it, or
+/// the one an out-of-block body names.
+pub(crate) fn routine_class<'d>(d: &'d Design, c: &Cst, decl: NodeId) -> Option<&'d Class> {
+    let mut p = c.parent(decl);
+    while let Some(x) = p {
+        if c.kind(x) == ClassDecl {
+            let (_, nt) = c.tree.child(x, Name).and_then(|n| c.tree.token_bounds(n))?;
+            let k = crate::g_methodology::key(c.loc(nt));
+            return d.classes().iter().find(|cls| crate::g_methodology::key(cls.loc) == k);
+        }
+        p = c.parent(x);
+    }
+    let name = c.tree.child(decl, Name).map(|n| c.tree.bare_text(n))?;
+    let (cls, _) = name.split_once("::")?;
+    d.classes().iter().find(|k| k.name == cls)
+}
+
+/// A routine body slang binds as bad, so that its visitors skip it: it
+/// holds a syntax error or an unknown macro, or (in a class) calls a plain
+/// name that is neither a method of the class or a base nor a free routine.
+pub(crate) fn bad_body(d: &Design, c: &Cst, body: NodeId, cls: Option<&Class>, free: &HashSet<String>) -> bool {
+    let Some((a, b)) = c.tree.token_bounds(body) else { return false };
+    if c.tree.errors.iter().any(|e| e.token >= a && e.token <= b) {
+        return true;
+    }
+    let (ta, tb) = (&c.tree.tokens[a as usize], &c.tree.tokens[b as usize]);
+    if !ta.from_macro && !tb.from_macro && ta.origin.file == tb.origin.file {
+        let (f, lo, hi) = (ta.origin.file, ta.origin.offset, tb.origin.offset);
+        if c.tree.pp_diagnostics.iter().any(|x| x.origin.file == f && x.origin.offset >= lo && x.origin.offset <= hi) {
+            return true;
+        }
+    }
+    let Some(cls) = cls else { return false };
+    let known = |name: &str| {
+        free.contains(name)
+            || std::iter::once(cls).chain(d.ancestors(cls.id)).any(|k| k.methods.iter().any(|m| m.name == name))
+    };
+    c.subtree(body).into_iter().any(|n| {
+        if c.kind(n) != CallExpr {
+            return false;
+        }
+        let Some(callee) = c.tree.children(n).next() else { return false };
+        if c.kind(callee) != NameExpr || c.tree.children(callee).next().is_some() {
+            return false;
+        }
+        let name = c.tree.bare_text(callee);
+        !name.starts_with('$') && name != "new" && !known(&name)
+    })
+}
+
+/// The routine body around a node is bad (see [`bad_body`]).
+fn in_bad_body(d: &Design, c: &Cst, n: NodeId, free: &HashSet<String>) -> bool {
     let mut p = c.parent(n);
     while let Some(x) = p {
         if c.kind(x) == Body {
-            let Some((a, b)) = c.tree.token_bounds(x) else { return false };
-            if c.tree.errors.iter().any(|e| e.token >= a && e.token <= b) {
-                return true;
-            }
-            let (ta, tb) = (&c.tree.tokens[a as usize], &c.tree.tokens[b as usize]);
-            if ta.from_macro || tb.from_macro || ta.origin.file != tb.origin.file {
-                return false;
-            }
-            let (f, lo, hi) = (ta.origin.file, ta.origin.offset, tb.origin.offset);
-            return c.tree.pp_diagnostics.iter().any(|d| d.origin.file == f && d.origin.offset >= lo && d.origin.offset <= hi);
+            let cls = c.parent(x).and_then(|decl| routine_class(d, c, decl));
+            return bad_body(d, c, x, cls, free);
         }
         p = c.parent(x);
     }
@@ -326,6 +388,7 @@ is hidden from the reader. Keep one soft default and override it with a hard con
         }
     }
     // `soft` inside randomize() with { } anywhere in user code.
+    let free = free_routine_names(csts);
     for c in csts {
         for n in c.nodes(CallExpr) {
             if !is_with_wrapper(c, n) {
@@ -336,7 +399,7 @@ is hidden from the reader. Keep one soft default and override it with a hard con
                 continue;
             }
             let Some(blk) = c.tree.child(n, WithClause).and_then(|w| c.tree.child(w, ConstraintBlock)) else { continue };
-            if in_library(d, c, n) || in_bad_body(c, n) {
+            if in_library(d, c, n) || in_bad_body(d, c, n, &free) {
                 continue;
             }
             let mut es = Vec::new();
@@ -462,7 +525,7 @@ fn feature_envy(d: &Design, csts: &[Cst], out: &mut Sink) {
         field_uses(&ctx, c, body, &mut u);
         let mut top: Option<(&String, &(usize, &Class))> = None;
         for e in &u.foreign {
-            if top.is_none_or(|t| e.1 .0 > t.1 .0) {
+            if top.map_or(true, |t| e.1 .0 > t.1 .0) {
                 top = Some(e);
             }
         }

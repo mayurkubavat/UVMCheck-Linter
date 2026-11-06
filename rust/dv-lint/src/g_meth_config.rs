@@ -374,7 +374,10 @@ fn build_time_helpers<'m>(cls: &dv_model::Class, methods: &[&'m Method]) -> Hash
     out
 }
 
-fn field_uses(d: &Design, csts: &[Cst]) -> (Vec<(String, Loc)>, Vec<(String, Loc)>) {
+/// Field names with where each is used.
+type FieldUses = Vec<(String, Loc)>;
+
+fn field_uses(d: &Design, csts: &[Cst]) -> (FieldUses, FieldUses) {
     let ix = Index::new(csts);
     let (mut sets, mut gets) = (Vec::new(), Vec::new());
     for (_, m, c, body) in bodies(d, &ix) {

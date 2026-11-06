@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 287);
+    assert_eq!(r.len(), 336);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 287);
+    assert_eq!(ids.len(), 336);
 }
 
 #[test]
@@ -472,4 +472,38 @@ fn group_e_random_and_correctness_rules() {
     }
     let hint = found.iter().find(|f| f.rule == "SV-BUG-003").unwrap();
     assert!(hint.message.contains("write 'this.len = len;'"), "{}", hint.message);
+}
+
+#[test]
+fn methodology_rules_group_a() {
+    let src = "`define DEPTH 16\n\
+               `define TWO_STEPS(a) a = 0; a = 1;\n\
+               package p;\n\
+               typedef enum {A, B} e_t;\n\
+               class c;\n\
+               integer n;\n\
+               string mode;\n\
+               bit [31:0] h;\n\
+               rand int x;\n\
+               constraint c1 { soft x == 1; }\n\
+               constraint c2 { soft x == 2; }\n\
+               function void f(string op);\n\
+               case (mode) \"a\": ; \"b\": ; \"c\": ; endcase\n\
+               if (op == \"r\") ; else if (op == \"w\") ;\n\
+               h[7:0] = 0; h[15:8] = 0; h[31:16] = 0;\n\
+               endfunction\n\
+               endclass\n\
+               endpackage\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let at = |id: &str| found.iter().filter(|f| f.rule == id).map(|f| f.message.as_str()).collect::<Vec<_>>();
+    assert_eq!(at("SV-CNS-001"), ["`define DEPTH holds the constant '16'. As a macro it has no type, no scope and can be redefined by any later file. Declare it as a parameter or localparam in a package instead."]);
+    assert_eq!(at("SV-CNS-002").len(), 1);
+    assert_eq!(at("SV-CNS-006").len(), 1);
+    assert_eq!(at("SV-CNS-007").len(), 1);
+    assert_eq!(at("SV-CNS-004").len(), 1);
+    assert_eq!(at("SV-CPL-001").len(), 1);
+    assert_eq!(at("SV-CNS-005").len(), 1);
+    assert_eq!(at("SV-RND-027").len(), 1);
 }
