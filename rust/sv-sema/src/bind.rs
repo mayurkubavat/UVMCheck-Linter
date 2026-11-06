@@ -52,7 +52,22 @@ const BUILTINS: &[&str] = &[
     "CrossQueueType",
 ];
 
-type Names = Rc<HashSet<String>>;
+type Names = Rc<Vis>;
+
+/// The names a scope sees: its own set plus the scopes it sees through
+/// (imports, bases, the enclosing scope), shared, not copied.
+struct Vis {
+    set: HashSet<String>,
+    up: Vec<Names>,
+    /// Also sees the compilation units' global names.
+    global: bool,
+}
+
+impl Vis {
+    fn contains(&self, b: &Binder, name: &str) -> bool {
+        self.set.contains(name) || (self.global && b.global.contains(name)) || self.up.iter().any(|u| u.contains(b, name))
+    }
+}
 
 /// A scope's own names and its imports (package, item or `None` for `*`).
 type Own = Rc<(HashSet<String>, Vec<(String, Option<String>)>)>;
@@ -344,14 +359,14 @@ impl Binder<'_> {
     fn compute(&self, s: At, depth: usize) -> Option<Names> {
         let t = &self.trees[s.tree];
         let own = self.own_names(s);
-        let mut v: HashSet<String> = own.0.clone();
+        let mut v = Vis { set: own.0.clone(), up: Vec::new(), global: false };
         for (p, item) in &own.1 {
             let pk = *self.packages.get(p)?;
             let pv = self.visible(pk, depth + 1)?;
             match item {
-                None => v.extend(pv.iter().cloned()),
+                None => v.up.push(pv),
                 Some(i) => {
-                    v.insert(i.clone());
+                    v.set.insert(i.clone());
                 }
             }
         }
@@ -361,20 +376,20 @@ impl Binder<'_> {
                 for base in self.base_names(t, ext) {
                     let at = self.classes.get(&base)?;
                     for &c in at {
-                        v.extend(self.visible(c, depth + 1)?.iter().cloned());
+                        v.up.push(self.visible(c, depth + 1)?);
                     }
                 }
             }
         }
         if s.node != t.root {
             let up = self.scope_of(s.tree, s.node);
-            v.extend(self.visible(up, depth + 1)?.iter().cloned());
+            v.up.push(self.visible(up, depth + 1)?);
         }
         if t.kind(s.node) == PackageDecl {
             // A package's own names only (not its file's), as an import sees them.
             return Some(Rc::new(v));
         }
-        v.extend(self.global.iter().cloned());
+        v.global = true;
         Some(Rc::new(v))
     }
 
@@ -457,12 +472,12 @@ impl Binder<'_> {
                         let Some(cv) = self.visible(at[0], 0) else { return };
                         let Some(sv) = self.visible(scope, 0) else { return };
                         let own = self.own_names(At { tree: ix, node: n });
-                        let mut v: HashSet<String> = (*cv).clone();
-                        v.extend(sv.iter().cloned());
-                        v.extend(own.0.iter().cloned());
-                        let v = Rc::new(v);
+                        // Look names up in each layer: copying the class's
+                        // and the scope's names per method is quadratic.
+                        let own = Vis { set: own.0.clone(), up: Vec::new(), global: false };
+                        let layers: [&Vis; 3] = [&cv, &sv, &own];
                         for c in t.children(n) {
-                            self.walk_with(ix, c, &v, out);
+                            self.walk_with(ix, c, &layers, out);
                         }
                         return;
                     }
@@ -476,7 +491,7 @@ impl Binder<'_> {
                         if let Some(name) = single_ident(t, base) {
                             if !self.everywhere.contains(name) {
                                 if let Some(v) = self.visible(scope, 0) {
-                                    if !v.contains(name) {
+                                    if !v.contains(self, name) {
                                         out.push(undeclared(ix, base, name));
                                     }
                                 }
@@ -514,7 +529,7 @@ impl Binder<'_> {
             NameExpr | DataType => {
                 if let Some(name) = single_ident(t, n) {
                     if let Some(v) = self.visible(scope, 0) {
-                        if !v.contains(name) {
+                        if !v.contains(self, name) {
                             out.push(undeclared(ix, n, name));
                         }
                     }
@@ -540,11 +555,11 @@ impl Binder<'_> {
 
     /// [`Binder::walk`] with a fixed set of visible names (an out-of-block
     /// method's body).
-    fn walk_with(&self, ix: usize, n: NodeId, v: &Names, out: &mut Vec<Diag>) {
+    fn walk_with(&self, ix: usize, n: NodeId, v: &[&Vis], out: &mut Vec<Diag>) {
         let t = &self.trees[ix];
         if matches!(t.kind(n), NameExpr | DataType) {
             if let Some(name) = single_ident(t, n) {
-                if !v.contains(name) && !self.everywhere.contains(name) {
+                if !v.iter().any(|l| l.contains(self, name)) && !self.everywhere.contains(name) {
                     out.push(undeclared(ix, n, name));
                 }
                 return;
