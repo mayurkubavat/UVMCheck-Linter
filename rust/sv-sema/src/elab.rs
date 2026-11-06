@@ -162,6 +162,47 @@ impl<'b, 't> Elab<'b, 't> {
         tops
     }
 
+    /// A top-level module's interface ports have nothing to connect to
+    /// (23.3.3.4).
+    fn interface_ports(&mut self, top: &str) {
+        let b = self.b;
+        let Some(def) = self.defs.get(top) else { return };
+        let decl = def.decl;
+        let Some(pl) = b.child(decl, Header).and_then(|h| b.child(h, PortList)) else { return };
+        let is_iface = |name: &str| self.defs.get(name).is_some_and(|d| b.kind(d.decl) == InterfaceDecl);
+        let body = b.children(decl);
+        for port in b.children(pl).into_iter().filter(|p| b.kind(*p) == Port) {
+            let own = b.own_tokens(port);
+            let Some(d) = b.child(port, Declarator) else { continue };
+            let Some((name, _)) = b.name_of(d) else { continue };
+            let dtype = b.child(port, DataType).map(|t| b.toks_of(t));
+            let iface = match own.first().copied() {
+                Some("interface") => true,
+                Some(n) if own.get(1) == Some(&".") => is_iface(n),
+                None => match dtype {
+                    Some(t) => t.len() == 1 && is_iface(t[0]),
+                    // Non-ANSI: the body declares it.
+                    None => body.iter().filter(|c| b.kind(**c) == DataDecl).any(|c| {
+                        let named = b
+                            .children(*c)
+                            .into_iter()
+                            .any(|x| b.kind(x) == Declarator && b.name_of(x).is_some_and(|(n, _)| n == name));
+                        let t = b.child(*c, DataType).map(|t| b.toks_of(t)).unwrap_or_default();
+                        named && !t.is_empty() && is_iface(t[0]) && (t.len() == 1 || t.get(1) == Some(&"."))
+                    }),
+                },
+                _ => false,
+            };
+            if iface {
+                self.diags.push(crate::names::Diag {
+                    tree: d.tree,
+                    node: d.node,
+                    message: format!("top-level module '{top}' has unconnected interface port '{name}'"),
+                });
+            }
+        }
+    }
+
     /// A header parameter without a default (a top cannot have one).
     fn needs_params(&self, decl: NodeRef) -> bool {
         let b = self.b;
@@ -176,6 +217,7 @@ impl<'b, 't> Elab<'b, 't> {
 
     pub fn run(&mut self) {
         for top in self.tops() {
+            self.interface_ports(&top);
             self.out.push(format!("$root instance {top} : {top}"));
             self.instance(&top, &top, &Overrides::new(), Vec::new(), Rc::new(HashMap::new()), 0);
         }

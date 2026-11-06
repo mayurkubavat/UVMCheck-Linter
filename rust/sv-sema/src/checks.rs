@@ -15,7 +15,13 @@
 //!   compound assignment (6.19.3, 6.19.4);
 //! - a parameter whose value uses a specparam (6.20.5);
 //! - a `randc` variable in `solve ... before`, a soft constraint or a
-//!   distribution (18.5.4, 18.5.10, 18.5.14).
+//!   distribution (18.5.4, 18.5.10, 18.5.14);
+//! - an assignment, `++` / `--` or a system subroutine's output argument
+//!   that writes to a literal, an operator result, a call or a parameter
+//!   (11.4.1, 21.3);
+//! - a variable, net or port in a constant expression: parameter values,
+//!   dimensions, generate conditions and loop headers, elaboration task
+//!   arguments, ANSI port and unpacked struct member defaults (11.2.1).
 //!
 //! A name the checks cannot resolve for sure (inherited, imported,
 //! hierarchical) never makes an error.
@@ -48,6 +54,20 @@ fn name_of(t: &Tree, n: NodeId) -> String {
 }
 
 const ASSIGN_OPS: &[&str] = &["=", "<=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "<<<=", ">>>="];
+/// System subroutines that write an argument: the first one written and
+/// whether every later one is written too.
+fn output_args(name: &str) -> Option<(usize, bool)> {
+    Some(match name {
+        "$swrite" | "$swriteb" | "$swriteh" | "$swriteo" | "$sformat" | "$random" | "$fgets" | "$fread" | "$cast" => {
+            (0, false)
+        }
+        n if n.starts_with("$dist_") => (0, false),
+        "$ferror" | "$value$plusargs" | "$readmemb" | "$readmemh" => (1, false),
+        "$fscanf" | "$sscanf" => (2, true),
+        _ => return None,
+    })
+}
+
 pub(crate) fn is_assign_op(s: &str) -> bool {
     ASSIGN_OPS.contains(&s)
 }
@@ -385,11 +405,14 @@ impl Ctx<'_> {
             }
             DataType if first_tok(t, n) == Some("enum") => self.enum_decl(t, n, &mut err),
             ExprStmt => self.assignment(ix, t, n, parent, &mut err),
+            BinaryExpr | PrefixExpr | PostfixExpr | CallExpr => self.lvalues(ix, t, n, parent, &mut err),
+            Dim | ElabTask | IfGenerate | CaseGenerate | LoopGenerate => self.constant_context(ix, t, n, parent, &mut err),
             ConcatExpr if matches!(toks(t, n).get(1).copied(), Some("<<" | ">>")) => {
                 self.stream_into(ix, t, n, parent, &mut err)
             }
             AssignPattern => array_pattern(t, n, parent, &mut err),
             Declarator => {
+                self.constant_context(ix, t, n, parent, &mut err);
                 // `e v = 1;`
                 let Some(p) = up(parent, n) else { return };
                 if t.kind(p) != DataDecl {
@@ -443,6 +466,7 @@ impl Ctx<'_> {
                 }
             }
             ParamDecl => {
+                self.constant_context(ix, t, n, parent, &mut err);
                 for d in t.children(n).filter(|&c| t.kind(c) == Declarator) {
                     let mut stack: Vec<NodeId> = t.children(d).filter(|&c| t.kind(c) != Name).collect();
                     while let Some(e) = stack.pop() {
@@ -463,6 +487,222 @@ impl Ctx<'_> {
                 self.pure_constraints(t, n, &mut err);
             }
             _ => {}
+        }
+    }
+
+    /// What `n` writes to is assignable: an assignment's left side, the
+    /// operand of `++` / `--`, a system subroutine's output argument
+    /// (11.4.1, 11.4.2, 21.3).
+    fn lvalues(&self, ix: usize, t: &Tree, n: NodeId, parent: &[u32], err: &mut impl FnMut(NodeId, String)) {
+        let op = toks(t, n).first().copied().unwrap_or("");
+        let kids: Vec<NodeId> = t.children(n).collect();
+        let targets: Vec<NodeId> = match t.kind(n) {
+            // `a <= b` is a comparison unless it is the statement itself.
+            BinaryExpr if ASSIGN_OPS.contains(&op) => {
+                if op == "<=" && !up(parent, n).is_some_and(|p| t.kind(p) == ExprStmt) {
+                    return;
+                }
+                if kids.len() != 2 || self.within(t, n, parent, &[Attribute, AttrSpec]) {
+                    return;
+                }
+                vec![kids[0]]
+            }
+            PrefixExpr | PostfixExpr if matches!(op, "++" | "--") => kids,
+            CallExpr => {
+                let Some(&callee) = kids.first() else { return };
+                let Some(list) = t.child(n, ArgList) else { return };
+                let out = output_args(&t.bare_text(callee));
+                if out.is_none() || t.kind(callee) != NameExpr {
+                    return;
+                }
+                let (first, rest) = out.unwrap_or((0, false));
+                // Argument slots, by commas; an empty one has no node.
+                let mut slots: Vec<Option<NodeId>> = vec![None];
+                for c in &t.node(list).children {
+                    match c {
+                        Child::Token(i) if &*t.tokens[*i as usize].text == "," => slots.push(None),
+                        Child::Node(a) => {
+                            let a = *a;
+                            if let Some(s) = slots.last_mut() {
+                                *s = t.children(a).next();
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                slots
+                    .iter()
+                    .enumerate()
+                    .filter(|&(i, _)| i == first || (rest && i > first))
+                    .filter_map(|(_, s)| *s)
+                    .collect()
+            }
+            _ => return,
+        };
+        for e in targets {
+            if self.not_assignable(ix, t, e, parent) {
+                err(e, "expression is not assignable".into());
+            }
+        }
+    }
+
+    /// Expressions that must be constant (11.2.1): parameter values,
+    /// dimensions, generate conditions and loop bounds, elaboration task
+    /// arguments, ANSI port defaults and unpacked struct member defaults.
+    /// They cannot refer to variables, nets or ports.
+    fn constant_context(&self, ix: usize, t: &Tree, n: NodeId, parent: &[u32], err: &mut impl FnMut(NodeId, String)) {
+        let p = up(parent, n);
+        let pk = p.map(|p| t.kind(p));
+        let exprs: Vec<NodeId> = match t.kind(n) {
+            ParamDecl => {
+                if toks(t, n).first() == Some(&"defparam")
+                    || self.within(t, n, parent, &[CheckerDecl, SequenceDecl, PropertyDecl, CovergroupDecl])
+                {
+                    return;
+                }
+                let mut v = Vec::new();
+                for d in t.children(n).filter(|&c| t.kind(c) == Declarator) {
+                    v.extend(t.children(d).filter(|&c| !matches!(t.kind(c), Name | Dim)));
+                }
+                v
+            }
+            Dim if matches!(pk, Some(Declarator | DataType)) => {
+                if self.within(t, n, parent, &[CheckerDecl, SequenceDecl, PropertyDecl, CovergroupDecl, LetDecl])
+                    || self.in_expression(t, n, parent)
+                {
+                    return;
+                }
+                t.children(n).collect()
+            }
+            ElabTask => t.children(n).collect(),
+            IfGenerate | CaseGenerate => {
+                t.children(n).filter(|&c| t.kind(c) != GenerateBlock).take(1).collect()
+            }
+            // The header only; the body may be a single item.
+            LoopGenerate => t
+                .children(n)
+                .filter(|&c| t.kind(c) == Literal || format!("{:?}", t.kind(c)).ends_with("Expr"))
+                .collect(),
+            // ANSI port defaults; unpacked struct member defaults.
+            Declarator if toks(t, n).contains(&"=") => {
+                let port = pk == Some(Port)
+                    && p.and_then(|p| up(parent, p)).and_then(|l| up(parent, l)).is_some_and(|h| {
+                        t.kind(h) == Header
+                            && up(parent, h).is_some_and(|d| matches!(t.kind(d), ModuleDecl | InterfaceDecl | ProgramDecl))
+                    });
+                let member = pk == Some(DataDecl)
+                    && p.and_then(|p| up(parent, p)).is_some_and(|d| {
+                        t.kind(d) == DataType && matches!(toks(t, d).first(), Some(&"struct" | &"union"))
+                    });
+                if !port && !member {
+                    return;
+                }
+                t.children(n).filter(|&c| !matches!(t.kind(c), Name | Dim)).collect()
+            }
+            _ => return,
+        };
+        // In a subroutine, names resolve by position (a header dimension
+        // may use a parameter that a later argument hides); not checked.
+        if self.within(t, n, parent, &[FunctionDecl, TaskDecl]) {
+            return;
+        }
+        // Loop variables of enclosing generate loops are constants.
+        let mut genvars = Vec::new();
+        let mut cur = Some(n);
+        while let Some(a) = cur {
+            if t.kind(a) == LoopGenerate {
+                genvars.extend(t.child(a, Name).map(|nm| t.bare_text(nm)));
+            }
+            cur = up(parent, a);
+        }
+        let mut stack = exprs;
+        while let Some(e) = stack.pop() {
+            match t.kind(e) {
+                NameExpr => {
+                    let name = t.bare_text(e);
+                    if genvars.contains(&name) {
+                        continue;
+                    }
+                    if self.name_decl(ix, t, e, parent).is_some_and(|d| {
+                        matches!(d.kind, SymKind::Variable | SymKind::Net | SymKind::Port)
+                    }) {
+                        err(e, format!("reference to non-constant variable '{name}' is not allowed in a constant expression"));
+                    }
+                }
+                // `x.m`: a member or a method; not checked.
+                MemberExpr | WithClause | AssignPattern | DataType => {}
+                CallExpr => {
+                    let kids: Vec<NodeId> = t.children(e).collect();
+                    let callee = kids.first().map(|&c| t.bare_text(c)).unwrap_or_default();
+                    let unevaluated = matches!(
+                        callee.as_str(),
+                        "$bits"
+                            | "$size"
+                            | "$left"
+                            | "$right"
+                            | "$low"
+                            | "$high"
+                            | "$increment"
+                            | "$dimensions"
+                            | "$unpacked_dimensions"
+                            | "$typename"
+                            | "$isunbounded"
+                            | "$typeof"
+                    );
+                    for &k in kids.iter().skip(1) {
+                        if t.kind(k) == ArgList {
+                            stack.extend(t.children(k).skip(usize::from(unevaluated)));
+                        } else {
+                            stack.push(k);
+                        }
+                    }
+                }
+                _ => stack.extend(t.children(e)),
+            }
+        }
+    }
+
+    /// `n` is inside an expression (a cast's type, `new[n]`), not a
+    /// declaration.
+    fn in_expression(&self, t: &Tree, n: NodeId, parent: &[u32]) -> bool {
+        let mut cur = up(parent, n);
+        while let Some(a) = cur {
+            match t.kind(a) {
+                DataDecl | ParamDecl | TypedefDecl | Port | ModuleDecl | InterfaceDecl
+                | ProgramDecl | PackageDecl | ClassDecl => return false,
+                k if format!("{k:?}").ends_with("Expr") => return true,
+                _ => {}
+            }
+            cur = up(parent, a);
+        }
+        false
+    }
+
+    fn within(&self, t: &Tree, n: NodeId, parent: &[u32], kinds: &[SyntaxKind]) -> bool {
+        let mut cur = up(parent, n);
+        while let Some(a) = cur {
+            if kinds.contains(&t.kind(a)) {
+                return true;
+            }
+            cur = up(parent, a);
+        }
+        false
+    }
+
+    /// An expression that can never name storage: a literal, an operator
+    /// other than an assignment, `?:`, a call, or a parameter, enum value
+    /// or specparam.
+    fn not_assignable(&self, ix: usize, t: &Tree, e: NodeId, parent: &[u32]) -> bool {
+        let op = toks(t, e).first().copied().unwrap_or("");
+        match t.kind(e) {
+            ParenExpr => t.children(e).next().is_some_and(|c| self.not_assignable(ix, t, c, parent)),
+            Literal | CondExpr | CallExpr => true,
+            BinaryExpr => !ASSIGN_OPS.contains(&op),
+            PrefixExpr => !matches!(op, "++" | "--"),
+            NameExpr => self.name_decl(ix, t, e, parent).is_some_and(|d| {
+                matches!(d.kind, SymKind::Parameter | SymKind::EnumValue | SymKind::Specparam)
+            }),
+            _ => false,
         }
     }
 

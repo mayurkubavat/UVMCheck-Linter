@@ -22,6 +22,7 @@ use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
 pub mod bigint;
 pub mod bind;
+pub mod calls;
 mod body;
 pub mod checks;
 mod consteval;
@@ -29,6 +30,7 @@ mod elab;
 mod packed;
 pub mod iclass;
 pub mod names;
+pub mod order;
 pub mod scopes;
 pub mod sva;
 pub mod udp;

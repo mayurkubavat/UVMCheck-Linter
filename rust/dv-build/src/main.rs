@@ -135,6 +135,8 @@ fn main() -> ExitCode {
     checks.extend(sv_sema::iclass::check(&trees));
     checks.extend(sv_sema::udp::check(&trees));
     checks.extend(sv_sema::sva::check(&trees));
+    checks.extend(sv_sema::calls::check(&trees));
+    checks.extend(sv_sema::order::check(&trees, &scopes));
     for d in checks {
         let t = &trees[d.tree];
         let Some((tok, _)) = t.token_bounds(d.node) else {
