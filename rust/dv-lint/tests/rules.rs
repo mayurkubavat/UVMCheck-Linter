@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 61);
+    assert_eq!(r.len(), 68);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 61);
+    assert_eq!(ids.len(), 68);
 }
 
 #[test]
@@ -153,4 +153,30 @@ fn syntax_rules_batch_two() {
         assert!(got.contains(&want), "{want} not in {got:?}");
     }
     assert_eq!(got.iter().filter(|r| **r == "SV-BAN-001").count(), 2, "{got:?}");
+}
+
+#[test]
+fn syntax_rules_batch_three() {
+    let src = "class c; rand int x; constraint k { x inside {[10:2], [1:5]}; }\n\
+               task t(); int a; event e; c o, q[$];\n\
+               if ((a = 3) > 1) a += 1;\n\
+               repeat (2) for (a = 0; a < 2; a++) begin o = new(); q.push_back(new); end\n\
+               @(posedge e) -> e; @(e) -> e; #($urandom_range(1, 5));\n\
+               s.start(sqr, null, -2); s.start(sqr, null, -1);\n\
+               endtask endclass\n\
+               module m; logic clk, a, b;\n\
+               assert property (@(posedge clk) a ##[1:$] b[=0] ##1 b[->1]);\n\
+               endmodule\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
+    assert_eq!(count("SV-RND-021"), 1);
+    assert_eq!(count("SV-COR-020"), 1);
+    // Once for each enclosing loop; a `new` argument is not slang's NewClassExpression.
+    assert_eq!(count("SV-OOP-010"), 2);
+    assert_eq!(count("SV-CON-013"), 1);
+    assert_eq!(count("SVA-CYC-001"), 2);
+    assert_eq!(count("SV-SVA-004"), 1);
+    assert_eq!(count("UVM-SEQ-007"), 1);
 }
