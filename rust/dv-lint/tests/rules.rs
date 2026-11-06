@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 92);
+    assert_eq!(r.len(), 129);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 92);
+    assert_eq!(ids.len(), 129);
 }
 
 #[test]
@@ -274,4 +274,82 @@ fn syntax_rules_batch_six() {
     for id in ["SV-COV-006", "SV-COV-010", "SV-COV-012", "UVM-PHS-004", "SVA-VAC-001", "SVA-RST-001", "SV-PRF-012", "UVM-SEQ-012"] {
         assert!(count(id) >= 1, "{id}");
     }
+}
+
+/// The `(rule, line)` pairs an `expect.json` lists for `bad.sv`.
+fn expected(json: &str) -> Vec<(String, u32)> {
+    let mut out = Vec::new();
+    let mut rule = None;
+    for part in json.split(',').flat_map(|p| p.split('{')) {
+        let Some((k, v)) = part.split_once(':') else { continue };
+        let v = v.trim().trim_matches(|c: char| c == '}' || c == ']' || c.is_whitespace());
+        match k.trim().trim_matches('"') {
+            "rule" => rule = Some(v.trim_matches('"').to_string()),
+            "line" => {
+                if let (Some(r), Ok(l)) = (rule.take(), v.parse()) {
+                    out.push((r, l));
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Each uvm/ral rule finds what its repo fixture expects.
+#[test]
+fn uvm_and_ral_rules_on_fixtures() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let ids = [
+        "RAL-ACC-001", "RAL-ACC-002", "RAL-BLK-001", "RAL-COL-001", "RAL-MAP-001", "RAL-MAP-002",
+        "UVM-ALS-001", "UVM-DAG-001", "UVM-FAC-004", "UVM-FAC-005", "UVM-LOG-002", "UVM-OBJ-002",
+        "UVM-OBJ-003", "UVM-OBJ-004", "UVM-OBJ-005", "UVM-OBS-002", "UVM-PHS-005", "UVM-PHS-006",
+        "UVM-PHS-008", "UVM-PHS-010", "UVM-RAL-001", "UVM-REP-005", "UVM-SCB-001", "UVM-SCB-002",
+        "UVM-SEQ-005", "UVM-SEQ-006", "UVM-SEQ-008", "UVM-SEQ-009", "UVM-SEQ-010", "UVM-SEQ-011",
+        "UVM-SEQ-014", "UVM-SEQ-015", "UVM-STY-003", "UVM-TLM-004", "UVM-TLM-005", "UVM-TLM-006",
+    ];
+    for id in ids {
+        let area = if id == "UVM-RAL-001" { "oop" } else { "uvm" };
+        let dir = root.join("tests/rules").join(area).join(id);
+        let json = std::fs::read_to_string(dir.join("expect.json")).unwrap();
+        let args = [
+            format!("+incdir+{}", root.join("tests/common").display()),
+            dir.join("bad.sv").display().to_string(),
+        ];
+        let (d, trees) = sv_sema::load_with_trees(&args).unwrap();
+        let (files, found) = dv_lint::lint_all(&d, &trees, |r| r == id);
+        let lines: Vec<u32> = found.iter().map(|f| f.position_in(&files).1).collect();
+        let want: Vec<u32> = expected(&json).into_iter().filter(|(r, _)| r == id).map(|(_, l)| l).collect();
+        assert!(!want.is_empty(), "{id}: no expectation");
+        for l in want {
+            assert!(lines.contains(&l), "{id}: line {l} not in {lines:?}");
+        }
+    }
+}
+
+#[test]
+fn early_return_before_finish_item() {
+    let src = "class item; endclass\n\
+               class my_seq;\n  item req;\n\
+               task body(); start_item(req); if (req == null) return; finish_item(req); endtask\n\
+               task other(); if (req == null) return; endtask\n\
+               endclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (files, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |r| r == "UVM-SEQ-004");
+    let got: Vec<_> = found.iter().map(|f| f.position_in(&files)).map(|(_, l, c)| (l, c)).collect();
+    assert_eq!(got, vec![(4, 6)]);
+}
+
+/// An element-select receiver reports as 'reg' and always fires, as in slang.
+#[test]
+fn mirror_set_on_element_select() {
+    let src = "class fld; function void set(int v); endfunction endclass\n\
+               class blk; fld foo[4]; fld bar;\n\
+               function void f(); foo[2].set(1); bar.set(3); (bar).set(1); endfunction\nendclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |r| r == "RAL-ACC-001");
+    assert_eq!(found.len(), 1);
+    assert!(found[0].message.starts_with("Direct mirror update 'reg.set(...)'"));
 }

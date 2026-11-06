@@ -9,6 +9,8 @@
 use dv_model::{Class, ClassId, Design, Direction, Loc, Method, PhaseKind, Property, TypeShape};
 
 mod factory;
+mod g_uvm;
+mod g_uvm2;
 pub mod syntax;
 mod syntax2;
 mod syntax3;
@@ -201,6 +203,8 @@ pub fn rules() -> Vec<Rule> {
     v.extend(syntax4::rules());
     v.extend(syntax5::rules());
     v.extend(syntax6::rules());
+    v.extend(g_uvm::rules());
+    v.extend(g_uvm2::rules());
     v.sort_by_key(|r| r.id);
     v
 }
