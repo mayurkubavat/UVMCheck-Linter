@@ -515,6 +515,8 @@ fn never_set_parameter(c: &Cst, s: &mut Sink) {
     // Generic user classes some non-generic user class uses as a base or a
     // property type.
     let mut generics: Vec<usize> = Vec::new();
+    // The built-in generic `mailbox #(type T)`, used as a property type.
+    let mut std_mailbox = false;
     for i in classes.user() {
         let cls = &classes.list[i];
         if cls.generic {
@@ -532,9 +534,31 @@ fn never_set_parameter(c: &Cst, s: &mut Sink) {
         }
         for p in &cls.props {
             if let Some(n) = p.ty.and_then(|t| type_name(c, t)) {
+                if n == "mailbox" && classes.find(&n).is_none() {
+                    std_mailbox = true;
+                }
                 note(&n);
             }
         }
+    }
+    // slang reports the std class's parameter with no location.
+    if std_mailbox
+        && !c.nodes(DataType).into_iter().any(|ty| {
+            type_name(c, ty).as_deref() == Some("mailbox")
+                && c.tree.child(ty, ParamList).and_then(|pl| c.tree.child(pl, ArgList)).is_some_and(|a| {
+                    c.tree.children(a).any(|x| c.kind(x) == Arg && c.tree.children(x).next().is_some())
+                })
+        })
+    {
+        s.add(
+            "SV-DED-015",
+            "NeverSetClassParameter",
+            Severity::Info,
+            "Parameter 'T' of class 'mailbox' is never set by any specialization; every user takes the default. Make it a \
+             localparam, or remove it until a second configuration exists and is tested."
+                .into(),
+            dv_model::Loc::default(),
+        );
     }
     for k in generics {
         let gen = &classes.list[k];

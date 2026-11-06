@@ -613,6 +613,9 @@ fn unreachable_after_exit(c: &Cst, s: &mut Sink) {
 fn empty_conditional(c: &Cst, s: &mut Sink) {
     let units = Units::new(c);
     for n in c.nodes(IfStmt) {
+        if in_bad_body(c, n) {
+            continue;
+        }
         let (_, then, _) = if_parts(c, n);
         if then.is_some_and(|t| c.kind(t) == EmptyStmt) {
             report(
@@ -630,7 +633,7 @@ fn empty_conditional(c: &Cst, s: &mut Sink) {
         }
     }
     for n in c.nodes(LoopStmt) {
-        if stmt(c, n) != Some(St::While) {
+        if stmt(c, n) != Some(St::While) || in_bad_body(c, n) {
             continue;
         }
         if body_of(c, n).is_some_and(|t| c.kind(t) == EmptyStmt) {
@@ -693,6 +696,21 @@ fn dead_store(c: &Cst, s: &mut Sink) {
             }
         }
     }
+}
+
+/// `n` is in a subroutine or procedural block whose statements hold a
+/// syntax error: slang binds the body as invalid and its AST walk
+/// (VisitFlags::AllGood) skips all of it.
+fn in_bad_body(c: &Cst, n: NodeId) -> bool {
+    let Some(d) = ancestors_or_self(c, n)
+        .find(|&x| matches!(c.kind(x), FunctionDecl | TaskDecl | ProceduralBlock))
+    else {
+        return false;
+    };
+    c.tree
+        .children(d)
+        .filter(|&k| !matches!(c.kind(k), Name | PortList | ReturnType | DataType | Attribute))
+        .any(|k| has_error(c, k))
 }
 
 /// The variable an assignment target names as slang binds it: a plain name,
