@@ -35,7 +35,7 @@ pub(crate) type NormToken = (String, bool);
 /// slang gives the literal of a `__FILE__ or `__LINE__ in a body a
 /// location of its own, outside the expansion.
 fn from_macro_body(c: &Cst, t: &sv_syntax::Token) -> bool {
-    if !t.from_macro || (t.written.file == t.origin.file && t.written.offset > t.origin.offset) {
+    if !t.from_macro || t.from_arg {
         return false;
     }
     let src = c.tree.sources.get(t.written.file as usize).map(|s| &s[t.written.offset as usize..]).unwrap_or("");
@@ -196,8 +196,7 @@ fn routine_name(c: &Cst, n: NodeId) -> String {
 }
 
 /// The statement lists (two or more statements) of a routine body, as
-/// slang's StatementList: a body or block's items, a declaration being one
-/// statement per declarator.
+/// slang's StatementList: a body or block's statements.
 fn statement_lists(c: &Cst, routine: usize, body: NodeId, home: u32, out: &mut Vec<StmtList>) {
     for n in c.subtree(body) {
         if !matches!(c.kind(n), Body | SeqBlock | ParBlock) {
@@ -205,9 +204,9 @@ fn statement_lists(c: &Cst, routine: usize, body: NodeId, home: u32, out: &mut V
         }
         let mut items: Vec<NodeId> = Vec::new();
         for x in c.items(n) {
-            if c.kind(x) == DataDecl {
-                items.extend(c.tree.children(x).filter(|&k| c.kind(k) == Declarator));
-            } else if is_stmt(c, x) {
+            // slang's VariableDeclStatements carry no syntax, so the rule
+            // skips declarations.
+            if c.kind(x) != DataDecl && is_stmt(c, x) {
                 items.push(x);
             }
         }

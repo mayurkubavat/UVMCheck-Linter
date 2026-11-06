@@ -115,10 +115,13 @@ impl<'t> Cst<'t> {
     /// (none for macro-made tokens here).
     pub fn text(&self, n: NodeId) -> String {
         let mut s = String::new();
-        for t in self.tree.token_range(n) {
+        for (i, t) in self.tree.token_range(n).into_iter().enumerate() {
             let tok = &self.tree.tokens[t as usize];
             if !tok.from_macro {
                 s.push_str(self.tree.trivia(t));
+            } else if i > 0 && tok.space_before {
+                // slang keeps a macro body's trivia on the expanded tokens.
+                s.push(' ');
             }
             s.push_str(&tok.text);
         }

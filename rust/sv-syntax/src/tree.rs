@@ -28,6 +28,8 @@ pub struct Token {
     pub written: sv_preproc::Origin,
     /// Trivia came before it, also inside a macro expansion.
     pub space_before: bool,
+    /// Put here as a macro argument (see `sv_preproc::PpToken::from_arg`).
+    pub from_arg: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -289,6 +291,7 @@ pub(crate) fn tokens_from(out: &sv_preproc::Output) -> Vec<Token> {
                 trivia_start,
                 written: t.written,
                 space_before: t.space_before,
+                from_arg: t.from_arg,
             }
         })
         .collect()

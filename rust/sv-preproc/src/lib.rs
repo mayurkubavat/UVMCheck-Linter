@@ -50,6 +50,9 @@ pub struct PpToken {
     pub written: Origin,
     /// Whitespace or a comment came before it (in the text or the macro body).
     pub space_before: bool,
+    /// The last expansion step put it here as a macro argument (slang's
+    /// macro-argument location), not as part of a macro body.
+    pub from_arg: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -107,6 +110,8 @@ struct T {
     /// Where the text was written (a define body or a macro argument);
     /// None for text a macro made (pasting, stringifying, the command line).
     written: Option<Origin>,
+    /// See `PpToken::from_arg`.
+    from_arg: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -246,6 +251,7 @@ fn lex_to_t(src: &str, file: u32, from_macro: bool, origin_override: Option<Orig
                     origin: origin_override.unwrap_or(Origin { file, offset: tok.start }),
                     from_macro,
                     written: (!from_macro).then_some(Origin { file, offset: tok.start }),
+                    from_arg: false,
                 });
                 space = false;
                 newline = false;
@@ -327,7 +333,7 @@ impl Preprocessor {
         self.out.timescales.push((0, self.time_unit));
         while let Some(t) = self.next() {
             let written = t.written.unwrap_or(t.origin);
-            self.out.tokens.push(PpToken { kind: t.kind, text: t.text, origin: t.origin, from_macro: t.from_macro, written, space_before: t.space_before });
+            self.out.tokens.push(PpToken { kind: t.kind, text: t.text, origin: t.origin, from_macro: t.from_macro, written, space_before: t.space_before, from_arg: t.from_arg });
         }
         if !self.conds.is_empty() {
             self.diag(Origin { file: id, offset: src.len() as u32 }, "missing `endif".into());
@@ -1002,7 +1008,7 @@ impl Preprocessor {
 
     fn substitute(&self, use_tok: &T, body: &[T], names: &[&str], args: &[Vec<T>]) -> Vec<T> {
         let origin = use_tok.origin;
-        let mark = |t: &T, space: bool| T { origin, from_macro: true, space_before: space, newline_before: false, ..t.clone() };
+        let mark = |t: &T, space: bool| T { origin, from_macro: true, space_before: space, newline_before: false, from_arg: false, ..t.clone() };
         let param = |s: &str| names.iter().position(|n| *n == s);
         let mut out: Vec<T> = Vec::new();
         let mut i = 0;
@@ -1071,6 +1077,7 @@ impl Preprocessor {
                         origin,
                         from_macro: true,
                         written: None,
+                        from_arg: false,
                     });
                     i = j + 1;
                     continue;
@@ -1131,6 +1138,7 @@ impl Preprocessor {
                         }
                         for (n, a) in args[k].iter().enumerate() {
                             let mut m = mark(a, if n == 0 { t.space_before } else { a.space_before });
+                            m.from_arg = true;
                             if n == 0 {
                                 m.ws = t.ws.clone();
                             }
