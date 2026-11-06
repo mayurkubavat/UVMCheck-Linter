@@ -449,28 +449,40 @@ impl Units {
             edges.entry(parent.0).or_default().push((def, count));
             instantiated.insert(def.0, true);
         }
-        let mut times: HashMap<u32, usize> = HashMap::new();
-        // Tops are elaborated once; walk down, guarding against cycles.
-        fn visit(
-            d: NodeId,
-            k: usize,
-            edges: &HashMap<u32, Vec<(NodeId, usize)>>,
-            times: &mut HashMap<u32, usize>,
-            depth: usize,
-        ) {
-            if depth > 32 {
-                return;
-            }
-            *times.entry(d.0).or_insert(0) += k;
-            if let Some(es) = edges.get(&d.0) {
-                for &(child, n) in es {
-                    visit(child, k * n, edges, times, depth + 1);
-                }
+        // Tops are elaborated once; a definition as often as its parents,
+        // times the instances in each (memoized: the paths through a deep
+        // hierarchy are exponentially many). A cycle contributes nothing.
+        let mut parents: HashMap<u32, Vec<(u32, usize)>> = HashMap::new();
+        for (&p, es) in &edges {
+            for &(child, n) in es {
+                parents.entry(child.0).or_default().push((p, n));
             }
         }
+        fn times_of(
+            d: u32,
+            tops: &HashMap<u32, bool>,
+            parents: &HashMap<u32, Vec<(u32, usize)>>,
+            memo: &mut HashMap<u32, Option<usize>>,
+        ) -> usize {
+            match memo.get(&d) {
+                Some(Some(t)) => return *t,
+                Some(None) => return 0,
+                None => {}
+            }
+            memo.insert(d, None);
+            let mut t = usize::from(!tops.contains_key(&d));
+            for &(p, n) in parents.get(&d).map(Vec::as_slice).unwrap_or(&[]) {
+                t = t.saturating_add(times_of(p, tops, parents, memo).saturating_mul(n));
+            }
+            memo.insert(d, Some(t));
+            t
+        }
+        let mut memo = HashMap::new();
+        let mut times: HashMap<u32, usize> = HashMap::new();
         for &d in &defs {
-            if !instantiated.contains_key(&d.0) {
-                visit(d, 1, &edges, &mut times, 0);
+            let t = times_of(d.0, &instantiated, &parents, &mut memo);
+            if t > 0 {
+                times.insert(d.0, t);
             }
         }
         times
