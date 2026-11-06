@@ -23,6 +23,7 @@ pub(crate) fn rules() -> Vec<Rule> {
     let mut v = crate::g_meth_model::rules();
     v.extend(crate::g_meth_body::rules());
     v.extend(crate::g_meth_body2::rules());
+    v.extend(crate::g_meth_pattern::rules());
     v.extend(crate::g_meth_syntax::rules());
     v
 }
