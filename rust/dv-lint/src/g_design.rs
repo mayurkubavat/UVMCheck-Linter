@@ -664,11 +664,11 @@ fn dead_store(c: &Cst, s: &mut Sink) {
             let Some((l1, _, _)) = assignment(c, w[0]) else {
                 continue;
             };
-            let Some(n1) = ident(c, l1) else { continue };
+            let Some(n1) = store_target(c, l1) else { continue };
             let Some((l2, r2, _)) = assignment(c, w[1]) else {
                 continue;
             };
-            if ident(c, l2) != Some(n1) {
+            if store_target(c, l2) != Some(n1) {
                 continue;
             }
             // slang drops invalid statements: a syntax error, or a compound
@@ -693,6 +693,21 @@ fn dead_store(c: &Cst, s: &mut Sink) {
             }
         }
     }
+}
+
+/// The variable an assignment target names as slang binds it: a plain name,
+/// or `super.x`, which slang binds straight to the inherited member (unlike
+/// `this.x`, a member access).
+fn store_target<'t>(c: &Cst<'t>, e: NodeId) -> Option<&'t str> {
+    if c.kind(e) == MemberExpr {
+        let head = c.tree.children(e).next()?;
+        if c.kind(head) != NameExpr || c.tree.bare_text(head) != "super" {
+            return None;
+        }
+        let t = c.toks(e).last()?;
+        return Some(c.text_of(t));
+    }
+    ident(c, e)
 }
 
 fn ancestors_or_self<'a>(c: &'a Cst, n: NodeId) -> impl Iterator<Item = NodeId> + 'a {
@@ -775,7 +790,7 @@ fn enum_typed(c: &Cst, n: NodeId, name: &str) -> bool {
 /// A NamedValue reference to `name`: a bare identifier that is not the
 /// member name of `a.b` nor a callee.
 fn reads_name(c: &Cst, x: NodeId, name: &str) -> bool {
-    if ident(c, x) != Some(name) {
+    if store_target(c, x) != Some(name) {
         return false;
     }
     // The callee of `name(...)` is a call, not a value.
