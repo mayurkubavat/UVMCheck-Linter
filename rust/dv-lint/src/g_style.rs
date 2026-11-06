@@ -143,7 +143,7 @@ fn max_line_length(c: &Cst, s: &mut Sink) {
 /// slang's full path of a file: absolute, with `.` and `..` resolved.
 fn full_path(p: &std::path::Path) -> String {
     p.canonicalize()
-        .or_else(|_| std::path::absolute(p))
+        .or_else(|_| std::env::current_dir().map(|d| d.join(p)))
         .unwrap_or_else(|_| p.to_path_buf())
         .to_string_lossy()
         .into_owned()
@@ -314,7 +314,7 @@ fn last_directive(text: &str, base: u32) -> u32 {
         .iter()
         .filter(|t| t.kind == sv_lexer::Kind::Directive)
         .map(|t| base + t.start)
-        .last()
+        .next_back()
         .unwrap_or(0)
 }
 
@@ -450,7 +450,7 @@ fn routine_name(c: &Cst, n: NodeId) -> String {
 fn extern_method_threshold(c: &Cst, s: &mut Sink) {
     const THRESHOLD: u32 = 5;
     for (n, kw) in routines(c) {
-        if c.parent(n).is_none_or(|p| c.kind(p) != ClassDecl) {
+        if !c.parent(n).is_some_and(|p| c.kind(p) == ClassDecl) {
             continue;
         }
         if c.toks(n).any(|t| c.text_of(t) == "extern") {

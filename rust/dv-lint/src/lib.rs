@@ -22,6 +22,7 @@ mod g_concurrency;
 mod g_sva_cov;
 mod g_deprecated;
 mod g_readability;
+mod g_readability2;
 mod g_style;
 mod g_style2;
 pub mod syntax;
@@ -226,6 +227,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_deprecated::rules());
     v.extend(g_style2::rules());
     v.extend(g_readability::rules());
+    v.extend(g_readability2::rules());
     v.sort_by_key(|r| r.id);
     v
 }
