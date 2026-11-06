@@ -71,6 +71,9 @@ pub struct Output {
     /// The `timescale unit in force from a token index on, as a power of
     /// ten femtoseconds (1ns is 6). The first entry is at token 0.
     pub timescales: Vec<(u32, i32)>,
+    /// Text of conditional branches not taken: a file and the byte range
+    /// from the directive that starts skipping to the one that ends it.
+    pub skipped: Vec<(u32, u32, u32)>,
 }
 
 /// A macro used in the source text: its name without the backtick and the
@@ -430,7 +433,7 @@ impl Preprocessor {
                     let take = if name == "ifdef" { cond } else { !cond };
                     self.conds.push(Cond { taken: take });
                     if !take {
-                        self.skip_branch();
+                        self.skip_branch(t.origin);
                     }
                 }
                 "elsif" | "else" => {
@@ -441,7 +444,7 @@ impl Preprocessor {
                     if self.conds.is_empty() {
                         self.diag(t.origin, format!("`{name} without `ifdef"));
                     } else {
-                        self.skip_to_endif();
+                        self.skip_to_endif(t.origin);
                     }
                 }
                 "endif" => {
@@ -702,13 +705,17 @@ impl Preprocessor {
 
     /// Skips the rest of a branch not taken; stops after the `elsif/`else
     /// that takes over, or after the `endif.
-    fn skip_branch(&mut self) {
+    fn skip_branch(&mut self, from: Origin) {
         let mut depth = 0;
         while let Some(t) = self.frame_next() {
             if t.kind != Kind::Directive {
                 continue;
             }
-            match &t.text[1..] {
+            let name = &t.text[1..];
+            if depth == 0 && matches!(name, "endif" | "elsif" | "else") && t.origin.file == from.file {
+                self.out.skipped.push((from.file, from.offset, t.origin.offset));
+            }
+            match name {
                 "ifdef" | "ifndef" => depth += 1,
                 "endif" if depth > 0 => depth -= 1,
                 "endif" => {
@@ -739,11 +746,11 @@ impl Preprocessor {
         }
     }
 
-    fn skip_to_endif(&mut self) {
+    fn skip_to_endif(&mut self, from: Origin) {
         if let Some(c) = self.conds.last_mut() {
             c.taken = true;
         }
-        self.skip_branch();
+        self.skip_branch(from);
     }
 
     /// Next token of the current frame only (conditionals do not cross files).

@@ -38,7 +38,7 @@ def reference(args):
             data = json.load(open(out))
         except (OSError, ValueError):
             return None
-    return collections.Counter((os.path.basename(v['file']), v['line'], v['column'], v['ruleId'], v['message'])
+    return collections.Counter((os.path.basename(v['file']), v['line'], v['column'], v['ruleId'], v['message'].split('\n')[0])
                                for v in data['violations'] if v['ruleId'] in RULES)
 
 

@@ -119,6 +119,12 @@ impl<'t> Cst<'t> {
         self.text(n).trim_matches([' ', '\t', '\n', '\r']).to_string()
     }
 
+    /// Location of a preprocessor position (not in a macro).
+    pub fn loc_at(&self, o: sv_syntax::Origin) -> Loc {
+        let (file, line, column) = self.locator.borrow_mut().position(self.ix, self.tree, o);
+        Loc { file, line, column, expansion: None }
+    }
+
     pub fn loc(&self, tok: u32) -> Loc {
         self.locator.borrow_mut().loc(self.ix, self.tree, tok)
     }

@@ -63,6 +63,8 @@ pub struct Tree {
     pub pp_diagnostics: Vec<sv_preproc::Diagnostic>,
     /// Macros used in the source text, in order (see `sv_preproc::Output`).
     pub macro_uses: Vec<sv_preproc::MacroUse>,
+    /// Conditional branches not taken: (file, start, end) byte ranges.
+    pub skipped: Vec<(u32, u32, u32)>,
     /// `timescale units by token index (see `sv_preproc::Output`).
     pub timescales: Vec<(u32, i32)>,
     /// Per node: its first token and token count when its tokens are one

@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 68);
+    assert_eq!(r.len(), 71);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 68);
+    assert_eq!(ids.len(), 71);
 }
 
 #[test]
@@ -179,4 +179,28 @@ fn syntax_rules_batch_three() {
     assert_eq!(count("SVA-CYC-001"), 2);
     assert_eq!(count("SV-SVA-004"), 1);
     assert_eq!(count("UVM-SEQ-007"), 1);
+}
+
+#[test]
+fn syntax_rules_batch_three_b() {
+    let src = "`define M(a) a /* TODO in body */ + 1\n\
+               class c; rand int x; int q[$];\n\
+               constraint k { x dist {1 := 0, 2 :/ 0}; x dist {1 := 0, 2}; }\n\
+               // FIXME before code\n\
+               task t(); x = q[q.size()]; x = q[q.size() - 1]; x = `M(2); endtask\n\
+               // TODO dropped before a macro use\n\
+               `M(3);\n\
+               endclass\n\
+               `ifdef NOPE\n// TODO in a branch not taken\n`endif\n\
+               // XXX at the end\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
+    assert_eq!(count("SV-ARR-001"), 1);
+    assert_eq!(count("SV-RND-012"), 1);
+    let todo: Vec<_> = found.iter().filter(|f| f.rule == "SV-STY-003").map(|f| f.message.as_str()).collect();
+    // The body comment once per expansion.
+    assert_eq!(todo.len(), 4, "{todo:?}");
+    assert!(todo.iter().all(|m| !m.contains("dropped") && !m.contains("not taken")), "{todo:?}");
 }
