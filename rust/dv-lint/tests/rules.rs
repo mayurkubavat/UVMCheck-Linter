@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 346);
+    assert_eq!(r.len(), 349);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 346);
+    assert_eq!(ids.len(), 349);
 }
 
 #[test]
@@ -601,4 +601,20 @@ fn ref_args_and_string_keys() {
                endclass\n";
     assert_eq!(rule_lines(src, "SV-API-001"), vec![3]);
     assert_eq!(rule_lines(src, "SV-PRF-006"), vec![2]);
+}
+
+#[test]
+fn casts_reports_and_pattern_sizes() {
+    let src = "class b; endclass\n\
+               class c extends b;\n\
+               int f[4];\n\
+               function void g(b x); c y;\n\
+               $cast(y, x);\n\
+               void'($cast(y, x));\n\
+               if (!$cast(y, x)) return;\n\
+               endfunction\n\
+               function void h(); f = '{1, 2, 3}; endfunction\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-OOP-002"), vec![5, 6]);
+    assert_eq!(rule_lines(src, "SV-TYP-009"), vec![9]);
 }

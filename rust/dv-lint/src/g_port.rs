@@ -17,6 +17,9 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "SV-API-001", name: "RefArgumentNeverWritten", check: Syntax(ref_argument_never_written) },
         Rule { id: "SV-PRF-006", name: "StringKeyAssociativeArray", check: Syntax(string_key_assoc) },
         Rule { id: "UVM-FAC-001", name: "UvmComponentDirectNew", check: Syntax(component_direct_new) },
+        Rule { id: "SV-OOP-002", name: "UncheckedDynamicCast", check: Syntax(unchecked_dynamic_cast) },
+        Rule { id: "UVM-REP-009", name: "InfoAtNoneVerbosity", check: Syntax(info_at_none) },
+        Rule { id: "SV-TYP-009", name: "ArrayLiteralSizeMismatch", check: Syntax(array_literal_size) },
     ]
 }
 
@@ -213,5 +216,87 @@ fn component_direct_new(c: &Cst, s: &mut Sink) {
                 c.loc_of(nx),
             );
         }
+    }
+}
+
+// ---- SV-OOP-002 ----
+
+fn unchecked_dynamic_cast(c: &Cst, s: &mut Sink) {
+    for st in c.nodes(ExprStmt) {
+        let Some(mut e) = c.tree.children(st).next() else { continue };
+        // `void'($cast(a, b))`
+        if c.kind(e) == CastExpr && c.tree.children(e).next().is_some_and(|t| c.tree.bare_text(t) == "void") {
+            let Some(x) = c.tree.children(e).nth(1) else { continue };
+            e = x;
+        }
+        if c.kind(e) != CallExpr || crate::g_random::call_name(c, e) != Some("$cast") {
+            continue;
+        }
+        for _ in 0..ast_times(c, e) {
+            s.add(
+                "SV-OOP-002",
+                "UncheckedDynamicCast",
+                Severity::Warning,
+                "Return value of $cast() is ignored or cast to void. If dynamic cast fails, destination handle remains null, risking runtime null-pointer dereferences."
+                    .to_string(),
+                c.loc_of(st),
+            );
+        }
+    }
+}
+
+// ---- UVM-REP-009 ----
+
+fn info_at_none(c: &Cst, s: &mut Sink) {
+    for call in c.nodes(CallExpr) {
+        if crate::g_random::call_name(c, call) != Some("uvm_report_info") {
+            continue;
+        }
+        let args = c.call_args(call);
+        let Some(v) = c.arg_expr(args.get(2).copied().flatten()) else { continue };
+        let v = c.strip(v);
+        let none = match c.kind(v) {
+            NameExpr | ScopedExpr => c.last_text(v) == "UVM_NONE",
+            Literal => {
+                let t: String = c.toks(v).map(|t| c.text_of(t)).collect();
+                let digits = t.rsplit(['d', 'D', 'h', 'H', 'b', 'B', 'o', 'O', '\'']).next().unwrap_or("");
+                !digits.is_empty() && digits.chars().all(|ch| ch == '0' || ch == '_')
+            }
+            _ => false,
+        };
+        if !none {
+            continue;
+        }
+        let Some(first) = c.first_tok(call) else { continue };
+        let loc = c.loc_at(c.tree.tokens[first as usize].origin);
+        for _ in 0..ast_times(c, call) {
+            s.add(
+                "UVM-REP-009",
+                "InfoAtNoneVerbosity",
+                Severity::Info,
+                "Informational message at UVM_NONE: it prints at every verbosity, +UVM_VERBOSITY cannot silence it, and it floods regression logs. Use UVM_LOW for messages that should normally show, and keep UVM_NONE for the few lines every run must print (a test's final verdict)."
+                    .to_string(),
+                loc,
+            );
+        }
+    }
+}
+
+// ---- SV-TYP-009 ----
+
+/// slang's WrongNumberAssignmentPatterns diagnostic, once per pattern.
+fn array_literal_size(c: &Cst, s: &mut Sink) {
+    for ap in c.nodes(AssignPattern) {
+        if !crate::g_random_sema::pattern_count_mismatch(c, ap) {
+            continue;
+        }
+        s.add(
+            "SV-TYP-009",
+            "ArrayLiteralSizeMismatch",
+            Severity::Warning,
+            "Array literal assignment pattern element count does not match target array dimension. In IEEE 1800 \u{a7} 10.9 array assignment semantics, positional assignment patterns must provide an element count matching the target array dimension."
+                .to_string(),
+            c.loc_of(ap),
+        );
     }
 }

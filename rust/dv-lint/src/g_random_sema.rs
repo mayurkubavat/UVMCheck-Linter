@@ -399,7 +399,7 @@ fn assign_target(c: &Cst, e: NodeId) -> Option<(NodeId, NodeId)> {
     }
 }
 
-fn pattern_count_mismatch(c: &Cst, ap: NodeId) -> bool {
+pub(crate) fn pattern_count_mismatch(c: &Cst, ap: NodeId) -> bool {
     if c.tok(ap, ":").is_some() || c.tree.child(ap, ConcatExpr).is_some() {
         return false;
     }
