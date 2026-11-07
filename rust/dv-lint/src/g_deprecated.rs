@@ -51,7 +51,7 @@ pub(crate) fn copies(c: &Cst, n: NodeId) -> usize {
 
 /// Instances of module `name` in the tree, through the instances of the
 /// modules that instantiate it; 1 for a top.
-fn module_instances(c: &Cst, name: &str) -> usize {
+pub(crate) fn module_instances(c: &Cst, name: &str) -> usize {
     fn count(c: &Cst, name: &str, seen: &mut HashSet<String>) -> usize {
         if !seen.insert(name.to_string()) {
             return 1;

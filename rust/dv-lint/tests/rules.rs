@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 339);
+    assert_eq!(r.len(), 343);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 339);
+    assert_eq!(ids.len(), 343);
 }
 
 #[test]
@@ -552,4 +552,42 @@ fn virtual_class_new_only_in_named_specializations() {
     let lines: Vec<u32> = found.iter().filter(|f| f.rule == "SV-OOP-013").map(|f| f.loc.line).collect();
     // The default specialization (T = base) is not reported, as in slang.
     assert_eq!(lines, vec![9], "{found:?}");
+}
+
+fn rule_lines(src: &str, rule: &str) -> Vec<u32> {
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let mut lines: Vec<u32> = found.iter().filter(|f| f.rule == rule).map(|f| f.loc.line).collect();
+    lines.sort();
+    lines
+}
+
+#[test]
+fn language_gotcha_rules() {
+    let src = "module m;\n\
+               logic [3:0] a; logic [7:0] w;\n\
+               initial if (a == 4'b1x0x) $display(\"x\");\n\
+               initial w = {a, 5};\n\
+               function void f(); a <= 1; endfunction\n\
+               endmodule\n";
+    assert_eq!(rule_lines(src, "SV-LANG-001"), vec![3]);
+    assert_eq!(rule_lines(src, "SV-LANG-003"), vec![4]);
+    assert_eq!(rule_lines(src, "SV-LANG-005"), vec![5]);
+}
+
+#[test]
+fn literal_width_follows_bound_expressions() {
+    let src = "class p extends unknown_base; int d; endclass\n\
+               module m #(parameter int W = 4);\n\
+               int n; p r; logic [W-1:0] v;\n\
+               initial n = 'hff + 7;\n\
+               initial if (r.d == 9) n = 3;\n\
+               function void f(); #10; endfunction\n\
+               endmodule\n\
+               module top; m #(.W(8)) u(); endmodule\n";
+    // The overridden default (line 2), member access through a class with
+    // an unknown base (line 5) and a delay in a function (line 6) do not
+    // bind in slang, so it never sees those literals.
+    assert_eq!(rule_lines(src, "SV-STY-010"), vec![4, 4, 8]);
 }

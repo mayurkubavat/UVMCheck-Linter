@@ -331,6 +331,21 @@ impl Binder<'_> {
     }
 
     /// The scope around `n` (a design unit, package or class; else the root).
+    fn in_class_outside_hierarchy(&self, tree: usize, n: NodeId) -> bool {
+        let t = &self.trees[tree];
+        let mut class = false;
+        let mut cur = self.parents[tree][n.0 as usize];
+        while cur != u32::MAX {
+            match t.kind(NodeId(cur)) {
+                ClassDecl => class = true,
+                ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl => return false,
+                _ => {}
+            }
+            cur = self.parents[tree][cur as usize];
+        }
+        class
+    }
+
     fn scope_of(&self, tree: usize, n: NodeId) -> At {
         let t = &self.trees[tree];
         let mut cur = self.parents[tree][n.0 as usize];
@@ -449,6 +464,20 @@ impl Binder<'_> {
                     // The callee may be found upward; a dotted one's object is checked.
                     if t.kind(callee) != NameExpr {
                         self.walk(ix, callee, scope, out);
+                    } else if let Some(name) = single_ident(t, callee) {
+                        // No upward lookup outside the instance hierarchy:
+                        // a class method in a package or $unit.
+                        const CLASS_BUILTINS: [&str; 8] = [
+                            "rand_mode", "constraint_mode", "srandom", "get_randstate", "set_randstate",
+                            "pre_randomize", "post_randomize", "new",
+                        ];
+                        if !CLASS_BUILTINS.contains(&name) && self.in_class_outside_hierarchy(ix, n) {
+                            if let Some(v) = self.visible(scope, 0) {
+                                if !v.contains(self, name) {
+                                    out.push(undeclared(ix, callee, name));
+                                }
+                            }
+                        }
                     }
                 }
                 for c in kids {

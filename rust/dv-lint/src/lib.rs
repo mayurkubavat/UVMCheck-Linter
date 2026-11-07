@@ -18,6 +18,7 @@ mod g_design_metrics;
 mod g_design_spec;
 mod g_design_types;
 mod g_bug;
+mod g_lang;
 mod g_c_support;
 mod g_concurrency;
 mod g_sva_cov;
@@ -252,6 +253,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_random_types::rules());
     v.extend(g_methodology::rules());
     v.extend(g_bug::rules());
+    v.extend(g_lang::rules());
     v.sort_by_key(|r| r.id);
     v
 }
@@ -283,10 +285,12 @@ pub fn lint_all(
     let mixed = all.iter().any(|r| matches!(r.check, Check::Mixed(_)));
     if all.iter().any(Rule::is_syntax) {
         let mut prior: std::collections::HashSet<std::path::PathBuf> = Default::default();
+        let spec: std::rc::Rc<std::cell::OnceCell<_>> = Default::default();
         for (ix, tree) in trees.iter().enumerate() {
             let mut cst = syntax::Cst::new(tree, ix, locator);
             cst.prior_files = std::rc::Rc::new(prior.clone());
             cst.all = trees;
+            cst.spec = spec.clone();
             prior.extend(tree.files.iter().cloned());
             for r in &all {
                 if let Check::Syntax(run) = r.check {

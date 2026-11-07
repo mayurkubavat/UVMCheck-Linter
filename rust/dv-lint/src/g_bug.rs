@@ -645,7 +645,6 @@ fn abstract_new(c: &Cst, s: &mut Sink) {
         return;
     }
     let classes = Classes::new(c);
-    let trees = std::slice::from_ref(c.tree);
     let mut model: Option<sv_sema::SpecModel> = None;
     for n in news {
         // `new[n]`, `new obj` (a copy) and `super.new` call no constructor.
@@ -656,8 +655,8 @@ fn abstract_new(c: &Cst, s: &mut Sink) {
             continue;
         }
         let Some(dt) = new_target(c, &classes, n) else { continue };
-        let m = model.get_or_insert_with(|| sv_sema::SpecModel::new(trees));
-        let any_virtual = m.class_per_named_spec(0, dt).into_iter().flatten().any(|(_, cls)| {
+        let m = model.get_or_insert_with(|| sv_sema::SpecModel::new(c.all));
+        let any_virtual = m.class_per_named_spec(c.index(), dt).into_iter().flatten().any(|(_, cls)| {
             c.toks(cls).any(|t| c.text_of(t) == "virtual") && c.toks(cls).any(|t| c.text_of(t) == "class")
         });
         if !any_virtual {

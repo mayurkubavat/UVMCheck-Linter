@@ -28,6 +28,9 @@ pub struct Cst<'t> {
     /// Every tree of the compile (this one at `ix`), for checks that see
     /// names other files declare.
     pub all: &'t [Tree],
+    /// Specializations of each generic class of the compile (by tree and
+    /// class node), counted on first use and shared by its trees.
+    pub spec: std::rc::Rc<std::cell::OnceCell<std::collections::HashMap<(usize, NodeId), usize>>>,
 }
 
 const NO_PARENT: u32 = u32::MAX;
@@ -41,7 +44,14 @@ impl<'t> Cst<'t> {
                 parent[c.0 as usize] = n.0;
             }
         }
-        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default(), all: std::slice::from_ref(tree) }
+        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default(), all: std::slice::from_ref(tree), spec: Default::default() }
+    }
+
+    /// How many specializations slang elaborates of the generic class
+    /// declared at `class` in this tree (None for a class that is not
+    /// generic).
+    pub fn spec_count(&self, class: NodeId) -> Option<usize> {
+        self.spec.get_or_init(|| sv_sema::spec_counts(self.all)).get(&(self.index(), class)).copied()
     }
 
     /// This tree's index in [`Self::all`].
