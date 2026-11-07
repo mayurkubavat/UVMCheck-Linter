@@ -442,7 +442,17 @@ fn queue_concat_append(c: &Cst, out: &mut Sink) {
         if !is_queue(c, &ld) {
             continue;
         }
-        let same = |x: NodeId| crate::g_port2::expr_decl(c, x).is_some_and(|d| d.node == ld.node);
+        // slang's `getSymbolReference`: through element and range selects.
+        let same = |x: NodeId| {
+            let mut x = x;
+            while c.kind(x) == SelectExpr {
+                match crate::g_c_support::kids(c, x).first() {
+                    Some(&b) => x = b,
+                    None => return false,
+                }
+            }
+            crate::g_port2::expr_decl(c, x).is_some_and(|d| d.node == ld.node)
+        };
         let method = if same(ops[0]) {
             "push_back"
         } else if same(ops[1]) {
