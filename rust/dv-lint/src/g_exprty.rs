@@ -805,6 +805,11 @@ fn null_compare_fails(c: &Cst, ty: &mut Typer, n: NodeId) -> bool {
     false
 }
 
+/// [`CfgDbTypes`] of the compile.
+pub(crate) fn cfgdb_types(c: &Cst) -> Rc<CfgDbTypes> {
+    facts(c).4
+}
+
 /// [`SpecTypes`] of the compile.
 pub(crate) fn spec_types(c: &Cst) -> Rc<SpecTypes> {
     facts(c).3
@@ -815,11 +820,78 @@ type Facts = (
     Rc<HashMap<(usize, NodeId), String>>,
     Rc<std::collections::HashSet<(usize, NodeId)>>,
     Rc<SpecTypes>,
+    Rc<CfgDbTypes>,
 );
+
+/// For each `uvm_config_db#(T)::set/get` call: the value argument's own
+/// type and matching form, and the matching form of `T`.
+/// The value's type, its canonical text, and whether Slang converts it to
+/// `T`: one entry, or (flagged true) one per specialization of the generic
+/// class around.
+pub(crate) type CfgDbTypes = HashMap<(usize, NodeId), (bool, Vec<(ETy, String, bool)>)>;
+
 
 /// Per specialization of the generic class around them: the type and its
 /// matching form of each cast and `$cast` argument there.
 pub(crate) type SpecTypes = HashMap<(usize, NodeId), Vec<Option<(ETy, String)>>>;
+
+/// A `uvm_config_db#(T)::set/get` call `n`: None when it is not one, else
+/// its value's type, canonical text and whether slang converts it to `T`
+/// (None when the value does not type).
+fn cfgdb_entry(
+    tc: &Cst,
+    ty: &mut Typer,
+    o: &TypeOracle,
+    n: NodeId,
+    ifaces: &mut Option<std::collections::HashSet<String>>,
+) -> Option<Option<(ETy, String, bool)>> {
+    let i = tc.index();
+    let &callee = kids(tc, n).first()?;
+    if tc.kind(callee) != ScopedExpr {
+        return None;
+    }
+    let &prefix = kids(tc, callee).first()?;
+    let (cname, targ) = o.class_arg(i, prefix, "T")?;
+    if !cname.contains("uvm_config_db") {
+        return None;
+    }
+    let args = call_args(tc, n);
+    let Some(&v) = args.get(3) else { return Some(None) };
+    let vt = match ty.self_type(v) {
+        Some(x) => x,
+        // An interface instance handed to a virtual interface `T`: its
+        // type prints as the interface's specialization.
+        None if tc.kind(v) == NameExpr => {
+            let Some(t) = targ.as_ref() else { return Some(None) };
+            let ct = o.canonical(t);
+            let base = ct.split('#').next().unwrap_or("");
+            if !ifaces.get_or_insert_with(|| interface_names(tc.all)).contains(base) {
+                return Some(None);
+            }
+            sv_sema::oracle::TypeInfo::other(ct)
+        }
+        None => return Some(None),
+    };
+    let vc = o.canonical(&vt);
+    // Slang converts the actual unless its type is equivalent to T.
+    let converted = targ.is_some_and(|t| match (t.integral, vt.integral) {
+        (Some(a), Some(b)) => a != b,
+        _ => o.canonical(&t) != vc,
+    });
+    Some(Some((vt, vc, converted)))
+}
+
+/// The names of the interfaces declared in the compile.
+fn interface_names(all: &[sv_syntax::Tree]) -> std::collections::HashSet<String> {
+    let mut out = std::collections::HashSet::new();
+    for (i, t) in all.iter().enumerate() {
+        let c = Cst::new(t, i, sv_sema::Locator::default());
+        for n in c.nodes(InterfaceDecl) {
+            out.insert(crate::g_c_support::decl_name(&c, n));
+        }
+    }
+    out
+}
 
 fn facts(c: &Cst) -> Facts {
     thread_local! {
@@ -834,6 +906,10 @@ fn facts(c: &Cst) -> Facts {
     let mut canon = HashMap::new();
     let mut one_bit = std::collections::HashSet::new();
     let mut in_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::new();
+    let mut cfgdb: CfgDbTypes = HashMap::new();
+    let mut ifaces: Option<std::collections::HashSet<String>> = None;
+    let mut cfg_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::new();
+    let mut scoped_calls: Vec<(usize, NodeId)> = Vec::new();
     for (i, t) in c.all.iter().enumerate() {
         let own;
         let tc = if std::ptr::eq(t, c.tree) {
@@ -850,6 +926,13 @@ fn facts(c: &Cst) -> Facts {
             }
             if let Some(x) = ty.final_type(n) {
                 out.insert((i, n), x);
+            }
+        }
+        // `X::set/get(...)` calls, typed as config_db calls at the end.
+        for n in 0..t.nodes.len() {
+            let n = NodeId(n as u32);
+            if tc.kind(n) == CallExpr && kids(tc, n).first().is_some_and(|&f| tc.kind(f) == ScopedExpr) {
+                scoped_calls.push((i, n));
             }
         }
         let mut want = Vec::new();
@@ -928,8 +1011,64 @@ fn facts(c: &Cst) -> Facts {
             }
         }
     }
+    // After all other typing: resolving the class names can create
+    // specializations, which would change how earlier answers print.
     o.set_spec(None);
-    let v = (Rc::new(out), Rc::new(canon), Rc::new(one_bit), Rc::new(specs));
+    let mut by_tree: Vec<(usize, Vec<NodeId>)> = Vec::new();
+    for &(i, n) in &scoped_calls {
+        match by_tree.last_mut() {
+            Some(x) if x.0 == i => x.1.push(n),
+            _ => by_tree.push((i, vec![n])),
+        }
+    }
+    for (i, nodes) in by_tree {
+        let t = &c.all[i];
+        let own;
+        let tc = if std::ptr::eq(t, c.tree) {
+            c
+        } else {
+            own = Cst::new(t, i, sv_sema::Locator::default());
+            &own
+        };
+        let mut ty = Typer::new(tc, &o);
+        for n in nodes {
+            match o.specs_at(i, n) {
+                // Typed per specialization below.
+                Some((g, k)) if cfgdb_entry(tc, &mut ty, &o, n, &mut ifaces).is_some() => {
+                    cfg_generic.entry((i, g, k)).or_default().push(n);
+                }
+                _ => {
+                    if let Some(x) = cfgdb_entry(tc, &mut ty, &o, n, &mut ifaces) {
+                        cfgdb.insert((i, n), (false, x.into_iter().collect()));
+                    }
+                }
+            }
+        }
+    }
+    let mut groups: Vec<_> = cfg_generic.into_iter().collect();
+    groups.sort_by_key(|g| g.0);
+    for ((i, g, k), nodes) in groups {
+        let t = &c.all[i];
+        let own;
+        let tc = if std::ptr::eq(t, c.tree) {
+            c
+        } else {
+            own = Cst::new(t, i, sv_sema::Locator::default());
+            &own
+        };
+        for spec in 0..k {
+            o.set_spec(Some((g, spec)));
+            let mut ty = Typer::new(tc, &o);
+            for &n in &nodes {
+                let e = cfgdb.entry((i, n)).or_insert((true, Vec::new()));
+                if let Some(Some(x)) = cfgdb_entry(tc, &mut ty, &o, n, &mut ifaces) {
+                    e.1.push(x);
+                }
+            }
+        }
+    }
+    o.set_spec(None);
+    let v = (Rc::new(out), Rc::new(canon), Rc::new(one_bit), Rc::new(specs), Rc::new(cfgdb));
     FACTS.with(|k| *k.borrow_mut() = Some((key, v.clone())));
     v
 }

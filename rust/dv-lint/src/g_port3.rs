@@ -422,7 +422,13 @@ pub(crate) fn ast_visits(c: &Cst, n: NodeId) -> usize {
         }
         return crate::g_c_support::times(c, n);
     }
-    anc.iter().filter(|&&a| c.kind(a) == ClassDecl).map(|&a| c.spec_count(a).unwrap_or(1)).product()
+    // The class around it, or the one an out-of-block method body names.
+    let Some(k) = crate::g_c_support::enclosing_class(c, n) else { return 1 };
+    std::iter::once(k)
+        .chain(crate::g_c_support::ancestors(c, k))
+        .filter(|&a| c.kind(a) == ClassDecl)
+        .map(|a| c.spec_count(a).unwrap_or(1))
+        .product()
 }
 
 /// `q = {q, x}` or `q = {x, q}` on a queue: once per AST visit.

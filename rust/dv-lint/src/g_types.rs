@@ -21,6 +21,8 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "SV-PRF-002", name: "ArrayReductionWidthTruncation", check: Syntax(array_reduction_width) },
         Rule { id: "SV-RDB-006", name: "DoubleNegativeFlag", check: Syntax(double_negative_flag) },
         Rule { id: "UVM-SEQ-013", name: "SequenceItemTypeCompatibility", check: Syntax(item_type_compatibility) },
+        Rule { id: "UVM-CFG-001", name: "UvmConfigDbTypeMismatch", check: crate::Check::Mixed(config_db_type_mismatch) },
+        Rule { id: "UVM-CFG-005", name: "ConfigDbCrossComponentResolver", check: crate::Check::Mixed(config_db_cross_component) },
     ]
 }
 
@@ -621,6 +623,114 @@ fn item_type_compatibility(c: &Cst, out: &mut Sink) {
                 ),
                 c.loc(t),
             );
+        }
+    }
+}
+
+// ---- UVM-CFG-001, UVM-CFG-005 ----
+
+/// A `uvm_config_db#(T)::set` or `get` call, as the rules see it.
+struct CfgCall {
+    set: bool,
+    /// The value argument's type as slang prints it: for `set`, the formal
+    /// `T` when the value is converted to it.
+    ty: String,
+    class: String,
+    field: String,
+    loc: dv_model::Loc,
+    visits: usize,
+}
+
+/// The field-name argument: a string literal's value, else its text.
+fn field_arg(c: &Cst, a: NodeId) -> String {
+    let a = strip(c, a);
+    let t = crate::g_random_bug::expr_text(c, a);
+    let t = t.trim_matches([' ', '\t']);
+    if t.len() >= 2 && t.starts_with('"') && t.ends_with('"') {
+        return t[1..t.len() - 1].to_string();
+    }
+    t.to_string()
+}
+
+fn config_db_calls(csts: &[Cst]) -> Vec<CfgCall> {
+    let mut out = Vec::new();
+    // How slang prints the formal's type `T`.
+    let in_pkg = csts.iter().any(|c| c.nodes(PackageDecl).into_iter().any(|p| crate::g_c_support::decl_name(c, p) == "uvm_pkg"));
+    let formal = if in_pkg { "uvm_pkg::uvm_config_db::T" } else { "uvm_config_db::T" };
+    for c in csts {
+        let cfg = crate::g_exprty::cfgdb_types(c);
+        let ix = c.index();
+        for e in c.nodes(CallExpr) {
+            let Some((generic, entries)) = cfg.get(&(ix, e)) else { continue };
+            let Some((_, name, _)) = crate::g_c_support::call_parts(c, e) else { continue };
+            if name != "set" && name != "get" {
+                continue;
+            }
+            if !crate::g_random_sema::ast_ok(c, e) {
+                continue;
+            }
+            let args = crate::g_exprty::call_args(c, e);
+            let Some(&f) = args.get(2) else { continue };
+            let field = field_arg(c, f);
+            if field.is_empty() {
+                continue;
+            }
+            let set = name == "set";
+            let v = strip(c, args[3]);
+            let unbased = c.kind(v) == Literal && c.tree.bare_text(v).starts_with('\'');
+            let class = crate::g_c_support::enclosing_class(c, e)
+                .map(|k| crate::g_c_support::decl_name(c, k))
+                .unwrap_or_default();
+            let Some(t) = c.first_tok(e) else { continue };
+            // A generic class's body: once per specialization, typed there.
+            let visits = if *generic { 1 } else { ast_visits(c, e) };
+            for (ty, _, converted) in entries {
+                let ty = if set && (unbased || *converted) { formal.to_string() } else { ty.text.clone() };
+                out.push(CfgCall { set, ty, class: class.clone(), field: field.clone(), loc: c.loc(t), visits });
+            }
+        }
+    }
+    out
+}
+
+fn config_db_type_mismatch(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {
+    let calls = config_db_calls(csts);
+    // The set the AST walk meets last for each field.
+    let mut sets: std::collections::HashMap<&str, &CfgCall> = std::collections::HashMap::new();
+    for k in calls.iter().filter(|k| k.set && k.visits > 0) {
+        sets.insert(&k.field, k);
+    }
+    for g in calls.iter().filter(|k| !k.set) {
+        let Some(s) = sets.get(g.field.as_str()) else { continue };
+        if s.ty == g.ty {
+            continue;
+        }
+        for _ in 0..g.visits {
+            out.add(
+                "UVM-CFG-001",
+                "UvmConfigDbTypeMismatch",
+                Severity::Error,
+                format!(
+                    "Type mismatch in 'uvm_config_db' for field '{}': value was configured as type '{}', but is retrieved as type '{}'. Mismatched types prevent configuration retrieval at runtime.",
+                    g.field, s.ty, g.ty
+                ),
+                g.loc,
+            );
+        }
+    }
+}
+
+fn config_db_cross_component(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {
+    let calls = config_db_calls(csts);
+    for g in calls.iter().filter(|k| !k.set) {
+        for s in calls.iter().filter(|k| k.set && k.field == g.field && k.ty != g.ty) {
+            let msg = format!(
+                "Cross-component 'uvm_config_db' type mismatch for field '{}': configured in class '{}' with type '{}', but retrieved in class '{}' with incompatible type '{}'. Mismatched type parameters break runtime config lookup and leave fields uninitialized.",
+                g.field, s.class, s.ty, g.class, g.ty
+            );
+            for _ in 0..g.visits * s.visits {
+                out.add("UVM-CFG-005", "ConfigDbCrossComponentResolver", Severity::Error, msg.clone(), g.loc);
+            }
         }
     }
 }

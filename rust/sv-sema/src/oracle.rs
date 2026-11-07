@@ -260,6 +260,19 @@ impl<'t> TypeOracle<'t> {
         }
     }
 
+    /// For a name standing for a class type (`uvm_config_db#(int)`, or a
+    /// typedef of one): the class's name and the type its parameter
+    /// `param` is bound to.
+    pub fn class_arg(&self, tree: usize, n: sv_syntax::NodeId, param: &str) -> Option<(String, Option<TypeInfo>)> {
+        let b = &self.b;
+        let scope = self.scope_of(tree, n);
+        let env = self.env_of(scope);
+        let ti = b.resolve_env(NodeRef { tree, node: n }, scope, &env, 0);
+        let crate::Resolved::Class(c) = ti.resolved else { return None };
+        let arg = ti.args.get(param).map(|bd| self.decl_type(bd.node.tree, Some(bd.node.node), None));
+        Some((b.classes[c].name.clone(), arg))
+    }
+
     /// The result of a method of class declaration `class` whose return
     /// type `ret` is one of its type parameters, called on a value declared
     /// with type `recv`: the type the receiver's specialization binds it to,

@@ -48,6 +48,8 @@ thread_local! {
 struct Whole {
     diags: std::collections::HashMap<usize, Vec<sv_syntax::NodeId>>,
     declared: HashSet<String>,
+    /// Each interface's modport names.
+    modports: std::collections::HashMap<String, HashSet<String>>,
 }
 
 thread_local! {
@@ -88,9 +90,27 @@ fn whole(c: &Cst) -> Rc<Whole> {
             }
         }
     }
-    let w = Rc::new(Whole { diags: by_tree, declared });
+    let w = Rc::new(Whole { diags: by_tree, declared, modports: modports(all) });
     WHOLE.with(|k| *k.borrow_mut() = Some((key, w.clone())));
     w
+}
+
+/// Each interface's modport names.
+fn modports(all: &[Tree]) -> std::collections::HashMap<String, HashSet<String>> {
+    let mut out: std::collections::HashMap<String, HashSet<String>> = Default::default();
+    for t in all {
+        for i in t.preorder().into_iter().filter(|&n| t.kind(n) == InterfaceDecl) {
+            let Some(name) = t.child(i, Name) else { continue };
+            for d in t.children(i).filter(|&n| t.kind(n) == ModportDecl) {
+                for dcl in t.children(d).filter(|&x| t.kind(x) == Declarator) {
+                    if let Some(nm) = t.child(dcl, Name) {
+                        out.entry(t.bare_text(name).to_string()).or_default().insert(t.bare_text(nm).to_string());
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 pub(crate) fn info(c: &Cst) -> Rc<Info> {
@@ -125,6 +145,23 @@ pub(crate) fn info(c: &Cst) -> Rc<Info> {
         }
         if !typed_decl {
             bad.push(range);
+        }
+    }
+    // `vif.mp` with `mp` a modport of vif's interface: slang reports that
+    // 'mp' cannot be used in an expression.
+    let mps = &whole(c).modports;
+    if !mps.is_empty() {
+        let tys = crate::g_exprty::expr_types(c);
+        for m in c.nodes(MemberExpr) {
+            let Some(t) = c.toks(m).last() else { continue };
+            let Some(base) = c.tree.children(m).next() else { continue };
+            let Some(bt) = tys.get(&(c.index(), base)) else { continue };
+            let iface = bt.text.split('#').next().unwrap_or("");
+            if mps.get(iface).is_some_and(|s| s.contains(c.text_of(t))) {
+                if let Some(r) = c.tree.token_bounds(m) {
+                    bad.push(r);
+                }
+            }
         }
     }
     let mut bad_expr = Vec::new();
