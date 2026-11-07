@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 349);
+    assert_eq!(r.len(), 351);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 349);
+    assert_eq!(ids.len(), 351);
 }
 
 #[test]
@@ -617,4 +617,18 @@ fn casts_reports_and_pattern_sizes() {
                endclass\n";
     assert_eq!(rule_lines(src, "SV-OOP-002"), vec![5, 6]);
     assert_eq!(rule_lines(src, "SV-TYP-009"), vec![9]);
+}
+
+#[test]
+fn out_of_bounds_selects_and_magic_numbers() {
+    let src = "class c;\n\
+               logic [7:0] v; int a[4];\n\
+               function void f();\n\
+               v[8] = 0; a[4] = 1; v[7] = 0;\n\
+               if (a[0] == 42) v[2] = 0;\n\
+               endfunction\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-LANG-002"), vec![4, 4]);
+    // 2 on line 5 is the first use of 2 after 8 and 4 on line 4.
+    assert_eq!(rule_lines(src, "SV-RDB-002"), vec![4, 4, 4, 5, 5]);
 }

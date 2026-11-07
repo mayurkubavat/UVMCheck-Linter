@@ -20,6 +20,8 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "SV-OOP-002", name: "UncheckedDynamicCast", check: Syntax(unchecked_dynamic_cast) },
         Rule { id: "UVM-REP-009", name: "InfoAtNoneVerbosity", check: Syntax(info_at_none) },
         Rule { id: "SV-TYP-009", name: "ArrayLiteralSizeMismatch", check: Syntax(array_literal_size) },
+        Rule { id: "SV-LANG-002", name: "BitSelectOutOfBounds", check: Syntax(bit_select_out_of_bounds) },
+        Rule { id: "SV-RDB-002", name: "MagicNumber", check: Syntax(magic_number) },
     ]
 }
 
@@ -298,5 +300,224 @@ fn array_literal_size(c: &Cst, s: &mut Sink) {
                 .to_string(),
             c.loc_of(ap),
         );
+    }
+}
+
+// ---- SV-LANG-002 ----
+
+/// The declaration a name or member expression refers to.
+fn decl_of_expr(c: &Cst, e: NodeId) -> Option<(crate::g_c_support::Decl, String)> {
+    use crate::g_c_support::{class_member, expr_type, find_class, lookup};
+    match c.kind(e) {
+        NameExpr if c.tree.children(e).next().is_none() => {
+            let name = c.tree.bare_text(e);
+            lookup(c, e, &name).map(|d| (d, name))
+        }
+        MemberExpr => {
+            let base = c.tree.children(e).next()?;
+            let member = c.last_text(e).to_string();
+            let cls = find_class(c, &expr_type(c, base)?, e)?;
+            class_member(c, cls, &member).map(|d| (d, member))
+        }
+        _ => None,
+    }
+}
+
+fn int_value(c: &Cst, n: NodeId) -> Option<i64> {
+    let n = c.strip(n);
+    if c.kind(n) != Literal {
+        return None;
+    }
+    let toks: Vec<u32> = c.toks(n).collect();
+    let [t] = toks[..] else { return None };
+    let text = c.text_of(t).replace('_', "");
+    text.bytes().all(|b| b.is_ascii_digit()).then(|| text.parse().ok()).flatten()
+}
+
+/// `[left:right]` of the first dimension a select on the declaration
+/// indexes: its first unpacked dimension, else its first packed one, else
+/// the bits of a built-in integer type.
+fn fixed_range(c: &Cst, d: &crate::g_c_support::Decl) -> Option<(i64, i64)> {
+    let bounds = |dim: NodeId| -> Option<(i64, i64)> {
+        let k: Vec<NodeId> = c.tree.children(dim).collect();
+        match k[..] {
+            [n] if c.tok(dim, ":").is_none() => {
+                let n = int_value(c, n)?;
+                (n > 0).then_some((0, n - 1))
+            }
+            [a, b] if c.tok(dim, ":").is_some() && c.tok(dim, "+:").is_none() && c.tok(dim, "-:").is_none() => {
+                Some((int_value(c, a)?, int_value(c, b)?))
+            }
+            _ => None,
+        }
+    };
+    if c.kind(d.node) == Declarator {
+        if let Some(dim) = c.tree.children(d.node).find(|&x| c.kind(x) == Dim) {
+            return bounds(dim);
+        }
+    }
+    let mut dt = d.dtype?;
+    // `typedef logic [3:0] nib_t;`, `typedef int arr_t[4];`
+    for _ in 0..4 {
+        let toks: Vec<u32> = c.toks(dt).collect();
+        let [t] = toks[..] else { break };
+        if c.tree.tokens[t as usize].kind != sv_syntax::TokenKind::Identifier {
+            break;
+        }
+        let name = c.text_of(t);
+        let Some(td) = c.nodes(TypedefDecl).into_iter().find(|&td| c.tree.child(td, Name).is_some_and(|n| c.tree.bare_text(n) == name))
+        else {
+            return None;
+        };
+        if let Some(dim) = c.tree.children(td).find(|&x| c.kind(x) == Dim) {
+            return bounds(dim);
+        }
+        dt = c.tree.child(td, DataType)?;
+    }
+    if let Some(dim) = c.tree.children(dt).find(|&x| c.kind(x) == Dim) {
+        return bounds(dim);
+    }
+    let kw = c.first_tok(dt).map(|t| c.text_of(t))?;
+    let bits = match kw {
+        "byte" => 8,
+        "shortint" => 16,
+        "int" | "integer" => 32,
+        "longint" => 64,
+        _ => return None,
+    };
+    // Only the keyword (and signing) is written.
+    if c.toks(dt).count() > 2 {
+        return None;
+    }
+    Some((bits - 1, 0))
+}
+
+fn bit_select_out_of_bounds(c: &Cst, s: &mut Sink) {
+    for sel in c.nodes(SelectExpr) {
+        if c.tok(sel, ":").is_some() || c.tok(sel, "+:").is_some() || c.tok(sel, "-:").is_some() {
+            continue;
+        }
+        let k: Vec<NodeId> = c.tree.children(sel).collect();
+        let [base, index] = k[..] else { continue };
+        let Some(idx) = int_value(c, index) else { continue };
+        let Some((d, name)) = decl_of_expr(c, c.strip(base)) else { continue };
+        let Some((left, right)) = fixed_range(c, &d) else { continue };
+        if idx >= left.min(right) && idx <= left.max(right) {
+            continue;
+        }
+        for _ in 0..ast_times(c, sel) {
+            s.add(
+                "SV-LANG-002",
+                "BitSelectOutOfBounds",
+                Severity::Error,
+                format!(
+                    "Static out-of-bounds bit/element select: index [{idx}] is outside declared range [{left}:{right}] of '{name}'. In SystemVerilog (IEEE 1800 \u{a7} 7.4.5), reading out-of-bounds returns 'x without crashing, silently propagating uninitialized state into downstream verification logic."
+                ),
+                c.loc_of(sel),
+            );
+        }
+    }
+}
+
+// ---- SV-RDB-002 ----
+
+/// An integer literal's value, when it has no x/z bits and fits.
+fn literal_value(c: &Cst, n: NodeId) -> Option<i64> {
+    let toks: Vec<u32> = c.toks(n).collect();
+    let texts: Vec<&str> = toks.iter().map(|&t| c.text_of(t)).collect();
+    let (base, digits) = match texts[..] {
+        [d] if d.bytes().all(|b| b.is_ascii_digit() || b == b'_') => (10, d),
+        [b, d] | [_, b, d] if b.starts_with('\'') => {
+            let radix = match b.trim_start_matches('\'').trim_start_matches(['s', 'S']).chars().next()? {
+                'd' | 'D' => 10,
+                'h' | 'H' => 16,
+                'o' | 'O' => 8,
+                'b' | 'B' => 2,
+                _ => return None,
+            };
+            (radix, d)
+        }
+        _ => return None,
+    };
+    let d: String = digits.chars().filter(|&ch| ch != '_').collect();
+    i64::from_str_radix(&d, base).ok()
+}
+
+fn is_display_call(n: &str) -> bool {
+    n.starts_with("$display")
+        || n.starts_with("$write")
+        || n.starts_with("$sformat")
+        || n.starts_with("$fdisplay")
+        || n.starts_with("$fwrite")
+        || n == "$psprintf"
+        || n == "$swrite"
+}
+
+fn magic_number(c: &Cst, s: &mut Sink) {
+    use crate::g_design_class::{report_level, Level, Role};
+    let classes = Classes::new(c);
+    let in_module = |n: NodeId| {
+        std::iter::successors(c.parent(n), |&a| c.parent(a))
+            .any(|a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl))
+    };
+    // Default specializations join only when the model has a class at all.
+    let any_plain = classes.list.iter().any(|k| !k.generic && !in_module(k.node));
+    for i in classes.user() {
+        let cls = &classes.list[i];
+        if cls.generic && !any_plain {
+            continue;
+        }
+        // The model indexes classes of packages and $unit, not of modules.
+        if classes.role(i) == Role::RegModel
+            || in_module(cls.node)
+        {
+            continue;
+        }
+        for m in &cls.methods {
+            let Some(body) = m.body else { continue };
+            let where_ = format!("{}::{}", cls.name, m.name);
+            let mut reported = std::collections::HashSet::new();
+            let mut stack = vec![body];
+            while let Some(x) = stack.pop() {
+                match c.kind(x) {
+                    CallExpr => {
+                        let name = crate::g_random::call_name(c, x).unwrap_or("");
+                        if report_level(c, x) != Level::None || is_display_call(name) {
+                            continue;
+                        }
+                    }
+                    TimingControl if c.tok(x, "#").is_some() => continue,
+                    // Local declarations are symbols the statement visitor
+                    // does not enter.
+                    DataDecl => continue,
+                    Literal => {
+                        let Some(v) = literal_value(c, x) else { continue };
+                        if matches!(v, 0 | 1 | -1) {
+                            continue;
+                        }
+                        let Some(t) = c.first_tok(x) else { continue };
+                        if c.tree.tokens[t as usize].from_macro || !crate::g_random_sema::ast_ok(c, x) {
+                            continue;
+                        }
+                        if !reported.insert(v) {
+                            continue;
+                        }
+                        s.add(
+                            "SV-RDB-002",
+                            "MagicNumber",
+                            Severity::Info,
+                            format!(
+                                "Magic number {v} in {where_}. Give it a name (localparam, enum or config field) so its meaning and every place that depends on it are visible."
+                            ),
+                            c.loc(t),
+                        );
+                        continue;
+                    }
+                    _ => {}
+                }
+                let kids: Vec<NodeId> = c.tree.children(x).collect();
+                stack.extend(kids.into_iter().rev());
+            }
+        }
     }
 }
