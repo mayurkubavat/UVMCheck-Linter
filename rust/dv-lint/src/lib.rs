@@ -343,7 +343,7 @@ fn lint_serial(design: &Design, trees: &[sv_syntax::Tree], all: &[Rule]) -> (Vec
     let mut sink = Sink::default();
     for r in all {
         if let Check::Model(run) = r.check {
-            run(design, &mut sink);
+            timed(r.id, || run(design, &mut sink));
         }
     }
     let mut locator = sv_sema::Locator::new(design.files().to_vec());
@@ -357,7 +357,7 @@ fn lint_serial(design: &Design, trees: &[sv_syntax::Tree], all: &[Rule]) -> (Vec
             prior.extend(tree.files.iter().cloned());
             for r in all {
                 if let Check::Syntax(run) = r.check {
-                    run(&cst, &mut sink);
+                    timed(r.id, || run(&cst, &mut sink));
                 }
             }
             if mixed {
@@ -375,11 +375,21 @@ fn lint_serial(design: &Design, trees: &[sv_syntax::Tree], all: &[Rule]) -> (Vec
         let csts = mixed_csts(trees, &files);
         for r in all {
             if let Check::Mixed(run) = r.check {
-                run(design, &csts, &mut sink);
+                timed(r.id, || run(design, &csts, &mut sink));
             }
         }
     }
     (files, sink.findings)
+}
+
+/// Runs `f`, printing its time under `DV_LINT_PROFILE` (serial runs).
+fn timed(id: &str, f: impl FnOnce()) {
+    if std::env::var_os("DV_LINT_PROFILE").is_none() {
+        return f();
+    }
+    let t = std::time::Instant::now();
+    f();
+    eprintln!("profile {id} {:.1}", t.elapsed().as_secs_f64() * 1e3);
 }
 
 /// The trees as the mixed rules see them, sharing file table `files`.

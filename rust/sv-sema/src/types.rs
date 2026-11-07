@@ -551,12 +551,27 @@ impl<'t> Builder<'t> {
     /// from `scope`.
     pub(crate) fn enum_typedef(&self, name: &str, scope: usize) -> Option<(NodeRef, usize)> {
         let own = |s: usize| {
-            self.scopes[s].typedefs.values().copied().find(|&t| {
-                self.child(t, DataType).is_some_and(|dt| {
-                    self.own_tokens(dt).first() == Some(&"enum")
-                        && self.children(dt).into_iter().any(|d| self.kind(d) == Declarator && self.name_of(d).is_some_and(|n| n.0 == name))
-                })
-            })
+            let m = self.enum_typedefs.borrow().get(&s).cloned();
+            let m = m.unwrap_or_else(|| {
+                let mut m = HashMap::new();
+                for t in self.scopes[s].typedefs.values().copied() {
+                    let Some(dt) = self.child(t, DataType) else { continue };
+                    if self.own_tokens(dt).first() != Some(&"enum") {
+                        continue;
+                    }
+                    for d in self.children(dt) {
+                        if self.kind(d) == Declarator {
+                            if let Some(n) = self.name_of(d) {
+                                m.entry(n.0).or_insert(t);
+                            }
+                        }
+                    }
+                }
+                let m = std::rc::Rc::new(m);
+                self.enum_typedefs.borrow_mut().insert(s, m.clone());
+                m
+            });
+            m.get(name).copied()
         };
         let mut cur = Some(scope);
         while let Some(s) = cur {
@@ -580,22 +595,22 @@ impl<'t> Builder<'t> {
 
     /// A member of an enum typedef declared in scope `s` itself.
     fn enum_in(&self, name: &str, s: usize, depth: usize) -> Option<CVal> {
-        {
-            for &t in self.scopes[s].typedefs.values() {
-                if let Some(dt) = self.child(t, DataType) {
-                    if self.own_tokens(dt).first() == Some(&"enum") {
-                        if let Some((_, v)) = self
-                            .enum_values(dt, s, &Env::default(), depth + 1)
-                            .into_iter()
-                            .find(|(n, _)| n == name)
-                        {
-                            return Some(v);
-                        }
+        if let Some(m) = self.enum_cache.borrow().get(&s) {
+            return m.get(name).cloned();
+        }
+        let mut all: HashMap<String, CVal> = HashMap::new();
+        for &t in self.scopes[s].typedefs.values() {
+            if let Some(dt) = self.child(t, DataType) {
+                if self.own_tokens(dt).first() == Some(&"enum") {
+                    for (n, v) in self.enum_values(dt, s, &Env::default(), depth + 1) {
+                        all.entry(n).or_insert(v);
                     }
                 }
             }
         }
-        None
+        let v = all.get(name).cloned();
+        self.enum_cache.borrow_mut().insert(s, std::rc::Rc::new(all));
+        v
     }
 
     /// Each enum member with its value.

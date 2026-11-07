@@ -195,11 +195,9 @@ impl Builder<'_> {
     /// The declarator holding value `v` has unpacked dimensions.
     pub(crate) fn unpacked_decl(&self, v: NodeRef) -> bool {
         let t = self.tree(v);
-        t.preorder()
-            .into_iter()
-            .find(|n| t.children(*n).any(|c| c == v.node))
-            .is_some_and(|d| t.kind(d) == Declarator && t.children(d).any(|c| t.kind(c) == Dim))
+        self.parent_node(v).is_some_and(|d| t.kind(d) == Declarator && t.children(d).any(|c| t.kind(c) == Dim))
     }
+
 
     // ---- the static type of an expression -----------------------------------
 

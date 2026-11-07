@@ -36,6 +36,8 @@ pub(crate) struct Info {
     tainted: HashSet<String>,
     /// Classes extending an unresolved base.
     pub(crate) tainted_classes: HashSet<String>,
+    /// [`expr_ok`]'s answers by node: a bind root is asked about often.
+    memo: std::sync::Mutex<std::collections::HashMap<NodeId, bool>>,
 }
 
 
@@ -278,7 +280,7 @@ fn build_info(c: &Cst) -> Info {
             }
         }
     }
-    Info { bad, bad_expr, poisoned, declared, tainted, tainted_classes }
+    Info { bad, bad_expr, poisoned, declared, tainted, tainted_classes, memo: Default::default() }
 }
 
 pub(crate) fn is_expr(k: SyntaxKind) -> bool {
@@ -567,6 +569,15 @@ pub(crate) fn expr_binds(c: &Cst, n: NodeId) -> bool {
 }
 
 pub(crate) fn expr_ok(c: &Cst, i: &Info, top: NodeId) -> bool {
+    if let Some(&v) = i.memo.lock().unwrap_or_else(|e| e.into_inner()).get(&top) {
+        return v;
+    }
+    let v = expr_ok_of(c, i, top);
+    i.memo.lock().unwrap_or_else(|e| e.into_inner()).insert(top, v);
+    v
+}
+
+fn expr_ok_of(c: &Cst, i: &Info, top: NodeId) -> bool {
     let Some((a, b)) = c.tree.token_bounds(top) else { return true };
     if i.bad.iter().any(|&(x, y)| a <= x && y <= b) {
         return false;

@@ -12,6 +12,7 @@
 //!   `std::unordered_set<std::string>`, which some messages list names in.
 
 use std::collections::{HashMap, HashSet};
+use std::sync::{Arc, Mutex};
 
 use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
@@ -806,6 +807,10 @@ fn out_of_block(c: &Cst, cls: &str, m: &str, at: NodeId) -> Option<NodeId> {
 /// `swe::allUserRoutines`: the methods of user classes, then routines of
 /// packages, `$unit` and module instances (once per instance).
 pub(crate) fn user_routines(c: &Cst) -> Vec<(NodeId, usize)> {
+    crate::shared::get("user_routines", c.tree_key(), || build_user_routines(c)).to_vec()
+}
+
+fn build_user_routines(c: &Cst) -> Vec<(NodeId, usize)> {
     let mut out: Vec<(NodeId, usize)> = Vec::new();
     let mut seen = HashSet::new();
     for cls in user_classes(c) {
@@ -865,30 +870,54 @@ fn declarators_named(c: &Cst, decl: NodeId, name: &str) -> Option<NodeId> {
 }
 
 fn in_items(c: &Cst, scope: NodeId, name: &str, kind: DeclKind) -> Option<Decl> {
+    let idx = item_index(c, scope);
+    let &(param, dtype, node) = idx.get(name)?;
+    Some(Decl { kind: if param { DeclKind::Parameter } else { kind }, dtype, node })
+}
+
+/// A scope's item names, as [`in_items`] finds them (the first wins):
+/// name -> (a parameter, its data type, its declarator).
+type ItemIndex = HashMap<String, (bool, Option<NodeId>, NodeId)>;
+
+fn item_index(c: &Cst, scope: NodeId) -> Arc<ItemIndex> {
+    let all = crate::shared::get("item_index", c.tree_key(), || Mutex::new(HashMap::<NodeId, Arc<ItemIndex>>::new()));
+    if let Some(v) = all.lock().unwrap_or_else(|e| e.into_inner()).get(&scope) {
+        return v.clone();
+    }
+    let mut m = ItemIndex::new();
+    index_items(c, scope, &mut m);
+    let v = Arc::new(m);
+    all.lock().unwrap_or_else(|e| e.into_inner()).insert(scope, v.clone());
+    v
+}
+
+fn index_declarators(c: &Cst, decl: NodeId, param: bool, m: &mut ItemIndex) {
+    for d in c.tree.children(decl).filter(|&d| c.kind(d) == Declarator) {
+        if let Some(x) = c.tree.child(d, Name) {
+            m.entry(c.tree.bare_text(x)).or_insert((param, c.tree.child(decl, DataType), d));
+        }
+    }
+}
+
+fn index_items(c: &Cst, scope: NodeId, m: &mut ItemIndex) {
     for d in kids(c, scope) {
         match c.kind(d) {
-            DataDecl => {
-                if let Some(x) = declarators_named(c, d, name) {
-                    return Some(Decl { kind, dtype: c.tree.child(d, DataType), node: x });
-                }
-            }
+            DataDecl => index_declarators(c, d, false, m),
             ParamDecl => {
                 if has_kw(c, d, "type") {
-                    if c.tree.child(d, Name).is_some_and(|x| c.tree.bare_text(x) == name) {
-                        return Some(Decl { kind: DeclKind::Parameter, dtype: None, node: d });
+                    if let Some(x) = c.tree.child(d, Name) {
+                        m.entry(c.tree.bare_text(x)).or_insert((true, None, d));
                     }
-                } else if let Some(x) = declarators_named(c, d, name) {
-                    return Some(Decl { kind: DeclKind::Parameter, dtype: c.tree.child(d, DataType), node: x });
+                } else {
+                    index_declarators(c, d, true, m);
                 }
             }
             Header => {
                 for k in kids(c, d) {
                     if matches!(c.kind(k), PortList | ParamList) {
-                        if let Some(x) = in_items(c, k, name, kind) {
-                            return Some(x);
-                        }
-                        if let Some(x) = in_ports(c, k, name, kind) {
-                            return Some(x);
+                        index_items(c, k, m);
+                        for p in c.tree.children(k).filter(|&p| c.kind(p) == Port) {
+                            index_declarators(c, p, false, m);
                         }
                     }
                 }
@@ -896,7 +925,6 @@ fn in_items(c: &Cst, scope: NodeId, name: &str, kind: DeclKind) -> Option<Decl> 
             _ => {}
         }
     }
-    None
 }
 
 fn in_ports(c: &Cst, list: NodeId, name: &str, kind: DeclKind) -> Option<Decl> {

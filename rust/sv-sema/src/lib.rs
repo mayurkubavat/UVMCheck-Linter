@@ -675,6 +675,10 @@ struct Builder<'t> {
     parent_of: std::cell::OnceCell<Vec<Vec<u32>>>,
     /// Values of parameters outside class specializations, by scope.
     const_cache: std::cell::RefCell<HashMap<(usize, String), Option<types::CVal>>>,
+    /// Scope -> the members of the enum typedefs declared in it, first wins.
+    enum_cache: std::cell::RefCell<HashMap<usize, std::rc::Rc<HashMap<String, types::CVal>>>>,
+    /// Scope -> member name -> the enum typedef declared in it that names it, first wins.
+    enum_typedefs: std::cell::RefCell<HashMap<usize, std::rc::Rc<HashMap<String, NodeRef>>>>,
     /// Typedefs declared in blocks and routines, by name: tree, the
     /// block's token bounds, the declaration's first token, the decl.
     block_typedefs: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>>,
@@ -708,7 +712,7 @@ struct Builder<'t> {
     invalid: std::cell::Cell<bool>,
     /// Parameters and genvars of the instance being elaborated (see `elab`).
     /// `None`: a parameter with no value here (its declaration's must not be used).
-    inst: std::cell::RefCell<HashMap<String, Option<types::CVal>>>,
+    inst: std::cell::RefCell<elab::Vals>,
 }
 
 impl<'t> Builder<'t> {
@@ -739,6 +743,8 @@ impl<'t> Builder<'t> {
             keying: Default::default(),
             parent_of: Default::default(),
             const_cache: Default::default(),
+            enum_cache: Default::default(),
+            enum_typedefs: Default::default(),
             block_typedefs: HashMap::new(),
             spec_counts: HashMap::new(),
             spec_sets: HashMap::new(),

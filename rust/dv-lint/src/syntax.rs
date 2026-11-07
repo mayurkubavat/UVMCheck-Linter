@@ -28,6 +28,8 @@ pub struct Cst<'t> {
     /// Every tree of the compile (this one at `ix`), for checks that see
     /// names other files declare.
     pub all: &'t [Tree],
+    /// The nodes of each kind in preorder, made on first use.
+    by_kind: std::cell::OnceCell<Vec<Vec<NodeId>>>,
 }
 
 const NO_PARENT: u32 = u32::MAX;
@@ -41,7 +43,7 @@ impl<'t> Cst<'t> {
                 parent[c.0 as usize] = n.0;
             }
         }
-        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default(), all: std::slice::from_ref(tree) }
+        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default(), all: std::slice::from_ref(tree), by_kind: Default::default() }
     }
 
     /// How many specializations slang elaborates of the generic class
@@ -81,7 +83,23 @@ impl<'t> Cst<'t> {
 
     /// Nodes of a kind, in source order.
     pub fn nodes(&self, kind: SyntaxKind) -> Vec<NodeId> {
-        self.pre.iter().copied().filter(|&n| self.tree.kind(n) == kind).collect()
+        self.kind_nodes(kind).to_vec()
+    }
+
+    /// [`Self::nodes`] without the copy.
+    pub fn kind_nodes(&self, kind: SyntaxKind) -> &[NodeId] {
+        let by = self.by_kind.get_or_init(|| {
+            let mut v: Vec<Vec<NodeId>> = Vec::new();
+            for &n in &self.pre {
+                let k = self.tree.kind(n) as u16 as usize;
+                if v.len() <= k {
+                    v.resize_with(k + 1, Vec::new);
+                }
+                v[k].push(n);
+            }
+            v
+        });
+        by.get(kind as u16 as usize).map_or(&[], Vec::as_slice)
     }
 
     pub fn kind(&self, n: NodeId) -> SyntaxKind {

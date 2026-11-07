@@ -28,7 +28,43 @@ const MAX_ITER: i128 = 1 << 16;
 
 /// Values of the parameters and genvars visible at a point of an instance.
 /// `None`: one with no value (unknown, or not integral).
-type Vals = HashMap<String, Option<CVal>>;
+/// Parameter and genvar values in scope: a block's own, then its parents'.
+/// Cloning shares; a block adds a small scope of its own instead of
+/// copying every value above it.
+#[derive(Clone, Default)]
+pub(crate) struct Vals(Rc<Scope>);
+
+#[derive(Clone, Default)]
+struct Scope {
+    /// `None`: removed here (hides a parent's value).
+    own: HashMap<String, Option<Option<CVal>>>,
+    parent: Option<Vals>,
+}
+
+impl Vals {
+    /// A new scope below this one.
+    fn child(&self) -> Vals {
+        Vals(Rc::new(Scope { own: HashMap::new(), parent: Some(self.clone()) }))
+    }
+
+    pub(crate) fn get(&self, k: &str) -> Option<&Option<CVal>> {
+        let mut s = &*self.0;
+        loop {
+            if let Some(v) = s.own.get(k) {
+                return v.as_ref();
+            }
+            s = &*s.parent.as_ref()?.0;
+        }
+    }
+
+    fn insert(&mut self, k: String, v: Option<CVal>) {
+        Rc::make_mut(&mut self.0).own.insert(k, Some(v));
+    }
+
+    fn remove(&mut self, k: &str) {
+        Rc::make_mut(&mut self.0).own.insert(k.to_string(), None);
+    }
+}
 
 /// An override of a parameter: its expression where the instance (or
 /// defparam) is, and its value when integral.
@@ -37,7 +73,7 @@ struct Over {
     val: Option<CVal>,
     node: NodeRef,
     scope: usize,
-    vals: Rc<Vals>,
+    vals: Vals,
     env: Env,
 }
 
@@ -336,7 +372,7 @@ impl<'b, 't> Elab<'b, 't> {
         self.reached.insert(decl);
         self.copy(decl);
         let b = self.b;
-        let mut vals = Vals::new();
+        let mut vals = Vals::default();
         // Header parameters: `#(parameter A = 1, int B = 2, localparam C = 3)`.
         let header = b.child(decl, Header).and_then(|h| b.child(h, ParamList));
         if let Some(pl) = header {
@@ -414,7 +450,7 @@ impl<'b, 't> Elab<'b, 't> {
                         let v = match shape {
                             Some((w, s)) => {
                                 // Sized by this parameter's type (IEEE 11.6).
-                                *b.inst.borrow_mut() = (*o.vals).clone();
+                                *b.inst.borrow_mut() = o.vals.clone();
                                 let c = b.eval_ctx(o.node, w, s, o.scope, &o.env, 0);
                                 *b.inst.borrow_mut() = vals.clone();
                                 c.unwrap_or_else(|| v.cast(w, s))
@@ -426,7 +462,7 @@ impl<'b, 't> Elab<'b, 't> {
                     // A string, real or assignment pattern: evaluated
                     // there, for this parameter's type.
                     None => {
-                        *b.inst.borrow_mut() = (*o.vals).clone();
+                        *b.inst.borrow_mut() = o.vals.clone();
                         let val = dt.and_then(|t| b.eval_typed(o.node, Ty::of(t, scope), o.scope, &o.env, 0));
                         let text = match &val {
                             Some(v) => Some(v.show()),
@@ -465,6 +501,7 @@ impl<'b, 't> Elab<'b, 't> {
                     self.out.push(format!("{path} parameter {name} = {t}"));
                 }
             }
+            *b.inst.borrow_mut() = Vals::default();
             vals.insert(name, val);
         }
     }
@@ -664,7 +701,7 @@ impl<'b, 't> Elab<'b, 't> {
             self.out.push(format!("{path} generate {name}"));
         }
         let inner = format!("{path}.{name}");
-        let mut v = vals.clone();
+        let mut v = vals.child();
         self.items(&items, &inner, scope, &Overrides::new(), false, &mut v, depth);
     }
 
@@ -704,7 +741,7 @@ impl<'b, 't> Elab<'b, 't> {
         else {
             return;
         };
-        let mut v = vals.clone();
+        let mut v = vals.child();
         let Some(mut i) = self.eval(init, scope, &v).map(|x| x.cast(32, true)) else {
             if self.uninst > 0 {
                 // Unknown bounds where nothing is instantiated: one copy.
@@ -713,6 +750,7 @@ impl<'b, 't> Elab<'b, 't> {
             return;
         };
         for k in 0..MAX_ITER {
+            *self.b.inst.borrow_mut() = Vals::default();
             v.insert(var.clone(), Some(i.clone()));
             match self.eval(cond, scope, &v) {
                 Some(x) if x.is_true() => {}
@@ -721,6 +759,7 @@ impl<'b, 't> Elab<'b, 't> {
                 // So does one whose bounds are unknown where nothing is
                 // instantiated.
                 c if k == 0 && (c.is_some() || self.uninst > 0) => {
+                    *self.b.inst.borrow_mut() = Vals::default();
                     v.remove(&var);
                     self.uninst += 1;
                     self.block(body, None, path, scope, &v, depth, construct);
@@ -778,7 +817,7 @@ impl<'b, 't> Elab<'b, 't> {
         // Overrides, evaluated here.
         let mut over = Overrides::new();
         let mut types: HashMap<String, Bound> = HashMap::new();
-        let shared = Rc::new(vals.clone());
+        let shared = vals.clone();
         if let Some(pl) = b.child(dt, ParamList) {
             let args: Vec<NodeRef> = match b.child(pl, ArgList) {
                 Some(al) => b.children(al).into_iter().filter(|a| b.kind(*a) == Arg).collect(),
@@ -894,7 +933,7 @@ impl<'b, 't> Elab<'b, 't> {
         if !items.iter().any(|p| b.own_tokens(*p).contains(&"defparam")) {
             return;
         }
-        let mut v = vals.clone();
+        let mut v = vals.child();
         let saved = std::mem::take(&mut self.out);
         for &p in &items {
             let own = b.own_tokens(p);
@@ -921,7 +960,7 @@ impl<'b, 't> Elab<'b, 't> {
             return;
         }
         let val = self.eval(e, scope, vals);
-        let o = Over { val, node: e, scope, vals: Rc::new(vals.clone()), env: self.env() };
+        let o = Over { val, node: e, scope, vals: vals.clone(), env: self.env() };
         if let Some(d) = self.defparams.last_mut() {
             d.push((segs, o));
         }

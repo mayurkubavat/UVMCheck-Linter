@@ -40,6 +40,9 @@ pub struct TypeOracle<'t> {
     /// The specialization of a generic class to type its body in (see
     /// [`Self::set_spec`]); otherwise its representative.
     spec: std::cell::RefCell<Option<(usize, Env)>>,
+    /// An enum typedef's type, by (tree, typedef, scope), where no
+    /// specialization applies.
+    enum_types: std::cell::RefCell<HashMap<(usize, sv_syntax::NodeId, usize), Option<TypeInfo>>>,
 }
 
 impl<'t> TypeOracle<'t> {
@@ -50,7 +53,7 @@ impl<'t> TypeOracle<'t> {
         b.collect_names();
         b.collect();
         let regions = (0..trees.len()).map(|t| b.regions(t)).collect();
-        TypeOracle { b, regions, decls: Default::default(), values: Default::default(), consts: Default::default(), members: Default::default(), spec: Default::default() }
+        TypeOracle { b, regions, decls: Default::default(), values: Default::default(), consts: Default::default(), members: Default::default(), spec: Default::default(), enum_types: Default::default() }
     }
 
     fn scope_of(&self, tree: usize, n: sv_syntax::NodeId) -> usize {
@@ -171,9 +174,22 @@ impl<'t> TypeOracle<'t> {
     fn enum_member_in(&self, scope: usize, name: &str) -> Option<TypeInfo> {
         let env = self.env_of(scope);
         let (t, s) = self.b.enum_typedef(name, scope)?;
-        let text = self.b.typedef_target(t, s, &env);
+        if !env.is_empty() {
+            return self.enum_type(t, s, &env);
+        }
+        let key = (t.tree, t.node, s);
+        if let Some(v) = self.enum_types.borrow().get(&key) {
+            return v.clone();
+        }
+        let v = self.enum_type(t, s, &env);
+        self.enum_types.borrow_mut().insert(key, v.clone());
+        v
+    }
+
+    fn enum_type(&self, t: crate::NodeRef, s: usize, env: &Env) -> Option<TypeInfo> {
+        let text = self.b.typedef_target(t, s, env);
         let dt = self.b.child(t, DataType)?;
-        Some(TypeInfo { text, integral: self.shape(dt, s, &env), src: Some((dt.tree, dt.node)), aggregate: true })
+        Some(TypeInfo { text, integral: self.shape(dt, s, env), src: Some((dt.tree, dt.node)), aggregate: true })
     }
 
     /// The type of `pkg::name`: a package variable, parameter or enum member.

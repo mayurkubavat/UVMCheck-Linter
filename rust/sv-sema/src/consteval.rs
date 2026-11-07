@@ -519,7 +519,7 @@ impl Builder<'_> {
     }
 
     /// The node `n` is a child of.
-    fn parent_node(&self, n: NodeRef) -> Option<sv_syntax::NodeId> {
+    pub(crate) fn parent_node(&self, n: NodeRef) -> Option<sv_syntax::NodeId> {
         let all = self.parent_of.get_or_init(|| {
             self.trees
                 .iter()

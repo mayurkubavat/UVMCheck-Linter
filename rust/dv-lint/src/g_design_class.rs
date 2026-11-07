@@ -296,7 +296,12 @@ fn meth(c: &Cst, decl: NodeId, virtual_kw: bool, out_of_block: bool) -> Option<M
 }
 
 impl Classes {
-    pub fn new(c: &Cst) -> Classes {
+    /// The tree's classes, built once and shared.
+    pub fn new(c: &Cst) -> std::sync::Arc<Classes> {
+        crate::shared::get("classes", c.tree_key(), || Classes::build(c))
+    }
+
+    fn build(c: &Cst) -> Classes {
         let mut list = Vec::new();
         let mut typedefs = HashMap::new();
         for t in c.nodes(TypedefDecl) {

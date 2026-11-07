@@ -31,7 +31,7 @@ pub(crate) fn rules() -> Vec<Rule> {
 
 /// The routine declaration whose name token is `tok`.
 fn routine_decl(c: &Cst, tok: u32) -> Option<NodeId> {
-    c.nodes(FunctionDecl).into_iter().chain(c.nodes(TaskDecl)).find(|&d| {
+    c.kind_nodes(FunctionDecl).iter().chain(c.kind_nodes(TaskDecl)).copied().find(|&d| {
         c.tree.child(d, Name).and_then(|n| c.tree.token_bounds(n)).is_some_and(|(_, b)| b == tok)
     })
 }
