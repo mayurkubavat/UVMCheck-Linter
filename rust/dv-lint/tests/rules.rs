@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 355);
+    assert_eq!(r.len(), 356);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 355);
+    assert_eq!(ids.len(), 356);
 }
 
 #[test]
@@ -691,4 +691,17 @@ fn error_reporting_rules() {
                endclass\n";
     assert_eq!(rule_lines(src, "UVM-REP-006"), vec![4]);
     assert_eq!(rule_lines(src, "UVM-TST-001"), vec![6]);
+}
+
+#[test]
+fn failure_not_reported() {
+    let src = "class c;\n\
+               rand int a;\n\
+               function void f(c o);\n\
+               if (!randomize()) $display(\"failed\");\n\
+               if (!randomize()) uvm_report_error(\"X\", \"failed\");\n\
+               if (!$cast(o, this)) begin end\n\
+               endfunction\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-ERR-001"), vec![4, 6]);
 }
