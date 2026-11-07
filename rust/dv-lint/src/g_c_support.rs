@@ -530,18 +530,14 @@ pub(crate) fn times(c: &Cst, n: NodeId) -> usize {
     count * paths.map_or(1, |p| p.len().max(1))
 }
 
-/// The elaborated hierarchy of the whole compile: instance paths of each
-/// definition and the generate blocks under each path.
+/// The whole compile's elaboration: instance paths of each definition,
+/// and the copies slang builds of each body and generate item.
 struct Hier {
     instances: HashMap<String, Vec<String>>,
-    generates: HashMap<String, Vec<String>>,
     /// The definition of each instance path.
     def_of: HashMap<String, String>,
-    /// Instance paths a `bind` adds: the engine's walk does not reach
-    /// them or anything under them.
-    bound: HashSet<String>,
-    /// Integer parameter values by instance or generate block path.
-    params: HashMap<String, HashMap<String, i64>>,
+    /// (all, instantiated) copies by tree and node.
+    copies: HashMap<(usize, NodeId), (usize, usize)>,
 }
 
 thread_local! {
@@ -553,50 +549,16 @@ fn hier(c: &Cst) -> std::rc::Rc<Hier> {
     if let Some(h) = HIER.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
         return h;
     }
-    let mut h = Hier { instances: HashMap::new(), generates: HashMap::new(), def_of: HashMap::new(), bound: HashSet::new(), params: HashMap::new() };
-    for line in sv_sema::elaborate_tops(c.all, &crate::tops()).0 {
+    let e = sv_sema::elaborate_full(c.all, &crate::tops());
+    let mut h = Hier { instances: HashMap::new(), def_of: HashMap::new(), copies: e.copies };
+    for line in e.hierarchy {
         let mut it = line.splitn(3, ' ');
-        let (Some(parent), Some(kind), Some(rest)) = (it.next(), it.next(), it.next()) else { continue };
+        let (Some(parent), Some("instance"), Some(rest)) = (it.next(), it.next(), it.next()) else { continue };
         let path = |name: &str| if parent == "$root" { name.to_string() } else { format!("{parent}.{name}") };
-        match kind {
-            "instance" => {
-                if let Some((name, def)) = rest.split_once(" : ") {
-                    h.instances.entry(def.to_string()).or_default().push(path(name));
-                    h.def_of.insert(path(name), def.to_string());
-                }
-            }
-            "generate" => h.generates.entry(parent.to_string()).or_default().push(path(rest)),
-            "parameter" => {
-                if let Some((name, v)) = rest.split_once(" = ") {
-                    if let Some(v) = int_text(v) {
-                        h.params.entry(parent.to_string()).or_default().insert(name.to_string(), v);
-                    }
-                }
-            }
-            _ => {}
+        if let Some((name, def)) = rest.split_once(" : ") {
+            h.instances.entry(def.to_string()).or_default().push(path(name));
+            h.def_of.insert(path(name), def.to_string());
         }
-    }
-    let binds = crate::g_lang::bind_sites(c);
-    if !binds.is_empty() {
-        let found: Vec<String> = h
-            .def_of
-            .keys()
-            .filter(|p| {
-                let Some((parent, name)) = p.rsplit_once('.') else { return false };
-                let mut q = parent;
-                loop {
-                    if let Some(d) = h.def_of.get(q) {
-                        return binds.contains(&(d.clone(), name.to_string()));
-                    }
-                    match q.rsplit_once('.') {
-                        Some((r, _)) => q = r,
-                        None => return false,
-                    }
-                }
-            })
-            .cloned()
-            .collect();
-        h.bound.extend(found);
     }
     let h = std::rc::Rc::new(h);
     HIER.with(|k| *k.borrow_mut() = Some((key, h.clone())));
@@ -629,228 +591,66 @@ pub(crate) fn instances_of(c: &Cst, def: &str) -> Option<Vec<(Option<String>, St
     )
 }
 
-/// An integer value as the hierarchy prints it (`4`, `32'd4`, `-1`, `1'b0`).
-fn int_text(v: &str) -> Option<i64> {
-    let v = v.replace('_', "");
-    if let Some(q) = v.find('\'') {
-        let rest = v[q + 1..].trim_start_matches(['s', 'S']);
-        let base = match rest.chars().next()? {
-            'd' | 'D' => 10,
-            'h' | 'H' => 16,
-            'b' | 'B' => 2,
-            'o' | 'O' => 8,
-            _ => return None,
-        };
-        let neg = v.starts_with('-');
-        let n = i64::from_str_radix(&rest[1..], base).ok()?;
-        return Some(if neg { -n } else { n });
+/// A generate item elaboration builds copies of: a branch of an `if` or
+/// `case` generate, a loop body, or a bare generate block. Nested
+/// constructs are not items of their own.
+fn is_gen_item(c: &Cst, n: NodeId) -> bool {
+    if matches!(c.kind(n), IfGenerate | CaseGenerate) {
+        return false;
     }
-    v.parse().ok()
-}
-
-/// A constant integer expression, names read from `env`.
-fn const_eval(c: &Cst, n: NodeId, env: &dyn Fn(&str) -> Option<i64>, depth: u32) -> Option<i64> {
-    if depth > 32 {
-        return None;
-    }
-    let kids: Vec<NodeId> = c.tree.children(n).collect();
-    let op = || c.toks(n).next().map(|t| c.text_of(t));
-    match c.kind(n) {
-        Literal => int_text(&c.tree.token_range(n).into_iter().map(|t| c.text_of(t)).collect::<String>()),
-        NameExpr => env(&c.tree.bare_text(n)),
-        ParenExpr => const_eval(c, *kids.first()?, env, depth + 1),
-        PrefixExpr => {
-            let v = const_eval(c, *kids.first()?, env, depth + 1)?;
-            match op()? {
-                "-" => Some(-v),
-                "+" => Some(v),
-                "!" => Some(i64::from(v == 0)),
-                _ => None,
-            }
-        }
-        BinaryExpr => {
-            let a = const_eval(c, *kids.first()?, env, depth + 1)?;
-            let b = const_eval(c, *kids.get(1)?, env, depth + 1)?;
-            Some(match op()? {
-                "+" => a.checked_add(b)?,
-                "-" => a.checked_sub(b)?,
-                "*" => a.checked_mul(b)?,
-                "/" => a.checked_div(b)?,
-                "%" => a.checked_rem(b)?,
-                "**" => a.checked_pow(u32::try_from(b).ok()?)?,
-                "<<" => a.checked_shl(u32::try_from(b).ok()?)?,
-                ">>" => a.checked_shr(u32::try_from(b).ok()?)?,
-                "<" => i64::from(a < b),
-                "<=" => i64::from(a <= b),
-                ">" => i64::from(a > b),
-                ">=" => i64::from(a >= b),
-                "==" => i64::from(a == b),
-                "!=" => i64::from(a != b),
-                "&&" => i64::from(a != 0 && b != 0),
-                "||" => i64::from(a != 0 || b != 0),
-                _ => return None,
-            })
-        }
-        _ => None,
+    let Some(p) = c.parent(n) else { return false };
+    match c.kind(p) {
+        IfGenerate => c.tree.children(p).next() != Some(n) && c.kind(n) != ElseClause,
+        ElseClause => c.parent(p).is_some_and(|q| c.kind(q) == IfGenerate),
+        LoopGenerate => c.tree.children(p).last() == Some(n),
+        CaseGenerate => c.tree.children(p).next() != Some(n) && !crate::g_random_sema::is_expr(c.kind(n)),
+        _ => c.kind(n) == GenerateBlock,
     }
 }
 
-/// A parameter's value at a hierarchy path (or the instance above it).
-fn param_at(h: &Hier, path: &str, name: &str) -> Option<i64> {
-    let mut p = path;
-    loop {
-        if let Some(v) = h.params.get(p).and_then(|m| m.get(name)) {
-            return Some(*v);
+/// How many copies of module code at `n` slang's AST holds, from the whole
+/// compile's elaboration: those of the innermost generate item around it,
+/// or of its module, interface or program (none of an item no instance
+/// builds; only the instantiated ones for an instance's parameters and
+/// connections). A unit nothing reaches is walked once as a definition,
+/// unless something instantiates it. None outside such units.
+pub(crate) fn elab_copies(c: &Cst, n: NodeId) -> Option<usize> {
+    let h = hier(c);
+    let ti = c.index();
+    let mut in_inst = false;
+    let mut missing_item = false;
+    for a in std::iter::once(n).chain(ancestors(c, n)) {
+        if matches!(c.kind(a), Instantiation | BindDirective) {
+            in_inst = true;
         }
-        if h.def_of.contains_key(p) {
-            return None;
-        }
-        p = p.rsplit_once('.')?.0;
-    }
-}
-
-fn is_construct(k: SyntaxKind) -> bool {
-    matches!(k, IfGenerate | LoopGenerate | CaseGenerate)
-}
-
-/// An `else if` of a generate if: part of the outer construct.
-fn is_else_if(c: &Cst, n: NodeId) -> bool {
-    c.kind(n) == IfGenerate && c.parent(n).is_some_and(|p| c.kind(p) == ElseClause)
-}
-
-/// slang's name of a generate construct's unnamed blocks: `genblk<n>`,
-/// with n the construct's position among those of its scope.
-fn genblk_name(c: &Cst, construct: NodeId) -> String {
-    let mut x = construct;
-    while is_else_if(c, x) {
-        x = c.parent(c.parent(x).unwrap()).unwrap();
-    }
-    // The scope: a unit or generate block, or an unbraced construct body.
-    let Some(p) = c.parent(x) else { return "genblk1".into() };
-    if is_construct(c.kind(p)) || c.kind(p) == ElseClause {
-        return "genblk1".into();
-    }
-    let mut scope = p;
-    while !matches!(c.kind(scope), ModuleDecl | InterfaceDecl | ProgramDecl | GenerateBlock) {
-        match c.parent(scope) {
-            Some(q) => scope = q,
-            None => break,
-        }
-    }
-    let mut n = 0;
-    let mut stack: Vec<NodeId> = c.tree.children(scope).collect();
-    stack.reverse();
-    while let Some(y) = stack.pop() {
-        if is_construct(c.kind(y)) {
-            n += 1;
-            if y == x {
-                return format!("genblk{n}");
-            }
+        let unit = matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl);
+        if !unit && !is_gen_item(c, a) {
             continue;
         }
-        if c.kind(y) == GenerateRegion {
-            let mut k: Vec<NodeId> = c.tree.children(y).collect();
-            k.reverse();
-            stack.extend(k);
-        }
-    }
-    "genblk1".into()
-}
-
-/// How many elaborated copies of module code the whole compile's
-/// hierarchy holds of `n`: one per instance path of its unit, with each
-/// generate construct around it unrolled or (for an if or case) kept only
-/// where its branch was taken. None outside modules, interfaces and
-/// programs, or where the hierarchy does not know the unit.
-pub(crate) fn elab_copies(c: &Cst, n: NodeId) -> Option<usize> {
-    let chain: Vec<NodeId> = {
-        let mut v: Vec<NodeId> = std::iter::once(n).chain(ancestors(c, n)).collect();
-        v.reverse();
-        v
-    };
-    let ui = chain.iter().position(|&a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl))?;
-    let h = hier(c);
-    // (false, anchor): a copy in an uninstantiated generate block (an
-    // untaken branch), which slang still builds, below the instantiated
-    // path `anchor`.
-    let mut paths: Vec<(bool, String)> = match h.instances.get(&decl_name(c, chain[ui])) {
-        Some(inst) => inst
-            .iter()
-            .filter(|p| {
-                h.bound.is_empty()
-                    || !h.bound.iter().any(|b| p.as_str() == b || p.strip_prefix(b.as_str()).is_some_and(|r| r.starts_with('.')))
-            })
-            .map(|p| (true, p.clone()))
-            .collect(),
-        // With -top, a module no top reaches: walked once, as an
-        // uninstantiated definition, unless something instantiates it
-        // (in an untaken branch, say).
-        None if !crate::tops().is_empty() => {
-            if crate::g_lang::is_instantiated(c, &decl_name(c, chain[ui])) {
+        if let Some(&(all, inst)) = h.copies.get(&(ti, a)) {
+            if missing_item {
                 return Some(0);
             }
-            vec![(false, String::new())]
+            return Some(if in_inst { inst } else { all });
         }
-        None => return None,
-    };
-    let mut i = ui + 1;
-    while i < chain.len() {
-        let a = chain[i];
-        if !is_construct(c.kind(a)) || is_else_if(c, a) {
-            if matches!(c.kind(a), ClassDecl | FunctionDecl | TaskDecl | ModuleDecl | InterfaceDecl | ProgramDecl) {
-                break;
+        if unit {
+            // Not reached: once as a definition, unless instantiated (in a
+            // branch no instance takes, or by a bind).
+            if in_inst || crate::g_lang::is_instantiated(c, &decl_name(c, a)) {
+                return Some(0);
             }
-            i += 1;
-            continue;
+            // Every branch built once, loops with constant bounds unrolled.
+            let loops = std::iter::once(n)
+                .chain(ancestors(c, n))
+                .take_while(|&x| x != a)
+                .filter(|&x| c.kind(x) == LoopGenerate)
+                .map(|x| crate::g_lang::loop_iterations(c, x).unwrap_or(1))
+                .product();
+            return Some(loops);
         }
-        // The branch: past else clauses and else-ifs.
-        let mut j = i + 1;
-        let mut owner = a;
-        while j < chain.len() && (c.kind(chain[j]) == ElseClause || is_else_if(c, chain[j])) {
-            if is_else_if(c, chain[j]) {
-                owner = chain[j];
-            }
-            j += 1;
-        }
-        let Some(&branch) = chain.get(j) else { break };
-        if c.parent(branch) == Some(owner) && crate::g_random_sema::is_expr(c.kind(branch)) && c.kind(owner) != CaseGenerate {
-            return None;
-        }
-        let name = block_label(c, branch).unwrap_or_else(|| genblk_name(c, a));
-        let mut next = Vec::new();
-        for p in &paths {
-            let p = match p {
-                (true, p) => p,
-                (false, anchor) => {
-                    // slang still unrolls a loop there, its bounds read
-                    // from the instance's parameters.
-                    let k = if c.kind(a) == LoopGenerate {
-                        let env = |name: &str| param_at(&h, anchor, name);
-                        crate::g_lang::loop_iterations_by(c, a, &|e| const_eval(c, e, &env, 0)).unwrap_or(1)
-                    } else {
-                        1
-                    };
-                    next.extend(std::iter::repeat_n((false, anchor.clone()), k));
-                    continue;
-                }
-            };
-            let g = h.generates.get(p);
-            if c.kind(a) == LoopGenerate {
-                let pre = format!("{p}.{name}[");
-                next.extend(g.into_iter().flatten().filter(|x| x.starts_with(&pre)).map(|x| (true, x.clone())));
-            } else {
-                let q = format!("{p}.{name}");
-                next.push(if g.is_some_and(|g| g.contains(&q)) { (true, q) } else { (false, p.clone()) });
-            }
-        }
-        paths = next;
-        i = j;
+        missing_item = true;
     }
-    // An uninstantiated instance's parameters and connections are not bound.
-    if chain.iter().any(|&a| c.kind(a) == Instantiation) {
-        return Some(paths.iter().filter(|p| p.0).count());
-    }
-    Some(paths.len())
+    None
 }
 
 /// A generate block's label (`begin : l` or `l : begin`).

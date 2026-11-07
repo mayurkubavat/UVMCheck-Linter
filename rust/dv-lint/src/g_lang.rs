@@ -158,29 +158,6 @@ fn instantiations(c: &Cst) -> std::rc::Rc<Insts> {
     v
 }
 
-/// The instances `bind` directives add: (target module, instance name).
-pub(crate) fn bind_sites(c: &Cst) -> std::collections::HashSet<(String, String)> {
-    let mut out = std::collections::HashSet::new();
-    for (i, t) in c.all.iter().enumerate() {
-        let own;
-        let tc = if std::ptr::eq(t, c.tree) {
-            c
-        } else {
-            own = Cst::new(t, i, sv_sema::Locator::default());
-            &own
-        };
-        for b in tc.nodes(BindDirective) {
-            let Some(target) = tc.tree.child(b, NameExpr).map(|t| tc.tree.bare_text(t)) else { continue };
-            for k in tc.tree.children(b).filter(|&k| tc.kind(k) == Instance) {
-                if let Some(nm) = tc.tree.child(k, Name) {
-                    out.insert((target.clone(), tc.tree.bare_text(nm)));
-                }
-            }
-        }
-    }
-    out
-}
-
 /// Some module of the compile instantiates `module`.
 pub(crate) fn is_instantiated(c: &Cst, module: &str) -> bool {
     instantiations(c).contains_key(module)
@@ -255,7 +232,12 @@ pub(crate) fn ast_times(c: &Cst, n: NodeId) -> usize {
                 let unit = std::iter::successors(c.parent(p), |&a| c.parent(a))
                     .find(|&a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | ClassDecl | PackageDecl));
                 match unit.map(|u| (u, c.kind(u))) {
-                    Some((u, ModuleDecl | InterfaceDecl | ProgramDecl)) => {
+                    // Only a parameter an instance can set: not a localparam,
+                    // nor one in a generate block.
+                    Some((u, ModuleDecl | InterfaceDecl | ProgramDecl))
+                        if c.keyword(p).is_some_and(|k| c.text_of(k) != "localparam")
+                            && c.parent(p).is_some_and(|q| q == u || c.kind(q) == ParamList) =>
+                    {
                         if let Some(k) = overridden_everywhere(c, u, p) {
                             return if k > 0 && ast_ok(c, n) { k } else { 0 };
                         }
@@ -309,11 +291,6 @@ pub(crate) fn loop_iterations(c: &Cst, lg: NodeId) -> Option<usize> {
         }
         lit.digits.replace('_', "").parse().ok()
     };
-    loop_iterations_by(c, lg, &int)
-}
-
-/// [`loop_iterations`] with `int` evaluating the start, bound and step.
-pub(crate) fn loop_iterations_by(c: &Cst, lg: NodeId, int: &dyn Fn(NodeId) -> Option<i64>) -> Option<usize> {
     let kids: Vec<NodeId> = c.tree.children(lg).collect();
     let var = c.tree.bare_text(*kids.iter().find(|&&k| c.kind(k) == Name)?);
     let exprs: Vec<NodeId> = kids.iter().copied().filter(|&k| is_expr(c.kind(k))).collect();

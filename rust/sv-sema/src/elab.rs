@@ -73,6 +73,15 @@ pub(crate) struct Elab<'b, 't> {
     /// What no instance elaborates: generate items no instance takes, and
     /// definitions that need parameter values and that nothing instantiates.
     pub skipped: Vec<NodeRef>,
+    /// The copies slang builds of each definition body and generate item:
+    /// (all, instantiated). A branch no condition takes is still built,
+    /// uninstantiated, with its loops unrolled; instances there are not
+    /// elaborated. Instances a `bind` adds are left out (with all under
+    /// them), as the engine's walk does not reach them.
+    pub copies: HashMap<NodeRef, (usize, usize)>,
+    /// Depth of uninstantiated blocks and of bound instances being walked.
+    uninst: usize,
+    bound: usize,
 }
 
 impl<'b, 't> Elab<'b, 't> {
@@ -126,6 +135,21 @@ impl<'b, 't> Elab<'b, 't> {
             considered: HashSet::new(),
             reached: HashSet::new(),
             skipped: Vec::new(),
+            copies: HashMap::new(),
+            uninst: 0,
+            bound: 0,
+        }
+    }
+
+    /// Counts one copy of a body or generate item.
+    fn copy(&mut self, n: NodeRef) {
+        if self.bound > 0 {
+            return;
+        }
+        let e = self.copies.entry(n).or_default();
+        e.0 += 1;
+        if self.uninst == 0 {
+            e.1 += 1;
         }
     }
 
@@ -310,6 +334,7 @@ impl<'b, 't> Elab<'b, 't> {
         let Some(d) = self.defs.get(def) else { return };
         let (decl, scope) = (d.decl, d.scope);
         self.reached.insert(decl);
+        self.copy(decl);
         let b = self.b;
         let mut vals = Vals::new();
         // Header parameters: `#(parameter A = 1, int B = 2, localparam C = 3)`.
@@ -356,7 +381,9 @@ impl<'b, 't> Elab<'b, 't> {
             .map(|x| x.2)
             .collect();
         for bd in binds {
+            self.bound += 1;
             self.instantiation(bd, path, scope, &vals, depth);
+            self.bound -= 1;
         }
     }
 
@@ -434,7 +461,9 @@ impl<'b, 't> Elab<'b, 't> {
                 }
             };
             if let Some(t) = text {
-                self.out.push(format!("{path} parameter {name} = {t}"));
+                if self.uninst == 0 {
+                    self.out.push(format!("{path} parameter {name} = {t}"));
+                }
             }
             vals.insert(name, val);
         }
@@ -496,17 +525,28 @@ impl<'b, 't> Elab<'b, 't> {
                 IfGenerate | CaseGenerate => {
                     *construct += 1;
                     let n = *construct;
+                    if self.uninst > 0 {
+                        // Not decided: every branch is built.
+                        let mut all = Vec::new();
+                        self.branches(c, &mut all);
+                        for item in all {
+                            self.block(item, None, path, scope, vals, depth, n);
+                        }
+                        continue;
+                    }
                     if self.decided(c, scope, vals) {
                         let mut all = Vec::new();
                         self.branches(c, &mut all);
                         self.considered.extend(all);
                     }
                     let mut item = self.choose(c, scope, vals);
+                    let mut chain = vec![c];
                     // `if (a) if (b) ...`: a nested construct with no
                     // block of its own belongs to this one.
                     for _ in 0..64 {
                         match item {
                             Some(i) if matches!(b.kind(i), IfGenerate | CaseGenerate) => {
+                                chain.push(i);
                                 item = self.choose(i, scope, vals)
                             }
                             _ => break,
@@ -516,6 +556,18 @@ impl<'b, 't> Elab<'b, 't> {
                         self.taken.insert(item);
                         self.block(item, None, path, scope, vals, depth, n);
                     }
+                    // The branches not taken, built uninstantiated.
+                    let mut rest = Vec::new();
+                    for &k in &chain {
+                        self.branches(k, &mut rest);
+                    }
+                    self.uninst += 1;
+                    for r in rest {
+                        if Some(r) != item && !chain.contains(&r) {
+                            self.block(r, None, path, scope, vals, depth, n);
+                        }
+                    }
+                    self.uninst -= 1;
                 }
                 _ => {}
             }
@@ -607,7 +659,10 @@ impl<'b, 't> Elab<'b, 't> {
         if let Some(i) = index {
             name = format!("{name}[{i}]");
         }
-        self.out.push(format!("{path} generate {name}"));
+        self.copy(item);
+        if self.uninst == 0 {
+            self.out.push(format!("{path} generate {name}"));
+        }
         let inner = format!("{path}.{name}");
         let mut v = vals.clone();
         self.items(&items, &inner, scope, &Overrides::new(), false, &mut v, depth);
@@ -650,17 +705,34 @@ impl<'b, 't> Elab<'b, 't> {
             return;
         };
         let mut v = vals.clone();
-        let Some(mut i) = self.eval(init, scope, &v).map(|x| x.cast(32, true)) else { return };
-        for _ in 0..MAX_ITER {
+        let Some(mut i) = self.eval(init, scope, &v).map(|x| x.cast(32, true)) else {
+            if self.uninst > 0 {
+                // Unknown bounds where nothing is instantiated: one copy.
+                self.block(body, None, path, scope, &v, depth, construct);
+            }
+            return;
+        };
+        for k in 0..MAX_ITER {
             v.insert(var.clone(), Some(i.clone()));
             match self.eval(cond, scope, &v) {
                 Some(x) if x.is_true() => {}
+                // A loop that runs no iteration still has one block,
+                // uninstantiated (its names are checked).
+                // So does one whose bounds are unknown where nothing is
+                // instantiated.
+                c if k == 0 && (c.is_some() || self.uninst > 0) => {
+                    v.remove(&var);
+                    self.uninst += 1;
+                    self.block(body, None, path, scope, &v, depth, construct);
+                    self.uninst -= 1;
+                    return;
+                }
                 _ => return,
             }
             // The genvar is a parameter of each block.
             let before = self.out.len();
             self.block(body, Some(i.i()), path, scope, &v, depth, construct);
-            if self.out.len() > before {
+            if self.uninst == 0 && self.out.len() > before {
                 let head = self.out[before].clone();
                 if let Some(name) = head.strip_prefix(&format!("{path} generate ")) {
                     self.out.push(format!("{path}.{name} parameter {var} = {}", i.show()));
@@ -695,6 +767,9 @@ impl<'b, 't> Elab<'b, 't> {
 
     /// `m #(...) a(...), b[0:1](...);`
     fn instantiation(&mut self, c: NodeRef, path: &str, scope: usize, vals: &Vals, depth: usize) {
+        if self.uninst > 0 {
+            return;
+        }
         let b = self.b;
         let Some(dt) = b.child(c, DataType) else { return };
         let Some(def) = b.toks_of(dt).first().map(|s| s.to_string()) else { return };

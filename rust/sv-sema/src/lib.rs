@@ -233,6 +233,9 @@ pub struct Elaborated {
     pub hierarchy: Vec<String>,
     pub diags: Vec<names::Diag>,
     pub skipped: Vec<(usize, sv_syntax::NodeId)>,
+    /// Copies of each definition body and generate item (by tree and
+    /// node): all of them, and those instantiated (see `Elab::copies`).
+    pub copies: HashMap<(usize, sv_syntax::NodeId), (usize, usize)>,
 }
 
 pub fn elaborate_full(trees: &[Tree], tops: &[String]) -> Elaborated {
@@ -244,7 +247,8 @@ pub fn elaborate_full(trees: &[Tree], tops: &[String]) -> Elaborated {
     e.top = tops.to_vec();
     e.run();
     let skipped = e.skipped.iter().map(|r| (r.tree, r.node)).collect();
-    Elaborated { hierarchy: e.out, diags: e.diags, skipped }
+    let copies = e.copies.iter().map(|(r, k)| ((r.tree, r.node), *k)).collect();
+    Elaborated { hierarchy: e.out, diags: e.diags, skipped, copies }
 }
 
 /// Types (as [`symbol_types`]) and the values of parameters, specparams
