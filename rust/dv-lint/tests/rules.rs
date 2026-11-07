@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 365);
+    assert_eq!(r.len(), 366);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 365);
+    assert_eq!(ids.len(), 366);
 }
 
 #[test]
@@ -832,4 +832,33 @@ fn style_engine() {
     assert_eq!(rule_lines(&src, "SV-STY-102"), vec![2]);
     assert_eq!(rule_lines(&src, "SV-STY-103"), vec![7]);
     assert_eq!(rule_lines(&src, "SV-STY-104"), vec![3, 5, 6]);
+}
+
+#[test]
+fn naming_engine() {
+    let src = "package Foo; endpackage\n\
+               package bar_pkg; endpackage\n\
+               interface bus; endinterface\n\
+               class c;\n\
+               localparam int lowp = 1;\n\
+               localparam int OK_P = 3;\n\
+               constraint bad { }\n\
+               constraint good_c { }\n\
+               covergroup g;\n\
+               a: coverpoint lowp;\n\
+               cp_b: coverpoint lowp;\n\
+               x: cross a, cp_b;\n\
+               endgroup\n\
+               typedef enum {A} st;\n\
+               typedef int w_t;\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-NAM-101"), vec![1]);
+    assert_eq!(rule_lines(src, "SV-NAM-102"), vec![3]);
+    assert_eq!(rule_lines(src, "SV-NAM-109"), vec![5]);
+    assert_eq!(rule_lines(src, "SV-NAM-112"), vec![7]);
+    assert_eq!(rule_lines(src, "SV-NAM-105"), vec![9]);
+    assert_eq!(rule_lines(src, "SV-NAM-106"), vec![10]);
+    assert_eq!(rule_lines(src, "SV-NAM-107"), vec![12]);
+    assert_eq!(rule_lines(src, "SV-NAM-110"), vec![14]);
+    assert!(rule_lines(src, "SV-NAM-111").is_empty());
 }

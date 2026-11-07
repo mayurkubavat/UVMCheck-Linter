@@ -176,6 +176,7 @@ pub(crate) fn tops() -> Vec<String> {
 pub fn sub_rules(id: &str) -> &'static [(&'static str, &'static str)] {
     match id {
         "SV-STY-100" => g_port3::STYLE_SUBS,
+        "SV-NAM-100" => g_port3::NAMING_SUBS,
         _ => &[],
     }
 }
