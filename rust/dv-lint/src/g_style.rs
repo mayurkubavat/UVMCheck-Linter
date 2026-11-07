@@ -95,7 +95,7 @@ fn lines(text: &str) -> Vec<(usize, usize, usize)> {
     out
 }
 
-fn at(c: &Cst, file: u32, offset: usize) -> Loc {
+pub(crate) fn at(c: &Cst, file: u32, offset: usize) -> Loc {
     c.loc_at(Origin { file, offset: offset as u32 })
 }
 
@@ -442,7 +442,7 @@ fn section_banner(c: &Cst, s: &mut Sink) {
 
 /// slang's `FunctionDeclarationSyntax`: function and task declarations
 /// with a body, with their `function`/`task` keyword.
-fn routines(c: &Cst) -> Vec<(NodeId, u32)> {
+pub(crate) fn routines(c: &Cst) -> Vec<(NodeId, u32)> {
     let mut out = Vec::new();
     for n in c.nodes(FunctionDecl).into_iter().chain(c.nodes(TaskDecl)) {
         let Some(kw) = c.toks(n).find(|&t| matches!(c.text_of(t), "function" | "task")) else { continue };
@@ -452,7 +452,7 @@ fn routines(c: &Cst) -> Vec<(NodeId, u32)> {
 }
 
 /// The routine name as slang prints it without whitespace.
-fn routine_name(c: &Cst, n: NodeId) -> String {
+pub(crate) fn routine_name(c: &Cst, n: NodeId) -> String {
     c.tree.child(n, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default()
 }
 
@@ -486,12 +486,12 @@ fn extern_method_threshold(c: &Cst, s: &mut Sink) {
 
 /// The end keyword of a routine or class and its label's name token. A
 /// missing end keyword is where slang puts it: right after the last token.
-enum End {
+pub(crate) enum End {
     Tok(u32),
     Missing(Loc),
 }
 
-fn end_and_label(c: &Cst, n: NodeId, end: &[&str]) -> Option<(End, Option<u32>)> {
+pub(crate) fn end_and_label(c: &Cst, n: NodeId, end: &[&str]) -> Option<(End, Option<u32>)> {
     let label = c.tree.child(n, EndLabel).and_then(|l| c.toks(l).filter(|&t| c.text_of(t) != ":").last());
     match c.toks(n).filter(|&t| end.contains(&c.text_of(t))).last() {
         Some(e) => Some((End::Tok(e), label)),
@@ -507,14 +507,14 @@ fn end_and_label(c: &Cst, n: NodeId, end: &[&str]) -> Option<(End, Option<u32>)>
     }
 }
 
-fn end_loc(c: &Cst, e: End) -> Loc {
+pub(crate) fn end_loc(c: &Cst, e: End) -> Loc {
     match e {
         End::Tok(t) => c.loc(t),
         End::Missing(l) => l,
     }
 }
 
-fn classes(c: &Cst) -> Vec<(NodeId, String)> {
+pub(crate) fn classes(c: &Cst) -> Vec<(NodeId, String)> {
     c.nodes(ClassDecl)
         .into_iter()
         .map(|n| (n, c.tree.child(n, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default()))

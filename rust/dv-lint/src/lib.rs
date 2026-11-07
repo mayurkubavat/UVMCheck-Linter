@@ -21,6 +21,7 @@ mod g_bug;
 mod g_lang;
 mod g_port;
 mod g_port2;
+mod g_port3;
 mod waivers;
 mod g_c_support;
 mod g_concurrency;
@@ -171,6 +172,14 @@ pub(crate) fn tops() -> Vec<String> {
     TOPS.read().map(|t| t.clone()).unwrap_or_default()
 }
 
+/// Ids a rule reports under besides its own (a rule engine's sub-rules).
+pub fn sub_rules(id: &str) -> &'static [(&'static str, &'static str)] {
+    match id {
+        "SV-STY-100" => g_port3::STYLE_SUBS,
+        _ => &[],
+    }
+}
+
 pub fn rules() -> Vec<Rule> {
     let mut v = vec![
         Rule {
@@ -273,6 +282,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_lang::rules());
     v.extend(g_port::rules());
     v.extend(g_port2::rules());
+    v.extend(g_port3::rules());
     v.sort_by_key(|r| r.id);
     v
 }

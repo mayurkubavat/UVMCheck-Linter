@@ -29,6 +29,9 @@ fn main() {
                 for r in dv_lint::rules() {
                     let kind = if r.is_syntax() { "syntax" } else { "model" };
                     println!("{} {} {}", r.id, r.name, kind);
+                    for (id, name) in dv_lint::sub_rules(r.id) {
+                        println!("{id} {name} {kind}");
+                    }
                 }
                 return;
             }

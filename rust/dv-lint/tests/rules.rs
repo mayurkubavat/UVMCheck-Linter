@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 364);
+    assert_eq!(r.len(), 365);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 364);
+    assert_eq!(ids.len(), 365);
 }
 
 #[test]
@@ -814,4 +814,22 @@ fn unused_local_method() {
                function void run(); used(); endfunction\n\
                endclass\n";
     assert_eq!(rule_lines(src, "SV-DED-014"), vec![3]);
+}
+
+#[test]
+fn style_engine() {
+    let long = "x".repeat(130);
+    let src = format!(
+        "class c;\n\
+         \tint a; \n\
+         function void f(); endfunction\n\
+         task t(); endtask : t\n\
+         endclass\n\
+         interface i; endinterface\n\
+         // {long}\n"
+    );
+    assert_eq!(rule_lines(&src, "SV-STY-101"), vec![2]);
+    assert_eq!(rule_lines(&src, "SV-STY-102"), vec![2]);
+    assert_eq!(rule_lines(&src, "SV-STY-103"), vec![7]);
+    assert_eq!(rule_lines(&src, "SV-STY-104"), vec![3, 5, 6]);
 }
