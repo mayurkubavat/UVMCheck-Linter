@@ -126,7 +126,7 @@ thread_local! {
 }
 
 /// The module instance and specialization counts of the tree (cached).
-fn units(c: &Cst) -> std::rc::Rc<Units> {
+pub(crate) fn units(c: &Cst) -> std::rc::Rc<Units> {
     let key = (c.tree as *const sv_syntax::Tree as usize, c.tree.tokens.len());
     if let Some(u) = UNITS.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
         return u;
@@ -138,7 +138,7 @@ fn units(c: &Cst) -> std::rc::Rc<Units> {
 
 /// How many times slang's AST holds the literal `n` (0 where elaboration
 /// folds it away).
-fn ast_times(c: &Cst, n: NodeId) -> usize {
+pub(crate) fn ast_times(c: &Cst, n: NodeId) -> usize {
     let mut x = n;
     let mut loops = 1usize;
     let mut class_param = false;

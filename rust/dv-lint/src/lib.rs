@@ -19,6 +19,8 @@ mod g_design_spec;
 mod g_design_types;
 mod g_bug;
 mod g_lang;
+mod g_port;
+mod waivers;
 mod g_c_support;
 mod g_concurrency;
 mod g_sva_cov;
@@ -254,6 +256,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_methodology::rules());
     v.extend(g_bug::rules());
     v.extend(g_lang::rules());
+    v.extend(g_port::rules());
     v.sort_by_key(|r| r.id);
     v
 }
@@ -326,6 +329,7 @@ pub fn lint_all(
     }
     let mut f = sink.findings;
     f.retain(|x| !x.position_in(&files).0.contains("uvm_mock.svh"));
+    waivers::apply(&mut f, &files);
     f.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
     (files, f)
 }

@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 343);
+    assert_eq!(r.len(), 346);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 343);
+    assert_eq!(ids.len(), 346);
 }
 
 #[test]
@@ -590,4 +590,15 @@ fn literal_width_follows_bound_expressions() {
     // an unknown base (line 5) and a delay in a function (line 6) do not
     // bind in slang, so it never sees those literals.
     assert_eq!(rule_lines(src, "SV-STY-010"), vec![4, 4, 8]);
+}
+
+#[test]
+fn ref_args_and_string_keys() {
+    let src = "class c;\n\
+               int a[string];\n\
+               function int f(ref int q[$], int v); return q[0] + v; endfunction\n\
+               function void g(ref int q[$]); q.push_back(1); endfunction\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-API-001"), vec![3]);
+    assert_eq!(rule_lines(src, "SV-PRF-006"), vec![2]);
 }

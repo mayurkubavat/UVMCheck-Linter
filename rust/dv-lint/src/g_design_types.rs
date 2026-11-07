@@ -192,6 +192,33 @@ impl<'a, 'c> Env<'a, 'c> {
         Some((k, (p.ty, p.array)))
     }
 
+    /// The declared type node of a name or member expression.
+    pub fn decl_type(&self, e: NodeId) -> Option<NodeId> {
+        let c = self.c;
+        let e = strip_parens(c, e);
+        match c.kind(e) {
+            NameExpr => {
+                let name = ident(c, e)?;
+                if let Some(&(ty, _)) = self.locals.get(name) {
+                    return ty;
+                }
+                if let Some(i) = self.class {
+                    if let Some((_, (ty, _))) = self.prop(i, name) {
+                        return ty;
+                    }
+                }
+                self.globals.get(name).and_then(|&(ty, _)| ty)
+            }
+            MemberExpr => {
+                let recv = c.tree.children(e).next()?;
+                let k = self.expr_type(recv).filter(|t| !t.array)?.class?;
+                let (_, b) = c.tree.token_bounds(e)?;
+                self.prop(k, c.text_of(b))?.1 .0
+            }
+            _ => None,
+        }
+    }
+
     /// slang's `Expression::type`, for the expressions rules care about.
     pub fn expr_type(&self, e: NodeId) -> Option<Ty> {
         let c = self.c;
