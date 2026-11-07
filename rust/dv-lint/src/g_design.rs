@@ -420,72 +420,9 @@ impl Units {
     }
 
     fn count(c: &Cst, direct_only: bool) -> HashMap<u32, usize> {
-        let defs: Vec<NodeId> = c
-            .nodes(ModuleDecl)
-            .into_iter()
-            .chain(c.nodes(InterfaceDecl))
-            .chain(c.nodes(ProgramDecl))
-            .collect();
-        let name = |n: NodeId| c.tree.child(n, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();
-        let by_name: HashMap<String, NodeId> = defs.iter().map(|&d| (name(d), d)).collect();
-        // Instances of each definition inside each definition.
-        let mut edges: HashMap<u32, Vec<(NodeId, usize)>> = HashMap::new();
-        let mut instantiated: HashMap<u32, bool> = HashMap::new();
-        for inst in c.nodes(Instantiation) {
-            let Some(ty) = c.tree.child(inst, DataType) else {
-                continue;
-            };
-            let Some(t) = c.first_tok(ty) else { continue };
-            let Some(&def) = by_name.get(c.text_of(t)) else {
-                continue;
-            };
-            let Some(parent) = enclosing_unit(c, inst) else {
-                continue;
-            };
-            if direct_only && in_generate(c, inst, parent) {
-                continue;
-            }
-            let count = c.tree.children(inst).filter(|&x| c.kind(x) == Instance).count();
-            edges.entry(parent.0).or_default().push((def, count));
-            instantiated.insert(def.0, true);
-        }
-        // Tops are elaborated once; a definition as often as its parents,
-        // times the instances in each (memoized: the paths through a deep
-        // hierarchy are exponentially many). A cycle contributes nothing.
-        let mut parents: HashMap<u32, Vec<(u32, usize)>> = HashMap::new();
-        for (&p, es) in &edges {
-            for &(child, n) in es {
-                parents.entry(child.0).or_default().push((p, n));
-            }
-        }
-        fn times_of(
-            d: u32,
-            tops: &HashMap<u32, bool>,
-            parents: &HashMap<u32, Vec<(u32, usize)>>,
-            memo: &mut HashMap<u32, Option<usize>>,
-        ) -> usize {
-            match memo.get(&d) {
-                Some(Some(t)) => return *t,
-                Some(None) => return 0,
-                None => {}
-            }
-            memo.insert(d, None);
-            let mut t = usize::from(!tops.contains_key(&d));
-            for &(p, n) in parents.get(&d).map(Vec::as_slice).unwrap_or(&[]) {
-                t = t.saturating_add(times_of(p, tops, parents, memo).saturating_mul(n));
-            }
-            memo.insert(d, Some(t));
-            t
-        }
-        let mut memo = HashMap::new();
-        let mut times: HashMap<u32, usize> = HashMap::new();
-        for &d in &defs {
-            let t = times_of(d.0, &instantiated, &parents, &mut memo);
-            if t > 0 {
-                times.insert(d.0, t);
-            }
-        }
-        times
+        let all = compile_counts(c.all, direct_only);
+        let ix = c.index();
+        all.iter().filter(|((t, _), _)| *t == ix).map(|((_, n), &k)| (*n, k)).collect()
     }
 
     /// [`Self::times`] counting only instances outside generate blocks.
@@ -513,7 +450,7 @@ impl Units {
     }
 
     /// Specializations of the generic classes around `n`.
-    fn spec_times(&self, c: &Cst, n: NodeId) -> usize {
+    pub(crate) fn spec_times(&self, c: &Cst, n: NodeId) -> usize {
         let mut k = 1;
         let mut x = Some(n);
         while let Some(y) = x {
@@ -535,29 +472,115 @@ impl Units {
     }
 }
 
-fn in_generate(c: &Cst, n: NodeId, unit: NodeId) -> bool {
-    let mut x = c.parent(n);
-    while let Some(y) = x {
-        if y == unit {
-            return false;
-        }
-        if matches!(c.kind(y), GenerateBlock | IfGenerate | LoopGenerate | CaseGenerate) {
-            return true;
-        }
-        x = c.parent(y);
+/// [`Units`]' instance counts over every tree of the compile: a module
+/// one file declares is often instantiated in another. Keyed by tree index
+/// and definition node; cached per compile.
+fn compile_counts(all: &[sv_syntax::Tree], direct_only: bool) -> std::rc::Rc<HashMap<(usize, u32), usize>> {
+    type Cache = Vec<((usize, usize, bool), std::rc::Rc<HashMap<(usize, u32), usize>>)>;
+    thread_local! {
+        static CACHE: std::cell::RefCell<Cache> = const { std::cell::RefCell::new(Vec::new()) };
     }
-    false
-}
-
-pub(crate) fn enclosing_unit(c: &Cst, n: NodeId) -> Option<NodeId> {
-    let mut x = c.parent(n);
-    while let Some(y) = x {
-        if matches!(c.kind(y), ModuleDecl | InterfaceDecl | ProgramDecl) {
-            return Some(y);
-        }
-        x = c.parent(y);
+    let key = (all.as_ptr() as usize, all.len(), direct_only);
+    if let Some(v) = CACHE.with(|k| k.borrow().iter().find(|e| e.0 == key).map(|e| e.1.clone())) {
+        return v;
     }
-    None
+    let units = |k: SyntaxKind| matches!(k, ModuleDecl | InterfaceDecl | ProgramDecl);
+    let mut defs: Vec<(usize, u32)> = Vec::new();
+    let mut by_name: HashMap<String, (usize, u32)> = HashMap::new();
+    let mut parents_of: Vec<Vec<u32>> = Vec::new();
+    for (ti, t) in all.iter().enumerate() {
+        let pre = t.preorder();
+        let mut parent = vec![u32::MAX; t.nodes.len()];
+        for &n in &pre {
+            for ch in t.children(n) {
+                parent[ch.0 as usize] = n.0;
+            }
+            if units(t.kind(n)) {
+                if let Some(nm) = t.child(n, Name) {
+                    by_name.insert(t.bare_text(nm), (ti, n.0));
+                }
+                defs.push((ti, n.0));
+            }
+        }
+        parents_of.push(parent);
+    }
+    let mut parents: HashMap<(usize, u32), Vec<((usize, u32), usize)>> = HashMap::new();
+    let mut instantiated: std::collections::HashSet<(usize, u32)> = Default::default();
+    for (ti, t) in all.iter().enumerate() {
+        let parent = &parents_of[ti];
+        let up = |n: u32| (parent[n as usize] != u32::MAX).then(|| parent[n as usize]);
+        for inst in t.preorder() {
+            if t.kind(inst) != Instantiation {
+                continue;
+            }
+            let Some(ty) = t.child(inst, DataType) else { continue };
+            let Some((a, _)) = t.token_bounds(ty) else { continue };
+            let Some(&def) = by_name.get(&*t.tokens[a as usize].text) else { continue };
+            // The enclosing unit, and whether a generate construct is
+            // between it and the instantiation.
+            let mut x = up(inst.0);
+            let mut gen = false;
+            let mut unit = None;
+            while let Some(y) = x {
+                let k = t.kind(NodeId(y));
+                if units(k) {
+                    unit = Some(y);
+                    break;
+                }
+                if matches!(k, GenerateBlock | IfGenerate | LoopGenerate | CaseGenerate) {
+                    gen = true;
+                }
+                x = up(y);
+            }
+            let Some(u) = unit else { continue };
+            if direct_only && gen {
+                continue;
+            }
+            let count = t.children(inst).filter(|&x| t.kind(x) == Instance).count();
+            parents.entry(def).or_default().push(((ti, u), count));
+            instantiated.insert(def);
+        }
+    }
+    // Tops are elaborated once; a definition as often as its parents,
+    // times the instances in each (memoized: the paths through a deep
+    // hierarchy are exponentially many). A cycle contributes nothing.
+    type Key = (usize, u32);
+    fn times_of(
+        d: Key,
+        tops: &std::collections::HashSet<Key>,
+        parents: &HashMap<Key, Vec<(Key, usize)>>,
+        memo: &mut HashMap<Key, Option<usize>>,
+    ) -> usize {
+        match memo.get(&d) {
+            Some(Some(t)) => return *t,
+            Some(None) => return 0,
+            None => {}
+        }
+        memo.insert(d, None);
+        let mut t = usize::from(!tops.contains(&d));
+        for &(p, n) in parents.get(&d).map(Vec::as_slice).unwrap_or(&[]) {
+            t = t.saturating_add(times_of(p, tops, parents, memo).saturating_mul(n));
+        }
+        memo.insert(d, Some(t));
+        t
+    }
+    let mut memo = HashMap::new();
+    let mut out = HashMap::new();
+    for &d in &defs {
+        let t = times_of(d, &instantiated, &parents, &mut memo);
+        if t > 0 {
+            out.insert(d, t);
+        }
+    }
+    let v = std::rc::Rc::new(out);
+    CACHE.with(|k| {
+        let mut k = k.borrow_mut();
+        if k.len() > 4 {
+            k.remove(0);
+        }
+        k.push((key, v.clone()));
+    });
+    v
 }
 
 /// Adds a finding once per elaboration of the code at `at`.

@@ -19,6 +19,12 @@ fn main() {
             "--time" => time = true,
             "--specs" => specs = true,
             "--rule" => only.extend(it.next()),
+            // The design's tops, as slang's --top: modules no top reaches
+            // are not elaborated.
+            "-top" | "--top" => {
+                let t: Vec<String> = it.next().into_iter().collect();
+                dv_lint::add_tops(&t);
+            }
             "--list" => {
                 for r in dv_lint::rules() {
                     let kind = if r.is_syntax() { "syntax" } else { "model" };

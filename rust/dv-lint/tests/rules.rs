@@ -652,3 +652,26 @@ fn part_select_reversed() {
                endmodule\n";
     assert_eq!(rule_lines(src, "SV-LANG-004"), vec![4, 4]);
 }
+
+#[test]
+fn literal_per_generate_copy() {
+    // One copy per instance and generate block: an untaken branch is
+    // still built once (with its loops unrolled).
+    let src = "module leaf #(parameter int W = 2) (output logic [7:0] y);\n\
+                 if (W == 1) begin : g_one\n\
+                   assign y = 5;\n\
+                 end else begin : g_many\n\
+                   for (genvar i = 0; i < W; i++) begin : g_bit\n\
+                     assign y[i] = 7 > i;\n\
+                   end\n\
+                 end\n\
+               endmodule\n\
+               module top;\n\
+                 logic [7:0] a, b;\n\
+                 leaf #(.W(3)) u_a (.y(a));\n\
+                 leaf #(.W(1)) u_b (.y(b));\n\
+               endmodule\n";
+    let mut lines = rule_lines(src, "SV-STY-010");
+    lines.sort();
+    assert_eq!(lines, vec![3, 3, 6, 6, 6, 6, 12]);
+}

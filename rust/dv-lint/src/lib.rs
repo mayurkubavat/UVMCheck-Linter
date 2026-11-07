@@ -156,6 +156,20 @@ impl Rule {
 }
 
 /// Every ported rule, in the order uvmcheck registers them (by id).
+static TOPS: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
+
+/// Adds top modules (`-top`): elaboration starts from them only.
+pub fn add_tops(tops: &[String]) {
+    if let Ok(mut t) = TOPS.write() {
+        t.extend(tops.iter().cloned());
+    }
+}
+
+/// The tops `-top` named (empty: every module nothing instantiates).
+pub(crate) fn tops() -> Vec<String> {
+    TOPS.read().map(|t| t.clone()).unwrap_or_default()
+}
+
 pub fn rules() -> Vec<Rule> {
     let mut v = vec![
         Rule {

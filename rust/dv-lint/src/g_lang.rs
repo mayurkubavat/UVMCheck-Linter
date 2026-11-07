@@ -10,6 +10,8 @@
 
 use sv_syntax::{NodeId, SyntaxKind, TokenKind};
 
+use std::collections::HashMap;
+
 use crate::g_bug::declared_type;
 use crate::g_design::Units;
 use crate::g_design_class::Classes;
@@ -82,43 +84,106 @@ fn overridden_everywhere(c: &Cst, unit: NodeId, param: NodeId) -> Option<usize> 
     };
     // Its position among the unit's header parameters, for positional lists.
     let header = c.tree.child(unit, ParamList).or_else(|| c.tree.child(unit, Header).and_then(|h| c.tree.child(h, ParamList)));
-    // `defparam u.W = 4;`
-    let defparams: Vec<String> = c
-        .nodes(ParamDecl)
-        .into_iter()
-        .filter(|&p| c.keyword(p).is_some_and(|k| c.text_of(k) == "defparam"))
-        .filter_map(|p| c.tree.child(p, MemberExpr).map(|m| compact(c, m)))
-        .collect();
     let pos = header.and_then(|h| c.tree.children(h).filter(|&p| c.kind(p) == ParamDecl).position(|p| p == param));
-    let mut any = false;
-    let mut via_defparam = false;
-    for inst in c.nodes(Instantiation) {
-        let Some(ty) = c.tree.child(inst, DataType) else { continue };
-        if c.first_tok(ty).map(|t| c.text_of(t)) != Some(module.as_str()) {
-            continue;
-        }
-        any = true;
-        let by_defparam = || {
-            c.tree.children(inst).filter(|&k| c.kind(k) == Instance).all(|k| {
-                c.tree.child(k, Name).is_some_and(|nm| defparams.contains(&format!("{}.{name}", c.tree.bare_text(nm))))
-            })
-        };
-        let Some(list) = c.tree.child(ty, ParamList).or_else(|| c.tree.child(inst, ParamList)) else {
-            if by_defparam() {
-                // slang binds the default before it applies the defparam.
-                via_defparam = true;
-                continue;
-            }
-            return None;
-        };
-        let text = compact(c, list);
+    let insts = instantiations(c);
+    let recs = insts.get(&module)?;
+    // An instantiation leaves the default bound unless its parameter list
+    // sets it (slang binds the default before it applies a defparam).
+    let overrides = |list: &Option<String>| {
+        let Some(text) = list else { return false };
         let named = text.contains(&format!(".{name}("));
         let positional = !text.contains("(.") && pos.is_some_and(|p| text.trim_start_matches("#(").trim_end_matches(')').split(',').count() > p);
-        if !named && !positional {
-            return None;
+        named || positional
+    };
+    let Some(paths) = crate::g_c_support::instances_of(c, &module) else {
+        return recs.iter().all(|r| overrides(&r.1)).then_some(0);
+    };
+    let bound = paths
+        .iter()
+        .filter(|(parent, inst)| {
+            let Some(parent) = parent else { return true };
+            let rec = recs.iter().find(|r| &r.0 == parent && r.2.contains(inst));
+            !rec.is_some_and(|r| overrides(&r.1))
+        })
+        .count();
+    Some(bound)
+}
+
+/// Every instantiation of each module in the compile: the module it is in,
+/// its parameter list (compacted) and its instance names.
+type Insts = HashMap<String, Vec<(String, Option<String>, Vec<String>)>>;
+
+fn instantiations(c: &Cst) -> std::rc::Rc<Insts> {
+    thread_local! {
+        static INSTS: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<Insts>)>> = const { std::cell::RefCell::new(None) };
+    }
+    let key = (c.all.as_ptr() as usize, c.all.len());
+    if let Some(v) = INSTS.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
+        return v;
+    }
+    let mut out: Insts = HashMap::new();
+    for (i, t) in c.all.iter().enumerate() {
+        let own;
+        let tc = if std::ptr::eq(t, c.tree) {
+            c
+        } else {
+            own = Cst::new(t, i, sv_sema::Locator::default());
+            &own
+        };
+        // `bind target m #(...) u (...);` instantiates m in target.
+        let mut sites = tc.nodes(Instantiation);
+        sites.extend(tc.nodes(BindDirective));
+        for inst in sites {
+            let Some(ty) = tc.tree.child(inst, DataType) else { continue };
+            let Some(m) = tc.first_tok(ty).map(|t| tc.text_of(t).to_string()) else { continue };
+            let list = tc.tree.child(ty, ParamList).or_else(|| tc.tree.child(inst, ParamList)).map(|l| compact(tc, l));
+            let names: Vec<String> = tc
+                .tree
+                .children(inst)
+                .filter(|&k| tc.kind(k) == Instance)
+                .filter_map(|k| tc.tree.child(k, Name).map(|nm| tc.tree.bare_text(nm)))
+                .collect();
+            let parent = if tc.kind(inst) == BindDirective {
+                tc.tree.child(inst, NameExpr).map(|t| tc.tree.bare_text(t))
+            } else {
+                std::iter::successors(tc.parent(inst), |&a| tc.parent(a))
+                    .find(|&a| matches!(tc.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl))
+                    .map(|u| decl_name(tc, u))
+            };
+            out.entry(m).or_default().push((parent.unwrap_or_default(), list, names));
         }
     }
-    any.then_some(usize::from(via_defparam))
+    let v = std::rc::Rc::new(out);
+    INSTS.with(|k| *k.borrow_mut() = Some((key, v.clone())));
+    v
+}
+
+/// The instances `bind` directives add: (target module, instance name).
+pub(crate) fn bind_sites(c: &Cst) -> std::collections::HashSet<(String, String)> {
+    let mut out = std::collections::HashSet::new();
+    for (i, t) in c.all.iter().enumerate() {
+        let own;
+        let tc = if std::ptr::eq(t, c.tree) {
+            c
+        } else {
+            own = Cst::new(t, i, sv_sema::Locator::default());
+            &own
+        };
+        for b in tc.nodes(BindDirective) {
+            let Some(target) = tc.tree.child(b, NameExpr).map(|t| tc.tree.bare_text(t)) else { continue };
+            for k in tc.tree.children(b).filter(|&k| tc.kind(k) == Instance) {
+                if let Some(nm) = tc.tree.child(k, Name) {
+                    out.insert((target.clone(), tc.tree.bare_text(nm)));
+                }
+            }
+        }
+    }
+    out
+}
+
+/// Some module of the compile instantiates `module`.
+pub(crate) fn is_instantiated(c: &Cst, module: &str) -> bool {
+    instantiations(c).contains_key(module)
 }
 
 thread_local! {
@@ -208,8 +273,15 @@ pub(crate) fn ast_times(c: &Cst, n: NodeId) -> usize {
     if !ast_ok(c, n) {
         return 0;
     }
-    let k = if class_param { 1 } else { units(c).times(c, n) };
-    k.saturating_mul(loops)
+    if class_param {
+        return loops;
+    }
+    // Module code: the elaborated hierarchy has each copy, generate
+    // constructs unrolled and untaken branches left out.
+    if let Some(m) = crate::g_c_support::elab_copies(c, n) {
+        return m.saturating_mul(units(c).spec_times(c, n));
+    }
+    units(c).times(c, n).saturating_mul(loops)
 }
 
 /// The declared type of the variable an assignment pattern initializes is
@@ -228,8 +300,7 @@ fn struct_target(c: &Cst, ap: NodeId) -> bool {
 }
 
 /// Iterations of `for (genvar i = A; i op B; step)` with literal bounds.
-fn loop_iterations(c: &Cst, lg: NodeId) -> Option<usize> {
-    let kids: Vec<NodeId> = c.tree.children(lg).collect();
+pub(crate) fn loop_iterations(c: &Cst, lg: NodeId) -> Option<usize> {
     let int = |n: NodeId| -> Option<i64> {
         let n = unparen(c, n);
         let lit = (c.kind(n) == Literal).then(|| integer_literal(c, n)).flatten()?;
@@ -238,6 +309,12 @@ fn loop_iterations(c: &Cst, lg: NodeId) -> Option<usize> {
         }
         lit.digits.replace('_', "").parse().ok()
     };
+    loop_iterations_by(c, lg, &int)
+}
+
+/// [`loop_iterations`] with `int` evaluating the start, bound and step.
+pub(crate) fn loop_iterations_by(c: &Cst, lg: NodeId, int: &dyn Fn(NodeId) -> Option<i64>) -> Option<usize> {
+    let kids: Vec<NodeId> = c.tree.children(lg).collect();
     let var = c.tree.bare_text(*kids.iter().find(|&&k| c.kind(k) == Name)?);
     let exprs: Vec<NodeId> = kids.iter().copied().filter(|&k| is_expr(c.kind(k))).collect();
     let [init, cond, step] = exprs[..] else { return None };
