@@ -24,6 +24,7 @@ mod g_port2;
 mod g_port3;
 pub mod g_exprty;
 mod g_types;
+mod uvm_api;
 mod waivers;
 mod g_c_support;
 mod g_concurrency;

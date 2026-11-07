@@ -29,6 +29,8 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "SV-PKG-001", name: "FileClassNameMismatch", check: Mixed(file_class_name_mismatch) },
         Rule { id: "SV-PKG-002", name: "WildcardImportOutsidePackage", check: Mixed(wildcard_import_outside_package) },
         Rule { id: "SV-PKG-003", name: "UnusedPackageImport", check: Mixed(unused_package_import) },
+        Rule { id: "UVM-API-001", name: "AccelleraOnlyApi", check: Mixed(accellera_only_api) },
+        Rule { id: "UVM-API-002", name: "DeprecatedUvmMacro", check: Mixed(deprecated_uvm_macro) },
         Rule { id: "SV-PKG-004", name: "PackageLayerInversion", check: Mixed(package_layer_inversion) },
         Rule { id: "SV-PKG-005", name: "UnstablePackageDependedOn", check: Mixed(unstable_package_depended_on) },
     ]
@@ -1038,5 +1040,144 @@ stable package.",
             ),
             *loc,
         );
+    }
+}
+
+// ---- UVM-API-001, UVM-API-002 ----
+
+/// The UVM version string of the compile: `uvm_pkg::UVM_VERSION_STRING`,
+/// else `uvm_pkg::uvm_revision` (the string they are set to).
+fn uvm_version(csts: &[Cst]) -> Option<String> {
+    for want in ["UVM_VERSION_STRING", "uvm_revision"] {
+        for c in csts {
+            for d in c.nodes(ParamDecl) {
+                if !c.toks(d).any(|t| c.text_of(t) == want) {
+                    continue;
+                }
+                let in_uvm = crate::g_c_support::ancestors(c, d)
+                    .any(|a| c.kind(a) == PackageDecl && crate::g_c_support::decl_name(c, a) == "uvm_pkg");
+                if !in_uvm {
+                    continue;
+                }
+                if let Some(t) = c.toks(d).find(|&t| c.tree.tokens[t as usize].kind == Kind::StringLiteral) {
+                    return Some(c.text_of(t).trim_matches('"').to_string());
+                }
+            }
+        }
+    }
+    None
+}
+
+fn api_pack(csts: &[Cst]) -> Option<&'static crate::uvm_api::ApiPack> {
+    crate::uvm_api::for_version(uvm_version(csts).as_deref())
+}
+
+fn accellera_only_api(_: &Design, csts: &[Cst], out: &mut Sink) {
+    let Some(pack) = api_pack(csts) else { return };
+    let report = |out: &mut Sink, what: String, where_: &str, loc: Loc| {
+        out.add(
+            "UVM-API-001",
+            "AccelleraOnlyApi",
+            Severity::Info,
+            format!(
+                "{what} ({where_}) is a detail of the Accellera UVM library (tagged @uvm-accellera in UVM {}), not part of IEEE 1800.2. \
+Another UVM implementation, or a later Accellera release, need not have it. Keep such calls in one debug helper, or use the standard API.",
+                pack.version
+            ),
+            loc,
+        );
+    };
+    let mut seen = HashSet::new();
+    for c in csts {
+        let fs = Files::new(c.tree);
+        for e in c.nodes(CallExpr) {
+            let Some(t) = c.first_tok(e) else { continue };
+            if c.text_of(t).starts_with('$') || !user_tok(c, &fs, t) {
+                continue;
+            }
+            let Some(decl) = crate::g_c_support::callee_decl(c, e) else { continue };
+            if !matches!(c.kind(decl), FunctionDecl | TaskDecl | MethodPrototype) {
+                continue;
+            }
+            let Some(cls) = crate::g_c_support::ancestors(c, decl).find(|&a| c.kind(a) == ClassDecl) else { continue };
+            let cname = crate::g_c_support::decl_name(c, cls);
+            let member = crate::g_c_support::last_name(c, decl);
+            if !cname.starts_with("uvm_") || !pack.accellera_members.contains(&(cname.clone(), member.clone())) {
+                continue;
+            }
+            let o = c.tree.tokens[t as usize].origin;
+            if !seen.insert((fs.path(o.file), o.offset)) {
+                continue;
+            }
+            report(out, format!("'{cname}::{member}'"), "called here", c.loc(t));
+        }
+        for k in c.nodes(ClassDecl) {
+            let Some(nm) = c.tree.child(k, Name) else { continue };
+            let Some((_, nt)) = c.tree.token_bounds(nm) else { continue };
+            if !user_tok(c, &fs, nt) {
+                continue;
+            }
+            // The base class's (generic) name.
+            let Some(bt) = crate::g_uvm::base_name_node(c, k) else { continue };
+            let Some(base) = c
+                .toks(bt)
+                .map(|t| c.text_of(t))
+                .take_while(|t| *t != "#")
+                .filter(|t| t.chars().next().is_some_and(|ch| ch.is_alphabetic() || ch == '_'))
+                .last()
+                .map(str::to_string)
+            else {
+                continue;
+            };
+            if !pack.accellera_classes.contains(&base) {
+                continue;
+            }
+            let name = c.tree.bare_text(nm);
+            for _ in 0..crate::g_port3::ast_visits(c, nm) {
+                report(out, format!("class '{base}'"), &format!("'{name}' extends it"), c.loc(nt));
+            }
+        }
+    }
+}
+
+fn deprecated_uvm_macro(_: &Design, csts: &[Cst], out: &mut Sink) {
+    let Some(pack) = api_pack(csts) else { return };
+    let mut seen = HashSet::new();
+    for c in csts {
+        let fs = Files::new(c.tree);
+        for (f, lx) in fs.lexed.iter().enumerate() {
+            if fs.lib[f] {
+                continue;
+            }
+            let mut i = 0;
+            while i < lx.toks.len() {
+                if lx.toks[i].0 != Kind::Directive || !live(c.tree, f as u32, lx.toks[i].1) {
+                    i += 1;
+                    continue;
+                }
+                let text = lx.text(i);
+                if text == "`define" {
+                    // A use in a macro body is the expansion's.
+                    i = lx.rest_of_line(i).end;
+                    continue;
+                }
+                let name = &text[1..];
+                if pack.deprecated_macros.contains(name) && seen.insert((fs.path(f as u32), lx.toks[i].1)) {
+                    out.add(
+                        "UVM-API-002",
+                        "DeprecatedUvmMacro",
+                        Severity::Warning,
+                        format!(
+                            "`{name} is deprecated in UVM {}: the library defines it only when UVM_ENABLE_DEPRECATED_API is set, so this line \
+stops compiling without that define. For the `uvm_do family use `uvm_do(SEQ_OR_ITEM, SEQR, PRIORITY, {{CONSTRAINTS}}) and its \
+`uvm_send / `uvm_rand_send forms with the extra arguments.",
+                            pack.version
+                        ),
+                        origin_loc(c, f as u32, lx.toks[i].1),
+                    );
+                }
+                i += 1;
+            }
+        }
     }
 }
