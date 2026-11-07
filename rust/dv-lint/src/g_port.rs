@@ -549,7 +549,27 @@ fn enum_of(c: &Cst, dt: NodeId) -> Option<(String, Vec<(String, Option<i64>)>)> 
         let toks: Vec<u32> = c.toks(dt).collect();
         let [t] = toks[..] else { return None };
         let tn = c.text_of(t);
-        let td = c.nodes(TypedefDecl).into_iter().find(|&td| c.tree.child(td, Name).is_some_and(|n| c.tree.bare_text(n) == tn))?;
+        // The typedef in scope: in a unit around the use (innermost first),
+        // else in a package or at the top of the file.
+        let scope_of = |n: NodeId| {
+            std::iter::successors(c.parent(n), |&a| c.parent(a))
+                .find(|&a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | ClassDecl | PackageDecl | FunctionDecl | TaskDecl))
+        };
+        let around: Vec<NodeId> = std::iter::successors(c.parent(dt), |&a| c.parent(a)).collect();
+        let td = c
+            .nodes(TypedefDecl)
+            .into_iter()
+            .filter(|&td| c.tree.child(td, Name).is_some_and(|n| c.tree.bare_text(n) == tn))
+            .filter_map(|td| match scope_of(td) {
+                None => Some((usize::MAX, td)),
+                Some(sc) => match around.iter().position(|&a| a == sc) {
+                    Some(depth) => Some((depth, td)),
+                    None if c.kind(sc) == PackageDecl => Some((usize::MAX - 1, td)),
+                    None => None,
+                },
+            })
+            .min_by_key(|x| x.0)
+            .map(|x| x.1)?;
         name = tn.to_string();
         dt = c.tree.child(td, DataType)?;
     }
