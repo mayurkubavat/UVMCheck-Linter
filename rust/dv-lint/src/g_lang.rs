@@ -163,19 +163,9 @@ pub(crate) fn is_instantiated(c: &Cst, module: &str) -> bool {
     instantiations(c).contains_key(module)
 }
 
-thread_local! {
-    static UNITS: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<Units>)>> = const { std::cell::RefCell::new(None) };
-}
-
 /// The module instance and specialization counts of the tree (cached).
-pub(crate) fn units(c: &Cst) -> std::rc::Rc<Units> {
-    let key = (c.tree as *const sv_syntax::Tree as usize, c.tree.tokens.len());
-    if let Some(u) = UNITS.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
-        return u;
-    }
-    let u = std::rc::Rc::new(Units::new(c));
-    UNITS.with(|k| *k.borrow_mut() = Some((key, u.clone())));
-    u
+pub(crate) fn units(c: &Cst) -> std::sync::Arc<Units> {
+    crate::shared::get("units", c.tree_key(), || Units::new(c))
 }
 
 /// How many times slang's AST holds the literal `n` (0 where elaboration

@@ -6,7 +6,7 @@
 //! no trivia of their own.
 
 use std::path::PathBuf;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use sv_lexer::Kind;
 use sv_preproc::Origin;
@@ -16,7 +16,7 @@ use crate::SyntaxKind;
 #[derive(Clone, Debug)]
 pub struct Token {
     pub kind: Kind,
-    pub text: Rc<str>,
+    pub text: Arc<str>,
     pub origin: Origin,
     /// Made by a macro expansion (or `__FILE__`/`__LINE__`).
     pub from_macro: bool,
@@ -60,7 +60,7 @@ pub struct Tree {
     pub nodes: Vec<Node>,
     pub root: NodeId,
     pub files: Vec<PathBuf>,
-    pub sources: Vec<Rc<str>>,
+    pub sources: Vec<Arc<str>>,
     pub errors: Vec<SyntaxError>,
     pub pp_diagnostics: Vec<sv_preproc::Diagnostic>,
     /// Macros used in the source text, in order (see `sv_preproc::Output`).

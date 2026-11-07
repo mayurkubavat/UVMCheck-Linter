@@ -28,9 +28,6 @@ pub struct Cst<'t> {
     /// Every tree of the compile (this one at `ix`), for checks that see
     /// names other files declare.
     pub all: &'t [Tree],
-    /// Specializations of each generic class of the compile (by tree and
-    /// class node), counted on first use and shared by its trees.
-    pub spec: std::rc::Rc<std::cell::OnceCell<std::collections::HashMap<(usize, NodeId), usize>>>,
 }
 
 const NO_PARENT: u32 = u32::MAX;
@@ -44,19 +41,27 @@ impl<'t> Cst<'t> {
                 parent[c.0 as usize] = n.0;
             }
         }
-        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default(), all: std::slice::from_ref(tree), spec: Default::default() }
+        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default(), all: std::slice::from_ref(tree) }
     }
 
     /// How many specializations slang elaborates of the generic class
     /// declared at `class` in this tree (None for a class that is not
     /// generic).
     pub fn spec_count(&self, class: NodeId) -> Option<usize> {
-        self.spec.get_or_init(|| sv_sema::spec_counts(self.all)).get(&(self.index(), class)).copied()
+        crate::shared::get("spec_counts", self.compile_key(), || sv_sema::spec_counts(self.all)).get(&(self.index(), class)).copied()
     }
 
     /// Identifies the compile for per-compile caches: the trees' address
     /// and their sizes (an address alone can be reused by a later compile
     /// in the same thread).
+    /// Identifies this tree within its compile, for per-tree caches whose
+    /// values depend on the other trees too.
+    pub fn tree_key(&self) -> (usize, usize) {
+        let (a, b) = self.compile_key();
+        let t = (self.tree.nodes.len() << 20) ^ self.tree.tokens.len();
+        (self.tree as *const Tree as usize, a.rotate_left(17) ^ b.wrapping_mul(0x9E37_79B9) ^ t)
+    }
+
     pub fn compile_key(&self) -> (usize, usize) {
         let size = self.all.iter().fold(self.all.len(), |a, t| {
             a.wrapping_mul(31).wrapping_add(t.nodes.len()).wrapping_mul(131).wrapping_add(t.tokens.len())

@@ -936,20 +936,13 @@ fn clocking_output_read(c: &Cst, out: &mut Sink) {
 
 // ---- SV-CMP-001 ----
 
-type SemaDiags = std::rc::Rc<Vec<sv_sema::names::Diag>>;
+type SemaDiags = std::sync::Arc<Vec<sv_sema::names::Diag>>;
 
 /// The native front end's semantic errors for the compile, computed once.
 fn semantic_diags(c: &Cst) -> SemaDiags {
-    thread_local! {
-        static DIAGS: std::cell::RefCell<Option<((usize, usize), SemaDiags)>> = const { std::cell::RefCell::new(None) };
-    }
-    let key = c.compile_key();
-    if let Some(v) = DIAGS.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
-        return v;
-    }
-    let v = std::rc::Rc::new(sv_sema::semantic_diags(c.all, &crate::tops()).0);
-    DIAGS.with(|k| *k.borrow_mut() = Some((key, v.clone())));
-    v
+    crate::shared::get("semantic_diags", c.compile_key(), || {
+        crate::shared::sema_checks(c).diags(c.all, &crate::shared::elaboration(c))
+    })
 }
 
 /// The compiler's errors as findings: preprocessor, syntax and semantic

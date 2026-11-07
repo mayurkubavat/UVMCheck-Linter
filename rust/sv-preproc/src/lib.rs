@@ -17,6 +17,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
+use std::sync::Arc;
 
 use sv_lexer::Kind;
 
@@ -40,7 +41,7 @@ pub struct Origin {
 #[derive(Clone, Debug)]
 pub struct PpToken {
     pub kind: Kind,
-    pub text: Rc<str>,
+    pub text: Arc<str>,
     pub origin: Origin,
     /// Made or rearranged by a macro expansion.
     pub from_macro: bool,
@@ -66,7 +67,7 @@ pub struct Output {
     pub tokens: Vec<PpToken>,
     pub files: Vec<PathBuf>,
     /// The text of each file in `files`, as read.
-    pub sources: Vec<Rc<str>>,
+    pub sources: Vec<Arc<str>>,
     pub diagnostics: Vec<Diagnostic>,
     /// Uses of defined macros written in the source text (not inside
     /// another expansion), in order: Slang's top-level macro references.
@@ -85,7 +86,7 @@ pub struct Output {
 /// backtick's position.
 #[derive(Clone, Debug)]
 pub struct MacroUse {
-    pub name: Rc<str>,
+    pub name: Arc<str>,
     pub origin: Origin,
 }
 
@@ -95,11 +96,11 @@ pub struct MacroUse {
 #[derive(Clone, Debug)]
 struct T {
     kind: Kind,
-    text: Rc<str>,
+    text: Arc<str>,
     space_before: bool,
     /// The whitespace (not comments or line breaks) before the token, as
     /// written; stringification keeps it.
-    ws: Rc<str>,
+    ws: Arc<str>,
     /// How much of `ws` came before a line continuation. Slang turns a
     /// continuation into trivia for the next token produced, so inside a
     /// define this part follows `" into the stringified text.
@@ -125,7 +126,7 @@ struct Frame {
     toks: Vec<T>,
     idx: usize,
     /// The macro this frame expands, to stop recursion; None for a file.
-    macro_name: Option<Rc<str>>,
+    macro_name: Option<Arc<str>>,
     /// The file this frame reads, for `include lookup and `__FILE__.
     file: Option<u32>,
 }
@@ -143,7 +144,7 @@ pub struct Preprocessor {
     conds: Vec<Cond>,
     out: Output,
     paths: Vec<PathBuf>,
-    sources: Vec<Rc<str>>,
+    sources: Vec<Arc<str>>,
     /// `begin_keywords versions in force, innermost last.
     keyword_versions: Vec<sv_lexer::KeywordVersion>,
     /// Inside a module, interface, program or package (some directives
@@ -151,7 +152,7 @@ pub struct Preprocessor {
     in_design_element: bool,
     /// Text of the last token handed out, for `extern module` and
     /// `interface class`.
-    last_text: Rc<str>,
+    last_text: Arc<str>,
     /// The last token opened a design element.
     just_opened: bool,
     /// Line start offsets per source, built on the first `__LINE__`.
@@ -203,8 +204,8 @@ const LINE_DIRECTIVES: &[&str] = &[
     "endprotected",
 ];
 
-fn empty() -> Rc<str> {
-    thread_local!(static EMPTY: Rc<str> = Rc::from(""));
+fn empty() -> Arc<str> {
+    thread_local!(static EMPTY: Arc<str> = Arc::from(""));
     EMPTY.with(|e| e.clone())
 }
 
@@ -243,10 +244,10 @@ fn lex_to_t(src: &str, file: u32, from_macro: bool, origin_override: Option<Orig
                 continuation = false;
                 out.push(T {
                     kind: tok.kind,
-                    text: Rc::from(tok.text(src)),
+                    text: Arc::from(tok.text(src)),
                     space_before: space,
                     lc_len: std::mem::take(&mut lc_len) as u32,
-                    ws: if ws.is_empty() { empty() } else { Rc::from(std::mem::take(&mut ws)) },
+                    ws: if ws.is_empty() { empty() } else { Arc::from(std::mem::take(&mut ws)) },
                     newline_before: newline,
                     origin: origin_override.unwrap_or(Origin { file, offset: tok.start }),
                     from_macro,
@@ -368,7 +369,7 @@ impl Preprocessor {
 
     fn add_file(&mut self, path: PathBuf, src: &str) -> u32 {
         self.paths.push(path);
-        self.sources.push(Rc::from(src));
+        self.sources.push(Arc::from(src));
         (self.paths.len() - 1) as u32
     }
 
@@ -486,11 +487,11 @@ impl Preprocessor {
                 "__FILE__" => {
                     let file = self.current_file().map(|f| self.paths[f as usize].to_string_lossy().into_owned());
                     let text = format!("\"{}\"", file.unwrap_or_default());
-                    return Some(T { kind: Kind::StringLiteral, text: Rc::from(text), from_macro: true, ..t });
+                    return Some(T { kind: Kind::StringLiteral, text: Arc::from(text), from_macro: true, ..t });
                 }
                 "__LINE__" => {
                     let line = self.line_of(t.origin);
-                    return Some(T { kind: Kind::IntegerLiteral, text: Rc::from(line.to_string()), from_macro: true, ..t });
+                    return Some(T { kind: Kind::IntegerLiteral, text: Arc::from(line.to_string()), from_macro: true, ..t });
                 }
                 "begin_keywords" => {
                     let spec = self.line_next();
@@ -519,7 +520,7 @@ impl Preprocessor {
                 _ => {
                     if let Some(m) = self.macros.get(name).cloned() {
                         if self.top_level(&t) {
-                            self.out.macro_uses.push(MacroUse { name: Rc::from(name), origin: t.origin });
+                            self.out.macro_uses.push(MacroUse { name: Arc::from(name), origin: t.origin });
                         }
                         self.expand(&t, name, &m);
                     } else {
@@ -935,7 +936,7 @@ impl Preprocessor {
             first.ws = if nested { use_tok.ws.clone() } else { empty() };
             first.space_before = nested && use_tok.space_before;
         }
-        self.frames.push(Frame { toks, idx: 0, macro_name: Some(Rc::from(name)), file: None });
+        self.frames.push(Frame { toks, idx: 0, macro_name: Some(Arc::from(name)), file: None });
     }
 
     /// Fully expands a token list on its own (a macro argument), keeping
@@ -945,7 +946,7 @@ impl Preprocessor {
         for f in saved.iter().filter(|f| f.macro_name.is_some()) {
             self.frames.push(Frame { toks: Vec::new(), idx: 0, macro_name: f.macro_name.clone(), file: None });
         }
-        self.frames.push(Frame { toks: Vec::new(), idx: 0, macro_name: Some(Rc::from(outer)), file: None });
+        self.frames.push(Frame { toks: Vec::new(), idx: 0, macro_name: Some(Arc::from(outer)), file: None });
         let file = saved.iter().rev().find_map(|f| f.file);
         self.frames.push(Frame { toks, idx: 0, macro_name: None, file });
         let mut out = Vec::new();
@@ -1012,13 +1013,13 @@ impl Preprocessor {
         let param = |s: &str| names.iter().position(|n| *n == s);
         let mut out: Vec<T> = Vec::new();
         let mut i = 0;
-        let mut carry: Option<(bool, Rc<str>)> = None;
+        let mut carry: Option<(bool, Arc<str>)> = None;
         // `/``* ... *``/`: a comment made by pasting, from where it starts.
         let mut comment_at: Option<usize> = None;
         while i < body.len() {
             let t = &body[i];
             let before = out.len();
-            let mut pending: Option<(bool, Rc<str>)> = None;
+            let mut pending: Option<(bool, Arc<str>)> = None;
             match t.kind {
                 Kind::MacroQuote => {
                     // `" ... `": one string literal, arguments substituted.
@@ -1069,7 +1070,7 @@ impl Preprocessor {
                     s.push('"');
                     out.push(T {
                         kind: Kind::StringLiteral,
-                        text: Rc::from(s),
+                        text: Arc::from(s),
                         space_before: t.space_before,
                         ws: t.ws.clone(),
                         lc_len: t.lc_len,
@@ -1129,7 +1130,7 @@ impl Preprocessor {
                     i += 2;
                     continue;
                 }
-                Kind::MacroEscapedQuote => out.push(T { kind: Kind::Punct, text: Rc::from("\""), ..mark(t, t.space_before) }),
+                Kind::MacroEscapedQuote => out.push(T { kind: Kind::Punct, text: Arc::from("\""), ..mark(t, t.space_before) }),
                 _ => match param(&t.text) {
                     Some(k) if t.kind == Kind::Identifier || t.kind == Kind::Keyword => {
                         if args[k].is_empty() {

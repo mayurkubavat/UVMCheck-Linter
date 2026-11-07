@@ -3,6 +3,9 @@
 //!
 //!     dv-lint [--slang] [--time] [--history] [--rule ID]... [--list] <compile options>
 //!
+//! Rules run on one thread per core (`DV_LINT_JOBS=N` to choose; 1 runs
+//! them serially); the output does not depend on it.
+//!
 //! Exit status: 0 clean, 1 findings, 2 load error.
 use dv_model::Design;
 

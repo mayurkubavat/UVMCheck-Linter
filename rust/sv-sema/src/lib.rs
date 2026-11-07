@@ -243,29 +243,64 @@ pub struct Elaborated {
 /// `dv-build` reports after the syntax errors), with the hierarchy it
 /// elaborated.
 pub fn semantic_diags(trees: &[Tree], tops: &[String]) -> (Vec<names::Diag>, Elaborated) {
-    let scopes = scopes::build(trees);
-    let mut checks = names::check(trees, &scopes);
-    checks.extend(checks::check(trees, &scopes));
-    let mut elab = elaborate_full(trees, tops);
-    checks.append(&mut elab.diags);
-    // Names in what no instance elaborates are not checked (as in slang).
-    let skipped: Vec<(usize, u32, u32)> = elab
-        .skipped
-        .iter()
-        .filter_map(|&(tr, n)| trees[tr].token_bounds(n).map(|(a, b)| (tr, a, b)))
-        .collect();
-    checks.extend(bind::check(trees).into_iter().filter(|d| {
-        let Some((a, _)) = trees[d.tree].token_bounds(d.node) else { return true };
-        !skipped.iter().any(|&(tr, s, e)| tr == d.tree && s <= a && a <= e)
-    }));
-    checks.extend(iclass::check(trees));
-    checks.extend(udp::check(trees));
-    checks.extend(sva::check(trees));
-    checks.extend(calls::check(trees));
-    checks.extend(order::check(trees, &scopes));
-    checks.extend(classes::check(trees));
-    checks.extend(typed::check(trees, &scopes));
-    (checks, elab)
+    let parts = SemaChecks::new(trees);
+    let elab = elaborate_full(trees, tops);
+    (parts.diags(trees, &elab), elab)
+}
+
+/// The semantic checks of a compile, each on its own, so that callers
+/// that need some of them (and elaboration separately) compute them once.
+pub struct SemaChecks {
+    pub names: Vec<names::Diag>,
+    pub checks: Vec<names::Diag>,
+    pub bind: Vec<names::Diag>,
+    pub iclass: Vec<names::Diag>,
+    pub udp: Vec<names::Diag>,
+    pub sva: Vec<names::Diag>,
+    pub calls: Vec<names::Diag>,
+    pub order: Vec<names::Diag>,
+    pub classes: Vec<names::Diag>,
+    pub typed: Vec<names::Diag>,
+}
+
+impl SemaChecks {
+    pub fn new(trees: &[Tree]) -> SemaChecks {
+        let scopes = scopes::build(trees);
+        SemaChecks {
+            names: names::check(trees, &scopes),
+            checks: checks::check(trees, &scopes),
+            bind: bind::check(trees),
+            iclass: iclass::check(trees),
+            udp: udp::check(trees),
+            sva: sva::check(trees),
+            calls: calls::check(trees),
+            order: order::check(trees, &scopes),
+            classes: classes::check(trees),
+            typed: typed::check(trees, &scopes),
+        }
+    }
+
+    /// Every semantic error, in [`semantic_diags`]'s order, given the
+    /// compile's elaboration.
+    pub fn diags(&self, trees: &[Tree], elab: &Elaborated) -> Vec<names::Diag> {
+        let mut out = self.names.clone();
+        out.extend(self.checks.iter().cloned());
+        out.extend(elab.diags.iter().cloned());
+        // Names in what no instance elaborates are not checked (as in slang).
+        let skipped: Vec<(usize, u32, u32)> = elab
+            .skipped
+            .iter()
+            .filter_map(|&(tr, n)| trees[tr].token_bounds(n).map(|(a, b)| (tr, a, b)))
+            .collect();
+        out.extend(self.bind.iter().filter(|d| {
+            let Some((a, _)) = trees[d.tree].token_bounds(d.node) else { return true };
+            !skipped.iter().any(|&(tr, s, e)| tr == d.tree && s <= a && a <= e)
+        }).cloned());
+        for v in [&self.iclass, &self.udp, &self.sva, &self.calls, &self.order, &self.classes, &self.typed] {
+            out.extend(v.iter().cloned());
+        }
+        out
+    }
 }
 
 pub fn elaborate_full(trees: &[Tree], tops: &[String]) -> Elaborated {

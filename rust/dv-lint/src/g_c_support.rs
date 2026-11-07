@@ -11,10 +11,9 @@
 //! - [`std_unordered_order`]: the iteration order of a libstdc++
 //!   `std::unordered_set<std::string>`, which some messages list names in.
 
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 
-use sv_syntax::{NodeId, SyntaxKind, Tree};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 use crate::syntax::Cst;
@@ -344,22 +343,9 @@ struct TreeInfo {
     specs: HashMap<u32, usize>,
 }
 
-thread_local! {
-    static INFO: RefCell<Option<(usize, usize, std::rc::Rc<TreeInfo>)>> = const { RefCell::new(None) };
-}
 
-fn info(c: &Cst) -> std::rc::Rc<TreeInfo> {
-    let key = (c.tree as *const Tree as usize, c.tree.nodes.len());
-    INFO.with(|cell| {
-        if let Some((a, b, i)) = &*cell.borrow() {
-            if (*a, *b) == key {
-                return i.clone();
-            }
-        }
-        let i = std::rc::Rc::new(build_info(c));
-        *cell.borrow_mut() = Some((key.0, key.1, i.clone()));
-        i
-    })
+fn info(c: &Cst) -> std::sync::Arc<TreeInfo> {
+    crate::shared::get("tree_info", c.tree_key(), || build_info(c))
 }
 
 fn build_info(c: &Cst) -> TreeInfo {
@@ -542,18 +528,15 @@ struct Hier {
     last: HashMap<String, usize>,
 }
 
-thread_local! {
-    static HIER: RefCell<Option<((usize, usize), std::rc::Rc<Hier>)>> = const { RefCell::new(None) };
+
+fn hier(c: &Cst) -> std::sync::Arc<Hier> {
+    crate::shared::get("hier", c.compile_key(), || build_hier(c))
 }
 
-fn hier(c: &Cst) -> std::rc::Rc<Hier> {
-    let key = c.compile_key();
-    if let Some(h) = HIER.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
-        return h;
-    }
-    let e = sv_sema::elaborate_full(c.all, &crate::tops());
-    let mut h = Hier { instances: HashMap::new(), def_of: HashMap::new(), copies: e.copies, last: HashMap::new() };
-    for (ix, line) in e.hierarchy.into_iter().enumerate() {
+fn build_hier(c: &Cst) -> Hier {
+    let e = crate::shared::elaboration(c);
+    let mut h = Hier { instances: HashMap::new(), def_of: HashMap::new(), copies: e.copies.clone(), last: HashMap::new() };
+    for (ix, line) in e.hierarchy.iter().enumerate() {
         let mut it = line.splitn(3, ' ');
         let (Some(parent), Some("instance"), Some(rest)) = (it.next(), it.next(), it.next()) else { continue };
         let path = |name: &str| if parent == "$root" { name.to_string() } else { format!("{parent}.{name}") };
@@ -563,8 +546,6 @@ fn hier(c: &Cst) -> std::rc::Rc<Hier> {
             h.def_of.insert(path(name), def.to_string());
         }
     }
-    let h = std::rc::Rc::new(h);
-    HIER.with(|k| *k.borrow_mut() = Some((key, h.clone())));
     h
 }
 

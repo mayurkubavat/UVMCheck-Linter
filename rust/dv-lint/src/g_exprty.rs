@@ -7,7 +7,7 @@
 //! (tools/exprdump.cpp is the reference).
 
 use std::collections::HashMap;
-use std::rc::Rc;
+use std::sync::Arc;
 
 use sv_sema::oracle::{TypeInfo, TypeOracle};
 use sv_syntax::NodeId;
@@ -760,18 +760,18 @@ pub(crate) fn call_args(c: &Cst, e: NodeId) -> Vec<NodeId> {
 
 /// The type of every expression of the compile's trees, by (tree, node):
 /// what rules read as `Expression::type` after stripping conversions.
-pub(crate) fn expr_types(c: &Cst) -> Rc<HashMap<(usize, NodeId), ETy>> {
+pub(crate) fn expr_types(c: &Cst) -> Arc<HashMap<(usize, NodeId), ETy>> {
     facts(c).0
 }
 
 /// The routine formals (their declarators) of one bit.
-pub(crate) fn one_bit_formals(c: &Cst) -> Rc<std::collections::HashSet<(usize, NodeId)>> {
+pub(crate) fn one_bit_formals(c: &Cst) -> Arc<std::collections::HashSet<(usize, NodeId)>> {
     facts(c).2
 }
 
 /// The matching-type form (`TypeOracle::canonical`) of the type of each
 /// cast and `$cast` argument.
-pub(crate) fn cast_canon(c: &Cst) -> Rc<HashMap<(usize, NodeId), String>> {
+pub(crate) fn cast_canon(c: &Cst) -> Arc<HashMap<(usize, NodeId), String>> {
     facts(c).1
 }
 
@@ -806,21 +806,21 @@ fn null_compare_fails(c: &Cst, ty: &mut Typer, n: NodeId) -> bool {
 }
 
 /// [`CfgDbTypes`] of the compile.
-pub(crate) fn cfgdb_types(c: &Cst) -> Rc<CfgDbTypes> {
+pub(crate) fn cfgdb_types(c: &Cst) -> Arc<CfgDbTypes> {
     facts(c).4
 }
 
 /// [`SpecTypes`] of the compile.
-pub(crate) fn spec_types(c: &Cst) -> Rc<SpecTypes> {
+pub(crate) fn spec_types(c: &Cst) -> Arc<SpecTypes> {
     facts(c).3
 }
 
 type Facts = (
-    Rc<HashMap<(usize, NodeId), ETy>>,
-    Rc<HashMap<(usize, NodeId), String>>,
-    Rc<std::collections::HashSet<(usize, NodeId)>>,
-    Rc<SpecTypes>,
-    Rc<CfgDbTypes>,
+    Arc<HashMap<(usize, NodeId), ETy>>,
+    Arc<HashMap<(usize, NodeId), String>>,
+    Arc<std::collections::HashSet<(usize, NodeId)>>,
+    Arc<SpecTypes>,
+    Arc<CfgDbTypes>,
 );
 
 /// For each `uvm_config_db#(T)::set/get` call: the value argument's own
@@ -894,13 +894,10 @@ fn interface_names(all: &[sv_syntax::Tree]) -> std::collections::HashSet<String>
 }
 
 fn facts(c: &Cst) -> Facts {
-    thread_local! {
-        static FACTS: std::cell::RefCell<Option<((usize, usize), Facts)>> = const { std::cell::RefCell::new(None) };
-    }
-    let key = c.compile_key();
-    if let Some(v) = FACTS.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
-        return v;
-    }
+    (*crate::shared::get("facts", c.compile_key(), || build_facts(c))).clone()
+}
+
+fn build_facts(c: &Cst) -> Facts {
     let o = TypeOracle::new(c.all);
     let mut out = HashMap::new();
     let mut canon = HashMap::new();
@@ -1068,9 +1065,7 @@ fn facts(c: &Cst) -> Facts {
         }
     }
     o.set_spec(None);
-    let v = (Rc::new(out), Rc::new(canon), Rc::new(one_bit), Rc::new(specs), Rc::new(cfgdb));
-    FACTS.with(|k| *k.borrow_mut() = Some((key, v.clone())));
-    v
+    (Arc::new(out), Arc::new(canon), Arc::new(one_bit), Arc::new(specs), Arc::new(cfgdb))
 }
 
 pub(crate) fn is_expr(k: sv_syntax::SyntaxKind) -> bool {

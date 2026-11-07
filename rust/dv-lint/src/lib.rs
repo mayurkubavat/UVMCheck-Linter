@@ -24,6 +24,7 @@ mod g_port2;
 mod g_port3;
 pub mod g_exprty;
 mod g_types;
+pub(crate) mod shared;
 mod g_history;
 pub use g_history::set_history;
 mod uvm_api;
@@ -311,9 +312,36 @@ pub fn lint_all(
     trees: &[sv_syntax::Tree],
     keep: impl Fn(&str) -> bool,
 ) -> (Vec<String>, Vec<Finding>) {
-    let mut sink = Sink::default();
     let all: Vec<Rule> = rules().into_iter().filter(|r| keep(r.id)).collect();
-    for r in &all {
+    let gen = shared::begin();
+    let jobs = jobs().min(all.len());
+    let out = if jobs > 1 {
+        lint_parallel(design, trees, &all, jobs, gen).unwrap_or_else(|| lint_serial(design, trees, &all))
+    } else {
+        lint_serial(design, trees, &all)
+    };
+    shared::end(gen);
+    let (files, mut f) = out;
+    f.retain(|x| !x.position_in(&files).0.contains("uvm_mock.svh"));
+    waivers::apply(&mut f, &files);
+    f.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
+    (files, f)
+}
+
+/// Threads for the rules: `DV_LINT_JOBS`, else the machine's cores.
+fn jobs() -> usize {
+    std::env::var("DV_LINT_JOBS")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or_else(|| std::thread::available_parallelism().map_or(1, |n| n.get()))
+        .max(1)
+}
+
+/// The rules one after another: model rules, then each tree's syntax
+/// rules, then the mixed rules over all trees.
+fn lint_serial(design: &Design, trees: &[sv_syntax::Tree], all: &[Rule]) -> (Vec<String>, Vec<Finding>) {
+    let mut sink = Sink::default();
+    for r in all {
         if let Check::Model(run) = r.check {
             run(design, &mut sink);
         }
@@ -322,14 +350,12 @@ pub fn lint_all(
     let mixed = all.iter().any(|r| matches!(r.check, Check::Mixed(_)));
     if all.iter().any(Rule::is_syntax) {
         let mut prior: std::collections::HashSet<std::path::PathBuf> = Default::default();
-        let spec: std::rc::Rc<std::cell::OnceCell<_>> = Default::default();
         for (ix, tree) in trees.iter().enumerate() {
             let mut cst = syntax::Cst::new(tree, ix, locator);
             cst.prior_files = std::rc::Rc::new(prior.clone());
             cst.all = trees;
-            cst.spec = spec.clone();
             prior.extend(tree.files.iter().cloned());
-            for r in &all {
+            for r in all {
                 if let Check::Syntax(run) = r.check {
                     run(&cst, &mut sink);
                 }
@@ -346,26 +372,161 @@ pub fn lint_all(
     }
     let files = locator.into_files();
     if mixed {
-        let csts: Vec<syntax::Cst> = trees
-            .iter()
-            .enumerate()
-            .map(|(ix, t)| {
-                let mut c = syntax::Cst::new(t, ix, sv_sema::Locator::new(files.clone()));
-                c.all = trees;
-                c
-            })
-            .collect();
-        for r in &all {
+        let csts = mixed_csts(trees, &files);
+        for r in all {
             if let Check::Mixed(run) = r.check {
                 run(design, &csts, &mut sink);
             }
         }
     }
-    let mut f = sink.findings;
-    f.retain(|x| !x.position_in(&files).0.contains("uvm_mock.svh"));
-    waivers::apply(&mut f, &files);
-    f.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
-    (files, f)
+    (files, sink.findings)
+}
+
+/// The trees as the mixed rules see them, sharing file table `files`.
+fn mixed_csts<'t>(trees: &'t [sv_syntax::Tree], files: &[String]) -> Vec<syntax::Cst<'t>> {
+    trees
+        .iter()
+        .enumerate()
+        .map(|(ix, t)| {
+            let mut c = syntax::Cst::new(t, ix, sv_sema::Locator::new(files.to_vec()));
+            c.all = trees;
+            c
+        })
+        .collect()
+}
+
+/// The trees as the syntax rules see them (each knowing the files of the
+/// trees before it), sharing file table `files`.
+fn syntax_csts<'t>(trees: &'t [sv_syntax::Tree], files: &[String]) -> Vec<syntax::Cst<'t>> {
+    let mut prior: std::collections::HashSet<std::path::PathBuf> = Default::default();
+    let mut out = Vec::new();
+    for (ix, tree) in trees.iter().enumerate() {
+        let mut c = syntax::Cst::new(tree, ix, sv_sema::Locator::new(files.to_vec()));
+        c.prior_files = std::rc::Rc::new(prior.clone());
+        c.all = trees;
+        prior.extend(tree.files.iter().cloned());
+        out.push(c);
+    }
+    out
+}
+
+/// A unit of parallel work: build a shared cache, or run a rule.
+enum Task {
+    Warm(fn(&syntax::Cst)),
+    Rule(usize),
+}
+
+/// Rules that take longest on large designs, started first so that they
+/// do not finish last.
+const SLOW: &[&str] = &[
+    "SV-STY-010", "SV-BUG-001", "SV-CMP-001", "SV-LANG-003", "SV-CNC-003", "SV-DED-004", "SV-DED-001",
+    "SV-DED-012", "SV-PKG-003", "SV-PRF-007", "SV-API-001", "SV-LANG-002", "SV-RDB-006",
+];
+
+/// The rules on `jobs` threads, each taking the next rule; the caches in
+/// [`shared`] are built once for all of them. Every thread numbers files
+/// from one table made up front; `None` (run serially instead) if a thread
+/// had to number a file that table lacks.
+fn lint_parallel(
+    design: &Design,
+    trees: &[sv_syntax::Tree],
+    all: &[Rule],
+    jobs: usize,
+    gen: usize,
+) -> Option<(Vec<String>, Vec<Finding>)> {
+    let mut locator = sv_sema::Locator::new(design.files().to_vec());
+    for (ix, tree) in trees.iter().enumerate() {
+        let cst = syntax::Cst::new(tree, ix, locator);
+        for f in 0..tree.files.len() as u32 {
+            cst.loc_at(sv_syntax::Origin { file: f, offset: 0 });
+        }
+        locator = cst.into_locator();
+    }
+    let files = locator.into_files();
+    // The work, in order: first the caches most rules wait for (when many
+    // rules run), then the slowest rules, then the rest as registered.
+    let warm: &[fn(&syntax::Cst)] = if all.len() >= 32 {
+        &[
+            |c| drop(g_exprty::expr_types(c)),
+            |c| drop(shared::sema_checks(c)),
+            |c| drop(shared::elaboration(c)),
+            |c| {
+                let _ = c.spec_count(sv_syntax::NodeId(0));
+            },
+        ]
+    } else {
+        &[]
+    };
+    let mut order: Vec<usize> = (0..all.len()).collect();
+    order.sort_by_key(|&i| SLOW.iter().position(|&s| s == all[i].id).unwrap_or(SLOW.len()));
+    let tasks: Vec<Task> = warm.iter().map(|&w| Task::Warm(w)).chain(order.into_iter().map(Task::Rule)).collect();
+    let next = std::sync::atomic::AtomicUsize::new(0);
+    let found: Vec<std::sync::Mutex<Vec<Finding>>> = all.iter().map(|_| Default::default()).collect();
+    let same_files = std::sync::atomic::AtomicBool::new(true);
+    std::thread::scope(|s| {
+        for _ in 0..jobs {
+            let (next, found, files, same_files, tasks) = (&next, &found, &files, &same_files, &tasks);
+            std::thread::Builder::new()
+                .stack_size(256 << 20)
+                .spawn_scoped(s, move || {
+                    shared::enter(gen);
+                    let mut syn: Option<Vec<syntax::Cst>> = None;
+                    let mut mix: Option<Vec<syntax::Cst>> = None;
+                    loop {
+                        let k = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+                        let i = match tasks.get(k) {
+                            None => break,
+                            Some(Task::Warm(w)) => {
+                                if let Some(c) = mix.get_or_insert_with(|| mixed_csts(trees, files)).first() {
+                                    w(c);
+                                }
+                                continue;
+                            }
+                            Some(&Task::Rule(i)) => i,
+                        };
+                        let r = &all[i];
+                        let mut sink = Sink::default();
+                        match r.check {
+                            Check::Model(run) => run(design, &mut sink),
+                            Check::Syntax(run) => {
+                                for c in syn.get_or_insert_with(|| syntax_csts(trees, files)).iter() {
+                                    run(c, &mut sink);
+                                }
+                            }
+                            Check::Mixed(run) => run(design, mix.get_or_insert_with(|| mixed_csts(trees, files)), &mut sink),
+                        }
+                        if let Ok(mut f) = found[i].lock() {
+                            *f = sink.findings;
+                        }
+                    }
+                    for c in syn.into_iter().chain(mix).flatten() {
+                        if c.into_locator().into_files().len() != files.len() {
+                            same_files.store(false, std::sync::atomic::Ordering::Relaxed);
+                        }
+                    }
+                })
+                .expect("spawn a rule thread");
+        }
+    });
+    if !same_files.into_inner() {
+        return None;
+    }
+    // In the serial order: model rules, then syntax, then mixed.
+    let mut out = Vec::new();
+    let mut found: Vec<Vec<Finding>> = found.into_iter().map(|m| m.into_inner().unwrap_or_default()).collect();
+    for group in 0..3 {
+        for (i, r) in all.iter().enumerate() {
+            let g = match r.check {
+                Check::Model(_) => 0,
+                Check::Syntax(_) => 1,
+                Check::Mixed(_) => 2,
+            };
+            if g == group {
+                out.append(&mut found[i]);
+            }
+        }
+    }
+    Some((files, out))
 }
 
 /// Visits of each generic class's body, one line per class, by the syntax

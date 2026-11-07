@@ -11,9 +11,8 @@
 //! each one tree); a name another tree declares then reads as undeclared,
 //! which only drops findings.
 
-use std::cell::RefCell;
 use std::collections::HashSet;
-use std::rc::Rc;
+use std::sync::Arc as Rc;
 
 use sv_syntax::{NodeId, SyntaxKind, Tree};
 
@@ -39,9 +38,6 @@ pub(crate) struct Info {
     pub(crate) tainted_classes: HashSet<String>,
 }
 
-thread_local! {
-    static CACHE: RefCell<Vec<(usize, usize, Rc<Info>)>> = const { RefCell::new(Vec::new()) };
-}
 
 /// What the whole compile says: sv-sema's diagnostics by tree (the
 /// nodes), and the names every other tree declares at its top.
@@ -52,25 +48,17 @@ struct Whole {
     modports: std::collections::HashMap<String, HashSet<String>>,
 }
 
-thread_local! {
-    static WHOLE: RefCell<Option<((usize, usize), Rc<Whole>)>> = const { RefCell::new(None) };
-}
 
 fn whole(c: &Cst) -> Rc<Whole> {
+    crate::shared::get("whole", c.compile_key(), || build_whole(c))
+}
+
+fn build_whole(c: &Cst) -> Whole {
     let all = c.all;
-    let key = (all.as_ptr() as usize, all.len());
-    if let Some(w) = WHOLE.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
-        return w;
-    }
-    let scopes = sv_sema::scopes::build(all);
-    let mut diags = sv_sema::names::check(all, &scopes);
-    diags.extend(sv_sema::bind::check(all));
-    diags.extend(sv_sema::checks::check(all, &scopes));
-    diags.extend(sv_sema::order::check(all, &scopes));
-    diags.extend(sv_sema::calls::check(all));
-    diags.extend(sv_sema::typed::check(all, &scopes));
+    let sc = crate::shared::sema_checks(c);
+    let diags = sc.names.iter().chain(&sc.bind).chain(&sc.checks).chain(&sc.order).chain(&sc.calls).chain(&sc.typed);
     let mut by_tree: std::collections::HashMap<usize, Vec<sv_syntax::NodeId>> = Default::default();
-    for d in diags {
+    for d in diags.cloned() {
         // Constraint mode errors leave the expression itself bound.
         if d.message.starts_with("randc variable") {
             continue;
@@ -90,9 +78,7 @@ fn whole(c: &Cst) -> Rc<Whole> {
             }
         }
     }
-    let w = Rc::new(Whole { diags: by_tree, declared, modports: modports(all) });
-    WHOLE.with(|k| *k.borrow_mut() = Some((key, w.clone())));
-    w
+    Whole { diags: by_tree, declared, modports: modports(all) }
 }
 
 /// Each interface's modport names.
@@ -114,10 +100,10 @@ fn modports(all: &[Tree]) -> std::collections::HashMap<String, HashSet<String>> 
 }
 
 pub(crate) fn info(c: &Cst) -> Rc<Info> {
-    let key = (c.tree as *const Tree as usize, c.tree.tokens.len());
-    if let Some(i) = CACHE.with(|k| k.borrow().iter().find(|e| (e.0, e.1) == key).map(|e| e.2.clone())) {
-        return i;
-    }
+    crate::shared::get("random_sema_info", c.tree_key(), || build_info(c))
+}
+
+fn build_info(c: &Cst) -> Info {
     let all = whole(c);
     let diags = all.diags.get(&c.index()).map(|v| &v[..]).unwrap_or(&[]);
     let mut bad = Vec::new();
@@ -292,15 +278,7 @@ pub(crate) fn info(c: &Cst) -> Rc<Info> {
             }
         }
     }
-    let i = Rc::new(Info { bad, bad_expr, poisoned, declared, tainted, tainted_classes });
-    CACHE.with(|k| {
-        let mut k = k.borrow_mut();
-        if k.len() > 8 {
-            k.remove(0);
-        }
-        k.push((key.0, key.1, i.clone()));
-    });
-    i
+    Info { bad, bad_expr, poisoned, declared, tainted, tainted_classes }
 }
 
 pub(crate) fn is_expr(k: SyntaxKind) -> bool {
