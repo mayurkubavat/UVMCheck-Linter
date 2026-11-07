@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 351);
+    assert_eq!(r.len(), 352);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 351);
+    assert_eq!(ids.len(), 352);
 }
 
 #[test]
@@ -631,4 +631,14 @@ fn out_of_bounds_selects_and_magic_numbers() {
     assert_eq!(rule_lines(src, "SV-LANG-002"), vec![4, 4]);
     // 2 on line 5 is the first use of 2 after 8 and 4 on line 4.
     assert_eq!(rule_lines(src, "SV-RDB-002"), vec![4, 4, 4, 5, 5]);
+}
+
+#[test]
+fn enum_case_with_default() {
+    let src = "typedef enum {IDLE, RUN, DONE} st_t;\n\
+               module m; st_t s;\n\
+               initial case (s) IDLE: ; default: ; endcase\n\
+               initial case (s) IDLE, RUN, DONE: ; default: ; endcase\n\
+               endmodule\n";
+    assert_eq!(rule_lines(src, "SV-FSM-001"), vec![3]);
 }
