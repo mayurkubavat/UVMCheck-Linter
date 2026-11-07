@@ -145,6 +145,7 @@ pub(crate) fn info(c: &Cst) -> Rc<Info> {
     }
     // `f = '{1, 2, 3}` for `int f[4]`, `b[0:3]` for `logic [7:0] b`.
     for n in c.tree.preorder() {
+        // Both are errors that make the statement list around them bad.
         let wrong = match c.kind(n) {
             AssignPattern => pattern_count_mismatch(c, n),
             SelectExpr => reversed_select(c, n),
@@ -152,7 +153,7 @@ pub(crate) fn info(c: &Cst) -> Rc<Info> {
         };
         if wrong {
             if let Some(r) = c.tree.token_bounds(n) {
-                bad_expr.push(r);
+                bad.push(r);
             }
         }
     }
@@ -358,20 +359,10 @@ pub(crate) fn top_expr(c: &Cst, mut n: NodeId) -> NodeId {
     n
 }
 
-/// The one declaration of `name` in the tree: its type and declarator.
-fn decl_of(c: &Cst, name: &str) -> Option<(NodeId, NodeId)> {
-    let mut found = None;
-    for dd in c.nodes(DataDecl) {
-        for dcl in c.tree.children(dd).filter(|&x| c.kind(x) == Declarator) {
-            if c.tree.child(dcl, Name).is_some_and(|nm| c.tree.bare_text(nm) == name) {
-                if found.is_some() {
-                    return None;
-                }
-                found = Some((c.tree.child(dd, DataType)?, dcl));
-            }
-        }
-    }
-    found
+/// The declaration `name` names at `at`: its type and declarator.
+fn decl_of(c: &Cst, at: NodeId, name: &str) -> Option<(NodeId, NodeId)> {
+    let d = crate::g_c_support::lookup(c, at, name)?;
+    (c.kind(d.node) == Declarator).then_some((d.dtype?, d.node))
 }
 
 fn small_int(c: &Cst, n: NodeId) -> Option<i64> {
@@ -392,7 +383,7 @@ fn assign_target(c: &Cst, e: NodeId) -> Option<(NodeId, NodeId)> {
             if c.kind(l) != NameExpr {
                 return None;
             }
-            decl_of(c, &c.tree.bare_text(l))
+            decl_of(c, l, &c.tree.bare_text(l))
         }
         Declarator => Some((c.tree.child(c.parent(p)?, DataType)?, p)),
         _ => None,
@@ -414,7 +405,7 @@ pub(crate) fn pattern_count_mismatch(c: &Cst, ap: NodeId) -> bool {
     given != size
 }
 
-fn reversed_select(c: &Cst, s: NodeId) -> bool {
+pub(crate) fn reversed_select(c: &Cst, s: NodeId) -> bool {
     if c.tok(s, ":").is_none() || c.tok(s, "+:").is_some() || c.tok(s, "-:").is_some() {
         return false;
     }
@@ -424,7 +415,7 @@ fn reversed_select(c: &Cst, s: NodeId) -> bool {
         return false;
     }
     let (Some(l), Some(r)) = (small_int(c, l), small_int(c, r)) else { return false };
-    let Some((dt, dcl)) = decl_of(c, &c.tree.bare_text(base)) else { return false };
+    let Some((dt, dcl)) = decl_of(c, base, &c.tree.bare_text(base)) else { return false };
     if c.tree.child(dcl, Dim).is_some() {
         return false;
     }
@@ -508,6 +499,12 @@ fn tainted_classes(c: &Cst, declared: &HashSet<String>) -> HashSet<String> {
             return out;
         }
     }
+}
+
+/// `n`'s tokens hold an error that makes slang's statement list bad.
+pub(crate) fn holds_bad(c: &Cst, n: NodeId) -> bool {
+    let Some((a, b)) = c.tree.token_bounds(n) else { return false };
+    info(c).bad.iter().any(|&(x, y)| a <= x && y <= b)
 }
 
 /// slang's AST has this expression (it bound without error).

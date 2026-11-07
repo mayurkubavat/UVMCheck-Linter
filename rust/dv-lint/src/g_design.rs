@@ -671,7 +671,7 @@ fn dead_store(c: &Cst, s: &mut Sink) {
     let lists = statement_lists(c);
     let poisoned = bad_bodies(c, &lists);
     for b in lists {
-        if ancestors_or_self(c, b).any(|x| poisoned.contains(&x.0)) {
+        if ancestors_or_self(c, b).any(|x| poisoned.contains(&x.0)) || crate::g_random_sema::holds_bad(c, b) {
             continue;
         }
         let items = list(c, b);

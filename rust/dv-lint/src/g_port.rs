@@ -23,6 +23,7 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "SV-LANG-002", name: "BitSelectOutOfBounds", check: Syntax(bit_select_out_of_bounds) },
         Rule { id: "SV-RDB-002", name: "MagicNumber", check: Syntax(magic_number) },
         Rule { id: "SV-FSM-001", name: "NonExhaustiveEnumCase", check: Syntax(non_exhaustive_enum_case) },
+        Rule { id: "SV-LANG-004", name: "PartSelectReversed", check: Syntax(part_select_reversed) },
     ]
 }
 
@@ -614,5 +615,29 @@ fn non_exhaustive_enum_case(c: &Cst, s: &mut Sink) {
                 c.loc_of(cs),
             );
         }
+    }
+}
+
+// ---- SV-LANG-004 ----
+
+/// slang's RangeSelectReversed diagnostic (the select itself does not
+/// bind), once per select, at its left bound.
+fn part_select_reversed(c: &Cst, s: &mut Sink) {
+    for sel in c.nodes(SelectExpr) {
+        if !crate::g_random_sema::reversed_select(c, sel) {
+            continue;
+        }
+        let k: Vec<NodeId> = c.tree.children(sel).collect();
+        let [_, l, r] = k[..] else { continue };
+        let (Some(lv), Some(rv)) = (int_value(c, l), int_value(c, r)) else { continue };
+        s.add(
+            "SV-LANG-004",
+            "PartSelectReversed",
+            Severity::Error,
+            format!(
+                "Inverted part-select slicing: selection range [{lv}:{rv}] is reversed relative to declared vector endianness. In SystemVerilog (IEEE 1800 \u{a7} 7.4.3), part-select bounds must match the declared range endianness."
+            ),
+            c.loc_of(l),
+        );
     }
 }

@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 352);
+    assert_eq!(r.len(), 353);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 352);
+    assert_eq!(ids.len(), 353);
 }
 
 #[test]
@@ -641,4 +641,14 @@ fn enum_case_with_default() {
                initial case (s) IDLE, RUN, DONE: ; default: ; endcase\n\
                endmodule\n";
     assert_eq!(rule_lines(src, "SV-FSM-001"), vec![3]);
+}
+
+#[test]
+fn part_select_reversed() {
+    let src = "module m;\n\
+               logic [7:0] v;\n\
+               logic [0:7] u;\n\
+               initial begin v[0:3] = 0; u[3:0] = 0; v[3:0] = 0; u[0:3] = 0; end\n\
+               endmodule\n";
+    assert_eq!(rule_lines(src, "SV-LANG-004"), vec![4, 4]);
 }
