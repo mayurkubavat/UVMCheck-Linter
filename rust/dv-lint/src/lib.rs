@@ -24,6 +24,8 @@ mod g_port2;
 mod g_port3;
 pub mod g_exprty;
 mod g_types;
+mod g_history;
+pub use g_history::set_history;
 mod uvm_api;
 mod waivers;
 mod g_c_support;
@@ -288,6 +290,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_port2::rules());
     v.extend(g_port3::rules());
     v.extend(g_types::rules());
+    v.extend(g_history::rules());
     v.sort_by_key(|r| r.id);
     v
 }

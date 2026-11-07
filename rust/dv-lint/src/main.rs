@@ -1,7 +1,7 @@
 //! Runs the ported rules over a design, built natively (default) or through
 //! slang (`--slang`, model rules only), and prints findings as uvmcheck does:
 //!
-//!     dv-lint [--slang] [--time] [--rule ID]... [--list] <compile options>
+//!     dv-lint [--slang] [--time] [--history] [--rule ID]... [--list] <compile options>
 //!
 //! Exit status: 0 clean, 1 findings, 2 load error.
 use dv_model::Design;
@@ -22,6 +22,8 @@ fn main() {
             // Each expression's type, as tools/exprdump.cpp prints slang's.
             "--exprs" => exprs = true,
             "--rule" => only.extend(it.next()),
+            // Read git history for SV-EVO-001 and SV-EVO-002.
+            "--history" => dv_lint::set_history(true),
             // The design's tops, as slang's --top: modules no top reaches
             // are not elaborated.
             "-top" | "--top" => {
