@@ -697,11 +697,12 @@ fn error_reporting_rules() {
 fn failure_not_reported() {
     let src = "class c;\n\
                rand int a;\n\
+               function void uvm_report_error(string i, string m); endfunction\n\
                function void f(c o);\n\
                if (!randomize()) $display(\"failed\");\n\
                if (!randomize()) uvm_report_error(\"X\", \"failed\");\n\
                if (!$cast(o, this)) begin end\n\
                endfunction\n\
                endclass\n";
-    assert_eq!(rule_lines(src, "SV-ERR-001"), vec![4, 6]);
+    assert_eq!(rule_lines(src, "SV-ERR-001"), vec![5, 7]);
 }

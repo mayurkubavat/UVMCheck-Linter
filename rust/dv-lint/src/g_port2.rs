@@ -385,6 +385,10 @@ fn failure_not_reported(c: &Cst, out: &mut Sink) {
             cond.and_then(|x| classify(c, x)).zip(other)
         };
         let Some((s, branch)) = found else { continue };
+        let cond = c.tree.children(st).next();
+        if cond.is_some_and(|x| !crate::g_random_sema::ast_ok(c, x)) {
+            continue;
+        }
         let mut strongest = Level::None;
         if !only_weak_reports(c, branch, &mut strongest) {
             continue;
