@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 359);
+    assert_eq!(r.len(), 364);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 359);
+    assert_eq!(ids.len(), 364);
 }
 
 #[test]
@@ -746,4 +746,72 @@ fn clocking_output_read() {
                task t(); x = vif.cb.i; x = vif.cb.d + 1; endtask\n\
                endclass\n";
     assert_eq!(rule_lines(src, "SV-CB-001"), vec![5, 5]);
+}
+
+#[test]
+fn compiler_errors() {
+    let src = "module m;\n\
+               int a;\n\
+               initial b = 1;\n\
+               endmodule\n";
+    assert_eq!(rule_lines(src, "SV-CMP-001"), vec![3]);
+    assert!(rule_lines("module m; endmodule\n", "SV-CMP-001").is_empty());
+}
+
+#[test]
+fn unused_variable() {
+    let src = "class c;\n\
+               int q[$];\n\
+               function void f();\n\
+               int a;\n\
+               int b = a;\n\
+               int k;\n\
+               int u;\n\
+               foreach (q[k]) u = k;\n\
+               endfunction\n\
+               endclass\n";
+    // `a` is read only by an initializer, `k` is shadowed by the loop.
+    assert_eq!(rule_lines(src, "SV-DED-001"), vec![4, 5, 6]);
+}
+
+#[test]
+fn unreferenced_parameter() {
+    let src = "class box #(type T = int, int N = 2, int M = 3);\n\
+               T items[N];\n\
+               function int f(); return M; endfunction\n\
+               endclass\n\
+               class user; box#(byte, 4) b; endclass\n";
+    // A dimension is not a reference; `int N` after `type T` is a value parameter.
+    assert_eq!(rule_lines(src, "SV-DED-012"), vec![1]);
+}
+
+#[test]
+fn unused_routine_argument() {
+    let src = "class item; rand int addr; endclass\n\
+               class c;\n\
+               function void a(int x, int y, int _z);\n\
+               $display(x);\n\
+               endfunction\n\
+               task drive(int addr, int lim);\n\
+               item it = new();\n\
+               void'(it.randomize() with { addr == addr; addr < lim; });\n\
+               endtask\n\
+               task keep(int addr);\n\
+               item it = new();\n\
+               void'(it.randomize() with { addr == local::addr; });\n\
+               endtask\n\
+               virtual function void v(int unused_ok, int w); $display(1); endfunction\n\
+               endclass\n";
+    // Names in a randomize-with block resolve into the object first.
+    assert_eq!(rule_lines(src, "SV-DED-013"), vec![3, 6]);
+}
+
+#[test]
+fn unused_local_method() {
+    let src = "class c;\n\
+               local function void used(); $display(1); endfunction\n\
+               local function void dead(); $display(2); endfunction\n\
+               function void run(); used(); endfunction\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-DED-014"), vec![3]);
 }

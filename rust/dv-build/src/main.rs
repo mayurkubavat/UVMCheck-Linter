@@ -115,30 +115,9 @@ fn main() -> ExitCode {
     for (ix, t) in trees.iter().enumerate() {
         syntax_diagnostics(ix, t, &mut loc, &mut diags);
     }
-    let scopes = sv_sema::scopes::build(&trees);
-    let mut checks = sv_sema::names::check(&trees, &scopes);
-    checks.extend(sv_sema::checks::check(&trees, &scopes));
     let tops: Vec<String> = list.top.iter().map(|t| t.value.clone()).collect();
-    let elab = sv_sema::elaborate_full(&trees, &tops);
-    let (hier_lines, elab_diags) = (elab.hierarchy, elab.diags);
-    checks.extend(elab_diags);
-    // Names in what no instance elaborates are not checked (as in slang).
-    let skipped: Vec<(usize, u32, u32)> = elab
-        .skipped
-        .iter()
-        .filter_map(|&(tr, n)| trees[tr].token_bounds(n).map(|(a, b)| (tr, a, b)))
-        .collect();
-    checks.extend(sv_sema::bind::check(&trees).into_iter().filter(|d| {
-        let Some((a, _)) = trees[d.tree].token_bounds(d.node) else { return true };
-        !skipped.iter().any(|&(tr, s, e)| tr == d.tree && s <= a && a <= e)
-    }));
-    checks.extend(sv_sema::iclass::check(&trees));
-    checks.extend(sv_sema::udp::check(&trees));
-    checks.extend(sv_sema::sva::check(&trees));
-    checks.extend(sv_sema::calls::check(&trees));
-    checks.extend(sv_sema::order::check(&trees, &scopes));
-    checks.extend(sv_sema::classes::check(&trees));
-    checks.extend(sv_sema::typed::check(&trees, &scopes));
+    let (checks, elab) = sv_sema::semantic_diags(&trees, &tops);
+    let hier_lines = elab.hierarchy;
     for d in checks {
         let t = &trees[d.tree];
         let Some((tok, _)) = t.token_bounds(d.node) else {
@@ -172,6 +151,7 @@ fn main() -> ExitCode {
             println!("{l}");
         }
     } else if symbols {
+        let scopes = sv_sema::scopes::build(&trees);
         let (tys, vals) = if types || values { sv_sema::symbol_info(&trees, &scopes) } else { Default::default() };
         let lines = scopes.dump_full(types.then_some(tys.as_slice()), values.then_some(vals.as_slice()));
         for l in lines {

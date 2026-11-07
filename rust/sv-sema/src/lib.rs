@@ -238,6 +238,35 @@ pub struct Elaborated {
     pub copies: HashMap<(usize, sv_syntax::NodeId), (usize, usize)>,
 }
 
+/// Every semantic error the native front end finds in a compile (what
+/// `dv-build` reports after the syntax errors), with the hierarchy it
+/// elaborated.
+pub fn semantic_diags(trees: &[Tree], tops: &[String]) -> (Vec<names::Diag>, Elaborated) {
+    let scopes = scopes::build(trees);
+    let mut checks = names::check(trees, &scopes);
+    checks.extend(checks::check(trees, &scopes));
+    let mut elab = elaborate_full(trees, tops);
+    checks.append(&mut elab.diags);
+    // Names in what no instance elaborates are not checked (as in slang).
+    let skipped: Vec<(usize, u32, u32)> = elab
+        .skipped
+        .iter()
+        .filter_map(|&(tr, n)| trees[tr].token_bounds(n).map(|(a, b)| (tr, a, b)))
+        .collect();
+    checks.extend(bind::check(trees).into_iter().filter(|d| {
+        let Some((a, _)) = trees[d.tree].token_bounds(d.node) else { return true };
+        !skipped.iter().any(|&(tr, s, e)| tr == d.tree && s <= a && a <= e)
+    }));
+    checks.extend(iclass::check(trees));
+    checks.extend(udp::check(trees));
+    checks.extend(sva::check(trees));
+    checks.extend(calls::check(trees));
+    checks.extend(order::check(trees, &scopes));
+    checks.extend(classes::check(trees));
+    checks.extend(typed::check(trees, &scopes));
+    (checks, elab)
+}
+
 pub fn elaborate_full(trees: &[Tree], tops: &[String]) -> Elaborated {
     let mut b = Builder::new(trees);
     b.designs = true;

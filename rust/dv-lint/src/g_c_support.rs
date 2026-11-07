@@ -538,6 +538,8 @@ struct Hier {
     def_of: HashMap<String, String>,
     /// (all, instantiated) copies by tree and node.
     copies: HashMap<(usize, NodeId), (usize, usize)>,
+    /// Each definition's last instance in elaboration order.
+    last: HashMap<String, usize>,
 }
 
 thread_local! {
@@ -545,24 +547,53 @@ thread_local! {
 }
 
 fn hier(c: &Cst) -> std::rc::Rc<Hier> {
-    let key = (c.all.as_ptr() as usize, c.all.len());
+    let key = c.compile_key();
     if let Some(h) = HIER.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
         return h;
     }
     let e = sv_sema::elaborate_full(c.all, &crate::tops());
-    let mut h = Hier { instances: HashMap::new(), def_of: HashMap::new(), copies: e.copies };
-    for line in e.hierarchy {
+    let mut h = Hier { instances: HashMap::new(), def_of: HashMap::new(), copies: e.copies, last: HashMap::new() };
+    for (ix, line) in e.hierarchy.into_iter().enumerate() {
         let mut it = line.splitn(3, ' ');
         let (Some(parent), Some("instance"), Some(rest)) = (it.next(), it.next(), it.next()) else { continue };
         let path = |name: &str| if parent == "$root" { name.to_string() } else { format!("{parent}.{name}") };
         if let Some((name, def)) = rest.split_once(" : ") {
             h.instances.entry(def.to_string()).or_default().push(path(name));
+            h.last.insert(def.to_string(), ix);
             h.def_of.insert(path(name), def.to_string());
         }
     }
     let h = std::rc::Rc::new(h);
     HIER.with(|k| *k.borrow_mut() = Some((key, h.clone())));
     h
+}
+
+/// The instances of `def` that `swe::freeRoutines` reaches: from the tops
+/// through instances only (it does not enter generate blocks).
+pub(crate) fn direct_instances(c: &Cst, def: &str) -> usize {
+    let h = hier(c);
+    let Some(paths) = h.instances.get(def) else { return 0 };
+    paths
+        .iter()
+        .filter(|p| {
+            let mut prefix = String::new();
+            for seg in p.split('.') {
+                if !prefix.is_empty() {
+                    prefix.push('.');
+                }
+                prefix.push_str(seg);
+                if !h.def_of.contains_key(&prefix) {
+                    return false;
+                }
+            }
+            true
+        })
+        .count()
+}
+
+/// Where elaboration visits `def`'s last instance (None when no instance).
+pub(crate) fn last_instance_rank(c: &Cst, def: &str) -> Option<usize> {
+    hier(c).last.get(def).copied()
 }
 
 /// Each instance of definition `def` in the compile's hierarchy: the
@@ -653,6 +684,11 @@ pub(crate) fn elab_copies(c: &Cst, n: NodeId) -> Option<usize> {
     None
 }
 
+/// [`block_label`] for other modules.
+pub(crate) fn block_label_pub(c: &Cst, b: NodeId) -> Option<String> {
+    block_label(c, b)
+}
+
 /// A generate block's label (`begin : l` or `l : begin`).
 fn block_label(c: &Cst, b: NodeId) -> Option<String> {
     if c.kind(b) != GenerateBlock {
@@ -741,8 +777,12 @@ pub(crate) fn model_classes(c: &Cst) -> Vec<NodeId> {
 
 /// `swe::userClasses`: model classes plus parameterized ones (their default
 /// specialization), without library classes. Generic classes nested in a
-/// class are not reached.
+/// class are not reached. With no model class at all, the generic ones
+/// are not added either (the C++ walk starts from a model class).
 pub(crate) fn user_classes(c: &Cst) -> Vec<NodeId> {
+    if model_classes(c).is_empty() {
+        return Vec::new();
+    }
     c.nodes(ClassDecl)
         .into_iter()
         .filter(|&n| !ancestors(c, n).any(|a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl | FunctionDecl | TaskDecl)))
@@ -802,7 +842,7 @@ pub(crate) fn user_routines(c: &Cst) -> Vec<(NodeId, usize)> {
             let p = c.parent(r).map(|p| c.kind(p));
             let n = match p {
                 Some(SourceFile | PackageDecl) => 1,
-                Some(ModuleDecl | InterfaceDecl | ProgramDecl) => times(c, r),
+                Some(ModuleDecl | InterfaceDecl | ProgramDecl) => direct_instances(c, &decl_name(c, c.parent(r).unwrap_or(r))),
                 _ => continue,
             };
             seen.insert(r);

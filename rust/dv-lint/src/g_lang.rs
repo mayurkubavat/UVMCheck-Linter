@@ -117,7 +117,7 @@ fn instantiations(c: &Cst) -> std::rc::Rc<Insts> {
     thread_local! {
         static INSTS: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<Insts>)>> = const { std::cell::RefCell::new(None) };
     }
-    let key = (c.all.as_ptr() as usize, c.all.len());
+    let key = c.compile_key();
     if let Some(v) = INSTS.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
         return v;
     }

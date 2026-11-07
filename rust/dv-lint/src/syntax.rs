@@ -54,6 +54,16 @@ impl<'t> Cst<'t> {
         self.spec.get_or_init(|| sv_sema::spec_counts(self.all)).get(&(self.index(), class)).copied()
     }
 
+    /// Identifies the compile for per-compile caches: the trees' address
+    /// and their sizes (an address alone can be reused by a later compile
+    /// in the same thread).
+    pub fn compile_key(&self) -> (usize, usize) {
+        let size = self.all.iter().fold(self.all.len(), |a, t| {
+            a.wrapping_mul(31).wrapping_add(t.nodes.len()).wrapping_mul(131).wrapping_add(t.tokens.len())
+        });
+        (self.all.as_ptr() as usize, size)
+    }
+
     /// This tree's index in [`Self::all`].
     pub fn index(&self) -> usize {
         if self.all.len() == 1 { 0 } else { self.ix }
@@ -151,6 +161,12 @@ impl<'t> Cst<'t> {
 
     pub fn loc(&self, tok: u32) -> Loc {
         self.locator.borrow_mut().loc(self.ix, self.tree, tok)
+    }
+
+    /// Where a preprocessor diagnostic points.
+    pub fn origin_loc(&self, o: sv_syntax::Origin) -> Loc {
+        let (file, line, column) = self.locator.borrow_mut().position(self.ix, self.tree, o);
+        Loc { file, line, column, expansion: None }
     }
 
     /// The node after token `tok` among `n`'s children.

@@ -501,6 +501,11 @@ fn tainted_classes(c: &Cst, declared: &HashSet<String>) -> HashSet<String> {
     }
 }
 
+/// Token ranges of the nodes sv-sema reports an error at.
+pub(crate) fn bad_ranges(c: &Cst) -> Vec<(u32, u32)> {
+    info(c).bad.clone()
+}
+
 /// `n`'s tokens hold an error that makes slang's statement list bad.
 pub(crate) fn holds_bad(c: &Cst, n: NodeId) -> bool {
     let Some((a, b)) = c.tree.token_bounds(n) else { return false };
@@ -518,6 +523,32 @@ pub(crate) fn ast_ok(c: &Cst, n: NodeId) -> bool {
         }
     }
     expr_ok(c, &i, bind_root(c, n))
+}
+
+/// [`ast_ok`]'s two parts: the unit slang binds `root` in is good ...
+pub(crate) fn root_ok(c: &Cst, root: NodeId) -> bool {
+    expr_ok(c, &info(c), root)
+}
+
+/// ... and no expression error sits in `n`'s outermost expression.
+pub(crate) fn no_bad_expr(c: &Cst, n: NodeId) -> bool {
+    let i = info(c);
+    match c.tree.token_bounds(top_expr(c, n)) {
+        Some((a, b)) => !i.bad_expr.iter().any(|&(x, y)| a <= x && y <= b),
+        None => true,
+    }
+}
+
+/// [`ast_ok`] for the expression alone, whatever the statements around it.
+pub(crate) fn expr_binds(c: &Cst, n: NodeId) -> bool {
+    let i = info(c);
+    let top = top_expr(c, n);
+    if let Some((a, b)) = c.tree.token_bounds(top) {
+        if i.bad_expr.iter().any(|&(x, y)| a <= x && y <= b) {
+            return false;
+        }
+    }
+    expr_ok(c, &i, top)
 }
 
 pub(crate) fn expr_ok(c: &Cst, i: &Info, top: NodeId) -> bool {

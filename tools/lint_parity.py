@@ -38,8 +38,21 @@ def reference(args):
             data = json.load(open(out))
         except (OSError, ValueError):
             return None
-    return collections.Counter((os.path.basename(v['file']), v['line'], v['column'], v['ruleId'], v['message'].split('\n')[0])
-                               for v in data['violations'] if v['ruleId'] in RULES)
+    return files_with_errors(collections.Counter(
+        (os.path.basename(v['file']), v['line'], v['column'], v['ruleId'], v['message'].split('\n')[0])
+        for v in data['violations'] if v['ruleId'] in RULES))
+
+
+def files_with_errors(found):
+    # Compiler errors carry each front end's own wording and positions:
+    # compare which files have any.
+    out = collections.Counter()
+    for k, n in found.items():
+        if k[3] == 'SV-CMP-001':
+            out[(k[0], 0, 0, k[3], '')] = 1
+        else:
+            out[k] += n
+    return out
 
 
 def ported(args, slang):
@@ -50,7 +63,7 @@ def ported(args, slang):
         m = LINE.match(line)
         if m:
             got[(os.path.basename(m[1]), int(m[2]), int(m[3]), m[5], m[7])] += 1
-    return got
+    return files_with_errors(got)
 
 
 def compare(args, slang, show, label):

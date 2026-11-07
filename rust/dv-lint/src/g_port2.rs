@@ -22,6 +22,11 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "SV-ERR-002", name: "UseAfterFailedNullCheck", check: Syntax(use_after_failed_null_check) },
         Rule { id: "SV-ASC-001", name: "AssociativeArrayMutatingRead", check: Syntax(assoc_mutating_read) },
         Rule { id: "SV-CB-001", name: "ClockingBlockOutputReadSkew", check: Syntax(clocking_output_read) },
+        Rule { id: "SV-CMP-001", name: "CompilerError", check: Syntax(compiler_errors) },
+        Rule { id: "SV-DED-001", name: "UnusedVariable", check: Syntax(unused_variable) },
+        Rule { id: "SV-DED-012", name: "UnreferencedParameter", check: Syntax(unreferenced_parameter) },
+        Rule { id: "SV-DED-013", name: "UnusedRoutineArgument", check: Syntax(unused_routine_argument) },
+        Rule { id: "SV-DED-014", name: "UnusedLocalMethod", check: Syntax(unused_local_method) },
     ]
 }
 
@@ -761,7 +766,7 @@ fn assoc_names(c: &Cst) -> std::rc::Rc<HashSet<String>> {
     thread_local! {
         static NAMES: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<HashSet<String>>)>> = const { std::cell::RefCell::new(None) };
     }
-    let key = (c.all.as_ptr() as usize, c.all.len());
+    let key = c.compile_key();
     if let Some(v) = NAMES.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
         return v;
     }
@@ -853,7 +858,7 @@ fn clocking_outputs(c: &Cst) -> std::rc::Rc<HashSet<String>> {
     thread_local! {
         static NAMES: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<HashSet<String>>)>> = const { std::cell::RefCell::new(None) };
     }
-    let key = (c.all.as_ptr() as usize, c.all.len());
+    let key = c.compile_key();
     if let Some(v) = NAMES.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
         return v;
     }
@@ -927,4 +932,605 @@ fn clocking_output_read(c: &Cst, out: &mut Sink) {
             check(cond);
         }
     }
+}
+
+// ---- SV-CMP-001 ----
+
+type SemaDiags = std::rc::Rc<Vec<sv_sema::names::Diag>>;
+
+/// The native front end's semantic errors for the compile, computed once.
+fn semantic_diags(c: &Cst) -> SemaDiags {
+    thread_local! {
+        static DIAGS: std::cell::RefCell<Option<((usize, usize), SemaDiags)>> = const { std::cell::RefCell::new(None) };
+    }
+    let key = c.compile_key();
+    if let Some(v) = DIAGS.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
+        return v;
+    }
+    let v = std::rc::Rc::new(sv_sema::semantic_diags(c.all, &crate::tops()).0);
+    DIAGS.with(|k| *k.borrow_mut() = Some((key, v.clone())));
+    v
+}
+
+/// The compiler's errors as findings: preprocessor, syntax and semantic
+/// errors of the native front end (its messages, not slang's).
+fn compiler_errors(c: &Cst, out: &mut Sink) {
+    let mut add = |msg: &str, loc: dv_model::Loc| {
+        out.add("SV-CMP-001", "CompilerError", Severity::Error, msg.to_string(), loc);
+    };
+    for d in &c.tree.pp_diagnostics {
+        add(&d.message, c.origin_loc(d.origin));
+    }
+    let n = c.tree.tokens.len();
+    for e in &c.tree.errors {
+        if n == 0 {
+            continue;
+        }
+        let tok = (e.token as usize).min(n - 1) as u32;
+        add(&e.message, c.loc(tok));
+    }
+    let ix = c.index();
+    for d in semantic_diags(c).iter().filter(|d| d.tree == ix) {
+        let Some((tok, _)) = c.tree.token_bounds(d.node) else { continue };
+        add(&d.message, c.loc(tok));
+    }
+}
+
+// ---- SV-DED-001 ----
+
+/// The classes slang's model lists: non-generic classes of `$unit`,
+/// packages and other such classes (not of modules, not generic).
+fn model_classes(c: &Cst) -> Vec<NodeId> {
+    let generic = |k: NodeId| c.tree.child(k, Header).and_then(|h| c.tree.child(h, ParamList)).is_some();
+    c.nodes(ClassDecl)
+        .into_iter()
+        .filter(|&k| !generic(k))
+        .filter(|&k| {
+            crate::g_c_support::ancestors(c, k)
+                .all(|a| matches!(c.kind(a), SourceFile | PackageDecl) || (c.kind(a) == ClassDecl && !generic(a)))
+        })
+        .collect()
+}
+
+fn unused_variable(c: &Cst, out: &mut Sink) {
+    for cls in model_classes(c) {
+        for m in kids(c, cls).into_iter().filter(|&m| matches!(c.kind(m), FunctionDecl | TaskDecl)) {
+            let Some(body) = c.tree.child(m, Body) else { continue };
+            let mut locals = Vec::new();
+            for d in kids(c, body).into_iter().filter(|&d| c.kind(d) == DataDecl) {
+                let first = c.first_tok(d).map(|t| c.text_of(t)).unwrap_or("");
+                if matches!(first, "input" | "output" | "inout" | "ref" | "typedef" | "localparam" | "parameter") {
+                    continue;
+                }
+                for decl in c.tree.children(d).filter(|&x| c.kind(x) == Declarator) {
+                    if let Some(nm) = c.tree.child(decl, Name) {
+                        locals.push((decl, nm, c.tree.bare_text(nm)));
+                    }
+                }
+            }
+            if locals.is_empty() {
+                continue;
+            }
+            let used = body_refs(c, body);
+            let mname = last_name_of(c, m);
+            for (decl, nm, name) in locals {
+                if used.contains(&decl) {
+                    continue;
+                }
+                let Some(loc) = c.first_tok(nm).map(|t| c.loc(t)) else { continue };
+                out.add(
+                    "SV-DED-001",
+                    "UnusedVariable",
+                    Severity::Info,
+                    format!("Local variable '{name}' in method '{mname}' is declared but never referenced."),
+                    loc,
+                );
+            }
+        }
+    }
+}
+
+/// The declarations slang's AST visit of a routine body reads (its
+/// NamedValue expressions): not in declaration initializers (also a for
+/// loop's); foreach loop variables shadow; none when a statement does not
+/// bind (the whole body is then bad; an error in a declaration's
+/// initializer does not count).
+fn body_refs(c: &Cst, body: NodeId) -> HashSet<NodeId> {
+    body_refs_if_good(c, body).unwrap_or_default()
+}
+
+/// [`body_refs`], None when the body is bad.
+fn body_refs_if_good(c: &Cst, body: NodeId) -> Option<HashSet<NodeId>> {
+    let mut used: HashSet<NodeId> = HashSet::new();
+    let in_decl = |e: NodeId| crate::g_c_support::ancestors(c, e).take_while(|&a| a != body).any(|a| c.kind(a) == Declarator);
+    let all = crate::g_c_support::subtree(c, body);
+    let decls: Vec<(u32, u32)> =
+        all.iter().filter(|&&d| c.kind(d) == DataDecl).filter_map(|&d| c.tree.token_bounds(d)).collect();
+    let names: Vec<NodeId> = all
+        .iter()
+        .copied()
+        .filter(|&e| c.kind(e) == NameExpr && kids(c, e).is_empty() && !is_local_qualifier(c, e))
+        .collect();
+    let bad = c.tree.token_bounds(body).is_some_and(|(a, b)| {
+        crate::g_random_sema::bad_ranges(c)
+            .into_iter()
+            .any(|(x, y)| a <= x && y <= b && !decls.iter().any(|&(p, q)| p <= x && y <= q))
+    }) || names.iter().any(|&e| !in_decl(e) && !crate::g_random_sema::expr_binds(c, e))
+        || names.iter().any(|&e| !in_decl(e) && reads_bad_typed_local(c, e, body));
+    if bad {
+        return None;
+    }
+    for &e in &all {
+        // `foreach (arr[i])`: the header is tokens; its first name is read.
+        if c.kind(e) == LoopStmt && c.keyword(e).is_some_and(|k| c.text_of(k) == "foreach") {
+            let toks: Vec<u32> = c.toks(e).collect();
+            if let Some(&t) = toks.get(2).filter(|_| toks.get(1).is_some_and(|&p| c.text_of(p) == "(")) {
+                if let Some(d) = lookup(c, e, c.text_of(t)) {
+                    used.insert(d.node);
+                }
+            }
+        }
+    }
+    for &e in &names {
+        if in_decl(e) {
+            continue;
+        }
+        let Some(t) = c.first_tok(e) else { continue };
+        let name = c.text_of(t);
+        if foreach_var_in_scope(c, e, name, body) || randomize_with_member(c, e, name, body) {
+            continue;
+        }
+        if let Some(d) = lookup(c, e, name) {
+            used.insert(d.node);
+        }
+    }
+    // `local::x` in a randomize-with constraint reads the caller's `x`.
+    for &e in &all {
+        if c.kind(e) == ScopedExpr {
+            if let Some(&q) = kids(c, e).first() {
+                if is_local_qualifier(c, q) {
+                    if let Some(d) = lookup(c, e, c.last_text(e)) {
+                        used.insert(d.node);
+                    }
+                }
+            }
+        }
+    }
+    Some(used)
+}
+
+/// `e` reads a local of the body whose declared type does not bind (the
+/// variable is error-typed, so the statement reading it is bad).
+fn reads_bad_typed_local(c: &Cst, e: NodeId, body: NodeId) -> bool {
+    let Some(t) = c.first_tok(e) else { return false };
+    let Some(d) = lookup(c, e, c.text_of(t)) else { return false };
+    let Some(dd) = crate::g_c_support::ancestors(c, d.node).find(|&a| c.kind(a) == DataDecl) else { return false };
+    if !crate::g_c_support::ancestors(c, dd).any(|a| a == body) {
+        return false;
+    }
+    let Some((a, b)) = c.tree.child(dd, DataType).and_then(|ty| c.tree.token_bounds(ty)) else { return false };
+    crate::g_random_sema::bad_ranges(c).into_iter().any(|(x, y)| a <= x && y <= b)
+}
+
+/// The `local` of a `local::x` name.
+fn is_local_qualifier(c: &Cst, e: NodeId) -> bool {
+    c.first_tok(e).is_some_and(|t| c.text_of(t) == "local")
+        && c.parent(e).is_some_and(|p| c.kind(p) == ScopedExpr)
+}
+
+/// `name` at `e` is inside the `with` constraint of `obj.randomize()` and
+/// names a member of obj's class, which constraint names resolve to first.
+fn randomize_with_member(c: &Cst, e: NodeId, name: &str, stop: NodeId) -> bool {
+    for w in crate::g_c_support::ancestors(c, e).take_while(|&a| a != stop) {
+        if c.kind(w) != WithClause {
+            continue;
+        }
+        let Some(call) = c.parent(w).filter(|&p| c.kind(p) == CallExpr) else { continue };
+        // `with (a, b) {..}`: only the listed names resolve into the object.
+        let toks: Vec<&str> = c.toks(w).map(|t| c.text_of(t)).collect();
+        if toks.get(1) == Some(&"(") {
+            let close = toks.iter().position(|t| *t == ")").unwrap_or(1);
+            if !toks[2..close].contains(&name) {
+                continue;
+            }
+        }
+        let Some(&inner) = kids(c, call).first() else { continue };
+        let callee = if c.kind(inner) == CallExpr { kids(c, inner).first().copied() } else { Some(inner) };
+        let Some(m) = callee.filter(|&m| c.kind(m) == MemberExpr && c.last_text(m) == "randomize") else { continue };
+        let Some(&base) = kids(c, m).first() else { continue };
+        let cls = if c.kind(base) == NameExpr && c.first_tok(base).is_some_and(|t| c.text_of(t) == "this") {
+            crate::g_c_support::enclosing_class(c, e)
+        } else {
+            expr_class(c, base)
+        };
+        if cls.is_some_and(|k| crate::g_c_support::class_member(c, k, name).is_some()) {
+            return true;
+        }
+    }
+    false
+}
+
+fn last_name_of(c: &Cst, m: NodeId) -> String {
+    crate::g_c_support::last_name(c, m)
+}
+
+/// `name` at `e` is a loop variable of a `foreach` around it.
+fn foreach_var_in_scope(c: &Cst, e: NodeId, name: &str, stop: NodeId) -> bool {
+    crate::g_c_support::ancestors(c, e).take_while(|&a| a != stop).any(|l| {
+        if c.kind(l) != LoopStmt || !c.keyword(l).is_some_and(|k| c.text_of(k) == "foreach") {
+            return false;
+        }
+        let toks: Vec<&str> = c.toks(l).map(|t| c.text_of(t)).collect();
+        let Some(open) = toks.iter().position(|t| *t == "[") else { return false };
+        let close = toks.iter().position(|t| *t == ")").unwrap_or(toks.len());
+        toks[open..close].contains(&name)
+    })
+}
+
+// ---- SV-DED-012 ----
+
+/// One finding of SV-DED-012: tree, name token, name, scope.
+type ParamFinding = (usize, u32, String, String);
+
+/// The scope slang names a parameter's parent: the module, class, package,
+/// routine or named generate block (`genblkN` for an unnamed `if`/`case`
+/// block, `global` for loop blocks and `$unit`).
+fn param_scope(c: &Cst, n: NodeId) -> String {
+    for a in crate::g_c_support::ancestors(c, n) {
+        match c.kind(a) {
+            GenerateBlock => {
+                if c.parent(a).is_some_and(|p| c.kind(p) == LoopGenerate) {
+                    return "global".into();
+                }
+                if let Some(nm) = c.tree.child(a, Name) {
+                    return c.tree.bare_text(nm);
+                }
+                if let Some(l) = crate::g_c_support::block_label_pub(c, a) {
+                    return l;
+                }
+                let Some(p) = c.parent(a) else { return "global".into() };
+                if c.kind(p) == LoopGenerate {
+                    return "global".into();
+                }
+                // Unnamed: genblk<N>, N counting the scope's generate constructs.
+                let mut top = p;
+                while let Some(q) = c.parent(top).filter(|_| matches!(c.kind(top), IfGenerate | CaseGenerate | ElseClause)) {
+                    if matches!(c.kind(q), IfGenerate | ElseClause) {
+                        top = q;
+                    } else {
+                        break;
+                    }
+                }
+                let Some(scope) = c.parent(top) else { return "global".into() };
+                let n = kids(c, scope)
+                    .into_iter()
+                    .filter(|&k| matches!(c.kind(k), IfGenerate | CaseGenerate | LoopGenerate | GenerateRegion))
+                    .position(|k| k == top)
+                    .map_or(1, |i| i + 1);
+                return format!("genblk{n}");
+            }
+            LoopGenerate => return "global".into(),
+            ModuleDecl | InterfaceDecl | ProgramDecl | ClassDecl | PackageDecl | FunctionDecl | TaskDecl | CheckerDecl => {
+                return crate::g_c_support::last_name(c, a);
+            }
+            _ => {}
+        }
+    }
+    "global".into()
+}
+
+fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
+    thread_local! {
+        static FOUND: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<Vec<ParamFinding>>)>> = const { std::cell::RefCell::new(None) };
+    }
+    let key = c.compile_key();
+    if let Some(v) = FOUND.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
+        return v;
+    }
+    // Declarations by name: (order, tree, token, scope); the one slang
+    // visits last is where it reports.
+    let mut decls: HashMap<String, ((usize, usize, u32), usize, u32, String)> = HashMap::new();
+    let mut referenced: HashSet<String> = HashSet::new();
+    // Classes specialized where slang visits the specialization: a base
+    // class, an implemented class, a type parameter's value.
+    let mut specialized: HashSet<String> = HashSet::new();
+    for t in c.all {
+        for i in 0..t.nodes.len() {
+            let p = NodeId(i as u32);
+            let typed = match t.kind(p) {
+                Extends => true,
+                ParamDecl => t.token_range(p).iter().any(|&k| &*t.tokens[k as usize].text == "type"),
+                _ => false,
+            };
+            if !typed {
+                continue;
+            }
+            let mut types: Vec<NodeId> = t.children(p).filter(|&d| t.kind(d) == DataType).collect();
+            for x in t.children(p).filter(|&x| t.kind(x) == Declarator) {
+                types.extend(t.children(x).filter(|&d| t.kind(d) == DataType));
+            }
+            for d in types {
+                for k in t.token_range(d) {
+                    specialized.insert(t.tokens[k as usize].text.to_string());
+                }
+            }
+        }
+    }
+    for (i, t) in c.all.iter().enumerate() {
+        let own;
+        let tc = if std::ptr::eq(t, c.tree) {
+            c
+        } else {
+            own = Cst::new(t, i, sv_sema::Locator::default());
+            &own
+        };
+        let visited = |n: NodeId| crate::g_c_support::elab_copies(tc, n) != Some(0);
+        // Packages, `$unit` and classes first, then instance bodies in
+        // elaboration order.
+        let rank = |n: NodeId| {
+            crate::g_c_support::ancestors(tc, n)
+                .find(|&a| matches!(tc.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl))
+                .map_or(0, |u| 1 + crate::g_c_support::last_instance_rank(tc, &crate::g_c_support::decl_name(tc, u)).unwrap_or(0))
+        };
+        let declare = |nm: NodeId, decls: &mut HashMap<String, ((usize, usize, u32), usize, u32, String)>| {
+            let Some(tok) = tc.first_tok(nm) else { return };
+            if !visited(nm) {
+                return;
+            }
+            let name = tc.tree.bare_text(nm);
+            if name.is_empty() || name.starts_with('$') {
+                return;
+            }
+            let order = (rank(nm), i, tok);
+            let scope = param_scope(tc, nm);
+            let e = decls.entry(name).or_insert((order, i, tok, scope.clone()));
+            if order >= e.0 {
+                *e = (order, i, tok, scope);
+            }
+        };
+        // A generic class with a parameter lacking a default has no
+        // default specialization to visit.
+        let no_default = |p: NodeId| {
+            let Some(cls) = crate::g_c_support::ancestors(tc, p).find(|&a| tc.kind(a) == ClassDecl) else { return false };
+            let Some(pl) = tc.tree.child(cls, Header).and_then(|h| tc.tree.child(h, ParamList)) else { return false };
+            !specialized.contains(&crate::g_c_support::decl_name(tc, cls)) && tc.tree.children(pl).filter(|&q| tc.kind(q) == ParamDecl).any(|q| !tc.tree.token_range(q).iter().any(|&t| tc.text_of(t) == "="))
+        };
+        // `#(type A = int, B = A)`: B is a type parameter too.
+        let mut type_params: HashSet<NodeId> = HashSet::new();
+        for pl in tc.nodes(ParamList) {
+            let mut sticky = false;
+            for q in tc.tree.children(pl).filter(|&q| tc.kind(q) == ParamDecl) {
+                let toks: Vec<&str> = tc.toks(q).map(|t| tc.text_of(t)).collect();
+                if toks.contains(&"type") {
+                    sticky = true;
+                } else if toks.contains(&"parameter") || toks.contains(&"localparam") || tc.tree.child(q, DataType).is_some_and(|d| {
+                    let name = tc.tree.child(q, Name).or_else(|| tc.tree.child(q, Declarator).and_then(|x| tc.tree.child(x, Name)));
+                    tc.first_tok(d) < name.and_then(|n| tc.first_tok(n))
+                }) {
+                    sticky = false;
+                }
+                if sticky {
+                    type_params.insert(q);
+                }
+            }
+        }
+        for p in tc.nodes(ParamDecl) {
+            let toks: Vec<&str> = tc.toks(p).map(|t| tc.text_of(t)).collect();
+            if toks.contains(&"type") || toks.contains(&"specparam") || type_params.contains(&p) || no_default(p) {
+                continue;
+            }
+            let ds: Vec<NodeId> = tc.tree.children(p).filter(|&d| tc.kind(d) == Declarator).collect();
+            if ds.is_empty() {
+                if let Some(nm) = tc.tree.child(p, Name) {
+                    declare(nm, &mut decls);
+                }
+            }
+            for d in ds {
+                if let Some(nm) = tc.tree.child(d, Name) {
+                    declare(nm, &mut decls);
+                }
+            }
+        }
+        for l in tc.nodes(LoopGenerate) {
+            if let Some(nm) = tc.tree.child(l, Name) {
+                declare(nm, &mut decls);
+            }
+        }
+        // Names slang binds as values: not in types, dimensions or the
+        // headers of generate constructs (elaboration evaluates those).
+        let mut roots: HashMap<NodeId, bool> = HashMap::new();
+        for e in tc.nodes(NameExpr).into_iter().chain(tc.nodes(ScopedExpr)) {
+            if tc.kind(e) == NameExpr && tc.parent(e).is_some_and(|p| tc.kind(p) == ScopedExpr) {
+                continue;
+            }
+            let mut skip = false;
+            let mut x = e;
+            while let Some(p) = tc.parent(x) {
+                match tc.kind(p) {
+                    // Parameter values of an instantiation or a base class are bound.
+                    DataType
+                        if tc.parent(p).is_some_and(|q| {
+                            matches!(tc.kind(q), Instantiation | BindDirective | Extends)
+                                || (tc.kind(q) == ParamDecl && tc.toks(q).any(|k| tc.text_of(k) == "type"))
+                                || (tc.kind(q) == Declarator
+                                    && tc.parent(q).is_some_and(|r| tc.kind(r) == ParamDecl && tc.toks(r).any(|k| tc.text_of(k) == "type")))
+                        }) => {}
+                    DataType | Dim => {
+                        skip = true;
+                        break;
+                    }
+                    IfGenerate | CaseGenerate | LoopGenerate => {
+                        // The header, not the generated blocks.
+                        if !matches!(tc.kind(x), GenerateBlock | ElseClause) {
+                            skip = true;
+                            break;
+                        }
+                    }
+                    _ => {}
+                }
+                x = p;
+            }
+            if skip {
+                continue;
+            }
+            // Not in what elaboration skips, nor what slang could not bind.
+            if !visited(e) {
+                continue;
+            }
+            let root = crate::g_random_sema::bind_root(tc, e);
+            if !*roots.entry(root).or_insert_with(|| crate::g_random_sema::root_ok(tc, root)) || !crate::g_random_sema::no_bad_expr(tc, e) {
+                continue;
+            }
+            let name = if tc.kind(e) == ScopedExpr { tc.last_text(e).to_string() } else { tc.tree.bare_text(e) };
+            referenced.insert(name);
+        }
+    }
+    let mut out: Vec<ParamFinding> = decls
+        .into_iter()
+        .filter(|(n, _)| !referenced.contains(n) && !matches!(n.as_str(), "UVM_NONE" | "UVM_LOW" | "UVM_MEDIUM" | "UVM_HIGH" | "UVM_FULL" | "UVM_DEBUG"))
+        .map(|(n, (_, t, tok, scope))| (t, tok, n, scope))
+        .collect();
+    out.sort();
+    let v = std::rc::Rc::new(out);
+    FOUND.with(|k| *k.borrow_mut() = Some((key, v.clone())));
+    v
+}
+
+fn unreferenced_parameter(c: &Cst, out: &mut Sink) {
+    let ix = c.index();
+    for (t, tok, name, scope) in unreferenced_params(c).iter().filter(|f| f.0 == ix) {
+        let _ = t;
+        out.add(
+            "SV-DED-012",
+            "UnreferencedParameter",
+            Severity::Warning,
+            format!(
+                "Parameter '{name}' is declared in scope '{scope}' but never referenced. Unreferenced parameters complicate \
+                 module and VIP interfaces, and often indicate forgotten configuration logic or obsolete constants."
+            ),
+            c.loc(*tok),
+        );
+    }
+}
+
+// ---- SV-DED-013 / SV-DED-014 ----
+
+/// The class's declaration of method `name` (prototype or body).
+fn method_decl_in(c: &Cst, cls: NodeId, name: &str) -> Option<NodeId> {
+    kids(c, cls)
+        .into_iter()
+        .find(|&m| matches!(c.kind(m), FunctionDecl | TaskDecl | MethodPrototype) && crate::g_c_support::last_name(c, m) == name)
+}
+
+/// slang's `isVirtual()`: declared virtual (on the body or its
+/// prototype), or overriding a virtual method of a base class.
+fn routine_is_virtual(c: &Cst, r: NodeId) -> bool {
+    use crate::g_c_support::{class_chain, enclosing_class, has_kw, last_name};
+    if has_kw(c, r, "virtual") {
+        return true;
+    }
+    let Some(cls) = enclosing_class(c, r) else { return false };
+    if !crate::g_c_support::ancestors(c, r).any(|a| a == cls) && c.kind(r) != MethodPrototype {
+        // Out of block: the prototype says.
+        let name = last_name(c, r);
+        if method_decl_in(c, cls, &name).is_some_and(|p| has_kw(c, p, "virtual")) {
+            return true;
+        }
+    }
+    let name = last_name(c, r);
+    class_chain(c, cls).into_iter().skip(1).any(|b| method_decl_in(c, b, &name).is_some_and(|m| has_kw(c, m, "virtual")))
+}
+
+fn unused_routine_argument(c: &Cst, out: &mut Sink) {
+    for (r, n) in crate::g_c_support::user_routines(c) {
+        let name = crate::g_c_support::last_name(c, r);
+        if name.ends_with("_phase") || routine_is_virtual(c, r) {
+            continue;
+        }
+        let Some(body) = c.tree.child(r, Body) else { continue };
+        let Some(pl) = c.tree.child(r, PortList) else { continue };
+        let args: Vec<(NodeId, NodeId)> = c
+            .tree
+            .children(pl)
+            .filter(|&p| c.kind(p) == Port)
+            .flat_map(|p| c.tree.children(p).filter(|&d| c.kind(d) == Declarator).collect::<Vec<_>>())
+            .filter_map(|d| c.tree.child(d, Name).map(|nm| (d, nm)))
+            .collect();
+        if args.is_empty() || crate::g_design_class::count_statements(c, body) == 0 {
+            continue;
+        }
+        // A body slang cannot bind has no statements.
+        let Some(used) = body_refs_if_good(c, body) else { continue };
+        for (d, nm) in args {
+            let a = c.tree.bare_text(nm);
+            if a.is_empty() || a.starts_with('_') || a.starts_with("unused") || used.contains(&d) {
+                continue;
+            }
+            let Some(loc) = c.first_tok(nm).map(|t| c.loc(t)) else { continue };
+            for _ in 0..n {
+                out.add(
+                    "SV-DED-013",
+                    "UnusedRoutineArgument",
+                    Severity::Info,
+                    format!("Argument '{a}' of '{name}' is never used. Remove it, or use it if the caller expects it to have an effect."),
+                    loc,
+                );
+            }
+        }
+    }
+}
+
+fn unused_local_method(c: &Cst, out: &mut Sink) {
+    use crate::g_c_support::{class_methods, decl_name, enclosing_class, has_kw, last_name, user_classes};
+    for cls in user_classes(c) {
+        let methods = class_methods(c, cls);
+        let cname = decl_name(c, cls);
+        for &t in &methods {
+            let name = last_name(c, t);
+            let proto = method_decl_in(c, cls, &name);
+            let local = has_kw(c, t, "local") || proto.is_some_and(|p| has_kw(c, p, "local"));
+            if !local || name == "new" || routine_is_virtual(c, t) {
+                continue;
+            }
+            let Some(body) = c.tree.child(t, Body) else { continue };
+            if crate::g_design_class::count_statements(c, body) == 0 || body_refs_if_good(c, body).is_none() {
+                continue;
+            }
+            let used = methods.iter().filter(|&&m| m != t).any(|&m| {
+                let Some(b) = c.tree.child(m, Body) else { return false };
+                if body_refs_if_good(c, b).is_none() {
+                    return false;
+                }
+                body_calls(c, b).into_iter().any(|call| {
+                    crate::g_c_support::callee_decl(c, call).is_some_and(|d| {
+                        last_name(c, d) == name && enclosing_class(c, d).is_some_and(|k| k == cls)
+                    })
+                })
+            });
+            if used {
+                continue;
+            }
+            let Some(nm) = c.tree.child(t, Name) else { continue };
+            let Some(loc) = c.tree.token_bounds(nm).map(|(_, b)| c.loc(b)) else { continue };
+            out.add(
+                "SV-DED-014",
+                "UnusedLocalMethod",
+                Severity::Warning,
+                format!(
+                    "Local method '{cname}::{name}' has no caller in the class. Remove it, or call it from the method that should use it."
+                ),
+                loc,
+            );
+        }
+    }
+}
+
+/// The calls slang's visit of a body sees (see [`body_refs`]).
+fn body_calls(c: &Cst, body: NodeId) -> Vec<NodeId> {
+    crate::g_c_support::subtree(c, body)
+        .into_iter()
+        .filter(|&x| c.kind(x) == CallExpr)
+        .filter(|&x| !crate::g_c_support::ancestors(c, x).take_while(|&a| a != body).any(|a| c.kind(a) == Declarator))
+        .filter(|&x| !crate::g_concurrency::is_system_call(c, x))
+        .collect()
 }
