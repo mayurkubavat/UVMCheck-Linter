@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 353);
+    assert_eq!(r.len(), 355);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 353);
+    assert_eq!(ids.len(), 355);
 }
 
 #[test]
@@ -674,4 +674,21 @@ fn literal_per_generate_copy() {
     let mut lines = rule_lines(src, "SV-STY-010");
     lines.sort();
     assert_eq!(lines, vec![3, 3, 6, 6, 6, 6, 12]);
+}
+
+#[test]
+fn error_reporting_rules() {
+    let src = "class uvm_report_catcher; endclass\n\
+               class uvm_scoreboard; endclass\n\
+               class demote extends uvm_report_catcher;\n\
+               function int catch(); set_severity(UVM_INFO); return 0; endfunction\n\
+               endclass\n\
+               class quiet_sb extends uvm_scoreboard;\n\
+               function void check(); endfunction\n\
+               endclass\n\
+               class loud_sb extends uvm_scoreboard;\n\
+               function void check(); uvm_report_error(\"X\", \"bad\"); endfunction\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "UVM-REP-006"), vec![4]);
+    assert_eq!(rule_lines(src, "UVM-TST-001"), vec![6]);
 }

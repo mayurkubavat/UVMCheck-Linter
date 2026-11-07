@@ -20,6 +20,7 @@ mod g_design_types;
 mod g_bug;
 mod g_lang;
 mod g_port;
+mod g_port2;
 mod waivers;
 mod g_c_support;
 mod g_concurrency;
@@ -271,6 +272,7 @@ pub fn rules() -> Vec<Rule> {
     v.extend(g_bug::rules());
     v.extend(g_lang::rules());
     v.extend(g_port::rules());
+    v.extend(g_port2::rules());
     v.sort_by_key(|r| r.id);
     v
 }
