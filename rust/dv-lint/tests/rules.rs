@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 366);
+    assert_eq!(r.len(), 367);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 366);
+    assert_eq!(ids.len(), 367);
 }
 
 #[test]
@@ -861,4 +861,21 @@ fn naming_engine() {
     assert_eq!(rule_lines(src, "SV-NAM-107"), vec![12]);
     assert_eq!(rule_lines(src, "SV-NAM-110"), vec![14]);
     assert!(rule_lines(src, "SV-NAM-111").is_empty());
+}
+
+#[test]
+fn queue_concat_append() {
+    let src = "typedef int iq_t[$];\n\
+               class c #(type T = int);\n\
+               int q[$]; iq_t r; int a[4]; int x;\n\
+               function void f();\n\
+               q = {q, x};\n\
+               r = {x, r};\n\
+               a = {a[1:3], x};\n\
+               q = {q, x, x};\n\
+               endfunction\n\
+               endclass\n\
+               class u; c#(byte) b; endclass\n";
+    // Once per specialization: the default one and c#(byte).
+    assert_eq!(rule_lines(src, "SV-PRF-007"), vec![5, 5, 6, 6]);
 }

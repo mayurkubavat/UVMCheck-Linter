@@ -502,7 +502,7 @@ fn expr_class(c: &Cst, e: NodeId) -> Option<NodeId> {
     }
 }
 
-fn expr_decl(c: &Cst, e: NodeId) -> Option<Decl> {
+pub(crate) fn expr_decl(c: &Cst, e: NodeId) -> Option<Decl> {
     match c.kind(e) {
         NameExpr => {
             if !kids(c, e).is_empty() || c.toks(e).count() != 1 {
