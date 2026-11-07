@@ -416,6 +416,10 @@ fn is_queue(c: &Cst, d: &crate::g_c_support::Decl) -> bool {
 pub(crate) fn ast_visits(c: &Cst, n: NodeId) -> usize {
     let anc: Vec<NodeId> = crate::g_c_support::ancestors(c, n).collect();
     if anc.iter().any(|&a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl)) {
+        // The elaborated copies: generate loops unrolled per instance.
+        if let Some(m) = crate::g_c_support::elab_copies(c, n) {
+            return m;
+        }
         return crate::g_c_support::times(c, n);
     }
     anc.iter().filter(|&&a| c.kind(a) == ClassDecl).map(|&a| c.spec_count(a).unwrap_or(1)).product()

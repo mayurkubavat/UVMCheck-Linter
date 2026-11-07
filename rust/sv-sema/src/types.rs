@@ -281,7 +281,7 @@ impl CVal {
     }
 }
 
-const INT_TYPES: [&str; 9] = [
+pub(crate) const INT_TYPES: [&str; 9] = [
     "bit", "logic", "reg", "int", "integer", "byte", "shortint", "longint", "time",
 ];
 
@@ -432,7 +432,7 @@ impl<'t> Builder<'t> {
         self.lookup_type(dt, scope)
     }
 
-    fn lookup_type(&self, dt: NodeRef, scope: usize) -> Option<Found> {
+    pub(crate) fn lookup_type(&self, dt: NodeRef, scope: usize) -> Option<Found> {
         let toks = self.toks_of(dt);
         let path: Vec<&str> = toks
             .iter()
@@ -467,25 +467,36 @@ impl<'t> Builder<'t> {
 
     /// A named constant seen from `scope`: a parameter or localparam, with
     /// type parameters' and value parameters' bindings from `env`.
+    fn const_value(&self, name: &str, s: usize, dt: Option<NodeRef>, val: Option<NodeRef>, env: &Env, depth: usize) -> Option<CVal> {
+        let v = match (env.get(name), self.scopes[s].kind) {
+            (Some(b), ScopeKind::Class(_)) => self.eval(b.node, b.scope, &b.env, depth + 1)?,
+            _ => match dt {
+                Some(d) => return self.eval_typed(val?, packed::Ty::of(d, s), s, env, depth + 1),
+                None => self.eval(val?, s, env, depth + 1)?,
+            },
+        };
+        Some(match dt.and_then(|d| self.int_shape(d, s, env, depth + 1)) {
+            Some((w, sg)) => v.cast(w, sg),
+            None => v,
+        })
+    }
+
     fn const_named(&self, name: &str, scope: usize, env: &Env, depth: usize) -> Option<CVal> {
         let mut cur = Some(scope);
         while let Some(s) = cur {
             if let Some(&(dt, val)) = self.scopes[s].consts.get(name) {
-                let v = match (env.get(name), self.scopes[s].kind) {
-                    (Some(b), ScopeKind::Class(_)) => {
-                        self.eval(b.node, b.scope, &b.env, depth + 1)?
+                // Outside a specialization the value is the scope's own.
+                let plain = env.is_empty() && !matches!(self.scopes[s].kind, ScopeKind::Class(_));
+                if plain {
+                    if let Some(v) = self.const_cache.borrow().get(&(s, name.to_string())) {
+                        return v.clone();
                     }
-                    _ => match dt {
-                        Some(d) => return self.eval_typed(val?, packed::Ty::of(d, s), s, env, depth + 1),
-                        None => self.eval(val?, s, env, depth + 1)?,
-                    },
-                };
-                return Some(
-                    match dt.and_then(|d| self.int_shape(d, s, env, depth + 1)) {
-                        Some((w, sg)) => v.cast(w, sg),
-                        None => v,
-                    },
-                );
+                }
+                let v = self.const_value(name, s, dt, val, env, depth);
+                if plain {
+                    self.const_cache.borrow_mut().insert((s, name.to_string()), v.clone());
+                }
+                return v;
             }
             if let ScopeKind::Class(c) = self.scopes[s].kind {
                 // Inherited parameters.
@@ -530,6 +541,37 @@ impl<'t> Builder<'t> {
             }
             if let Some(v) = self.enum_in(name, s, depth) {
                 return Some(v);
+            }
+            cur = self.scopes[s].parent;
+        }
+        None
+    }
+
+    /// The enum typedef (and its scope) that declares member `name`, seen
+    /// from `scope`.
+    pub(crate) fn enum_typedef(&self, name: &str, scope: usize) -> Option<(NodeRef, usize)> {
+        let own = |s: usize| {
+            self.scopes[s].typedefs.values().copied().find(|&t| {
+                self.child(t, DataType).is_some_and(|dt| {
+                    self.own_tokens(dt).first() == Some(&"enum")
+                        && self.children(dt).into_iter().any(|d| self.kind(d) == Declarator && self.name_of(d).is_some_and(|n| n.0 == name))
+                })
+            })
+        };
+        let mut cur = Some(scope);
+        while let Some(s) = cur {
+            for (pkg, item) in &self.scopes[s].imports {
+                if item.as_deref().is_some_and(|i| i != name) {
+                    continue;
+                }
+                if let Some(&p) = self.packages.get(pkg) {
+                    if let Some(t) = own(p) {
+                        return Some((t, p));
+                    }
+                }
+            }
+            if let Some(t) = own(s) {
+                return Some((t, s));
             }
             cur = self.scopes[s].parent;
         }

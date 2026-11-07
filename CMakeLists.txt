@@ -351,3 +351,6 @@ add_executable(uvmcheck_sym_dump tools/sym_dump.cpp)
 target_link_libraries(uvmcheck_sym_dump PRIVATE slang::slang)
 add_executable(uvmcheck_cst_exprs tools/cst_exprs.cpp)
 target_link_libraries(uvmcheck_cst_exprs PRIVATE slang::slang)
+# Reference expression types, for checking dv-lint's typer (tools/expr_gate.py).
+add_executable(uvmcheck_exprdump tools/exprdump.cpp)
+target_link_libraries(uvmcheck_exprdump PRIVATE slang::slang)

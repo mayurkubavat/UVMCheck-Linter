@@ -113,16 +113,7 @@ impl Builder<'_> {
     /// The scope a declaration sits in.
     fn decl_scope(&self, decl: NodeRef) -> Option<usize> {
         let t = self.tree(decl);
-        let parent = {
-            let mut p = None;
-            for n in t.preorder() {
-                if t.children(n).any(|c| c == decl.node) {
-                    p = Some(n);
-                    break;
-                }
-            }
-            p?
-        };
+        let parent = self.parent_node(decl)?;
         let pr = NodeRef { tree: decl.tree, node: parent };
         if parent == t.root {
             return Some(self.unit);
@@ -524,15 +515,27 @@ impl Builder<'_> {
     fn decl_of_const(&self, name: &str, s: usize) -> Option<NodeRef> {
         let (_, val) = *self.scopes[s].consts.get(name)?;
         let val = val?;
-        let t = self.tree(val);
-        let mut found = None;
-        for n in t.preorder() {
-            if t.children(n).any(|c| c == val.node) {
-                found = Some(NodeRef { tree: val.tree, node: n });
-                break;
-            }
-        }
-        found
+        Some(NodeRef { tree: val.tree, node: self.parent_node(val)? })
+    }
+
+    /// The node `n` is a child of.
+    fn parent_node(&self, n: NodeRef) -> Option<sv_syntax::NodeId> {
+        let all = self.parent_of.get_or_init(|| {
+            self.trees
+                .iter()
+                .map(|t| {
+                    let mut parent = vec![u32::MAX; t.nodes.len()];
+                    for p in t.preorder() {
+                        for c in t.children(p) {
+                            parent[c.0 as usize] = p.0;
+                        }
+                    }
+                    parent
+                })
+                .collect()
+        });
+        let p = *all.get(n.tree)?.get(n.node.0 as usize)?;
+        (p != u32::MAX).then_some(sv_syntax::NodeId(p))
     }
 }
 

@@ -10,6 +10,7 @@ fn main() {
     let mut slang = false;
     let mut time = false;
     let mut specs = false;
+    let mut exprs = false;
     let mut only: Vec<String> = Vec::new();
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
@@ -18,6 +19,8 @@ fn main() {
             "--slang" => slang = true,
             "--time" => time = true,
             "--specs" => specs = true,
+            // Each expression's type, as tools/exprdump.cpp prints slang's.
+            "--exprs" => exprs = true,
             "--rule" => only.extend(it.next()),
             // The design's tops, as slang's --top: modules no top reaches
             // are not elaborated.
@@ -50,6 +53,12 @@ fn main() {
             std::process::exit(2);
         }
     };
+    if exprs {
+        for l in dv_lint::g_exprty::expr_dump(design.files().to_vec(), &trees) {
+            println!("{l}");
+        }
+        return;
+    }
     if specs {
         // How often the AST walk visits each generic class (`name@file:line`).
         for l in dv_lint::spec_report(&design, &trees) {

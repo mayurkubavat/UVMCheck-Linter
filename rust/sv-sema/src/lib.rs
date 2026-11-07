@@ -37,6 +37,7 @@ pub mod sva;
 pub mod udp;
 pub mod typed;
 mod types;
+pub mod oracle;
 use SyntaxKind::*;
 
 /// Loads and models a design from compile options, as `Design::load` does.
@@ -635,6 +636,10 @@ struct Builder<'t> {
     rep_env: HashMap<usize, Env>,
     /// Set while [`Self::class_key`] prints: class types print canonically.
     keying: std::cell::Cell<bool>,
+    /// Each node's parent, per tree, built on first use.
+    parent_of: std::cell::OnceCell<Vec<Vec<u32>>>,
+    /// Values of parameters outside class specializations, by scope.
+    const_cache: std::cell::RefCell<HashMap<(usize, String), Option<types::CVal>>>,
     /// Typedefs declared in blocks and routines, by name: tree, the
     /// block's token bounds, the declaration's first token, the decl.
     block_typedefs: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>>,
@@ -656,6 +661,9 @@ struct Builder<'t> {
     /// Also make scopes for modules, interfaces and programs (the builder's
     /// typing, phase N2); the class model leaves them out.
     designs: bool,
+    /// Also take the localparams of generate blocks as their design's
+    /// (the first of a name; for typing expressions in them).
+    block_consts: bool,
     /// Locals of the constant functions being run (see `consteval`).
     frames: std::cell::RefCell<Vec<HashMap<String, types::CVal>>>,
     /// The declared types of those locals (with "" for the return value).
@@ -694,6 +702,8 @@ impl<'t> Builder<'t> {
             interfaces: HashMap::new(),
             rep_env: HashMap::new(),
             keying: Default::default(),
+            parent_of: Default::default(),
+            const_cache: Default::default(),
             block_typedefs: HashMap::new(),
             spec_counts: HashMap::new(),
             spec_sets: HashMap::new(),
@@ -704,6 +714,7 @@ impl<'t> Builder<'t> {
             chain_cache: Default::default(),
             decl_cache: Default::default(),
             designs: false,
+            block_consts: false,
             frames: Default::default(),
             ftypes: Default::default(),
             invalid: Default::default(),
@@ -880,6 +891,9 @@ impl<'t> Builder<'t> {
                     self.collect_scope(c, s);
                 }
                 GenerateRegion if self.designs => self.collect_scope(c, scope),
+                IfGenerate | LoopGenerate | CaseGenerate | GenerateBlock | ElseClause if self.designs && self.block_consts => {
+                    self.collect_block_consts(c, scope)
+                }
                 TypedefDecl => {
                     if let Some((name, _)) = self.name_of(c) {
                         self.scopes[scope].typedefs.insert(name, c);
@@ -933,6 +947,27 @@ impl<'t> Builder<'t> {
     }
 
     /// `#(parameter type T = int, U = bit, int N = 1)` of a design unit.
+    fn collect_block_consts(&mut self, r: NodeRef, scope: usize) {
+        for c in self.children(r) {
+            match self.kind(c) {
+                IfGenerate | LoopGenerate | CaseGenerate | GenerateBlock | ElseClause | GenerateRegion => {
+                    self.collect_block_consts(c, scope)
+                }
+                ParamDecl if !self.own_tokens(c).contains(&"type") => {
+                    let fresh = self
+                        .children(c)
+                        .into_iter()
+                        .filter(|d| self.kind(*d) == Declarator)
+                        .all(|d| self.name_of(d).is_some_and(|n| !self.scopes[scope].consts.contains_key(&n.0)));
+                    if fresh {
+                        self.collect_consts(c, scope);
+                    }
+                }
+                _ => {}
+            }
+        }
+    }
+
     fn collect_design_params(&mut self, pl: NodeRef, s: usize) {
         let mut ty = false;
         for p in self.children(pl) {
