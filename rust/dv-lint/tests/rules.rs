@@ -20,10 +20,10 @@ const MOCK: &str = "class uvm_object; function new(string name = \"\"); endfunct
 #[test]
 fn rules_have_unique_ids() {
     let r = rules();
-    assert_eq!(r.len(), 356);
+    assert_eq!(r.len(), 359);
     let mut ids: Vec<_> = r.iter().map(|r| r.id).collect();
     ids.dedup();
-    assert_eq!(ids.len(), 356);
+    assert_eq!(ids.len(), 359);
 }
 
 #[test]
@@ -705,4 +705,45 @@ fn failure_not_reported() {
                endfunction\n\
                endclass\n";
     assert_eq!(rule_lines(src, "SV-ERR-001"), vec![5, 7]);
+}
+
+#[test]
+fn use_after_failed_null_check() {
+    let src = "class item; int d; endclass\n\
+               class c;\n\
+               item a, b; int x;\n\
+               function void f(item o);\n\
+               if (a == null) $display(\"no a\");\n\
+               x = a.d;\n\
+               if (b == null) b = new();\n\
+               x = b.d;\n\
+               if (!$cast(a, o)) $display(\"bad\");\n\
+               if (a.randomize()) x = a.d;\n\
+               endfunction\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-ERR-002"), vec![6, 10]);
+}
+
+#[test]
+fn assoc_mutating_read() {
+    let src = "class c;\n\
+               int s[int]; int q[$];\n\
+               function void f(int k);\n\
+               if (s[k] == 1) ;\n\
+               if (q[0] == 1) ;\n\
+               if (s.exists(k)) ;\n\
+               endfunction\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-ASC-001"), vec![4]);
+}
+
+#[test]
+fn clocking_output_read() {
+    let src = "interface bi(input logic clk); logic d, i;\n\
+               clocking cb @(posedge clk); output d; input i; endclocking\n\
+               endinterface\n\
+               class c; virtual bi vif; int x;\n\
+               task t(); x = vif.cb.i; x = vif.cb.d + 1; endtask\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-CB-001"), vec![5, 5]);
 }

@@ -19,6 +19,9 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "UVM-REP-006", name: "BlanketErrorDemotion", check: Mixed(blanket_error_demotion) },
         Rule { id: "UVM-TST-001", name: "CheckerCannotFail", check: Mixed(checker_cannot_fail) },
         Rule { id: "SV-ERR-001", name: "FailureNotReported", check: Syntax(failure_not_reported) },
+        Rule { id: "SV-ERR-002", name: "UseAfterFailedNullCheck", check: Syntax(use_after_failed_null_check) },
+        Rule { id: "SV-ASC-001", name: "AssociativeArrayMutatingRead", check: Syntax(assoc_mutating_read) },
+        Rule { id: "SV-CB-001", name: "ClockingBlockOutputReadSkew", check: Syntax(clocking_output_read) },
     ]
 }
 
@@ -414,6 +417,514 @@ failure explicitly.",
                 ),
                 c.loc_of(st),
             );
+        }
+    }
+}
+
+// ---- SV-ERR-002 ----
+
+use crate::g_c_support::{call_parts, class_member, expr_type, find_class, kids, lookup, user_routines, Decl};
+use crate::g_concurrency::{assign_lhs, call_args, items, start, PathHooks, Walker};
+
+/// What a type name names: a class (its declaration, when in the tree), or
+/// another handle type (virtual interface, built-in class). Follows type
+/// parameters (their default) and typedefs.
+enum HandleTy {
+    Class(NodeId),
+    Other,
+}
+
+fn handle_type(c: &Cst, dtype: NodeId, ctx: Option<NodeId>, depth: u32) -> Option<HandleTy> {
+    let t = c.text_of(c.first_tok(dtype)?);
+    if t == "virtual" || matches!(t, "mailbox" | "semaphore" | "process") {
+        return Some(HandleTy::Other);
+    }
+    if let Some(k) = find_class(c, t, dtype) {
+        return Some(HandleTy::Class(k));
+    }
+    if depth > 8 {
+        return None;
+    }
+    if let Some(d) = lookup(c, dtype, t) {
+        if d.kind != crate::g_c_support::DeclKind::Parameter || c.kind(d.node) != ParamDecl {
+            return None;
+        }
+        if let Some((arg, x)) = ctx.and_then(|e| param_override(c, d.node, t, e)) {
+            return handle_type(c, arg, Some(x), depth + 1);
+        }
+        // `type T = cls`: the default type.
+        let toks = c.tree.token_range(d.node);
+        let eq = *toks.iter().find(|&&x| c.text_of(x) == "=")?;
+        let dt = kids(c, d.node).into_iter().find(|&k| c.kind(k) == DataType && c.first_tok(k).is_some_and(|f| f > eq))?;
+        return handle_type(c, dt, ctx, depth + 1);
+    }
+    let td = c.nodes(TypedefDecl).into_iter().find(|&td| c.tree.child(td, Name).is_some_and(|x| c.tree.bare_text(x) == t))?;
+    let dt = c.tree.child(td, DataType)?;
+    handle_type(c, dt, ctx, depth + 1)
+}
+
+/// The type a class below `ctx`'s chain passes for type parameter `name`
+/// (declared at `param`) of its base, with the class that passes it.
+fn param_override(c: &Cst, param: NodeId, name: &str, ctx: NodeId) -> Option<(NodeId, NodeId)> {
+    let owner = crate::g_c_support::enclosing_class(c, param)?;
+    let chain = crate::g_c_support::class_chain(c, ctx);
+    let i = chain.iter().position(|&k| k == owner)?;
+    let x = *chain.get(i.checked_sub(1)?)?;
+    let ext = c.tree.child(c.tree.child(x, Header)?, Extends)?;
+    let pl = c.tree.child(c.tree.child(ext, DataType)?, ParamList)?;
+    let al = c.tree.child(pl, ArgList)?;
+    let args: Vec<NodeId> = c.tree.children(al).filter(|&a| c.kind(a) == Arg).collect();
+    let named = |a: NodeId| {
+        let t: Vec<&str> = c.toks(a).map(|t| c.text_of(t)).collect();
+        if t.first() == Some(&".") { t.get(1).copied() } else { None }
+    };
+    let arg = if args.iter().any(|&a| named(a).is_some()) {
+        *args.iter().find(|&&a| named(a) == Some(name))?
+    } else {
+        let opl = c.tree.child(c.tree.child(owner, Header)?, ParamList)?;
+        let ix = c.tree.children(opl).filter(|&p| c.kind(p) == ParamDecl).position(|p| p == param)?;
+        *args.get(ix)?
+    };
+    Some((kids(c, arg).last().copied()?, x))
+}
+
+/// The class an expression's type names (through type parameters).
+fn expr_class(c: &Cst, e: NodeId) -> Option<NodeId> {
+    let d = expr_decl(c, e)?;
+    match handle_type(c, d.dtype?, crate::g_c_support::enclosing_class(c, e), 0)? {
+        HandleTy::Class(k) => Some(k),
+        HandleTy::Other => None,
+    }
+}
+
+fn expr_decl(c: &Cst, e: NodeId) -> Option<Decl> {
+    match c.kind(e) {
+        NameExpr => {
+            if !kids(c, e).is_empty() || c.toks(e).count() != 1 {
+                return None;
+            }
+            let name = c.text_of(c.first_tok(e)?);
+            if matches!(name, "this" | "super" | "null") {
+                return None;
+            }
+            lookup(c, e, name)
+        }
+        MemberExpr => {
+            let base = *kids(c, e).first()?;
+            let member = c.last_text(e).to_string();
+            let cls = match c.kind(base) {
+                NameExpr if c.tree.bare_text(base) == "this" => crate::g_c_support::enclosing_class(c, e)?,
+                _ => expr_class(c, base).or_else(|| expr_type(c, base).and_then(|t| find_class(c, &t, e)))?,
+            };
+            class_member(c, cls, &member)
+        }
+        ParenExpr => expr_decl(c, *kids(c, e).first()?),
+        _ => None,
+    }
+}
+
+/// The declaration a handle-typed name or member access refers to.
+fn tracked(c: &Cst, e: NodeId) -> Option<(u32, String)> {
+    let mut e = e;
+    while c.kind(e) == ParenExpr {
+        e = *kids(c, e).first()?;
+    }
+    if !matches!(c.kind(e), NameExpr | MemberExpr) {
+        return None;
+    }
+    let d = expr_decl(c, e)?;
+    handle_type(c, d.dtype?, crate::g_c_support::enclosing_class(c, e), 0)?;
+    let name = if c.kind(e) == MemberExpr { c.last_text(e).to_string() } else { c.tree.bare_text(e) };
+    Some((d.node.0, name))
+}
+
+fn is_null(c: &Cst, e: NodeId) -> bool {
+    let mut e = e;
+    while c.kind(e) == ParenExpr {
+        match kids(c, e).first() {
+            Some(&x) => e = x,
+            None => return false,
+        }
+    }
+    matches!(c.kind(e), NameExpr | Literal) && c.tree.bare_text(e) == "null"
+}
+
+/// The handle a failing `$cast` or `uvm_config_db::get` leaves unset.
+fn failed_call_target(c: &Cst, e: NodeId) -> Option<(u32, String)> {
+    if c.kind(e) != CallExpr {
+        return None;
+    }
+    let (_, n, _) = call_parts(c, e)?;
+    let args = call_args(c, e);
+    let target = if n == "$cast" {
+        *args.first()?
+    } else if n == "get" && args.len() == 4 && c.tree.bare_text(e).contains("uvm_config_db") {
+        args[3]
+    } else {
+        return None;
+    };
+    tracked(c, target)
+}
+
+/// Handles known null on a path, with the line of the check.
+#[derive(Clone)]
+struct NullSet(Vec<(u32, String, u32)>);
+
+impl PartialEq for NullSet {
+    fn eq(&self, o: &Self) -> bool {
+        self.0.len() == o.0.len() && self.0.iter().all(|a| o.0.iter().any(|b| b.0 == a.0))
+    }
+}
+
+impl NullSet {
+    fn add(&mut self, s: (u32, String), line: u32) {
+        if !self.0.iter().any(|x| x.0 == s.0) {
+            self.0.push((s.0, s.1, line));
+        }
+    }
+    fn remove(&mut self, k: u32) {
+        self.0.retain(|x| x.0 != k);
+    }
+}
+
+struct NullHooks<'c, 't> {
+    c: &'c Cst<'t>,
+    reported: HashSet<NodeId>,
+    found: Vec<(String, u32, NodeId)>,
+}
+
+impl NullHooks<'_, '_> {
+    /// slang's AST visit of a statement: member accesses and method calls
+    /// on a null handle are uses; an assignment to a handle kills it.
+    fn scan(&self, n: NodeId, st: &NullSet, uses: &mut Vec<(u32, NodeId)>, kills: &mut Vec<u32>) {
+        let c = self.c;
+        if let Some(l) = assign_lhs(c, n) {
+            if let Some((k, _)) = tracked(c, l) {
+                kills.push(k);
+                if let Some(&r) = kids(c, n).get(1) {
+                    self.scan(r, st, uses, kills);
+                }
+                return;
+            }
+        }
+        // Built-in methods (`randomize`) are system calls with no `this`.
+        let system_callee = c.parent(n).is_some_and(|p| {
+            c.kind(p) == CallExpr
+                && kids(c, p).first() == Some(&n)
+                && matches!(c.last_text(n), "randomize" | "srandom" | "get_randstate" | "set_randstate" | "rand_mode" | "constraint_mode")
+        });
+        if c.kind(n) == MemberExpr && !system_callee {
+            if let Some(&b) = kids(c, n).first() {
+                if let Some((k, _)) = tracked(c, b) {
+                    if st.0.iter().any(|x| x.0 == k) {
+                        uses.push((k, n));
+                    }
+                }
+            }
+        }
+        for k in kids(c, n) {
+            self.scan(k, st, uses, kills);
+        }
+    }
+
+    fn line(&self, n: NodeId) -> u32 {
+        start(self.c, n).map_or(0, |l| match l.expansion {
+            Some((_, line)) => line,
+            None => l.line,
+        })
+    }
+}
+
+impl<'c, 't> PathHooks<'c, 't> for NullHooks<'c, 't> {
+    type St = NullSet;
+
+    fn cst(&self) -> &'c Cst<'t> {
+        self.c
+    }
+
+    fn leaf(&mut self, s: NodeId, st: &mut NullSet) {
+        // slang's visit of a variable declaration statement skips its
+        // initializer.
+        if st.0.is_empty() || self.c.kind(s) == DataDecl {
+            return;
+        }
+        let (mut uses, mut kills) = (Vec::new(), Vec::new());
+        self.scan(s, st, &mut uses, &mut kills);
+        for (k, at) in uses {
+            let Some(i) = st.0.iter().position(|x| x.0 == k) else { continue };
+            if self.reported.insert(at) {
+                self.found.push((st.0[i].1.clone(), st.0[i].2, at));
+            }
+            st.0.remove(i);
+        }
+        for k in kills {
+            st.remove(k);
+        }
+    }
+
+    fn branch(&mut self, cond: NodeId, taken: bool, st: &mut NullSet) {
+        let c = self.c;
+        let mut e = cond;
+        let mut negated = false;
+        loop {
+            match c.kind(e) {
+                ParenExpr => e = match kids(c, e).first() {
+                    Some(&x) => x,
+                    None => return,
+                },
+                PrefixExpr if !negated && c.keyword(e).is_some_and(|k| c.text_of(k) == "!") => {
+                    negated = true;
+                    e = match kids(c, e).first() {
+                        Some(&x) => x,
+                        None => return,
+                    };
+                }
+                _ => break,
+            }
+        }
+        if c.kind(e) == BinaryExpr {
+            let op = c.keyword(e).map_or("", |k| c.text_of(k));
+            let eq = op == "==" || op == "===";
+            let ne = op == "!=" || op == "!==";
+            if !eq && !ne {
+                return;
+            }
+            let k = kids(c, e);
+            if k.len() != 2 {
+                return;
+            }
+            let side = if is_null(c, k[1]) {
+                k[0]
+            } else if is_null(c, k[0]) {
+                k[1]
+            } else {
+                return;
+            };
+            let Some(s) = tracked(c, side) else { return };
+            if (eq == taken) != negated {
+                let line = self.line(cond);
+                st.add(s, line);
+            } else {
+                st.remove(s.0);
+            }
+            return;
+        }
+        if negated {
+            if let Some(s) = failed_call_target(c, e) {
+                if taken {
+                    let line = self.line(cond);
+                    st.add(s, line);
+                } else {
+                    st.remove(s.0);
+                }
+            }
+        }
+    }
+
+    fn returned(&mut self, _s: NodeId, _st: &NullSet) {}
+}
+
+fn use_after_failed_null_check(c: &Cst, out: &mut Sink) {
+    for (r, n) in user_routines(c) {
+        let Some(body) = c.tree.child(r, Body) else { continue };
+        let mut hooks = NullHooks { c, reported: HashSet::new(), found: Vec::new() };
+        {
+            let mut w = Walker { h: &mut hooks };
+            let it = items(c, body);
+            w.list(&it, vec![NullSet(Vec::new())]);
+        }
+        for (name, line, at) in hooks.found {
+            let Some(loc) = start(c, at) else { continue };
+            for _ in 0..n {
+                out.add(
+                    "SV-ERR-002",
+                    "UseAfterFailedNullCheck",
+                    Severity::Error,
+                    format!(
+                        "'{name}' is null on this path: the check at line {line} found it null but execution continued \
+                         (`uvm_error does not stop the test). This dereference then crashes the simulator. Use `uvm_fatal, \
+                         return, or assign a default before the use."
+                    ),
+                    loc,
+                );
+            }
+        }
+    }
+}
+
+// ---- SV-ASC-001 ----
+
+/// Names declared anywhere in the compile with an unpacked dimension that
+/// reads like an associative index (`[int]`, `[*]`; also `[4]`, as the
+/// C++ rule's text test has it).
+fn assoc_names(c: &Cst) -> std::rc::Rc<HashSet<String>> {
+    thread_local! {
+        static NAMES: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<HashSet<String>>)>> = const { std::cell::RefCell::new(None) };
+    }
+    let key = (c.all.as_ptr() as usize, c.all.len());
+    if let Some(v) = NAMES.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
+        return v;
+    }
+    let mut out = HashSet::new();
+    for t in c.all {
+        for i in 0..t.nodes.len() {
+            let d = NodeId(i as u32);
+            if t.kind(d) != Declarator {
+                continue;
+            }
+            let assoc = t.children(d).filter(|&k| t.kind(k) == Dim).any(|k| {
+                let text = t.bare_text(k);
+                let text = text.trim();
+                text.len() >= 3
+                    && text.starts_with('[')
+                    && text.ends_with(']')
+                    && !text.contains(':')
+                    && !text.contains('$')
+                    && !text[1..text.len() - 1].trim().is_empty()
+            });
+            if assoc {
+                if let Some(nm) = t.child(d, Name) {
+                    let name = t.bare_text(nm);
+                    if !name.is_empty() {
+                        out.insert(name);
+                    }
+                }
+            }
+        }
+    }
+    let v = std::rc::Rc::new(out);
+    NAMES.with(|k| *k.borrow_mut() = Some((key, v.clone())));
+    v
+}
+
+fn assoc_mutating_read(c: &Cst, out: &mut Sink) {
+    let names = assoc_names(c);
+    if names.is_empty() {
+        return;
+    }
+    for e in c.nodes(BinaryExpr) {
+        let op = c.keyword(e).map_or("", |k| c.text_of(k));
+        if !matches!(op, "==" | "!=" | "===" | "!==" | "<" | "<=" | ">" | ">=") {
+            continue;
+        }
+        if op == "<=" && c.parent(e).is_some_and(|p| c.kind(p) == ExprStmt) {
+            continue;
+        }
+        for side in kids(c, e).into_iter().take(2) {
+            // slang's `name[i]...`: an identifier with selectors.
+            if c.kind(side) != SelectExpr {
+                continue;
+            }
+            let mut base = side;
+            while c.kind(base) == SelectExpr {
+                match kids(c, base).first() {
+                    Some(&b) => base = b,
+                    None => break,
+                }
+            }
+            if c.kind(base) != NameExpr || c.toks(base).count() != 1 || !kids(c, base).is_empty() {
+                continue;
+            }
+            let name = c.tree.bare_text(base);
+            if !names.contains(&name) {
+                continue;
+            }
+            let Some(loc) = start(c, side) else { continue };
+            out.add(
+                "SV-ASC-001",
+                "AssociativeArrayMutatingRead",
+                Severity::Warning,
+                format!(
+                    "Direct read indexing on associative array '{name}' in relational comparison. In SystemVerilog (IEEE 1800 § 7.8.1), \
+                     reading a non-existent key silently inserts the key and populates it with a default value, mutating array state and \
+                     leaking memory. Guard the lookup with '{name}.exists(...)' before indexing."
+                ),
+                loc,
+            );
+        }
+    }
+}
+
+// ---- SV-CB-001 ----
+
+/// The declarations of output-only clocking items anywhere in the compile,
+/// as written (`d`, `h = x.y`).
+fn clocking_outputs(c: &Cst) -> std::rc::Rc<HashSet<String>> {
+    thread_local! {
+        static NAMES: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<HashSet<String>>)>> = const { std::cell::RefCell::new(None) };
+    }
+    let key = (c.all.as_ptr() as usize, c.all.len());
+    if let Some(v) = NAMES.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
+        return v;
+    }
+    let mut out = HashSet::new();
+    for (i, t) in c.all.iter().enumerate() {
+        if !t.nodes.iter().any(|n| n.kind == ClockingItem) {
+            continue;
+        }
+        let own;
+        let tc = if std::ptr::eq(t, c.tree) {
+            c
+        } else {
+            own = Cst::new(t, i, sv_sema::Locator::default());
+            &own
+        };
+        for item in tc.nodes(ClockingItem) {
+            let toks: Vec<&str> = tc.toks(item).map(|t| tc.text_of(t)).collect();
+            if !toks.contains(&"output") || toks.contains(&"input") {
+                continue;
+            }
+            for d in tc.tree.children(item).filter(|&d| tc.kind(d) == Declarator) {
+                let name = crate::g_c_support::slang_trimmed(tc, d);
+                if !name.is_empty() {
+                    out.insert(name);
+                }
+            }
+        }
+    }
+    let v = std::rc::Rc::new(out);
+    NAMES.with(|k| *k.borrow_mut() = Some((key, v.clone())));
+    v
+}
+
+fn clocking_output_read(c: &Cst, out: &mut Sink) {
+    let outputs = clocking_outputs(c);
+    let mut check = |e: NodeId| {
+        let text = crate::g_c_support::slang_trimmed(c, e);
+        let at = match text.find(".cb.") {
+            Some(p) => p + 4,
+            None if text.starts_with("cb.") => 3,
+            None => return,
+        };
+        let sig = &text[at..];
+        let sig = match sig.find(|ch: char| " .[]()+-*/=!&|^".contains(ch)) {
+            Some(d) => &sig[..d],
+            None => sig,
+        };
+        if sig.is_empty() || !(outputs.contains(sig) || sig == "data_out" || sig == "tx_data") {
+            return;
+        }
+        let Some(loc) = start(c, e) else { return };
+        out.add(
+            "SV-CB-001",
+            "ClockingBlockOutputReadSkew",
+            Severity::Warning,
+            format!(
+                "Reading clocking block output signal '{text}'. In SystemVerilog (IEEE 1800 § 14.16), clocking block output signals \
+                 are drive-only; reading an output clocking signal observes post-drive values with simulation race conditions. Read \
+                 the corresponding input or interface signal instead."
+            ),
+            loc,
+        );
+    };
+    for n in c.nodes(BinaryExpr) {
+        for k in kids(c, n).into_iter().take(2) {
+            check(k);
+        }
+    }
+    for n in c.nodes(IfStmt) {
+        if let (Some(cond), _, _) = crate::g_concurrency::if_parts(c, n) {
+            check(cond);
         }
     }
 }

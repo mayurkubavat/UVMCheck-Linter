@@ -1383,7 +1383,7 @@ fn classify(c: &Cst, call: NodeId) -> (LockOp, String) {
 
 type Held = BTreeMap<String, i32>;
 
-struct Hooks<'c, 't> {
+struct LockHooks<'c, 't> {
     c: &'c Cst<'t>,
     released: BTreeSet<String>,
     acquired_at: HashMap<String, Loc>,
@@ -1391,7 +1391,30 @@ struct Hooks<'c, 't> {
     reported: BTreeSet<String>,
 }
 
-impl Hooks<'_, '_> {
+impl<'c, 't> PathHooks<'c, 't> for LockHooks<'c, 't> {
+    type St = Held;
+
+    fn cst(&self) -> &'c Cst<'t> {
+        self.c
+    }
+
+    fn leaf(&mut self, s: NodeId, st: &mut Held) {
+        for call in calls_in(self.c, s) {
+            self.apply(call, st);
+        }
+    }
+
+    fn branch(&mut self, cond: NodeId, taken: bool, st: &mut Held) {
+        self.try_get(cond, taken, st)
+    }
+
+    fn returned(&mut self, s: NodeId, st: &Held) {
+        let at = start(self.c, s);
+        self.leak(st, at);
+    }
+}
+
+impl LockHooks<'_, '_> {
     fn apply(&mut self, call: NodeId, st: &mut Held) {
         let (op, key) = classify(self.c, call);
         match op {
@@ -1413,13 +1436,7 @@ impl Hooks<'_, '_> {
         }
     }
 
-    fn leaf(&mut self, s: NodeId, st: &mut Held) {
-        for call in calls_in(self.c, s) {
-            self.apply(call, st);
-        }
-    }
-
-    fn branch(&mut self, cond: NodeId, taken: bool, st: &mut Held) {
+    fn try_get(&mut self, cond: NodeId, taken: bool, st: &mut Held) {
         let c = self.c;
         let mut e = cond;
         let mut negated = false;
@@ -1460,16 +1477,35 @@ impl Hooks<'_, '_> {
     }
 }
 
-#[derive(Default)]
-struct Out {
-    fall: Vec<Held>,
-    brk: Vec<Held>,
-    cont: Vec<Held>,
+/// `swe::PathWalker`'s hooks: a path-sensitive walk over a routine body.
+/// Loops run zero or one time, join_none bodies are skipped, and
+/// `uvm_fatal / $fatal / $finish end a path.
+pub(crate) trait PathHooks<'c, 't> {
+    type St: Clone + PartialEq;
+    fn cst(&self) -> &'c Cst<'t>;
+    /// A statement with no sub-statements.
+    fn leaf(&mut self, s: NodeId, st: &mut Self::St);
+    /// Refines a path's state on a condition.
+    fn branch(&mut self, cond: NodeId, taken: bool, st: &mut Self::St);
+    /// A path leaves through `return`.
+    fn returned(&mut self, s: NodeId, st: &Self::St);
+}
+
+pub(crate) struct Out<S> {
+    pub(crate) fall: Vec<S>,
+    brk: Vec<S>,
+    cont: Vec<S>,
+}
+
+impl<S> Default for Out<S> {
+    fn default() -> Self {
+        Out { fall: Vec::new(), brk: Vec::new(), cont: Vec::new() }
+    }
 }
 
 const MAX_STATES: usize = 32;
 
-fn merge(into: &mut Vec<Held>, from: &[Held]) {
+fn merge<S: Clone + PartialEq>(into: &mut Vec<S>, from: &[S]) {
     for s in from {
         if into.len() >= MAX_STATES {
             return;
@@ -1505,12 +1541,12 @@ fn stops(c: &Cst, s: NodeId) -> bool {
     matches!(n.as_str(), "uvm_report_fatal" | "$fatal" | "$finish" | "$exit")
 }
 
-struct Walker<'h, 'c, 't> {
-    h: &'h mut Hooks<'c, 't>,
+pub(crate) struct Walker<'h, H> {
+    pub(crate) h: &'h mut H,
 }
 
-impl Walker<'_, '_, '_> {
-    fn list(&mut self, stmts: &[NodeId], input: Vec<Held>) -> Out {
+impl<'c, 't: 'c, H: PathHooks<'c, 't>> Walker<'_, H> {
+    pub(crate) fn list(&mut self, stmts: &[NodeId], input: Vec<H::St>) -> Out<H::St> {
         let mut out = Out::default();
         let mut cur = input;
         for &st in stmts {
@@ -1526,13 +1562,13 @@ impl Walker<'_, '_, '_> {
         out
     }
 
-    fn block(&mut self, b: NodeId, input: Vec<Held>) -> Out {
-        let it = items(self.h.c, b);
+    fn block(&mut self, b: NodeId, input: Vec<H::St>) -> Out<H::St> {
+        let it = items(self.h.cst(), b);
         self.list(&it, input)
     }
 
-    fn walk(&mut self, s: NodeId, input: Vec<Held>) -> Out {
-        let c = self.h.c;
+    fn walk(&mut self, s: NodeId, input: Vec<H::St>) -> Out<H::St> {
+        let c = self.h.cst();
         let mut out = Out::default();
         if input.is_empty() {
             return out;
@@ -1625,9 +1661,8 @@ impl Walker<'_, '_, '_> {
                 }
             }
             ReturnStmt => {
-                let at = start(c, s);
                 for st in &input {
-                    self.h.leak(st, at);
+                    self.h.returned(s, st);
                 }
                 out
             }
@@ -1688,7 +1723,7 @@ pub(crate) fn case_arms(c: &Cst, s: NodeId) -> (Vec<NodeId>, Option<NodeId>) {
 
 fn lock_not_released(c: &Cst, s: &mut Sink) {
     for (r, n) in user_routines(c) {
-        let mut hooks = Hooks { c, released: BTreeSet::new(), acquired_at: HashMap::new(), leaks: Vec::new(), reported: BTreeSet::new() };
+        let mut hooks = LockHooks { c, released: BTreeSet::new(), acquired_at: HashMap::new(), leaks: Vec::new(), reported: BTreeSet::new() };
         let Some(body) = c.tree.child(r, Body) else { continue };
         for call in calls_in(c, body) {
             let (op, key) = classify(c, call);
