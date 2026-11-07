@@ -231,8 +231,9 @@ impl<'a, 't> Typer<'a, 't> {
         let r = self.self_type(e)?;
         let (lw, ls, l4) = l.integral?;
         if c.kind(e) == Literal && unbased(c, e) {
-            // `'1` takes the target's type, unsigned.
-            return Some(if ls { vector(lw, false, l4) } else { l });
+            // `'1` takes the target's type, unsigned (a vector of its width
+            // for an enum, struct or union).
+            return Some(if ls || l.aggregate { vector(lw, false, l4) } else { l });
         }
         let (rw, rs, r4) = r.integral?;
         let shape = (lw.max(rw), rs, l4 || r4);
@@ -610,16 +611,56 @@ impl<'a, 't> Typer<'a, 't> {
                 return Some(self.element_info(callee, elem));
             }
         }
-        let decl = crate::g_c_support::callee_decl(c, e)?;
+        let decl = match crate::g_c_support::callee_decl(c, e) {
+            Some(d) => d,
+            None => self.method_via_type(e)?,
+        };
         let rt = c.tree.child(decl, ReturnType).and_then(|r| c.tree.child(r, DataType));
         if c.toks(decl).any(|t| c.text_of(t) == "task") {
             return None;
         }
         match rt {
             Some(dt) if c.tree.bare_text(dt) == "void" => Some(ETy::other("void")),
-            Some(dt) => Some(self.o.data_type(c.index(), dt)),
+            Some(dt) => {
+                if let Some(t) = self.param_result(e, decl, dt) {
+                    return Some(t);
+                }
+                Some(self.o.data_type(c.index(), dt))
+            }
             None => Some(vector(1, false, true)),
         }
+    }
+}
+
+impl<'a, 't> Typer<'a, 't> {
+    /// The method a call on a value names, found through the value's
+    /// declared type (a typedef of a class or of a specialization).
+    fn method_via_type(&self, call: NodeId) -> Option<NodeId> {
+        let c = self.c;
+        let (_, name, recv) = crate::g_c_support::call_parts(c, call)?;
+        let rd = crate::g_port2::expr_decl(c, recv?)?;
+        let (tree, cls) = self.o.class_decl(c.index(), rd.dtype?)?;
+        if tree != c.index() {
+            return None;
+        }
+        crate::g_c_support::class_chain(c, cls).into_iter().find_map(|k| {
+            kids(c, k).into_iter().find(|&m| {
+                matches!(c.kind(m), FunctionDecl | TaskDecl | MethodPrototype) && crate::g_c_support::last_name(c, m) == name
+            })
+        })
+    }
+
+    /// `q.get(i)` with `T get(...)` in `class queue #(type T)`: what the
+    /// receiver's declared specialization binds `T` to.
+    fn param_result(&self, call: NodeId, decl: NodeId, ret: NodeId) -> Option<ETy> {
+        let c = self.c;
+        if c.toks(ret).count() != 1 || c.tree.children(ret).next().is_some() {
+            return None;
+        }
+        let (_, _, recv) = crate::g_c_support::call_parts(c, call)?;
+        let rd = crate::g_port2::expr_decl(c, recv?)?;
+        let cls = crate::g_c_support::ancestors(c, decl).find(|&a| c.kind(a) == ClassDecl)?;
+        self.o.method_result(c.index(), rd.dtype?, (c.index(), cls), ret)
     }
 }
 
@@ -734,11 +775,51 @@ pub(crate) fn cast_canon(c: &Cst) -> Rc<HashMap<(usize, NodeId), String>> {
     facts(c).1
 }
 
+/// Whether an `if` around `n` (in its routine) compares a value that is
+/// integral here with `null`: an error in this specialization, so slang
+/// leaves the statement unbound and rules do not see it.
+fn null_compare_fails(c: &Cst, ty: &mut Typer, n: NodeId) -> bool {
+    for a in crate::g_c_support::ancestors(c, n) {
+        match c.kind(a) {
+            FunctionDecl | TaskDecl | ClassDecl => return false,
+            IfStmt => {
+                let Some(&cond) = kids(c, a).first() else { continue };
+                let mut todo = vec![cond];
+                while let Some(e) = todo.pop() {
+                    if c.kind(e) == BinaryExpr && c.keyword(e).is_some_and(|k| matches!(c.text_of(k), "==" | "!=")) {
+                        let ks = kids(c, e);
+                        if let [l, r] = ks[..] {
+                            let null = |x: NodeId| c.kind(x) == Literal && c.tree.bare_text(x) == "null";
+                            let other = if null(r) { Some(l) } else if null(l) { Some(r) } else { None };
+                            if other.and_then(|o| ty.self_type(o)).is_some_and(|t| t.integral.is_some()) {
+                                return true;
+                            }
+                        }
+                    }
+                    todo.extend(kids(c, e));
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+/// [`SpecTypes`] of the compile.
+pub(crate) fn spec_types(c: &Cst) -> Rc<SpecTypes> {
+    facts(c).3
+}
+
 type Facts = (
     Rc<HashMap<(usize, NodeId), ETy>>,
     Rc<HashMap<(usize, NodeId), String>>,
     Rc<std::collections::HashSet<(usize, NodeId)>>,
+    Rc<SpecTypes>,
 );
+
+/// Per specialization of the generic class around them: the type and its
+/// matching form of each cast and `$cast` argument there.
+pub(crate) type SpecTypes = HashMap<(usize, NodeId), Vec<Option<(ETy, String)>>>;
 
 fn facts(c: &Cst) -> Facts {
     thread_local! {
@@ -752,6 +833,7 @@ fn facts(c: &Cst) -> Facts {
     let mut out = HashMap::new();
     let mut canon = HashMap::new();
     let mut one_bit = std::collections::HashSet::new();
+    let mut in_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::new();
     for (i, t) in c.all.iter().enumerate() {
         let own;
         let tc = if std::ptr::eq(t, c.tree) {
@@ -793,6 +875,9 @@ fn facts(c: &Cst) -> Facts {
             if let Some(x) = out.get(&(i, n)) {
                 canon.insert((i, n), o.canonical(x));
             }
+            if let Some((g, k)) = o.specs_at(i, n) {
+                in_generic.entry((i, g, k)).or_default().push(n);
+            }
         }
         // Formals: a port without a type takes the previous one's.
         for n in 0..t.nodes.len() {
@@ -815,7 +900,36 @@ fn facts(c: &Cst) -> Facts {
             }
         }
     }
-    let v = (Rc::new(out), Rc::new(canon), Rc::new(one_bit));
+    let mut specs: SpecTypes = HashMap::new();
+    let mut groups: Vec<_> = in_generic.into_iter().collect();
+    groups.sort_by_key(|g| g.0);
+    for ((i, g, k), nodes) in groups {
+        let t = &c.all[i];
+        let own;
+        let tc = if std::ptr::eq(t, c.tree) {
+            c
+        } else {
+            own = Cst::new(t, i, sv_sema::Locator::default());
+            &own
+        };
+        for spec in 0..k {
+            o.set_spec(Some((g, spec)));
+            let mut ty = Typer::new(tc, &o);
+            for &n in &nodes {
+                let x = if null_compare_fails(tc, &mut ty, n) {
+                    None
+                } else {
+                    ty.final_type(n).map(|x| {
+                        let m = o.canonical(&x);
+                        (x, m)
+                    })
+                };
+                specs.entry((i, n)).or_default().push(x);
+            }
+        }
+    }
+    o.set_spec(None);
+    let v = (Rc::new(out), Rc::new(canon), Rc::new(one_bit), Rc::new(specs));
     FACTS.with(|k| *k.borrow_mut() = Some((key, v.clone())));
     v
 }

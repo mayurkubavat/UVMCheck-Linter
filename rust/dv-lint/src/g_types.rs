@@ -19,6 +19,7 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "SV-RDB-005", name: "RedundantBoolean", check: Syntax(redundant_boolean) },
         Rule { id: "SV-RDB-001", name: "PositionalFlagLiterals", check: Syntax(positional_flags) },
         Rule { id: "SV-PRF-002", name: "ArrayReductionWidthTruncation", check: Syntax(array_reduction_width) },
+        Rule { id: "SV-RDB-006", name: "DoubleNegativeFlag", check: Syntax(double_negative_flag) },
     ]
 }
 
@@ -128,9 +129,29 @@ fn mixed_sign_comparison(c: &Cst, out: &mut Sink) {
 fn redundant_cast(c: &Cst, out: &mut Sink) {
     let types = expr_types(c);
     let canon = crate::g_exprty::cast_canon(c);
+    let specs = crate::g_exprty::spec_types(c);
     let ix = c.index();
     let matching = |a: (NodeId, &ETy), b: (NodeId, &ETy)| {
         a.1.text == b.1.text || canon.get(&(ix, a.0)).is_some_and(|x| canon.get(&(ix, b.0)) == Some(x))
+    };
+    // The type `a` has in each copy where `a` and `b` match: per
+    // specialization in a generic class, else every AST visit.
+    let matches = |e: NodeId, a: NodeId, b: NodeId| -> Vec<String> {
+        if let (Some(x), Some(y)) = (specs.get(&(ix, a)), specs.get(&(ix, b))) {
+            return x
+                .iter()
+                .zip(y)
+                .filter_map(|p| match p {
+                    (Some((at, ac)), Some((bt, bc))) if at.text == bt.text || ac == bc => Some(at.text.clone()),
+                    _ => None,
+                })
+                .collect();
+        }
+        let (Some(at), Some(bt)) = (types.get(&(ix, a)), types.get(&(ix, b))) else { return Vec::new() };
+        if !matching((a, at), (b, bt)) {
+            return Vec::new();
+        }
+        vec![at.text.clone(); ast_visits(c, e)]
     };
     for e in c.nodes(CallExpr) {
         let ks = kids(c, e);
@@ -140,19 +161,18 @@ fn redundant_cast(c: &Cst, out: &mut Sink) {
         }
         let args = crate::g_exprty::call_args(c, e);
         let (Some(&d), Some(&s)) = (args.first(), args.get(1)) else { continue };
-        let (Some(dt), Some(st)) = (types.get(&(ix, d)), types.get(&(ix, s))) else { continue };
-        if !matching((d, dt), (s, st)) || in_generate_header(c, e) {
+        if in_generate_header(c, e) {
             continue;
         }
         let Some(t) = c.first_tok(e) else { continue };
-        for _ in 0..ast_visits(c, e) {
+        for text in matches(e, d, s) {
             out.add(
                 "SV-TYP-008",
                 "RedundantCastToSameType",
                 Severity::Warning,
                 format!(
                     "Redundant dynamic cast '$cast(...)': destination and source both share identical static type '{}'. In SystemVerilog typing rules (IEEE 1800 \u{a7} 6.24), dynamic casting between identical types is unnecessary; use standard assignment '=' instead.",
-                    dt.text
+                    text
                 ),
                 c.loc(t),
             );
@@ -162,19 +182,18 @@ fn redundant_cast(c: &Cst, out: &mut Sink) {
         let ks = kids(c, e);
         let Some(&inner) = ks.get(1) else { continue };
         let inner = strip_parens(c, inner);
-        let (Some(ct), Some(it)) = (types.get(&(ix, e)), types.get(&(ix, inner))) else { continue };
-        if !matching((e, ct), (inner, it)) || in_generate_header(c, e) {
+        if in_generate_header(c, e) {
             continue;
         }
         let Some(t) = c.first_tok(e) else { continue };
-        for _ in 0..ast_visits(c, e) {
+        for text in matches(e, e, inner) {
             out.add(
                 "SV-TYP-008",
                 "RedundantCastToSameType",
                 Severity::Info,
                 format!(
                     "Redundant static cast to identical type '{}'. In SystemVerilog typing rules (IEEE 1800 \u{a7} 6.24), casting an expression to its already established static type adds unnecessary verbosity.",
-                    ct.text
+                    text
                 ),
                 c.loc(t),
             );
@@ -446,6 +465,99 @@ fn array_reduction_width(c: &Cst, out: &mut Sink) {
                 ),
                 c.loc(t),
             );
+        }
+    }
+}
+
+// ---- SV-RDB-006 ----
+
+/// The words of a name: split at `_`, digits and lower-to-upper case steps,
+/// lowercased.
+fn ident_words(name: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut cur = String::new();
+    for ch in name.chars() {
+        if ch == '_' || ch.is_ascii_digit() {
+            if !cur.is_empty() {
+                out.push(std::mem::take(&mut cur).to_lowercase());
+            }
+            continue;
+        }
+        if ch.is_ascii_uppercase() && cur.chars().last().is_some_and(|l| l.is_ascii_lowercase()) {
+            out.push(std::mem::take(&mut cur).to_lowercase());
+        }
+        cur.push(ch);
+    }
+    if !cur.is_empty() {
+        out.push(cur.to_lowercase());
+    }
+    out
+}
+
+fn negative_name(name: &str) -> bool {
+    const NEG: &[&str] = &["disable", "disabled", "dis", "no", "not", "inhibit", "skip", "ignore", "without", "non", "suppress"];
+    ident_words(name).iter().any(|w| NEG.contains(&w.as_str()))
+}
+
+/// A variable (not a net, argument or parameter) or a class property.
+fn user_variable(c: &Cst, d: &crate::g_c_support::Decl) -> bool {
+    use crate::g_c_support::DeclKind::*;
+    match d.kind {
+        Property | Local => true,
+        Static => {
+            const NETS: &[&str] = &["wire", "tri", "wand", "wor", "triand", "trior", "tri0", "tri1", "supply0", "supply1", "uwire", "trireg"];
+            // The declaration holding the declarator.
+            let Some(holder) = c.parent(d.node) else { return false };
+            if c.toks(holder).any(|t| NETS.contains(&c.text_of(t))) || d.dtype.is_some_and(|t| c.toks(t).any(|t| NETS.contains(&c.text_of(t)))) {
+                return false;
+            }
+            // A port without a data type is a net.
+            if c.kind(holder) == Port {
+                // An input or inout port is a net unless declared `var`.
+                let toks: Vec<&str> = c.toks(holder).map(|t| c.text_of(t)).collect();
+                if toks.iter().any(|t| matches!(*t, "input" | "inout")) && !toks.contains(&"var") {
+                    return false;
+                }
+                return d.dtype.and_then(|t| c.first_tok(t)).is_some_and(|f| !matches!(c.text_of(f), "signed" | "unsigned" | "["));
+            }
+            true
+        }
+        _ => false,
+    }
+}
+
+fn double_negative_flag(c: &Cst, out: &mut Sink) {
+    let types = expr_types(c);
+    let ix = c.index();
+    for e in c.nodes(PrefixExpr) {
+        let Some(op) = c.keyword(e).map(|k| c.text_of(k)) else { continue };
+        if op != "!" && op != "~" {
+            continue;
+        }
+        let Some(&operand) = kids(c, e).first() else { continue };
+        let o = strip(c, operand);
+        if op == "~" && !types.get(&(ix, o)).and_then(|t| t.integral).is_some_and(|(w, ..)| w == 1) {
+            continue;
+        }
+        if !matches!(c.kind(o), NameExpr | MemberExpr) {
+            continue;
+        }
+        let Some(d) = crate::g_port2::expr_decl(c, o) else { continue };
+        let name = if c.kind(o) == MemberExpr { c.last_text(o).to_string() } else { c.tree.bare_text(o) };
+        if !user_variable(c, &d) || !negative_name(&name) {
+            continue;
+        }
+        let times = user_visits(c, e);
+        if times == 0 || crate::g_design::in_bad_body(c, e) {
+            continue;
+        }
+        let Some(t) = c.first_tok(e) else { continue };
+        let msg = format!(
+            "'{}' negates a negative flag ('{name}'), which readers have to invert twice. Name the flag for the positive case (en_*, has_*, use_*) so the test reads straight.",
+            crate::g_random_bug::expr_text(c, with_parens(c, e))
+        );
+        for _ in 0..times {
+            out.add("SV-RDB-006", "DoubleNegativeFlag", Severity::Info, msg.clone(), c.loc(t));
         }
     }
 }

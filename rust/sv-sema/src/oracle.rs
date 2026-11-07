@@ -37,6 +37,9 @@ pub struct TypeOracle<'t> {
     consts: std::cell::RefCell<HashMap<(usize, sv_syntax::NodeId), Option<(i128, u32, bool)>>>,
     /// Enum members and package members by (scope, package, name).
     members: std::cell::RefCell<HashMap<(usize, String, String), Option<TypeInfo>>>,
+    /// The specialization of a generic class to type its body in (see
+    /// [`Self::set_spec`]); otherwise its representative.
+    spec: std::cell::RefCell<Option<(usize, Env)>>,
 }
 
 impl<'t> TypeOracle<'t> {
@@ -47,7 +50,7 @@ impl<'t> TypeOracle<'t> {
         b.collect_names();
         b.collect();
         let regions = (0..trees.len()).map(|t| b.regions(t)).collect();
-        TypeOracle { b, regions, decls: Default::default(), values: Default::default(), consts: Default::default(), members: Default::default() }
+        TypeOracle { b, regions, decls: Default::default(), values: Default::default(), consts: Default::default(), members: Default::default(), spec: Default::default() }
     }
 
     fn scope_of(&self, tree: usize, n: sv_syntax::NodeId) -> usize {
@@ -57,11 +60,34 @@ impl<'t> TypeOracle<'t> {
         }
     }
 
-    /// The scope's environment: a class's type parameters at their defaults.
+    /// The generic class around a node and how many specializations slang
+    /// elaborates of it (`None` outside a generic class).
+    pub fn specs_at(&self, tree: usize, n: sv_syntax::NodeId) -> Option<(usize, usize)> {
+        let g = self.b.generic_owner(self.scope_of(tree, n))?;
+        Some((g, self.b.spec_sets.get(&g).map_or(0, |m| m.len())))
+    }
+
+    /// Types generic class `g`'s body in its `i`th specialization (as
+    /// [`Self::specs_at`] counts them), or as before with `None`. Answers
+    /// already given are dropped.
+    pub fn set_spec(&self, spec: Option<(usize, usize)>) {
+        let env = spec.and_then(|(g, i)| Some((g, self.b.spec_sets.get(&g)?.values().nth(i)?.1.clone())));
+        *self.spec.borrow_mut() = env;
+        self.decls.borrow_mut().clear();
+        self.values.borrow_mut().clear();
+        self.consts.borrow_mut().clear();
+        self.members.borrow_mut().clear();
+    }
+
+    /// The scope's environment: a class's type parameters at their defaults
+    /// (or as the specialization being typed binds them).
     fn env_of(&self, scope: usize) -> Env {
         let mut cur = Some(scope);
         while let Some(s) = cur {
             if let ScopeKind::Class(c) = self.b.scopes[s].kind {
+                if let Some(env) = self.spec.borrow().as_ref().filter(|x| x.0 == c).map(|x| x.1.clone()) {
+                    return env;
+                }
                 return self.b.rep_env.get(&c).cloned().unwrap_or_default();
             }
             cur = self.b.scopes[s].parent;
@@ -198,28 +224,67 @@ impl<'t> TypeOracle<'t> {
         let Some((tree, node)) = t.src else { return norm(&t.text) };
         let b = &self.b;
         let mut dt = NodeRef { tree, node };
-        let mut moved = false;
         for _ in 0..16 {
             let scope = self.scope_of(dt.tree, dt.node);
             match b.lookup_type(dt, scope) {
                 Some(Found::Typedef(td, _)) if b.children(td).into_iter().all(|c| b.kind(c) != Dim) => match b.child(td, DataType) {
-                    Some(i) => {
-                        dt = i;
-                        moved = true;
-                    }
+                    Some(i) => dt = i,
                     None => break,
                 },
+                Some(Found::Param(..)) => {
+                    let name = b.toks_of(dt).concat();
+                    match self.env_of(scope).get(&name) {
+                        Some(bd) => dt = bd.node,
+                        None => break,
+                    }
+                }
                 _ => break,
             }
-        }
-        if !moved {
-            return norm(&t.text);
         }
         let r = self.decl_type(dt.tree, Some(dt.node), None);
         if r.aggregate {
             return t.text.rsplit_once('}').map_or(t.text.clone(), |(_, n)| n.to_string());
         }
         norm(&r.text)
+    }
+
+    /// The class declaration (tree, node) a declared type names, through
+    /// typedefs and specializations.
+    pub fn class_decl(&self, tree: usize, dt: sv_syntax::NodeId) -> Option<(usize, sv_syntax::NodeId)> {
+        let b = &self.b;
+        let scope = self.scope_of(tree, dt);
+        let env = self.env_of(scope);
+        match b.resolve_env(NodeRef { tree, node: dt }, scope, &env, 0).resolved {
+            crate::Resolved::Class(c) => Some((b.classes[c].node.tree, b.classes[c].node.node)),
+            _ => None,
+        }
+    }
+
+    /// The result of a method of class declaration `class` whose return
+    /// type `ret` is one of its type parameters, called on a value declared
+    /// with type `recv`: the type the receiver's specialization binds it to,
+    /// printed as slang prints the parameter.
+    pub fn method_result(
+        &self,
+        tree: usize,
+        recv: sv_syntax::NodeId,
+        class: (usize, sv_syntax::NodeId),
+        ret: sv_syntax::NodeId,
+    ) -> Option<TypeInfo> {
+        let b = &self.b;
+        let r = NodeRef { tree, node: recv };
+        let scope = self.scope_of(tree, recv);
+        let env = self.env_of(scope);
+        let ti = b.resolve_env(r, scope, &env, 0);
+        let crate::Resolved::Class(c) = ti.resolved else { return None };
+        if (b.classes[c].node.tree, b.classes[c].node.node) != class {
+            return None;
+        }
+        let name = b.toks_of(NodeRef { tree: class.0, node: ret }).concat();
+        let bd = ti.args.get(&name)?;
+        let shown = self.data_type(class.0, ret);
+        let actual = self.decl_type(bd.node.tree, Some(bd.node.node), None);
+        Some(TypeInfo { text: shown.text, ..actual })
     }
 
     /// The type of member `name` of a struct or union typed value.
