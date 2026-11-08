@@ -1202,23 +1202,40 @@ impl Ast {
     }
 }
 
-macro_rules! ast_rules {
-    ($($wrap:ident => $f:ident),* $(,)?) => {
-        $(fn $wrap(d: &Design, csts: &[Cst], s: &mut Sink) {
-            for c in csts {
-                $f(c, &Ast::new(d, c), s);
-            }
-        })*
-    };
+fn ast_hardcoded_paths(d: &Design, csts: &[Cst], s: &mut Sink) {
+    for c in csts {
+        hardcoded_paths(c, &Ast::new(d, c), s);
+    }
 }
 
-ast_rules! {
-    ast_hardcoded_paths => hardcoded_paths,
-    ast_plaintext_key => plaintext_key,
-    ast_unshielded_format => unshielded_format,
-    ast_zero_delay => zero_delay,
-    ast_resize_in_loop => resize_in_loop,
-    ast_queue_slice => queue_slice,
+fn ast_plaintext_key(d: &Design, csts: &[Cst], s: &mut Sink) {
+    for c in csts {
+        plaintext_key(c, &Ast::new(d, c), s);
+    }
+}
+
+fn ast_unshielded_format(d: &Design, csts: &[Cst], s: &mut Sink) {
+    for c in csts {
+        unshielded_format(c, &Ast::new(d, c), s);
+    }
+}
+
+fn ast_zero_delay(d: &Design, csts: &[Cst], s: &mut Sink) {
+    for c in csts {
+        zero_delay(c, &Ast::new(d, c), s);
+    }
+}
+
+fn ast_resize_in_loop(d: &Design, csts: &[Cst], s: &mut Sink) {
+    for c in csts {
+        resize_in_loop(c, &Ast::new(d, c), s);
+    }
+}
+
+fn ast_queue_slice(d: &Design, csts: &[Cst], s: &mut Sink) {
+    for c in csts {
+        queue_slice(c, &Ast::new(d, c), s);
+    }
 }
 
 /// The default value of each formal of the subroutines named `name` in the
