@@ -16,7 +16,7 @@
 //! and base classes only when their names are unique in the design, so a
 //! legal design never gets an error.
 
-use std::collections::{HashMap, HashSet};
+use crate::fx::{FxMap as HashMap, FxSet as HashSet};
 
 use sv_syntax::{Child, NodeId, SyntaxKind, Tree};
 use SyntaxKind::*;
@@ -125,9 +125,9 @@ fn is_virtual(t: &Tree, m: NodeId) -> bool {
 /// errors found (class member and parameter initializer errors), in tree and source order.
 pub fn check(trees: &[Tree]) -> Vec<Diag> {
     let mut out = Vec::new();
-    let mut classes: HashMap<String, Vec<Class>> = HashMap::new();
+    let mut classes: HashMap<String, Vec<Class>> = HashMap::default();
     for (ix, t) in trees.iter().enumerate() {
-        let mut in_header = HashSet::new();
+        let mut in_header = HashSet::default();
         for n in t.preorder() {
             if t.kind(n) == ParamList {
                 in_header.extend(t.children(n));
@@ -141,7 +141,7 @@ pub fn check(trees: &[Tree]) -> Vec<Diag> {
                         .child(n, Header)
                         .and_then(|h| t.child(h, Extends))
                         .map(|e| all_toks(t, e).into_iter().find(|x| *x != "extends").unwrap_or("").to_string());
-                    let mut methods = HashMap::new();
+                    let mut methods = HashMap::default();
                     for m in t.children(n).filter(|&c| matches!(t.kind(c), FunctionDecl | TaskDecl | MethodPrototype)) {
                         let name = name_of(t, m);
                         if name.is_empty() || name.contains("::") {
@@ -179,7 +179,7 @@ pub fn check(trees: &[Tree]) -> Vec<Diag> {
                 }
                 // The nearest base that declares it, and whether any does
                 // virtually.
-                let mut seen = HashSet::new();
+                let mut seen = HashSet::default();
                 let mut base = c.base.clone();
                 let mut found: Option<&Method> = None;
                 let mut virt = false;
@@ -315,7 +315,7 @@ fn supers(ix: usize, t: &Tree, has_base: &dyn Fn(&str) -> Option<bool>, out: &mu
 /// Non-static properties used in a static method or a static property's
 /// initializer.
 fn statics(ix: usize, t: &Tree, class: NodeId, out: &mut Vec<Diag>) {
-    let mut props = HashSet::new();
+    let mut props = HashSet::default();
     for d in t.children(class).filter(|&c| t.kind(c) == DataDecl) {
         let own = own_toks(t, d);
         if own.contains(&"static") || own.contains(&"typedef") {
@@ -349,7 +349,7 @@ fn statics(ix: usize, t: &Tree, class: NodeId, out: &mut Vec<Diag>) {
     }
     for b in bodies {
         // Names the method declares itself hide the properties.
-        let mut local = HashSet::new();
+        let mut local = HashSet::default();
         let mut stack = vec![b];
         let mut uses = Vec::new();
         while let Some(n) = stack.pop() {
@@ -403,9 +403,9 @@ fn statics(ix: usize, t: &Tree, class: NodeId, out: &mut Vec<Diag>) {
 /// Out-of-block method definitions: the prototype's return type, defined
 /// once.
 fn out_of_block<'a>(trees: &[Tree], unique: &dyn Fn(&str) -> Option<&'a Class>, out: &mut Vec<Diag>) {
-    let mut seen: HashSet<(usize, u32, String)> = HashSet::new();
+    let mut seen: HashSet<(usize, u32, String)> = HashSet::default();
     for (ix, t) in trees.iter().enumerate() {
-        let mut parent = HashMap::new();
+        let mut parent = HashMap::default();
         for n in t.preorder() {
             for c in t.children(n) {
                 parent.insert(c, n);

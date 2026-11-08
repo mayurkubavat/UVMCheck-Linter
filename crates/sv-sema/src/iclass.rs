@@ -15,7 +15,7 @@
 //! A class or base the checks cannot find (not in the design, or declared
 //! twice) is never an error.
 
-use std::collections::{HashMap, HashSet};
+use crate::fx::{FxMap as HashMap, FxSet as HashSet};
 
 use sv_syntax::{Child, NodeId, SyntaxKind, Tree};
 use SyntaxKind::*;
@@ -138,7 +138,7 @@ impl Classes<'_> {
         outer: &HashMap<String, String>,
     ) -> HashMap<String, String> {
         let t = &self.trees[c.tree];
-        let mut map = HashMap::new();
+        let mut map = HashMap::default();
         for (k, (name, _, default)) in params(t, c.node).into_iter().enumerate() {
             let v = args
                 .iter()
@@ -207,7 +207,7 @@ impl Classes<'_> {
 /// Runs this module's checks over every tree of a compile and returns the
 /// errors found (interface class and class relation errors), in tree and source order.
 pub fn check(trees: &[Tree]) -> Vec<Diag> {
-    let mut by_name: HashMap<String, Vec<At>> = HashMap::new();
+    let mut by_name: HashMap<String, Vec<At>> = HashMap::default();
     for (ix, t) in trees.iter().enumerate() {
         for n in t.preorder() {
             if t.kind(n) == ClassDecl {
@@ -276,7 +276,7 @@ fn class_rules(cx: &Classes, ix: usize, t: &Tree, n: NodeId, out: &mut Vec<Diag>
     for &d in &bases {
         let (b, args) = item(t, d);
         let Some(bc) = cx.unique(&b) else { return };
-        let map = cx.bind(bc, &args, &HashMap::new());
+        let map = cx.bind(bc, &args, &HashMap::default());
         if cx.inherited(bc, &map, 0, &mut all).is_none() {
             return;
         }

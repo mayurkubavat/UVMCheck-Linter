@@ -129,7 +129,7 @@ pub(crate) struct Elab<'b, 't> {
 
 impl<'b, 't> Elab<'b, 't> {
     pub fn new(b: &'b Builder<'t>) -> Self {
-        let mut defs = HashMap::new();
+        let mut defs = HashMap::default();
         for (ti, t) in b.trees.iter().enumerate() {
             for n in t.preorder() {
                 if matches!(t.kind(n), ModuleDecl | InterfaceDecl | ProgramDecl) {
@@ -169,16 +169,16 @@ impl<'b, 't> Elab<'b, 't> {
             defs,
             binds,
             defparams: Vec::new(),
-            envs: vec![Rc::new(HashMap::new())],
+            envs: vec![Rc::new(HashMap::default())],
             out: Vec::new(),
             diags: Vec::new(),
-            checked: HashSet::new(),
+            checked: HashSet::default(),
             top: Vec::new(),
-            taken: HashSet::new(),
-            considered: HashSet::new(),
-            reached: HashSet::new(),
+            taken: HashSet::default(),
+            considered: HashSet::default(),
+            reached: HashSet::default(),
             skipped: Vec::new(),
-            copies: HashMap::new(),
+            copies: HashMap::default(),
             uninst: 0,
             bound: 0,
             recording: 0,
@@ -223,7 +223,7 @@ impl<'b, 't> Elab<'b, 't> {
             return tops;
         }
         let b = self.b;
-        let mut used = HashSet::new();
+        let mut used = HashSet::default();
         for t in b.trees {
             for n in t.preorder() {
                 if matches!(t.kind(n), Instantiation | BindDirective) {
@@ -304,7 +304,7 @@ impl<'b, 't> Elab<'b, 't> {
         for top in self.tops() {
             self.interface_ports(&top);
             self.out.push(format!("$root instance {top} : {top}"));
-            self.instance(&top, &top, &Overrides::new(), Vec::new(), Rc::new(HashMap::new()), 0);
+            self.instance(&top, &top, &Overrides::default(), Vec::new(), Rc::new(HashMap::default()), 0);
         }
         self.out.sort();
         let mut skipped: Vec<NodeRef> = self.considered.difference(&self.taken).copied().collect();
@@ -724,7 +724,7 @@ impl<'b, 't> Elab<'b, 't> {
             // instantiated, so its path is not needed.
             self.copy(item);
             let mut v = vals.child();
-            self.items(&items, path, scope, &Overrides::new(), false, &mut v, depth);
+            self.items(&items, path, scope, &Overrides::default(), false, &mut v, depth);
             return;
         }
         let label = if b.kind(item) == GenerateBlock { self.label(item) } else { None };
@@ -738,7 +738,7 @@ impl<'b, 't> Elab<'b, 't> {
         }
         let inner = format!("{path}.{name}");
         let mut v = vals.child();
-        self.items(&items, &inner, scope, &Overrides::new(), false, &mut v, depth);
+        self.items(&items, &inner, scope, &Overrides::default(), false, &mut v, depth);
     }
 
     fn label(&self, block: NodeRef) -> Option<String> {
@@ -874,8 +874,8 @@ impl<'b, 't> Elab<'b, 't> {
         let Some(d) = self.defs.get(&def) else { return };
         let child = d.decl;
         // Overrides, evaluated here.
-        let mut over = Overrides::new();
-        let mut types: HashMap<String, Bound> = HashMap::new();
+        let mut over = Overrides::default();
+        let mut types: HashMap<String, Bound> = HashMap::default();
         let shared = vals.clone();
         if let Some(pl) = b.child(dt, ParamList) {
             let args: Vec<NodeRef> = match b.child(pl, ArgList) {

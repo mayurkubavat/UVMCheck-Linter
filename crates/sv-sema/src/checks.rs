@@ -26,7 +26,7 @@
 //! A name the checks cannot resolve for sure (inherited, imported,
 //! hierarchical) never makes an error.
 
-use std::collections::HashMap;
+use crate::fx::FxMap as HashMap;
 
 use sv_syntax::{Child, NodeId, SyntaxKind, Tree};
 use SyntaxKind::*;
@@ -102,7 +102,7 @@ struct Ctx<'a> {
 /// Runs the type checks over every tree of a compile, resolving names in
 /// `scopes`, and returns the errors found in tree and source order.
 pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
-    let mut values: HashMap<(usize, &str), Vec<usize>> = HashMap::new();
+    let mut values: HashMap<(usize, &str), Vec<usize>> = HashMap::default();
     for (i, s) in scopes.symbols.iter().enumerate() {
         if matches!(
             s.kind,
@@ -117,16 +117,16 @@ pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
             values.entry((s.scope, s.name.as_str())).or_default().push(i);
         }
     }
-    let mut opener = HashMap::new();
+    let mut opener = HashMap::default();
     for (i, sc) in scopes.scopes.iter().enumerate() {
         if let Some(y) = sc.symbol {
             let y = &scopes.symbols[y];
             opener.insert((y.tree, y.node), i);
         }
     }
-    let mut classes: HashMap<String, Vec<(usize, NodeId)>> = HashMap::new();
-    let mut enums: HashMap<String, bool> = HashMap::new();
-    let mut reals: HashMap<String, bool> = HashMap::new();
+    let mut classes: HashMap<String, Vec<(usize, NodeId)>> = HashMap::default();
+    let mut enums: HashMap<String, bool> = HashMap::default();
+    let mut reals: HashMap<String, bool> = HashMap::default();
     for (ix, t) in trees.iter().enumerate() {
         for n in t.preorder() {
             if t.kind(n) == ClassDecl {

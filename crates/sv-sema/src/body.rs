@@ -1,7 +1,7 @@
 //! Method bodies: calls (with what they call), assignments, timing controls
 //! and `super.new`, as slang's model reports them from the elaborated AST.
 
-use std::collections::HashMap;
+use crate::fx::FxMap as HashMap;
 
 use dv_model::{Assignment, Call, Direction, Loc, RootKind, TypeShape};
 use sv_syntax::SyntaxKind;
@@ -159,7 +159,7 @@ impl<'t> Builder<'t> {
             return BodyFacts::default();
         };
         let scope = self.classes[c].scope;
-        let mut args = HashMap::new();
+        let mut args = HashMap::default();
         let ret = self
             .child(decl, ReturnType)
             .and_then(|r| self.child(r, DataType))
@@ -177,7 +177,7 @@ impl<'t> Builder<'t> {
             class: c,
             env: env.clone(),
             scope,
-            frames: vec![args, HashMap::new()],
+            frames: vec![args, HashMap::default()],
             ret,
             facts: BodyFacts::default(),
         };
@@ -740,7 +740,7 @@ impl<'t> Builder<'t> {
         match k {
             DataDecl => self.declare(w, n, RootKind::Local),
             SeqBlock | ParBlock => {
-                w.frames.push(HashMap::new());
+                w.frames.push(HashMap::default());
                 // A function may hold `fork ... join_none`, timing and all.
                 let saved = w.in_function;
                 if k == ParBlock && self.own_tokens(n).contains(&"join_none") {
@@ -783,7 +783,7 @@ impl<'t> Builder<'t> {
                 }
             }
             LoopStmt => {
-                w.frames.push(HashMap::new());
+                w.frames.push(HashMap::default());
                 if self.own_tokens(n).first() == Some(&"foreach") {
                     self.foreach_vars(w, n);
                 }
@@ -1586,7 +1586,7 @@ impl<'t> Builder<'t> {
             },
             _ => Ty::Other,
         };
-        let mut frame = HashMap::new();
+        let mut frame = HashMap::default();
         frame.insert(iter, (elem, RootKind::Other));
         w.frames.push(frame);
         self.expr(w, e, None);

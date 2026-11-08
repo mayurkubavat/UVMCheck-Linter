@@ -15,7 +15,7 @@
 //! name it cannot see (a generate block, an inherited member) never makes
 //! an error.
 
-use std::collections::{HashMap, HashSet};
+use crate::fx::{FxMap as HashMap, FxSet as HashSet};
 
 use sv_syntax::{Child, NodeId, SyntaxKind, Tree};
 use SyntaxKind::*;
@@ -60,8 +60,8 @@ pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     redeclarations(trees, scopes, &mut out);
     let mut types: HashSet<String> = STD_TYPES.iter().map(|s| s.to_string()).collect();
     // Classes by name: whether each declaration may be instantiated.
-    let mut classes: HashMap<String, Vec<bool>> = HashMap::new();
-    let mut constraint_bodies = HashSet::new();
+    let mut classes: HashMap<String, Vec<bool>> = HashMap::default();
+    let mut constraint_bodies = HashSet::default();
     // Names a forward typedef promises, and where.
     let mut forwards: Vec<(usize, NodeId, String)> = Vec::new();
     for (ix, t) in trees.iter().enumerate() {
@@ -182,7 +182,7 @@ fn parents(t: &Tree) -> Vec<u32> {
 /// A name declared twice in one scope. A port and its net or variable
 /// share a name; `$unit` is checked per file.
 fn redeclarations(trees: &[Tree], s: &Scopes, out: &mut Vec<Diag>) {
-    let mut seen: HashMap<(usize, usize, &str), Vec<usize>> = HashMap::new();
+    let mut seen: HashMap<(usize, usize, &str), Vec<usize>> = HashMap::default();
     for (i, sym) in s.symbols.iter().enumerate() {
         if sym.scope == ROOT || sym.name.is_empty() {
             continue;

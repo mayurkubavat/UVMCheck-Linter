@@ -1,7 +1,7 @@
 //! SV-STY-003 (TodoCommentTracker): Tracks unresolved TODO, FIXME, ICEBOX,
 //! HACK, and XXX comment markers across the codebase.
 
-use std::collections::HashMap;
+use sv_sema::fx::FxMap as HashMap;
 use sv_syntax::Origin;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
@@ -61,7 +61,7 @@ const TAGS: [&str; 5] = ["TODO", "FIXME", "ICEBOX", "HACK", "XXX"];
 /// a macro body, after its first token, at each expansion.
 pub(crate) fn todo_comments(c: &Cst, s: &mut Sink) {
     let t = c.tree;
-    let mut uses: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut uses: HashMap<u32, Vec<u32>> = HashMap::default();
     for u in &t.macro_uses {
         uses.entry(u.origin.file).or_default().push(u.origin.offset);
     }
@@ -87,9 +87,9 @@ pub(crate) fn todo_comments(c: &Cst, s: &mut Sink) {
             loc,
         );
     };
-    let mut lexed: HashMap<u32, std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>>> = HashMap::new();
+    let mut lexed: HashMap<u32, std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>>> = HashMap::default();
     // The last token written in each file, and its end.
-    let mut last: HashMap<u32, (usize, u32)> = HashMap::new();
+    let mut last: HashMap<u32, (usize, u32)> = HashMap::default();
     for (i, tok) in t.tokens.iter().enumerate() {
         if tok.from_macro {
             // Comments before a token of a macro body (or argument), but

@@ -22,7 +22,7 @@
 //!   iterator names in `with` clauses (whose whole call is skipped),
 //!   members of a randomized object in `randomize() with`.
 
-use std::collections::{HashMap, HashSet};
+use crate::fx::{FxMap as HashMap, FxSet as HashSet};
 use std::rc::Rc;
 
 use sv_syntax::TokenKind as Kind;
@@ -137,13 +137,13 @@ pub fn check(trees: &[Tree]) -> Vec<Diag> {
     let mut b = Binder {
         trees,
         parents: trees.iter().map(parents).collect(),
-        classes: HashMap::new(),
-        packages: HashMap::new(),
+        classes: HashMap::default(),
+        packages: HashMap::default(),
         everywhere: BUILTINS.iter().map(|s| s.to_string()).collect(),
         global: BUILTINS.iter().map(|s| s.to_string()).collect(),
         visible: Default::default(),
         own: Default::default(),
-        uses: HashMap::new(),
+        uses: HashMap::default(),
     };
     for t in trees {
         for tok in &t.tokens {
@@ -208,7 +208,7 @@ impl Binder<'_> {
             return o.clone();
         }
         let t = &self.trees[s.tree];
-        let mut names = HashSet::new();
+        let mut names = HashSet::default();
         let mut imports = Vec::new();
         let mut stack: Vec<NodeId> = t.children(s.node).collect();
         // A design unit's header: ports, parameters, imports.

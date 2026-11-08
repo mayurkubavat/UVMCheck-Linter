@@ -8,7 +8,8 @@
 //! resolved) and references inside a generic class expanded for each of
 //! its own specializations, until no new ones appear.
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
+use sv_sema::fx::FxMap as HashMap;
 
 use sv_syntax::{NodeId, SyntaxKind};
 
@@ -68,7 +69,7 @@ impl Engine<'_, '_> {
                 return self.canon(td, subst, ctx, depth + 1);
             }
             if let Some(&td) = self.typedefs.get(t) {
-                return self.canon(td, &HashMap::new(), None, depth + 1);
+                return self.canon(td, &HashMap::default(), None, depth + 1);
             }
             return t.to_string();
         }
@@ -132,7 +133,7 @@ impl Engine<'_, '_> {
         depth: usize,
     ) -> Option<Vec<String>> {
         let params = &self.generics[g].params;
-        let mut own: HashMap<String, String> = HashMap::new();
+        let mut own: HashMap<String, String> = HashMap::default();
         let mut out = Vec::new();
         for (ix, (pname, default)) in params.iter().enumerate() {
             let given = args
@@ -199,7 +200,7 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
         let default_invalid = toks
             .windows(2)
             .any(|w| builtin_default.contains(&c.text_of(w[0])) && c.text_of(w[1]) == "::");
-        let mut locals = HashMap::new();
+        let mut locals = HashMap::default();
         for t in c.tree.children(n).filter(|&x| c.kind(x) == TypedefDecl) {
             if let (Some(nm), Some(ty)) = (c.tree.child(t, Name), c.tree.child(t, DataType)) {
                 locals.insert(c.tree.bare_text(nm), ty);
@@ -214,9 +215,9 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
         });
     }
     if generics.is_empty() {
-        return HashMap::new();
+        return HashMap::default();
     }
-    let mut typedefs = HashMap::new();
+    let mut typedefs = HashMap::default();
     for t in c.nodes(TypedefDecl) {
         // Only typedefs outside classes are global.
         if c.parent(t).is_some_and(|p| c.kind(p) == ClassDecl) {
@@ -234,7 +235,7 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
     };
     let class_of: HashMap<u32, usize> = engine.generics.iter().enumerate().map(|(i, g)| (g.node.0, i)).collect();
     // Out-of-block bodies of generic classes.
-    let mut out_of_block: HashMap<u32, usize> = HashMap::new();
+    let mut out_of_block: HashMap<u32, usize> = HashMap::default();
     for d in c.nodes(FunctionDecl).into_iter().chain(c.nodes(TaskDecl)) {
         let Some(nm) = c.tree.child(d, Name) else { continue };
         let toks: Vec<u32> = c.toks(nm).collect();
@@ -282,7 +283,7 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
                 queue.push((g, t));
             }
         };
-    let empty = HashMap::new();
+    let empty = HashMap::default();
     for g in 0..engine.generics.len() {
         if engine.generics[g].default_invalid {
             continue;

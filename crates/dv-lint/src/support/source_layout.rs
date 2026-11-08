@@ -1,7 +1,7 @@
 //! Line buffers, comments, banners, end labels and define ranges, for the
 //! style rules.
 
-use std::collections::HashMap;
+use sv_sema::fx::FxMap as HashMap;
 
 use dv_model::Loc;
 
@@ -184,7 +184,7 @@ pub(crate) fn comments_before(src: &str) -> std::sync::Arc<HashMap<u32, Vec<(u32
 }
 
 fn build_comments_before(src: &str) -> HashMap<u32, Vec<(u32, u32)>> {
-    let mut map = HashMap::new();
+    let mut map = HashMap::default();
     let mut pending = Vec::new();
     for &tk in crate::shared::raw_lex(src).iter() {
         match tk.kind {
@@ -227,13 +227,13 @@ pub(crate) fn trivia_comments(c: &Cst) -> Vec<(u32, u32, u32, Loc)> {
 pub(crate) fn build_trivia_comments(c: &Cst) -> Vec<(u32, u32, u32, Loc)> {
     let t = c.tree;
     let mut out = Vec::new();
-    let mut uses: HashMap<u32, Vec<u32>> = HashMap::new();
+    let mut uses: HashMap<u32, Vec<u32>> = HashMap::default();
     for u in &t.macro_uses {
         uses.entry(u.origin.file).or_default().push(u.origin.offset);
     }
     let skipped = |f: u32, p: u32| t.skipped.iter().any(|&(sf, a, e)| sf == f && a <= p && p < e);
-    let mut lexed: HashMap<u32, std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>>> = HashMap::new();
-    let mut last: HashMap<u32, (usize, u32)> = HashMap::new();
+    let mut lexed: HashMap<u32, std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>>> = HashMap::default();
+    let mut last: HashMap<u32, (usize, u32)> = HashMap::default();
     for (i, tok) in t.tokens.iter().enumerate() {
         if tok.from_macro {
             let Some(prev) = i.checked_sub(1).map(|p| &t.tokens[p]) else { continue };

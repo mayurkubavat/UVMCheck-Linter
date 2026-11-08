@@ -19,7 +19,7 @@
 //! declares is not checked in a file that imports a package; and only
 //! declarations in the same file count.
 
-use std::collections::HashMap;
+use crate::fx::FxMap as HashMap;
 
 use sv_syntax::{Child, NodeId, SyntaxKind, Tree};
 use SyntaxKind::*;
@@ -73,7 +73,7 @@ struct Decl {
 /// errors found (names used before they are declared), in tree and source order.
 pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     // Names some package declares.
-    let mut in_package = std::collections::HashSet::new();
+    let mut in_package = crate::fx::FxSet::default();
     for s in &scopes.symbols {
         let opener = scopes.scopes[s.scope].symbol.map(|y| scopes.symbols[y].kind);
         if opener == Some(SymKind::Package) {
@@ -93,7 +93,7 @@ struct Order<'a> {
     parent: Vec<u32>,
     decls: HashMap<(NodeId, String), Vec<Decl>>,
     imports: bool,
-    in_package: &'a std::collections::HashSet<&'a str>,
+    in_package: &'a crate::fx::FxSet<&'a str>,
 }
 
 fn pos(t: &Tree, n: NodeId) -> Option<u32> {
@@ -117,14 +117,14 @@ fn is_ident(s: &str) -> bool {
 }
 
 impl<'a> Order<'a> {
-    fn new(ix: usize, t: &'a Tree, scopes: &Scopes, in_package: &'a std::collections::HashSet<&'a str>) -> Self {
+    fn new(ix: usize, t: &'a Tree, scopes: &Scopes, in_package: &'a crate::fx::FxSet<&'a str>) -> Self {
         let mut parent = vec![u32::MAX; t.nodes.len()];
         for n in t.preorder() {
             for c in t.children(n) {
                 parent[c.0 as usize] = n.0;
             }
         }
-        let mut o = Order { ix, t, parent, decls: HashMap::new(), imports: false, in_package };
+        let mut o = Order { ix, t, parent, decls: HashMap::default(), imports: false, in_package };
         for s in scopes.symbols.iter().filter(|s| s.tree == ix) {
             let Some(p) = pos(t, s.node) else { continue };
             let checked = matches!(

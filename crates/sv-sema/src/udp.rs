@@ -14,7 +14,7 @@
 //! - gate instances with the wrong number of terminals or an empty one
 //!   (28.3), and primitive instances with more than two delays (29.7).
 
-use std::collections::HashSet;
+use crate::fx::FxSet as HashSet;
 
 use sv_syntax::{NodeId, SyntaxKind, Tree};
 use SyntaxKind::*;
@@ -25,7 +25,7 @@ use crate::names::Diag;
 /// errors found (user-defined primitive errors), in tree and source order.
 pub fn check(trees: &[Tree]) -> Vec<Diag> {
     let mut out = Vec::new();
-    let mut udps = HashSet::new();
+    let mut udps = HashSet::default();
     for t in trees {
         for n in t.preorder() {
             if t.kind(n) == UdpDecl {
@@ -243,7 +243,7 @@ impl Udp<'_> {
                 }
             }
         }
-        let mut declared: HashSet<(String, &str)> = HashSet::new();
+        let mut declared: HashSet<(String, &str)> = HashSet::default();
         let mut initial_target: Option<(NodeId, String, Vec<String>)> = None;
         let mut table = None;
         for c in t.children(n) {

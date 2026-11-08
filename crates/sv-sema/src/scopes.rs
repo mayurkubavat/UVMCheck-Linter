@@ -6,7 +6,7 @@
 //! [`Scopes::dump`] prints it in the form of the Slang reference
 //! (tools/oracles/sym_dump.cpp), one `<scope path> <kind> <name>` line per symbol.
 
-use std::collections::{HashMap, HashSet};
+use crate::fx::{FxMap as HashMap, FxSet as HashSet};
 
 use sv_syntax::{Child, NodeId, SyntaxKind, Tree};
 use SyntaxKind::*;
@@ -521,7 +521,7 @@ impl Walker<'_, '_> {
         // Non-ANSI port declarations name a net or variable, unless a
         // separate declaration of the same name does.
         let items = self.body_items(n);
-        let mut declared = HashSet::new();
+        let mut declared = HashSet::default();
         for &c in &items {
             if t.kind(c) == DataDecl && !self.has_direction(c) {
                 for d in t.children(c).filter(|&d| t.kind(d) == Declarator) {
@@ -763,7 +763,7 @@ impl Walker<'_, '_> {
 
 /// Symbols of each scope by name, in declaration order.
 pub fn by_scope(s: &Scopes) -> HashMap<usize, Vec<usize>> {
-    let mut m: HashMap<usize, Vec<usize>> = HashMap::new();
+    let mut m: HashMap<usize, Vec<usize>> = HashMap::default();
     for (i, sym) in s.symbols.iter().enumerate() {
         m.entry(sym.scope).or_default().push(i);
     }

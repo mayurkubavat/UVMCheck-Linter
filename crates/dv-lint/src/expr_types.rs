@@ -6,7 +6,7 @@
 //! `Type::toString()`. Gated against slang by tools/gates/expr_gate.py
 //! (tools/oracles/exprdump.cpp is the reference).
 
-use std::collections::HashMap;
+use sv_sema::fx::FxMap as HashMap;
 use std::sync::Arc;
 
 use sv_sema::oracle::{TypeInfo, TypeOracle};
@@ -95,7 +95,7 @@ fn is_assign(c: &Cst, e: NodeId) -> bool {
 
 impl<'a, 't> Typer<'a, 't> {
     pub(crate) fn new(c: &'a Cst<'t>, o: &'a TypeOracle<'t>) -> Self {
-        Typer { c, o, memo: HashMap::new(), fmemo: HashMap::new() }
+        Typer { c, o, memo: HashMap::default(), fmemo: HashMap::default() }
     }
 
     /// The type of `e` as the AST holds it: self-determined, or taken
@@ -765,7 +765,7 @@ pub(crate) fn expr_types(c: &Cst) -> Arc<HashMap<(usize, NodeId), ETy>> {
 }
 
 /// The routine formals (their declarators) of one bit.
-pub(crate) fn one_bit_formals(c: &Cst) -> Arc<std::collections::HashSet<(usize, NodeId)>> {
+pub(crate) fn one_bit_formals(c: &Cst) -> Arc<sv_sema::fx::FxSet<(usize, NodeId)>> {
     facts(c).2
 }
 
@@ -818,7 +818,7 @@ pub(crate) fn spec_types(c: &Cst) -> Arc<SpecTypes> {
 type Facts = (
     Arc<HashMap<(usize, NodeId), ETy>>,
     Arc<HashMap<(usize, NodeId), String>>,
-    Arc<std::collections::HashSet<(usize, NodeId)>>,
+    Arc<sv_sema::fx::FxSet<(usize, NodeId)>>,
     Arc<SpecTypes>,
     Arc<CfgDbTypes>,
 );
@@ -843,7 +843,7 @@ fn cfgdb_entry(
     ty: &mut Typer,
     o: &TypeOracle,
     n: NodeId,
-    ifaces: &mut Option<std::collections::HashSet<String>>,
+    ifaces: &mut Option<sv_sema::fx::FxSet<String>>,
 ) -> Option<Option<(ETy, String, bool)>> {
     let i = tc.index();
     let &callee = kids(tc, n).first()?;
@@ -882,8 +882,8 @@ fn cfgdb_entry(
 }
 
 /// The names of the interfaces declared in the compile.
-fn interface_names(all: &[sv_syntax::Tree]) -> std::collections::HashSet<String> {
-    let mut out = std::collections::HashSet::new();
+fn interface_names(all: &[sv_syntax::Tree]) -> sv_sema::fx::FxSet<String> {
+    let mut out = sv_sema::fx::FxSet::default();
     for (i, t) in all.iter().enumerate() {
         let c = Cst::new(t, i, sv_sema::Locator::default());
         for n in c.nodes(InterfaceDecl) {
@@ -902,13 +902,13 @@ const TYPE_PART: usize = 20_000;
 
 fn build_facts(c: &Cst) -> Facts {
     let o = TypeOracle::new(c.all);
-    let mut out = HashMap::new();
-    let mut canon = HashMap::new();
-    let mut one_bit = std::collections::HashSet::new();
-    let mut in_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::new();
-    let mut cfgdb: CfgDbTypes = HashMap::new();
-    let mut ifaces: Option<std::collections::HashSet<String>> = None;
-    let mut cfg_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::new();
+    let mut out = HashMap::default();
+    let mut canon = HashMap::default();
+    let mut one_bit = sv_sema::fx::FxSet::default();
+    let mut in_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::default();
+    let mut cfgdb: CfgDbTypes = HashMap::default();
+    let mut ifaces: Option<sv_sema::fx::FxSet<String>> = None;
+    let mut cfg_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::default();
     let mut scoped_calls: Vec<(usize, NodeId)> = Vec::new();
     for (i, t) in c.all.iter().enumerate() {
         let mut own;
@@ -1010,7 +1010,7 @@ fn build_facts(c: &Cst) -> Facts {
             }
         }
     }
-    let mut specs: SpecTypes = HashMap::new();
+    let mut specs: SpecTypes = HashMap::default();
     let mut groups: Vec<_> = in_generic.into_iter().collect();
     groups.sort_by_key(|g| g.0);
     for ((i, g, k), nodes) in groups {

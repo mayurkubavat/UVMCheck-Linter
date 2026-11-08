@@ -555,7 +555,7 @@ impl<'t> Builder<'t> {
         let own = |s: usize| {
             let m = self.enum_typedefs.borrow().get(&s).cloned();
             let m = m.unwrap_or_else(|| {
-                let mut m = HashMap::new();
+                let mut m = HashMap::default();
                 for t in self.scopes[s].typedefs.values().copied() {
                     let Some(dt) = self.child(t, DataType) else { continue };
                     if self.own_tokens(dt).first() != Some(&"enum") {
@@ -600,7 +600,7 @@ impl<'t> Builder<'t> {
         if let Some(m) = self.enum_cache.borrow().get(&s) {
             return m.get(name).cloned();
         }
-        let mut all: HashMap<String, CVal> = HashMap::new();
+        let mut all: HashMap<String, CVal> = HashMap::default();
         for &t in self.scopes[s].typedefs.values() {
             if let Some(dt) = self.child(t, DataType) {
                 if self.own_tokens(dt).first() == Some(&"enum") {

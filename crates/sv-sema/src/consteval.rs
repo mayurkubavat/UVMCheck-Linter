@@ -41,8 +41,8 @@ impl Builder<'_> {
         // Arguments are evaluated where the call is.
         let vals: Vec<CVal> = args.iter().map(|&a| self.eval(a, scope, env, depth + 1)).collect::<Option<_>>()?;
         let fscope = self.decl_scope(decl).unwrap_or(scope);
-        let mut frame: HashMap<String, CVal> = HashMap::new();
-        let mut types: HashMap<String, Ty> = HashMap::new();
+        let mut frame: HashMap<String, CVal> = HashMap::default();
+        let mut types: HashMap<String, Ty> = HashMap::default();
         let mut k = 0;
         let mut ports: Vec<(String, Option<NodeRef>)> = Vec::new();
         if let Some(pl) = self.child(decl, PortList) {

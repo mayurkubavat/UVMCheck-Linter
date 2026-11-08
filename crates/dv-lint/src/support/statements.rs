@@ -8,7 +8,7 @@
 //! `n` times is reported `n` times, as slang visits each instance body
 //! ([`Units::times`]).
 
-use std::collections::HashMap;
+use sv_sema::fx::FxMap as HashMap;
 
 use sv_syntax::{Child, NodeId, SyntaxKind};
 
@@ -432,7 +432,7 @@ pub(crate) fn compile_counts(all: &[sv_syntax::Tree], direct_only: bool) -> std:
     }
     let units = |k: SyntaxKind| matches!(k, ModuleDecl | InterfaceDecl | ProgramDecl);
     let mut defs: Vec<(usize, u32)> = Vec::new();
-    let mut by_name: HashMap<String, (usize, u32)> = HashMap::new();
+    let mut by_name: HashMap<String, (usize, u32)> = HashMap::default();
     let mut parents_of: Vec<Vec<u32>> = Vec::new();
     for (ti, t) in all.iter().enumerate() {
         let pre = t.preorder();
@@ -450,8 +450,8 @@ pub(crate) fn compile_counts(all: &[sv_syntax::Tree], direct_only: bool) -> std:
         }
         parents_of.push(parent);
     }
-    let mut parents: HashMap<(usize, u32), Vec<((usize, u32), usize)>> = HashMap::new();
-    let mut instantiated: std::collections::HashSet<(usize, u32)> = Default::default();
+    let mut parents: HashMap<(usize, u32), Vec<((usize, u32), usize)>> = HashMap::default();
+    let mut instantiated: sv_sema::fx::FxSet<(usize, u32)> = Default::default();
     for (ti, t) in all.iter().enumerate() {
         let parent = &parents_of[ti];
         let up = |n: u32| (parent[n as usize] != u32::MAX).then(|| parent[n as usize]);
@@ -493,7 +493,7 @@ pub(crate) fn compile_counts(all: &[sv_syntax::Tree], direct_only: bool) -> std:
     type Key = (usize, u32);
     fn times_of(
         d: Key,
-        tops: &std::collections::HashSet<Key>,
+        tops: &sv_sema::fx::FxSet<Key>,
         parents: &HashMap<Key, Vec<(Key, usize)>>,
         memo: &mut HashMap<Key, Option<usize>>,
     ) -> usize {
@@ -510,8 +510,8 @@ pub(crate) fn compile_counts(all: &[sv_syntax::Tree], direct_only: bool) -> std:
         memo.insert(d, Some(t));
         t
     }
-    let mut memo = HashMap::new();
-    let mut out = HashMap::new();
+    let mut memo = HashMap::default();
+    let mut out = HashMap::default();
     for &d in &defs {
         let t = times_of(d, &instantiated, &parents, &mut memo);
         if t > 0 {

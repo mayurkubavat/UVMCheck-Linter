@@ -11,7 +11,7 @@
 //! - [`std_unordered_order`]: the iteration order of a libstdc++
 //!   `std::unordered_set<std::string>`, which some messages list names in.
 
-use std::collections::{HashMap, HashSet};
+use sv_sema::fx::{FxMap as HashMap, FxSet as HashSet};
 use std::sync::{Arc, Mutex};
 
 use sv_syntax::{NodeId, SyntaxKind};
@@ -195,7 +195,7 @@ pub(crate) fn last_name(c: &Cst, decl: NodeId) -> String {
 /// A class's own routines (functions, tasks, prototypes) by last name, in
 /// item order: what [`callee_decl`] scans along the class chain.
 fn class_routines(c: &Cst, cls: NodeId) -> Arc<Vec<(String, NodeId)>> {
-    let all = crate::shared::get("class_routines", c.tree_key(), || Mutex::new(HashMap::<NodeId, Arc<Vec<(String, NodeId)>>>::new()));
+    let all = crate::shared::get("class_routines", c.tree_key(), || Mutex::new(HashMap::<NodeId, Arc<Vec<(String, NodeId)>>>::default()));
     if let Some(v) = all.lock().unwrap_or_else(|e| e.into_inner()).get(&cls) {
         return v.clone();
     }
@@ -423,7 +423,7 @@ fn build_info(c: &Cst) -> TreeInfo {
     let generic: Vec<NodeId> = c.nodes(ClassDecl).into_iter().filter(|&n| class_params(c, n).is_some()).collect();
     if !generic.is_empty() {
         let names: HashMap<String, NodeId> = generic.iter().map(|&n| (decl_name(c, n), n)).collect();
-        let mut keys: HashMap<u32, HashSet<Vec<String>>> = HashMap::new();
+        let mut keys: HashMap<u32, HashSet<Vec<String>>> = HashMap::default();
         for n in c.nodes(ParamList) {
             let Some(p) = c.parent(n) else { continue };
             if !matches!(c.kind(p), DataType | NameExpr) {
@@ -579,7 +579,7 @@ fn hier(c: &Cst) -> std::sync::Arc<Hier> {
 
 fn build_hier(c: &Cst) -> Hier {
     let e = crate::shared::elaboration(c);
-    let mut h = Hier { instances: HashMap::new(), def_of: HashMap::new(), copies: e.copies.clone(), last: HashMap::new() };
+    let mut h = Hier { instances: HashMap::default(), def_of: HashMap::default(), copies: e.copies.clone(), last: HashMap::default() };
     for (ix, line) in e.hierarchy.iter().enumerate() {
         let mut it = line.splitn(3, ' ');
         let (Some(parent), Some("instance"), Some(rest)) = (it.next(), it.next(), it.next()) else { continue };
@@ -848,7 +848,7 @@ fn out_of_block(c: &Cst, cls: &str, m: &str, at: NodeId) -> Option<NodeId> {
 /// Routines named `..::cls::m`, by (cls, m): functions first, then tasks,
 /// each in tree order.
 fn out_of_block_index(c: &Cst) -> HashMap<(String, String), Vec<NodeId>> {
-    let mut out: HashMap<(String, String), Vec<NodeId>> = HashMap::new();
+    let mut out: HashMap<(String, String), Vec<NodeId>> = HashMap::default();
     for d in [FunctionDecl, TaskDecl].into_iter().flat_map(|k| c.nodes(k)) {
         let full = decl_name(c, d);
         let mut parts = full.rsplit("::");
@@ -867,7 +867,7 @@ pub(crate) fn user_routines(c: &Cst) -> Vec<(NodeId, usize)> {
 
 fn build_user_routines(c: &Cst) -> Vec<(NodeId, usize)> {
     let mut out: Vec<(NodeId, usize)> = Vec::new();
-    let mut seen = HashSet::new();
+    let mut seen = HashSet::default();
     for cls in user_classes(c) {
         for m in class_methods(c, cls) {
             if seen.insert(m) {
@@ -935,11 +935,11 @@ fn in_items(c: &Cst, scope: NodeId, name: &str, kind: DeclKind) -> Option<Decl> 
 type ItemIndex = HashMap<String, (bool, Option<NodeId>, NodeId)>;
 
 fn item_index(c: &Cst, scope: NodeId) -> Arc<ItemIndex> {
-    let all = crate::shared::get("item_index", c.tree_key(), || Mutex::new(HashMap::<NodeId, Arc<ItemIndex>>::new()));
+    let all = crate::shared::get("item_index", c.tree_key(), || Mutex::new(HashMap::<NodeId, Arc<ItemIndex>>::default()));
     if let Some(v) = all.lock().unwrap_or_else(|e| e.into_inner()).get(&scope) {
         return v.clone();
     }
-    let mut m = ItemIndex::new();
+    let mut m = ItemIndex::default();
     index_items(c, scope, &mut m);
     let v = Arc::new(m);
     all.lock().unwrap_or_else(|e| e.into_inner()).insert(scope, v.clone());

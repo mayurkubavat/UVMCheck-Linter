@@ -27,7 +27,7 @@
 //! `body` for method bodies); `elab` elaborates on the same builder.
 
 use sv_source::{Dialect, FileList, ProcessEnv};
-use std::collections::{HashMap, HashSet};
+use crate::fx::{FxMap as HashMap, FxSet as HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
@@ -387,7 +387,7 @@ pub fn symbol_info(
     b.designs = true;
     b.collect_names();
     b.collect();
-    let empty: Env = Rc::new(HashMap::new());
+    let empty: Env = Rc::new(HashMap::default());
     // The builder scope of each scope: subroutines read their parent's.
     let mut map = vec![b.unit; s.scopes.len()];
     for (i, sc) in s.scopes.iter().enumerate() {
@@ -406,7 +406,7 @@ pub fn symbol_info(
             None => b.unit,
         };
     }
-    let mut nettypes: HashMap<String, NodeRef> = HashMap::new();
+    let mut nettypes: HashMap<String, NodeRef> = HashMap::default();
     for (ti, t) in trees.iter().enumerate() {
         for n in t.preorder() {
             if t.kind(n) == SyntaxKind::NetTypeDecl {
@@ -418,9 +418,9 @@ pub fn symbol_info(
     }
     // A class's members are typed in its default specialization: each
     // type parameter bound to its default.
-    let mut envs: HashMap<usize, Env> = HashMap::new();
+    let mut envs: HashMap<usize, Env> = HashMap::default();
     for c in &b.classes {
-        let mut m = HashMap::new();
+        let mut m = HashMap::default();
         for (name, is_type, default) in &c.params {
             if let (true, Some(d)) = (is_type, default) {
                 m.insert(
@@ -830,12 +830,12 @@ impl<'t> Builder<'t> {
             packages: Default::default(),
             unit: 0,
             classes: Vec::new(),
-            bodies: HashMap::new(),
+            bodies: HashMap::default(),
             used_names: Default::default(),
             type_names: Default::default(),
             sub_names: Default::default(),
             interfaces: Default::default(),
-            rep_env: HashMap::new(),
+            rep_env: HashMap::default(),
             keying: Default::default(),
             parent_of: Default::default(),
             const_cache: Default::default(),
@@ -843,10 +843,10 @@ impl<'t> Builder<'t> {
             enum_cache: Default::default(),
             enum_typedefs: Default::default(),
             enum_strings: Default::default(),
-            block_typedefs: HashMap::new(),
-            spec_counts: HashMap::new(),
-            spec_sets: HashMap::new(),
-            named_sets: HashMap::new(),
+            block_typedefs: HashMap::default(),
+            spec_counts: HashMap::default(),
+            spec_sets: HashMap::default(),
+            named_sets: HashMap::default(),
             node_scope: Default::default(),
             locator: Locator::default(),
             base_cache: Default::default(),
@@ -1347,7 +1347,7 @@ impl<'t> Builder<'t> {
         uses: &mut HashSet<(String, Option<String>)>,
     ) {
         let t = &self.trees[tree];
-        let mut own = HashSet::new();
+        let mut own = HashSet::default();
         // Token ranges of generic class bodies (and their out-of-block
         // methods), innermost last after sorting by start.
         let mut regions: Vec<(u32, u32, String)> = Vec::new();
@@ -1411,7 +1411,7 @@ impl<'t> Builder<'t> {
             .filter(|c| c.generic)
             .map(|c| c.name.as_str())
             .collect();
-        let mut uses = HashSet::new();
+        let mut uses = HashSet::default();
         for i in 0..self.trees.len() {
             self.collect_name_uses(i, &generics, &mut uses);
         }
@@ -1511,7 +1511,7 @@ impl<'t> Builder<'t> {
         // Keyed by the canonical form (bindings resolved through typedefs
         // and parameters), holding the printed form and the bindings.
         let mut uses = Vec::new();
-        let generic: std::collections::HashSet<&str> =
+        let generic: crate::fx::FxSet<&str> =
             self.classes.iter().filter(|c| c.generic).map(|c| c.name.as_str()).collect();
         for tree in 0..self.trees.len() {
             let regions = self.scope_map(tree);
@@ -1591,7 +1591,7 @@ impl<'t> Builder<'t> {
     }
 
     fn collect_block_typedefs(&mut self) {
-        let mut out: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>> = HashMap::new();
+        let mut out: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>> = HashMap::default();
         for (ti, t) in self.trees.iter().enumerate() {
             let mut stack = vec![t.root];
             while let Some(n) = stack.pop() {
@@ -1656,7 +1656,7 @@ impl<'t> Builder<'t> {
     /// `defaults`, every generic's default specialization is a seed and
     /// code in any generic with one is elaborated.
     fn spec_fixpoint(&self, uses: &[SpecUse], defaults: bool) -> SpecSets {
-        let mut specs: SpecSets = HashMap::new();
+        let mut specs: SpecSets = HashMap::default();
         // Each class's specialization keys in the order they were added
         // (entries are only ever added).
         let mut order: crate::fx::FxMap<usize, Vec<String>> = Default::default();
@@ -2093,7 +2093,7 @@ impl<'t> Builder<'t> {
             return Env::default();
         };
         let params = &self.classes[c].params;
-        let mut map = HashMap::new();
+        let mut map = HashMap::default();
         let mut pos = 0;
         for a in self.children(al) {
             if self.kind(a) != Arg {
@@ -2572,7 +2572,7 @@ impl<'t> Builder<'t> {
         if let Some(v) = self.decl_cache.borrow().get(&c) {
             return v.clone();
         }
-        let mut map: HashMap<&'t str, (bool, bool)> = HashMap::new();
+        let mut map: HashMap<&'t str, (bool, bool)> = HashMap::default();
         for m in self.children(self.classes[c].node) {
             if !matches!(self.kind(m), FunctionDecl | TaskDecl | MethodPrototype) {
                 continue;

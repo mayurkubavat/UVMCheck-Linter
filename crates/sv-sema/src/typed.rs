@@ -17,7 +17,7 @@
 //! package that exports anything, a parameterized class and named or
 //! defaulted arguments are not checked.
 
-use std::collections::{HashMap, HashSet};
+use crate::fx::{FxMap as HashMap, FxSet as HashSet};
 
 use sv_syntax::{Child, NodeId, SyntaxKind, Tree};
 use SyntaxKind::*;
@@ -198,9 +198,9 @@ struct Ctx<'a> {
 /// errors found (members and arity checked against declared types), in tree and source order.
 pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     let (types, _) = crate::symbol_info(trees, scopes);
-    let mut by_name: HashMap<(usize, &str), Vec<usize>> = HashMap::new();
-    let mut typedefs = HashMap::new();
-    let mut members: HashMap<usize, Vec<&str>> = HashMap::new();
+    let mut by_name: HashMap<(usize, &str), Vec<usize>> = HashMap::default();
+    let mut typedefs = HashMap::default();
+    let mut members: HashMap<usize, Vec<&str>> = HashMap::default();
     for (i, s) in scopes.symbols.iter().enumerate() {
         members.entry(s.scope).or_default().push(s.name.as_str());
         by_name.entry((s.scope, s.name.as_str())).or_default().push(i);
@@ -208,11 +208,11 @@ pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
             typedefs.insert(format!("{}.{}", scopes.scopes[s.scope].path, s.name), i);
         }
     }
-    let mut opener = HashMap::new();
-    let mut classes: HashMap<String, Option<usize>> = HashMap::new();
-    let mut packages: HashMap<String, Option<usize>> = HashMap::new();
-    let mut bases = HashMap::new();
-    let mut exporting = HashSet::new();
+    let mut opener = HashMap::default();
+    let mut classes: HashMap<String, Option<usize>> = HashMap::default();
+    let mut packages: HashMap<String, Option<usize>> = HashMap::default();
+    let mut bases = HashMap::default();
+    let mut exporting = HashSet::default();
     for (i, sc) in scopes.scopes.iter().enumerate() {
         let Some(y) = sc.symbol else { continue };
         let y = &scopes.symbols[y];
@@ -360,9 +360,9 @@ impl<'a> Ctx<'a> {
     /// Members of a class and the classes it extends; None when one of
     /// them is not in the design.
     fn class_members(&self, name: &str) -> Option<HashSet<&'a str>> {
-        let mut out = HashSet::new();
+        let mut out = HashSet::default();
         let mut cur = Some(name.to_string());
-        let mut seen = HashSet::new();
+        let mut seen = HashSet::default();
         while let Some(c) = cur {
             if !seen.insert(c.clone()) {
                 break;

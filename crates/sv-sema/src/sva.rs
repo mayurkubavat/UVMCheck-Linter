@@ -29,7 +29,7 @@
 //! Sequence and property names are matched by name, and only where the
 //! name declares nothing else anywhere in the design.
 
-use std::collections::{HashMap, HashSet};
+use crate::fx::{FxMap as HashMap, FxSet as HashSet};
 
 use sv_syntax::{Child, NodeId, SyntaxKind, Tree};
 use SyntaxKind::*;
@@ -149,8 +149,8 @@ struct Ctx<'a> {
 pub fn check(trees: &[Tree]) -> Vec<Diag> {
     // Every declared name, to keep only sequence / property names that
     // name nothing else.
-    let mut count: HashMap<String, usize> = HashMap::new();
-    let mut decls: HashMap<String, AssertDecl> = HashMap::new();
+    let mut count: HashMap<String, usize> = HashMap::default();
+    let mut decls: HashMap<String, AssertDecl> = HashMap::default();
     for (ix, t) in trees.iter().enumerate() {
         for n in t.preorder() {
             if t.kind(n) == Name {
@@ -311,7 +311,7 @@ impl Ctx<'_> {
         let args = t.child(n, ArgList).map(|al| entries(t, al)).unwrap_or_default();
         let named = args.first().is_some_and(|a| a.first().is_some_and(|x| x == "."));
         if named {
-            let mut seen = HashSet::new();
+            let mut seen = HashSet::default();
             for a in &args {
                 let Some(an) = a.get(1) else { continue };
                 if !d.formals.iter().any(|f| &f.name == an) {
@@ -413,7 +413,7 @@ impl Ctx<'_> {
 
     /// Sequences that instantiate themselves, directly or not.
     fn recursion(&mut self) {
-        let mut edges: HashMap<String, Vec<String>> = HashMap::new();
+        let mut edges: HashMap<String, Vec<String>> = HashMap::default();
         for (name, d) in &self.decls {
             if d.kind != SequenceDecl {
                 continue;
@@ -436,7 +436,7 @@ impl Ctx<'_> {
         names.sort();
         let mut bad = Vec::new();
         for start in names {
-            let mut seen = HashSet::new();
+            let mut seen = HashSet::default();
             let mut stack = edges[start].clone();
             while let Some(x) = stack.pop() {
                 if &x == start {
@@ -498,7 +498,7 @@ impl Ctx<'_> {
             }
         }
         // Free checker variables.
-        let mut free = HashSet::new();
+        let mut free = HashSet::default();
         for d in descendants(t, n).into_iter().filter(|&c| t.kind(c) == DataDecl) {
             if own_toks(t, d).contains(&"rand") {
                 for decl in t.children(d).filter(|&c| t.kind(c) == Declarator) {
@@ -611,7 +611,7 @@ impl Ctx<'_> {
 
     fn covergroup(&mut self, ix: usize, n: NodeId) {
         let t = &self.trees[ix];
-        let mut formals = HashSet::new();
+        let mut formals = HashSet::default();
         if let Some(pl) = t.child(n, PortList) {
             for p in t.children(pl).filter(|&c| t.kind(c) == Port) {
                 let own = own_toks(t, p);
