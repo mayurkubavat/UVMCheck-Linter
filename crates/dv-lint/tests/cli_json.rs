@@ -9,7 +9,7 @@ fn json_report_has_uvmchecks_fields() {
     let out = dir.join("r.json");
     let st =
         std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint")).arg("--json").arg(&out).arg(&src).status().unwrap();
-    assert_eq!(st.code(), Some(1), "findings exit 1");
+    assert_eq!(st.code(), Some(0), "only infos and warnings: exit 0, as uvmcheck");
     let text = std::fs::read_to_string(&out).unwrap();
     for key in ["\"tool\": \"dv-lint\"", "\"compileErrors\": 0", "\"violations\": [", "\"ruleId\": \"SV-STY-003\""] {
         assert!(text.contains(key), "{key} in {text}");
@@ -317,5 +317,26 @@ fn fix_rewrites_and_dry_run_shows_the_diff() {
     assert!(fixed.contains("[uvmcheck] Applied 3 fix-it(s) in 1 file(s)."), "{fixed}");
     assert_eq!(std::fs::read_to_string(&src).unwrap(), "module m;\n  logic a;\nendmodule\n");
     assert!(!fixed.contains("SV-STY-015"), "the next pass reports on the fixed text: {fixed}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn exit_status_follows_errors_only() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-exit-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("w.sv"), "module m; // TODO: x\nendmodule\n").unwrap();
+    // A syntax error is an ERROR finding (SV-CMP-001).
+    std::fs::write(dir.join("e.sv"), "module m; logic a endmodule\n").unwrap();
+    let code = |f: &str| {
+        std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+            .current_dir(&dir)
+            .args(["--no-config", f])
+            .output()
+            .unwrap()
+            .status
+            .code()
+    };
+    assert_eq!(code("w.sv"), Some(0));
+    assert_eq!(code("e.sv"), Some(1));
     let _ = std::fs::remove_dir_all(&dir);
 }

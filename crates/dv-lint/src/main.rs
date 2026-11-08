@@ -33,7 +33,9 @@
 //! Rules run on one thread per core (`DV_LINT_JOBS=N` to choose; 1 runs
 //! them serially); the output does not depend on it.
 //!
-//! Exit status: 0 clean, 1 findings, 2 load error.
+//! Exit status, as uvmcheck's: 1 when an ERROR finding remains (after
+//! waivers and re-grades), 0 when only warnings and infos do (or none), 2 for
+//! a load or configuration error.
 use dv_model::Design;
 
 fn main() {
@@ -519,7 +521,8 @@ fn report(
             std::process::exit(2);
         }
     }
-    std::process::exit(if found.is_empty() { 0 } else { 1 });
+    // As uvmcheck: warnings and infos alone do not fail the run.
+    std::process::exit(if found.iter().any(|f| f.severity == dv_lint::Severity::Error) { 1 } else { 0 });
 }
 
 #[cfg(feature = "slang")]
