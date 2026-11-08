@@ -247,10 +247,8 @@ pub(crate) fn timing_control(p: &mut Parser) {
                     p.bump();
                 } else {
                     expr(p);
-                    if p.eat(":") {
-                        if !p.eat("$") {
-                            expr(p);
-                        }
+                    if p.eat(":") && !p.eat("$") {
+                        expr(p);
                     }
                 }
                 p.expect("]");

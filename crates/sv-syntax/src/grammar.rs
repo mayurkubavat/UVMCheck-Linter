@@ -1488,11 +1488,8 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
                 data_decl(p);
                 return DataDecl;
             }
-            let before = p.pos();
             if expr_with(p, STATEMENT) {
                 p.expect(";");
-            } else if p.pos() == before {
-                to_semi(p);
             } else {
                 to_semi(p);
             }

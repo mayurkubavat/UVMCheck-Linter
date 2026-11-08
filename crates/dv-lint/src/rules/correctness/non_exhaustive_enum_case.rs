@@ -11,7 +11,10 @@ use SyntaxKind::*;
 
 /// The enum a declaration's type is, through typedefs: its name as slang
 /// prints the canonical type, and its members with their values.
-fn enum_of(c: &Cst, dt: NodeId) -> Option<(String, Vec<(String, Option<i64>)>)> {
+/// An enum's canonical name and its members with their values.
+type EnumMembers = (String, Vec<(String, Option<i64>)>);
+
+fn enum_of(c: &Cst, dt: NodeId) -> Option<EnumMembers> {
     let mut dt = dt;
     let mut name = String::new();
     for _ in 0..4 {

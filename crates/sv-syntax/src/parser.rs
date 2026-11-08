@@ -113,7 +113,7 @@ impl<'t> Parser<'t> {
 
     /// Trivia came before token `n` ahead (macro bodies included).
     pub(crate) fn space_before(&self, n: usize) -> bool {
-        self.toks.get(self.pos + n).map_or(true, |t| t.space_before)
+        self.toks.get(self.pos + n).is_none_or(|t| t.space_before)
     }
 
     /// No trivia between token `n` ahead and the one before it, as in `(*`.

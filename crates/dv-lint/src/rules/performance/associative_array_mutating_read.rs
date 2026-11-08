@@ -14,7 +14,7 @@ use sv_syntax::SyntaxKind::*;
 /// C++ rule's text test has it).
 fn assoc_names(c: &Cst) -> std::rc::Rc<HashSet<String>> {
     thread_local! {
-        static NAMES: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<HashSet<String>>)>> = const { std::cell::RefCell::new(None) };
+        static NAMES: crate::shared::CompileCache<HashSet<String>> = const { std::cell::RefCell::new(None) };
     }
     let key = c.compile_key();
     if let Some(v) = NAMES.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {

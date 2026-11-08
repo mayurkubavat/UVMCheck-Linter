@@ -109,7 +109,7 @@ pub(crate) fn feature_envy(d: &Design, csts: &[Cst], out: &mut Sink) {
         field_uses(&ctx, c, body, &mut u);
         let mut top: Option<(&String, &(usize, &Class))> = None;
         for e in &u.foreign {
-            if top.map_or(true, |t| e.1 .0 > t.1 .0) {
+            if top.is_none_or(|t| e.1 .0 > t.1 .0) {
                 top = Some(e);
             }
         }

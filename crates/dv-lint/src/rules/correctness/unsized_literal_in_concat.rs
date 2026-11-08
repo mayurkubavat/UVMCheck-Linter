@@ -19,7 +19,7 @@ fn packed_concat(c: &Cst, n: NodeId) -> bool {
     let unpacked = |d: NodeId| {
         c.kind(d) == Declarator
             && c.tree.child(d, Dim).is_some()
-            && c.parent(d).and_then(|dd| c.tree.child(dd, DataType)).map_or(true, |t| compact(c, t) != "int")
+            && c.parent(d).and_then(|dd| c.tree.child(dd, DataType)).is_none_or(|t| compact(c, t) != "int")
     };
     if unpacked(p) {
         return false;

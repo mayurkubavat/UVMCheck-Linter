@@ -55,10 +55,7 @@ pub(crate) fn decl_name(c: &Cst, n: NodeId) -> String {
 /// its module overrides it (slang then never binds the default).
 pub(crate) fn overridden_everywhere(c: &Cst, unit: NodeId, param: NodeId) -> Option<usize> {
     let module = decl_name(c, unit);
-    let Some(name) = c.tree.child(param, Declarator).and_then(|d| c.tree.child(d, Name)).map(|x| c.tree.bare_text(x))
-    else {
-        return None;
-    };
+    let name = c.tree.child(param, Declarator).and_then(|d| c.tree.child(d, Name)).map(|x| c.tree.bare_text(x))?;
     // Its position among the unit's header parameters, for positional lists.
     let header =
         c.tree.child(unit, ParamList).or_else(|| c.tree.child(unit, Header).and_then(|h| c.tree.child(h, ParamList)));
@@ -94,7 +91,7 @@ pub(crate) type Insts = HashMap<String, Vec<(String, Option<String>, Vec<String>
 
 pub(crate) fn instantiations(c: &Cst) -> std::rc::Rc<Insts> {
     thread_local! {
-        static INSTS: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<Insts>)>> = const { std::cell::RefCell::new(None) };
+        static INSTS: crate::shared::CompileCache<Insts> = const { std::cell::RefCell::new(None) };
     }
     let key = c.compile_key();
     if let Some(v) = INSTS.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {

@@ -23,11 +23,14 @@ pub(crate) fn base_name(p: &str) -> &str {
     p.rsplit(['/', '\\']).next().unwrap_or(p)
 }
 
-/// One lexed file of a tree: its tokens without trivia (kind, start,
-/// length, whether a line break came before it).
+/// A file's tokens without trivia: (kind, start, length, whether a line
+/// break came before it).
+pub(crate) type LexedToks = std::sync::Arc<Vec<(Kind, u32, u32, bool)>>;
+
+/// One lexed file of a tree: its tokens without trivia.
 pub(crate) struct Lexed<'s> {
     pub(crate) src: &'s str,
-    pub(crate) toks: std::sync::Arc<Vec<(Kind, u32, u32, bool)>>,
+    pub(crate) toks: LexedToks,
 }
 
 impl<'s> Lexed<'s> {
@@ -83,7 +86,7 @@ pub(crate) struct Files<'t> {
 
 /// [`Files`] without its sources, shared by the rules that read it.
 pub(crate) struct FilesData {
-    pub(crate) toks: Vec<std::sync::Arc<Vec<(Kind, u32, u32, bool)>>>,
+    pub(crate) toks: Vec<LexedToks>,
     pub(crate) lib: Vec<bool>,
     pub(crate) macros: HashMap<String, (u32, usize)>,
 }

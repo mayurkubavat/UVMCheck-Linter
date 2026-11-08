@@ -367,14 +367,14 @@ pub(crate) fn naming_engine(d: &Design, csts: &[Cst], out: &mut Sink) {
     for c in csts {
         let tok = |n: NodeId| c.first_tok(n).filter(|&t| !c.tree.tokens[t as usize].from_macro);
         for g in c.nodes(CovergroupDecl) {
-            let Some(t) = c.tree.child(g, Name).and_then(|nm| tok(nm)) else { continue };
+            let Some(t) = c.tree.child(g, Name).and_then(tok) else { continue };
             report(out, "Covergroup", "CovergroupNamingConvention", c.text_of(t), c.loc(t));
         }
         for (k, kind, rn) in
             [(Coverpoint, "Coverpoint", "CoverpointNamingConvention"), (Cross, "Cross", "CrossNamingConvention")]
         {
             for n in c.nodes(k) {
-                let Some(t) = c.tree.child(n, StmtLabel).and_then(|l| tok(l)) else { continue };
+                let Some(t) = c.tree.child(n, StmtLabel).and_then(tok) else { continue };
                 report(out, kind, rn, c.text_of(t), c.loc(t));
             }
         }
@@ -387,7 +387,7 @@ pub(crate) fn naming_engine(d: &Design, csts: &[Cst], out: &mut Sink) {
             report(out, "Constraint", "ConstraintNamingConvention", c.last_text(nm), c.loc(t));
         }
         for n in c.nodes(TypedefDecl) {
-            let Some(t) = c.tree.child(n, Name).and_then(|nm| tok(nm)) else { continue };
+            let Some(t) = c.tree.child(n, Name).and_then(tok) else { continue };
             let is_enum =
                 c.tree.child(n, DataType).and_then(|ty| c.first_tok(ty)).is_some_and(|f| c.text_of(f) == "enum");
             let (kind, rn) = if is_enum {
@@ -398,7 +398,7 @@ pub(crate) fn naming_engine(d: &Design, csts: &[Cst], out: &mut Sink) {
             report(out, kind, rn, c.text_of(t), c.loc(t));
         }
         for n in c.nodes(InterfaceDecl) {
-            let Some(t) = c.tree.child(n, Name).and_then(|nm| tok(nm)) else { continue };
+            let Some(t) = c.tree.child(n, Name).and_then(tok) else { continue };
             report(out, "Interface", "InterfaceNamingConvention", c.text_of(t), c.loc(t));
         }
     }

@@ -283,7 +283,7 @@ impl Builder<'_> {
             let field = *self.own_tokens(e).last()?;
             let Shape::Struct { fields, .. } = self.shape(ty?, env, 0)? else { return None };
             let f = fields.into_iter().find(|f| f.name == field)?;
-            let s = self.ty_shape(f.ty, env).map_or(false, |x| x.1);
+            let s = self.ty_shape(f.ty, env).is_some_and(|x| x.1);
             return Some((f.lo, f.w, s));
         }
         // A select: by the declared dimension, else bit `i` of an integer.

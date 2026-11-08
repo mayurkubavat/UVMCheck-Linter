@@ -171,9 +171,12 @@ pub(crate) fn comments(text: &str, base: u32) -> Vec<(u32, u32, bool)> {
     out
 }
 
+/// Each token's leading comments (start, end), by token offset.
+pub(crate) type Comments = std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>>;
+
 /// Each token's leading comments, by token offset, from lexing `src`.
 /// Shared: the same files are read by several rules.
-pub(crate) fn comments_before(src: &str) -> std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>> {
+pub(crate) fn comments_before(src: &str) -> Comments {
     if crate::shared::current() == 0 {
         return std::sync::Arc::new(build_comments_before(src));
     }
@@ -229,7 +232,7 @@ pub(crate) fn build_trivia_comments(c: &Cst) -> Vec<(u32, u32, u32, Loc)> {
         uses.entry(u.origin.file).or_default().push(u.origin.offset);
     }
     let skipped = |f: u32, p: u32| t.skipped.iter().any(|&(sf, a, e)| sf == f && a <= p && p < e);
-    let mut lexed: HashMap<u32, std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>>> = HashMap::default();
+    let mut lexed: HashMap<u32, Comments> = HashMap::default();
     let mut last: HashMap<u32, (usize, u32)> = HashMap::default();
     for (i, tok) in t.tokens.iter().enumerate() {
         if tok.from_macro {

@@ -1424,7 +1424,7 @@ impl<'t> Builder<'t> {
         let own = self.own_tokens(dt);
         match own.first().copied() {
             Some("bit" | "int" | "byte" | "shortint" | "longint") => true,
-            Some("enum") => self.child(dt, DataType).map_or(true, |b| self.two_state(b)),
+            Some("enum") => self.child(dt, DataType).is_none_or(|b| self.two_state(b)),
             _ => false,
         }
     }

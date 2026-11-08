@@ -29,7 +29,7 @@ pub(crate) fn query_changes_state(c: &Cst, s: &mut Sink) {
                 if property_owner(&classes, i, &w).is_none() {
                     continue;
                 }
-                if changed.as_ref().map_or(true, |x| w < *x) {
+                if changed.as_ref().is_none_or(|x| w < *x) {
                     changed = Some(w);
                 }
             }

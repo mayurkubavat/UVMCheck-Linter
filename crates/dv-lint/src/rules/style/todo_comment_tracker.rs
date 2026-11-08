@@ -87,7 +87,7 @@ pub(crate) fn todo_comments(c: &Cst, s: &mut Sink) {
             loc,
         );
     };
-    let mut lexed: HashMap<u32, std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>>> = HashMap::default();
+    let mut lexed: HashMap<u32, crate::support::source_layout::Comments> = HashMap::default();
     // The last token written in each file, and its end.
     let mut last: HashMap<u32, (usize, u32)> = HashMap::default();
     for (i, tok) in t.tokens.iter().enumerate() {

@@ -27,7 +27,7 @@ pub(crate) fn sequence_abort_safety(c: &Cst, s: &mut Sink) {
                 let finish = text[at..].find("finish_item").map(|i| i + at);
                 if let Some(ret) = text[at..].find("return").map(|i| i + at) {
                     let after = text[ret + 6..].find(|ch| ch != ' ' && ch != '\t').map(|i| i + ret + 6);
-                    if after.is_some_and(|a| text.as_bytes()[a] == b';') && finish.map_or(true, |f| ret < f) {
+                    if after.is_some_and(|a| text.as_bytes()[a] == b';') && finish.is_none_or(|f| ret < f) {
                         if let Some(loc) = name_loc(c, f) {
                             s.add(
                                 "UVM-SEQ-004",

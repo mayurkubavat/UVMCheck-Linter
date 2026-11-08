@@ -420,7 +420,7 @@ pub(crate) fn compile_counts(all: &[sv_syntax::Tree], direct_only: bool) -> std:
         }
         parents_of.push(parent);
     }
-    let mut parents: HashMap<(usize, u32), Vec<((usize, u32), usize)>> = HashMap::default();
+    let mut parents: HashMap<Key, Vec<(Key, usize)>> = HashMap::default();
     let mut instantiated: sv_sema::fx::FxSet<(usize, u32)> = Default::default();
     for (ti, t) in all.iter().enumerate() {
         let parent = &parents_of[ti];

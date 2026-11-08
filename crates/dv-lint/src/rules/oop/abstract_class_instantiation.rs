@@ -54,7 +54,7 @@ pub(crate) fn abstract_new(c: &Cst, s: &mut Sink) {
     let mut model: Option<sv_sema::SpecModel> = None;
     for n in news {
         // `new[n]`, `new obj` (a copy) and `super.new` call no constructor.
-        if c.toks(n).any(|t| c.text_of(t) == "[") || c.tree.child(n, ArgList).is_none() && kids(c, n).len() > 0 {
+        if c.toks(n).any(|t| c.text_of(t) == "[") || c.tree.child(n, ArgList).is_none() && !kids(c, n).is_empty() {
             continue;
         }
         if c.parent(n).is_some_and(|p| c.kind(p) == MemberExpr) {

@@ -673,8 +673,7 @@ impl Preprocessor {
         if self.line_peek().is_some_and(|t| &*t.text == "(" && !t.space_before) {
             self.line_next();
             let mut list = Vec::new();
-            loop {
-                let Some(p) = self.line_next() else { break };
+            while let Some(p) = self.line_next() {
                 if &*p.text == ")" {
                     break;
                 }
@@ -797,7 +796,7 @@ impl Preprocessor {
                     return;
                 }
                 "elsif" if depth == 0 => {
-                    let taken = self.conds.last().map_or(true, |c| c.taken);
+                    let taken = self.conds.last().is_none_or(|c| c.taken);
                     let cond = self.condition(&t);
                     if !taken && cond {
                         if let Some(c) = self.conds.last_mut() {
@@ -807,7 +806,7 @@ impl Preprocessor {
                     }
                 }
                 "else" if depth == 0 => {
-                    let taken = self.conds.last().map_or(true, |c| c.taken);
+                    let taken = self.conds.last().is_none_or(|c| c.taken);
                     if !taken {
                         if let Some(c) = self.conds.last_mut() {
                             c.taken = true;
@@ -1137,7 +1136,7 @@ impl Preprocessor {
                 Kind::MacroPaste => {
                     // a``b: glue the last token out with the next one in. A paste
                     // that borders whitespace, or ends the body, is dropped (slang).
-                    if t.space_before || body.get(i + 1).map_or(true, |b| b.space_before) || out.is_empty() {
+                    if t.space_before || body.get(i + 1).is_none_or(|b| b.space_before) || out.is_empty() {
                         i += 1;
                         continue;
                     }
@@ -1150,7 +1149,7 @@ impl Preprocessor {
                     }
                     let left = out.pop();
                     let mut glued = left.as_ref().map(|l| l.text.to_string()).unwrap_or_default();
-                    let space = left.as_ref().map_or(false, |l| l.space_before);
+                    let space = left.as_ref().is_some_and(|l| l.space_before);
                     if let Some(first) = next.first() {
                         glued.push_str(&first.text);
                     }
@@ -1218,6 +1217,61 @@ impl Preprocessor {
     }
 }
 
+/// A file `include can read: anything but a directory, so device files
+/// such as `/dev/null` work too.
+fn includable(p: &Path) -> bool {
+    p.exists() && !p.is_dir()
+}
+
+/// Checks `1ns / 1ps`: magnitudes 1, 10 or 100, precision no coarser than
+/// the unit.
+/// 1ns, as a power of ten femtoseconds.
+pub const DEFAULT_TIME_UNIT: i32 = 6;
+
+/// The unit of a `timescale spec as a power of ten femtoseconds, or why
+/// the spec is invalid.
+fn timescale_unit(spec: &str) -> Result<i32, String> {
+    const UNITS: &[&str] = &["fs", "ps", "ns", "us", "ms", "s"];
+    let value = |s: &str| -> Option<i32> {
+        let digits = s.find(|c: char| !c.is_ascii_digit())?;
+        let mag = match &s[..digits] {
+            "1" => 0,
+            "10" => 1,
+            "100" => 2,
+            _ => return None,
+        };
+        let unit = UNITS.iter().position(|u| *u == &s[digits..])? as i32;
+        Some(unit * 3 + mag)
+    };
+    let Some((unit, prec)) = spec.split_once('/') else {
+        return Err("`timescale needs unit / precision".into());
+    };
+    match (value(unit), value(prec)) {
+        (Some(u), Some(p)) if p > u => Err("`timescale precision is coarser than its unit".into()),
+        (Some(u), Some(_)) => Ok(u),
+        _ => Err(format!("invalid `timescale {spec}")),
+    }
+}
+
+fn is_directive_name(s: &str) -> bool {
+    matches!(
+        s,
+        "define"
+            | "undef"
+            | "undefineall"
+            | "ifdef"
+            | "ifndef"
+            | "elsif"
+            | "else"
+            | "endif"
+            | "include"
+            | "begin_keywords"
+            | "end_keywords"
+            | "__FILE__"
+            | "__LINE__"
+    ) || LINE_DIRECTIVES.contains(&s)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1272,59 +1326,4 @@ mod tests {
             ["begin", "x", ";", "end"]
         );
     }
-}
-
-/// A file `include can read: anything but a directory, so device files
-/// such as `/dev/null` work too.
-fn includable(p: &Path) -> bool {
-    p.exists() && !p.is_dir()
-}
-
-/// Checks `1ns / 1ps`: magnitudes 1, 10 or 100, precision no coarser than
-/// the unit.
-/// 1ns, as a power of ten femtoseconds.
-pub const DEFAULT_TIME_UNIT: i32 = 6;
-
-/// The unit of a `timescale spec as a power of ten femtoseconds, or why
-/// the spec is invalid.
-fn timescale_unit(spec: &str) -> Result<i32, String> {
-    const UNITS: &[&str] = &["fs", "ps", "ns", "us", "ms", "s"];
-    let value = |s: &str| -> Option<i32> {
-        let digits = s.find(|c: char| !c.is_ascii_digit())?;
-        let mag = match &s[..digits] {
-            "1" => 0,
-            "10" => 1,
-            "100" => 2,
-            _ => return None,
-        };
-        let unit = UNITS.iter().position(|u| *u == &s[digits..])? as i32;
-        Some(unit * 3 + mag)
-    };
-    let Some((unit, prec)) = spec.split_once('/') else {
-        return Err("`timescale needs unit / precision".into());
-    };
-    match (value(unit), value(prec)) {
-        (Some(u), Some(p)) if p > u => Err("`timescale precision is coarser than its unit".into()),
-        (Some(u), Some(_)) => Ok(u),
-        _ => Err(format!("invalid `timescale {spec}")),
-    }
-}
-
-fn is_directive_name(s: &str) -> bool {
-    matches!(
-        s,
-        "define"
-            | "undef"
-            | "undefineall"
-            | "ifdef"
-            | "ifndef"
-            | "elsif"
-            | "else"
-            | "endif"
-            | "include"
-            | "begin_keywords"
-            | "end_keywords"
-            | "__FILE__"
-            | "__LINE__"
-    ) || LINE_DIRECTIVES.contains(&s)
 }

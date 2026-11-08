@@ -56,7 +56,7 @@ pub(crate) fn magic_number(c: &Cst, s: &mut Sink) {
                     DataDecl => continue,
                     Literal => {
                         let Some(v) = literal_value(c, x) else { continue };
-                        if matches!(v, 0 | 1 | -1) {
+                        if matches!(v, -1..=1) {
                             continue;
                         }
                         let Some(t) = c.first_tok(x) else { continue };

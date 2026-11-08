@@ -278,7 +278,7 @@ impl Int {
             out.push(s2);
             carry = (c1 || c2) as u64;
         }
-        Int { w: out.into() }.trim()
+        Int { w: out }.trim()
     }
 
     /// `-self`, exact.
@@ -301,7 +301,7 @@ impl Int {
             let below = if i == 0 { 0 } else { self.word(i - 1) };
             out.push(if bs == 0 { lo } else { (lo << bs) | (below >> (64 - bs)) });
         }
-        Int { w: out.into() }.trim()
+        Int { w: out }.trim()
     }
 
     /// Arithmetic shift right (the sign repeats).
@@ -317,7 +317,7 @@ impl Int {
             let hi = self.word(i + 1);
             out.push(if bs == 0 { lo } else { (lo >> bs) | (hi << (64 - bs)) });
         }
-        Int { w: out.into() }.trim()
+        Int { w: out }.trim()
     }
 
     fn magnitude(&self) -> Vec<u64> {

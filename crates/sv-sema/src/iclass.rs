@@ -337,10 +337,10 @@ fn unadorned(cx: &Classes, ix: usize, t: &Tree, n: NodeId, parent: &[u32], out: 
                     return;
                 }
             }
-            FunctionDecl | TaskDecl | ConstraintDecl => {
-                if t.child(a, Name).is_some_and(|nm| text(t, nm).split(' ').any(|w| w == name)) {
-                    return;
-                }
+            FunctionDecl | TaskDecl | ConstraintDecl
+                if t.child(a, Name).is_some_and(|nm| text(t, nm).split(' ').any(|w| w == name)) =>
+            {
+                return;
             }
             _ => {}
         }

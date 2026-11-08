@@ -499,8 +499,11 @@ impl Builder<'_> {
         let elems: Vec<NodeRef> = self.children(val).into_iter().filter(|c| types::is_expr(self.kind(*c))).collect();
         let pos = match decl.and_then(|d| self.dim_range(d, decl_scope, env)) {
             Some((l, r)) if self.children(decl?).into_iter().filter(|c| types::is_expr(self.kind(*c))).count() == 2 => {
-                let p = if l >= r { l - idx } else { idx - l };
-                p
+                if l >= r {
+                    l - idx
+                } else {
+                    idx - l
+                }
             }
             _ => idx,
         };

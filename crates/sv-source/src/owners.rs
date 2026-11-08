@@ -237,7 +237,7 @@ mod tests {
         fs::write(d.join("agent/agent_items.svh"), "`include \"inc/drv.svh\"\n").unwrap();
         fs::write(d.join("agent/inc/drv.svh"), "class drv; endclass\n").unwrap();
         fs::write(d.join("tb.sv"), "`include \"agent/inc/drv.svh\"\nmodule tb; endmodule\n").unwrap();
-        let idx = IncludeIndex::scan(&[d.clone()], &[]);
+        let idx = IncludeIndex::scan(std::slice::from_ref(&d), &[]);
         let o = idx.owners(&d.join("agent/inc/drv.svh"));
         assert_eq!(o.len(), 2, "{o:?}");
         assert_eq!(o[0].root, canon(&d.join("agent/agent_pkg.sv")));

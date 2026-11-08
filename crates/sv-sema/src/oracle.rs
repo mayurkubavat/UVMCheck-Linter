@@ -29,14 +29,20 @@ impl TypeInfo {
     }
 }
 
+/// A [`TypeOracle::decl_type`] query: (tree, data type, declarator).
+type DeclKey = (usize, Option<sv_syntax::NodeId>, Option<sv_syntax::NodeId>);
+
+/// A constant expression's value, width and signedness.
+type ConstValue = (i128, u32, bool);
+
 /// The builder's scopes and constant evaluation, read-only.
 pub struct TypeOracle<'t> {
     b: Builder<'t>,
     regions: Vec<crate::ScopeMap>,
     /// Answers already given (constant functions make some slow).
-    decls: std::cell::RefCell<HashMap<(usize, Option<sv_syntax::NodeId>, Option<sv_syntax::NodeId>), TypeInfo>>,
+    decls: std::cell::RefCell<HashMap<DeclKey, TypeInfo>>,
     values: std::cell::RefCell<HashMap<(usize, sv_syntax::NodeId), TypeInfo>>,
-    consts: std::cell::RefCell<HashMap<(usize, sv_syntax::NodeId), Option<(i128, u32, bool)>>>,
+    consts: std::cell::RefCell<HashMap<(usize, sv_syntax::NodeId), Option<ConstValue>>>,
     /// Enum members and package members by (scope, package, name).
     members: std::cell::RefCell<HashMap<(usize, String, String), Option<TypeInfo>>>,
     /// The specialization of a generic class to type its body in (see

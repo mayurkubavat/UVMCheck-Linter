@@ -671,15 +671,20 @@ impl ScopeMap {
         for i in order {
             let (lo, hi, s) = regions[i];
             let hi = (hi as usize).min(ntok.saturating_sub(1));
-            for t in lo as usize..=hi {
-                if t < ntok {
-                    by_tok[t] = s as u32;
-                }
+            if (lo as usize) <= hi && hi < ntok {
+                by_tok[lo as usize..=hi].fill(s as u32);
             }
         }
         ScopeMap { by_tok }
     }
 }
+
+/// Typedefs declared in blocks and routines, by name: tree, the block's
+/// token bounds, the declaration's first token, the decl.
+type BlockTypedefs = HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>>;
+
+/// An enum type string's (tree, node, scope, alias).
+type EnumStringKey = (usize, NodeId, usize, Option<String>);
 
 type SpecSets = HashMap<usize, std::collections::BTreeMap<String, (String, Env)>>;
 
@@ -723,10 +728,9 @@ struct Builder<'t> {
     /// Scope -> member name -> the enum typedef declared in it that names it, first wins.
     enum_typedefs: std::cell::RefCell<HashMap<usize, std::rc::Rc<HashMap<String, NodeRef>>>>,
     /// Enum type strings outside any specialization, by (tree, node, scope, alias).
-    enum_strings: std::cell::RefCell<HashMap<(usize, NodeId, usize, Option<String>), String>>,
-    /// Typedefs declared in blocks and routines, by name: tree, the
-    /// block's token bounds, the declaration's first token, the decl.
-    block_typedefs: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>>,
+    enum_strings: std::cell::RefCell<HashMap<EnumStringKey, String>>,
+    /// Typedefs declared in blocks and routines, by name.
+    block_typedefs: BlockTypedefs,
     /// Specializations slang elaborates per generic class (default included).
     spec_counts: HashMap<usize, usize>,
     /// Those specializations' bindings, keyed by identity.
@@ -1303,7 +1307,7 @@ impl<'t> Builder<'t> {
         loop {
             let before = live.len();
             for (name, owner) in &uses {
-                if owner.as_ref().map_or(true, |o| live.contains(o) && o != name) {
+                if owner.as_ref().is_none_or(|o| live.contains(o) && o != name) {
                     live.insert(name.clone());
                 }
             }
@@ -1458,7 +1462,7 @@ impl<'t> Builder<'t> {
     }
 
     fn collect_block_typedefs(&mut self) {
-        let mut out: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>> = HashMap::default();
+        let mut out: BlockTypedefs = HashMap::default();
         for (ti, t) in self.trees.iter().enumerate() {
             let mut stack = vec![t.root];
             while let Some(n) = stack.pop() {

@@ -61,9 +61,12 @@ fn param_scope(c: &Cst, n: NodeId) -> String {
     "global".into()
 }
 
+/// Declarations by name: (order, tree, token, scope).
+type Decls = HashMap<String, ((usize, usize, u32), usize, u32, String)>;
+
 fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
     thread_local! {
-        static FOUND: std::cell::RefCell<Option<((usize, usize), std::rc::Rc<Vec<ParamFinding>>)>> = const { std::cell::RefCell::new(None) };
+        static FOUND: crate::shared::CompileCache<Vec<ParamFinding>> = const { std::cell::RefCell::new(None) };
     }
     let key = c.compile_key();
     if let Some(v) = FOUND.with(|k| k.borrow().as_ref().filter(|e| e.0 == key).map(|e| e.1.clone())) {
@@ -71,7 +74,7 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
     }
     // Declarations by name: (order, tree, token, scope); the one slang
     // visits last is where it reports.
-    let mut decls: HashMap<String, ((usize, usize, u32), usize, u32, String)> = HashMap::new();
+    let mut decls: Decls = HashMap::new();
     let mut referenced: HashSet<String> = HashSet::new();
     // Classes specialized where slang visits the specialization: a base
     // class, an implemented class, a type parameter's value.
@@ -118,7 +121,7 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
                         .unwrap_or(0)
                 })
         };
-        let declare = |nm: NodeId, decls: &mut HashMap<String, ((usize, usize, u32), usize, u32, String)>| {
+        let declare = |nm: NodeId, decls: &mut Decls| {
             let Some(tok) = tc.first_tok(nm) else { return };
             if !visited(nm) {
                 return;
@@ -220,12 +223,10 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
                         skip = true;
                         break;
                     }
-                    IfGenerate | CaseGenerate | LoopGenerate => {
-                        // The header, not the generated blocks.
-                        if !matches!(tc.kind(x), GenerateBlock | ElseClause) {
-                            skip = true;
-                            break;
-                        }
+                    // The header, not the generated blocks.
+                    IfGenerate | CaseGenerate | LoopGenerate if !matches!(tc.kind(x), GenerateBlock | ElseClause) => {
+                        skip = true;
+                        break;
                     }
                     _ => {}
                 }

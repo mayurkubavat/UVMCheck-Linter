@@ -152,10 +152,12 @@ fn main() -> ExitCode {
 }
 
 fn bench(o: &Opts) -> ExitCode {
-    let mut rows = Vec::new();
+    // One run: its timings, wall time (ms), classes and members.
+    type Row = (dv_model::Timings, f64, usize, usize);
+    let mut rows: Vec<Row> = Vec::new();
     for _ in 0..o.bench {
         let start = std::time::Instant::now();
-        let d = match load(&o) {
+        let d = match load(o) {
             Ok(d) => d,
             Err(e) => {
                 eprintln!("dv-map: {e}");
@@ -167,7 +169,7 @@ fn bench(o: &Opts) -> ExitCode {
         let members: usize = d.classes().iter().map(|c| c.properties.len() + c.methods.len()).sum();
         rows.push((t, wall, d.classes().len(), members));
     }
-    let med = |f: &dyn Fn(&(dv_model::Timings, f64, usize, usize)) -> f64| {
+    let med = |f: &dyn Fn(&Row) -> f64| {
         let mut v: Vec<f64> = rows.iter().map(f).collect();
         v.sort_by(|a, b| a.partial_cmp(b).unwrap());
         v[v.len() / 2]

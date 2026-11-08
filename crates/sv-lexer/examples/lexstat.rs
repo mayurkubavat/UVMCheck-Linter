@@ -53,7 +53,7 @@ fn main() {
             worst.push((unk.len(), f.display().to_string(), first));
         }
     }
-    worst.sort_by(|a, b| b.0.cmp(&a.0));
+    worst.sort_by_key(|w| std::cmp::Reverse(w.0));
     for (n, f, first) in worst.iter().take(15) {
         println!("  {n:5} unknown  {f}  first: {first:?}");
     }

@@ -39,9 +39,7 @@ fn fixed_range(c: &Cst, d: &crate::support::slang_ast::Decl) -> Option<(i64, i64
             break;
         }
         let name = c.text_of(t);
-        let Some(td) = c.first_named(TypedefDecl, name) else {
-            return None;
-        };
+        let td = c.first_named(TypedefDecl, name)?;
         if let Some(dim) = c.tree.children(td).find(|&x| c.kind(x) == Dim) {
             return bounds(dim);
         }

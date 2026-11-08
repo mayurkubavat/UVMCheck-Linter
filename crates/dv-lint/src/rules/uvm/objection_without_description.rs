@@ -45,7 +45,7 @@ pub(crate) fn objection_without_description(d: &Design, csts: &[Cst], s: &mut Si
                 false
             } else {
                 match ps[1].and_then(|a| ordered_expr(c, a)) {
-                    Some(e) => string_value(c, e).map_or(true, |v| !v.is_empty()),
+                    Some(e) => string_value(c, e).is_none_or(|v| !v.is_empty()),
                     None => true,
                 }
             };
