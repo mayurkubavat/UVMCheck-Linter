@@ -27,3 +27,56 @@ pub(crate) fn get(id: &str, key: &str, default: i64) -> i64 {
         .and_then(|o| o.as_ref().and_then(|m| m.get(&(id.to_string(), key.to_string())).copied()))
         .unwrap_or(default)
 }
+
+/// A `style` setting from the project configuration.
+#[derive(Clone, Debug)]
+pub enum StyleValue {
+    Bool(bool),
+    Int(i64),
+    Str(String),
+}
+
+static STYLE: RwLock<Option<HashMap<String, StyleValue>>> = RwLock::new(None);
+
+/// Sets the `style` block (key, value), as uvmcheck's StyleConfiguration.
+pub fn set_style(style: &[(String, StyleValue)]) {
+    if let Ok(mut s) = STYLE.write() {
+        *s = Some(style.iter().cloned().collect());
+    }
+}
+
+fn style(key: &str) -> Option<StyleValue> {
+    STYLE.read().ok().and_then(|s| s.as_ref().and_then(|m| m.get(key).cloned()))
+}
+
+pub(crate) fn style_bool(key: &str, default: bool) -> bool {
+    match style(key) {
+        Some(StyleValue::Bool(b)) => b,
+        _ => default,
+    }
+}
+
+pub(crate) fn style_int(key: &str, default: i64) -> i64 {
+    match style(key) {
+        Some(StyleValue::Int(n)) => n,
+        _ => default,
+    }
+}
+
+pub(crate) fn style_str(key: &str, default: &str) -> String {
+    match style(key) {
+        Some(StyleValue::Str(s)) => s,
+        _ => default.to_string(),
+    }
+}
+
+/// A header pattern of literal alternatives (`Copyright|SPDX-License-Identifier`),
+/// matched case-insensitively as uvmcheck's `std::regex::icase` search does.
+/// None for a pattern with other regex syntax (no regex engine here; the
+/// project config reports it as not applied).
+pub(crate) fn header_alternatives(pattern: &str) -> Option<Vec<String>> {
+    if pattern.contains(['\\', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '^', '$']) {
+        return None;
+    }
+    Some(pattern.split('|').map(str::to_lowercase).collect())
+}

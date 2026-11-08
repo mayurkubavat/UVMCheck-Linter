@@ -112,3 +112,35 @@ fn rule_options_from_the_config() {
     assert!(text.contains("threshold of 40 characters"), "{text}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn style_block_from_the_config() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-style-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("uvmcheck.json"),
+        r#"{"style": {"max_line_length": 30, "allow_tabs": true, "mandatory_matching_end_label": false,
+            "require_file_header": true, "file_header_pattern": "Copyright|SPDX-License-Identifier",
+            "file_matches_class_name": true}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("bar.sv"),
+        "class foo;\n\tint a;\n  function void f(); endfunction // padding padding\nendclass\n",
+    )
+    .unwrap();
+    std::fs::write(dir.join("ok.sv"), "// SPDX-License-Identifier: MIT\nclass ok; endclass\n").unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .current_dir(&dir)
+        .args(["bar.sv", "ok.sv"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    let has = |id: &str, file: &str| text.lines().any(|l| l.contains(id) && l.contains(file));
+    assert!(has("SV-STY-103", "bar.sv") && text.contains("limit of 30 characters"), "{text}");
+    assert!(!text.contains("SV-STY-101"), "tabs allowed: {text}");
+    assert!(!text.contains("SV-STY-104"), "end labels not required: {text}");
+    assert!(has("SV-STY-105", "bar.sv") && !has("SV-STY-105", "ok.sv"), "{text}");
+    assert!(has("SV-STY-106", "bar.sv") && !has("SV-STY-106", "ok.sv"), "{text}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

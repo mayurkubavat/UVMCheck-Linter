@@ -8,9 +8,9 @@
 //! A Python config (`.uvmcheck/config.py`) is evaluated by the uvmcheck
 //! Python SDK (`python3 -m uvmcheck.config_runner`), as the C++ engine does,
 //! into the same JSON a `.json` config holds. Integer and boolean rule
-//! options go to [`crate::options`]; `style` and `naming` blocks and other
-//! options are not applied by the native rules yet: [`Config::unapplied`]
-//! names them so the caller can say so.
+//! options and the `style` block go to [`crate::options`]; the `naming`
+//! block and other options are not applied by the native rules yet:
+//! [`Config::unapplied`] names them so the caller can say so.
 
 use std::path::{Path, PathBuf};
 
@@ -219,6 +219,8 @@ pub struct Config {
     pub unapplied: Vec<String>,
     /// Integer rule options: (rule ID or name, key, value).
     pub options: Vec<(String, String, i64)>,
+    /// The `style` block.
+    pub style: Vec<(String, crate::options::StyleValue)>,
 }
 
 fn severity(s: &str) -> Option<Severity> {
@@ -367,10 +369,48 @@ impl Config {
                 c.rules.push((key.clone(), rs));
             }
         }
-        for key in ["style", "naming"] {
-            if matches!(root.get(key), Json::Obj(o) if !o.is_empty()) {
-                c.unapplied.push(key.to_string());
+        // As uvmcheck: a rules key that names no rule is a warning.
+        let all = crate::rules();
+        for (key, _) in &c.rules {
+            let known =
+                all.iter().any(|r| r.id == key || r.name == key || crate::sub_rules(r.id).iter().any(|s| s.0 == key));
+            if !known {
+                c.warnings.push(format!("rules: '{key}' does not match any rule ID or name"));
             }
+        }
+        if let Json::Obj(style) = root.get("style") {
+            for (k, v) in style {
+                let val = match v {
+                    Json::Bool(b) => crate::options::StyleValue::Bool(*b),
+                    Json::Num(n) => crate::options::StyleValue::Int(*n as i64),
+                    Json::Str(s) => crate::options::StyleValue::Str(s.clone()),
+                    _ => continue,
+                };
+                match k.as_str() {
+                    // uvmcheck reads it but no rule acts on it.
+                    "one_statement_per_line" => {}
+                    "max_line_length"
+                    | "allow_tabs"
+                    | "allow_trailing_whitespace"
+                    | "mandatory_matching_end_label"
+                    | "require_file_header"
+                    | "file_matches_class_name" => {}
+                    "file_header_pattern" => {
+                        let lit = v.as_str().is_some_and(|p| p.is_empty() || crate::header_pattern_supported(p));
+                        let required =
+                            style.iter().any(|(k, v)| k == "require_file_header" && v.as_bool() == Some(true));
+                        if !lit && required {
+                            c.unapplied
+                                .push("style.file_header_pattern (only literal alternatives a|b are supported)".into());
+                        }
+                    }
+                    other => c.warnings.push(format!("unknown style setting '{other}' ignored")),
+                }
+                c.style.push((k.clone(), val));
+            }
+        }
+        if matches!(root.get("naming"), Json::Obj(o) if !o.is_empty()) {
+            c.unapplied.push("naming".to_string());
         }
         c.add_waivers(root.get("waivers"), &base)?;
         let wfile = project.join(".uvmcheck").join("waivers.json");
@@ -442,7 +482,7 @@ impl Config {
     }
 
     fn rule(&self, id: &str, name: &str) -> Option<&RuleSettings> {
-        self.rules.iter().find(|(k, _)| k == id || k == name).map(|(_, r)| r)
+        self.rules.iter().find(|(k, _)| k == id || (!name.is_empty() && k == name)).map(|(_, r)| r)
     }
 
     /// The rule runs under this config (`enabled` not false).
@@ -454,12 +494,10 @@ impl Config {
     /// excluded files and those waived, regrades severities. Returns how
     /// many were waived.
     pub fn apply(&self, found: &mut Vec<Finding>, files: &[String]) -> usize {
+        // Config keys and waivers name a rule by ID or by a rule's name, as
+        // uvmcheck resolves them: a sub-rule (SV-STY-102 ...) by its ID only.
         let all = crate::rules();
-        let names: std::collections::HashMap<&str, &str> = all
-            .iter()
-            .map(|r| (r.id, r.name))
-            .chain(all.iter().flat_map(|r| crate::sub_rules(r.id).iter().copied()))
-            .collect();
+        let names: std::collections::HashMap<&str, &str> = all.iter().map(|r| (r.id, r.name)).collect();
         let mut cache: std::collections::HashMap<u32, String> = Default::default();
         let mut norm = |f: u32| -> String {
             cache
@@ -469,7 +507,7 @@ impl Config {
         };
         let mut waived = 0;
         found.retain_mut(|x| {
-            let name = names.get(x.rule).copied().unwrap_or(x.name);
+            let name = names.get(x.rule).copied().unwrap_or("");
             if !self.enabled(x.rule, name) {
                 return false;
             }
@@ -499,7 +537,7 @@ impl Config {
             }
             let line = x.position_in(files).1;
             for w in &self.waivers {
-                let rule_ok = w.rule == "*" || w.rule == x.rule || w.rule == name;
+                let rule_ok = w.rule == "*" || w.rule == x.rule || (!name.is_empty() && w.rule == name);
                 let path_ok = w.path.as_ref().is_none_or(|p| p.matches(&path));
                 let line_ok = w.line == 0 || w.line == line;
                 // No regex engine here: a message pattern matches as text.

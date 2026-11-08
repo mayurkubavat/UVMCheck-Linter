@@ -60,6 +60,11 @@ mod rule_profiles;
 #[allow(dead_code)]
 pub(crate) mod json;
 pub mod options;
+
+/// A `style.file_header_pattern` the native style engine can match.
+pub fn header_pattern_supported(p: &str) -> bool {
+    options::header_alternatives(p).is_some()
+}
 pub mod project;
 
 /// Which rules run without `--rule`, as uvmcheck selects them: `preset`

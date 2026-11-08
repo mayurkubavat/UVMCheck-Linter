@@ -13,6 +13,10 @@ pub(crate) const STYLE_SUBS: &[(&str, &str)] = &[
     ("SV-STY-102", "TrailingWhitespace"),
     ("SV-STY-103", "MaxLineLengthExceeded"),
     ("SV-STY-104", "MandatoryMatchingEndLabel"),
+    // Off unless the project config sets style.file_matches_class_name /
+    // style.require_file_header.
+    ("SV-STY-105", "FileMatchesClassName"),
+    ("SV-STY-106", "MissingFileHeader"),
 ];
 
 /// The ids SV-NAM-100 reports under (the default naming rules; SV-NAM-104
