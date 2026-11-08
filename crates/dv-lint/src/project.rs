@@ -501,12 +501,11 @@ impl Config {
                     | "require_file_header"
                     | "file_matches_class_name" => {}
                     "file_header_pattern" => {
-                        let lit = v.as_str().is_some_and(|p| p.is_empty() || crate::header_pattern_supported(p));
+                        let why = v.as_str().filter(|p| !p.is_empty()).and_then(crate::header_pattern_error);
                         let required =
                             style.iter().any(|(k, v)| k == "require_file_header" && v.as_bool() == Some(true));
-                        if !lit && required {
-                            c.unapplied
-                                .push("style.file_header_pattern (only literal alternatives a|b are supported)".into());
+                        if let Some(why) = why.filter(|_| required) {
+                            c.unapplied.push(format!("style.file_header_pattern ({why}; the header check is off)"));
                         }
                     }
                     other => c.warnings.push(format!("unknown style setting '{other}' ignored")),

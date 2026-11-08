@@ -70,17 +70,6 @@ pub(crate) fn style_str(key: &str, default: &str) -> String {
     }
 }
 
-/// A header pattern of literal alternatives (`Copyright|SPDX-License-Identifier`),
-/// matched case-insensitively as uvmcheck's `std::regex::icase` search does.
-/// None for a pattern with other regex syntax (no regex engine here; the
-/// project config reports it as not applied).
-pub(crate) fn header_alternatives(pattern: &str) -> Option<Vec<String>> {
-    if pattern.contains(['\\', '.', '*', '+', '?', '(', ')', '[', ']', '{', '}', '^', '$']) {
-        return None;
-    }
-    Some(pattern.split('|').map(str::to_lowercase).collect())
-}
-
 /// One `naming.<Target>` block: the keys it sets.
 #[derive(Clone, Debug, Default)]
 pub struct NamingOverride {

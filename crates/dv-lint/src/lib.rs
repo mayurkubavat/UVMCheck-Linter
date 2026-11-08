@@ -68,9 +68,10 @@ pub fn naming_pattern_supported(target: &str, pattern: &str) -> bool {
     rules::naming_pattern_supported(target, pattern)
 }
 
-/// A `style.file_header_pattern` the native style engine can match.
-pub fn header_pattern_supported(p: &str) -> bool {
-    options::header_alternatives(p).is_some()
+/// Why the native style engine cannot use a `style.file_header_pattern`
+/// (None when it can).
+pub fn header_pattern_error(p: &str) -> Option<String> {
+    pattern::Pattern::new(p, true).err()
 }
 pub mod cache;
 pub mod changed;

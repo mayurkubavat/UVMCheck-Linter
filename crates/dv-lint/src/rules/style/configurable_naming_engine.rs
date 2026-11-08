@@ -17,35 +17,18 @@ enum Casing {
     AllCaps,
 }
 
-/// A `^...$` pattern of the default rules: an optional fixed start, a body
-/// of identifier characters, and one of some fixed ends.
-#[derive(Clone, Copy)]
+/// A naming pattern: its text, and compiled for `std::regex_match`
+/// ([`crate::pattern`]). None when it does not compile: uvmcheck then skips
+/// the pattern check (the other requirements still apply).
+#[derive(Clone)]
 struct Pattern {
     text: &'static str,
-    lower_only: bool,
-    starts: &'static [&'static str],
-    ends: &'static [&'static str],
-    /// The body may be empty (`[A-Za-z0-9_]*`, as `--init` writes them).
-    empty_body: bool,
+    re: Option<crate::pattern::Pattern>,
 }
 
 impl Pattern {
-    /// `std::regex_match` of these patterns: a fixed start or end around a
-    /// body of at least one identifier character.
     fn matches(&self, name: &str) -> bool {
-        let ok = |s: &str| {
-            (self.empty_body || !s.is_empty())
-                && s.bytes().all(|b| {
-                    b == b'_'
-                        || b.is_ascii_digit()
-                        || b.is_ascii_lowercase()
-                        || (!self.lower_only && b.is_ascii_uppercase())
-                })
-        };
-        if !self.starts.is_empty() {
-            return self.starts.iter().any(|p| name.strip_prefix(p).is_some_and(ok));
-        }
-        self.ends.iter().any(|e| name.strip_suffix(e).is_some_and(ok))
+        self.re.as_ref().is_none_or(|re| re.is_full_match(name))
     }
 }
 
@@ -63,51 +46,22 @@ struct Spec {
     enabled: bool,
 }
 
-const fn pat(
-    text: &'static str,
-    lower_only: bool,
-    starts: &'static [&'static str],
-    ends: &'static [&'static str],
-) -> Option<Pattern> {
-    Some(Pattern { text, lower_only, starts, ends, empty_body: false })
-}
-
-/// A pattern of the shape `--init` writes, `^[A-Za-z0-9_]*(_drv|_driver)$`:
-/// any identifier ending in one of the alternatives (which are themselves
-/// identifier text). None for any other regex.
-fn learnt_pattern(p: &str) -> Option<Pattern> {
-    static MADE: std::sync::Mutex<Vec<(String, Option<Pattern>)>> = std::sync::Mutex::new(Vec::new());
+/// `text` compiled, once per pattern for the run.
+fn pat(text: &str) -> Option<Pattern> {
+    static MADE: std::sync::Mutex<Vec<Pattern>> = std::sync::Mutex::new(Vec::new());
     let mut made = MADE.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some((_, m)) = made.iter().find(|(k, _)| k == p) {
-        return *m;
+    if let Some(p) = made.iter().find(|p| p.text == text) {
+        return Some(p.clone());
     }
-    let m = parse_learnt(p);
-    made.push((p.to_string(), m));
-    m
+    let p = Pattern {
+        text: Box::leak(text.to_string().into_boxed_str()),
+        re: crate::pattern::Pattern::new(text, false).ok(),
+    };
+    made.push(p.clone());
+    Some(p)
 }
 
-fn parse_learnt(p: &str) -> Option<Pattern> {
-    let alts = p.strip_prefix("^[A-Za-z0-9_]*(")?.strip_suffix(")$")?;
-    let ends: Vec<&'static str> = alts
-        .split('|')
-        .map(|e| (!e.is_empty() && e.bytes().all(|b| b == b'_' || b.is_ascii_alphanumeric())).then_some(e))
-        .collect::<Option<Vec<_>>>()?
-        .into_iter()
-        .map(|e| &*Box::leak(e.to_string().into_boxed_str()))
-        .collect();
-    // Made once per pattern (see learnt_pattern).
-    Some(Pattern {
-        text: Box::leak(p.to_string().into_boxed_str()),
-        lower_only: false,
-        starts: &[],
-        ends: Box::leak(ends.into_boxed_slice()),
-        empty_body: true,
-    })
-}
-
-/// The spec of `kind` under the project config; None when there is none or
-/// it cannot be checked here (a pattern the config replaces with another
-/// regex: no regex engine here, and the config reports it as not applied).
+/// The spec of `kind` under the project config; None when there is none.
 fn spec(kind: &str) -> Option<Spec> {
     let mut sp = default_spec(kind)?;
     let Some(o) = crate::options::naming(kind) else { return Some(sp) };
@@ -120,8 +74,8 @@ fn spec(kind: &str) -> Option<Spec> {
     if let Some(p) = o.pattern {
         if p.is_empty() {
             sp.pattern = Option::None;
-        } else if sp.pattern.as_ref().is_none_or(|d| d.text != p) {
-            sp.pattern = Some(learnt_pattern(&p)?);
+        } else {
+            sp.pattern = pat(&p);
         }
     }
     match o.casing.as_deref() {
@@ -145,14 +99,12 @@ fn spec(kind: &str) -> Option<Spec> {
 
 /// Whether `naming.<kind>` (with `pattern`, empty when not set) can be
 /// checked here: a target the engine knows (VirtualInterface is known to
-/// uvmcheck but checks nothing there either), and its default pattern or
-/// none.
+/// uvmcheck but checks nothing there either), and a pattern that compiles.
 pub(crate) fn target_supported(kind: &str, pattern: &str) -> bool {
     if kind == "VirtualInterface" {
         return true;
     }
-    let Some(d) = default_spec(kind) else { return false };
-    pattern.is_empty() || d.pattern.is_some_and(|p| p.text == pattern) || learnt_pattern(pattern).is_some()
+    default_spec(kind).is_some() && (pattern.is_empty() || crate::pattern::Pattern::new(pattern, false).is_ok())
 }
 
 fn default_spec(kind: &str) -> Option<Spec> {
@@ -172,7 +124,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "Package" => s(
             "SV-NAM-101",
             "Package",
-            pat("^[a-z0-9_]+_pkg$", true, &[], &["_pkg"]),
+            pat("^[a-z0-9_]+_pkg$"),
             "",
             "_pkg",
             Snake,
@@ -181,7 +133,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "Interface" => s(
             "SV-NAM-102",
             "Interface",
-            pat("^[a-z0-9_]+_if$", true, &[], &["_if"]),
+            pat("^[a-z0-9_]+_if$"),
             "",
             "_if",
             Snake,
@@ -190,7 +142,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "UvmDriver" => s(
             "UVM-NAM-101",
             "UvmDriver",
-            pat("^[a-zA-Z0-9_]+_(driver|drv)$", false, &[], &["_driver", "_drv"]),
+            pat("^[a-zA-Z0-9_]+_(driver|drv)$"),
             "",
             "",
             None,
@@ -199,7 +151,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "UvmMonitor" => s(
             "UVM-NAM-102",
             "UvmMonitor",
-            pat("^[a-zA-Z0-9_]+_(monitor|mon)$", false, &[], &["_monitor", "_mon"]),
+            pat("^[a-zA-Z0-9_]+_(monitor|mon)$"),
             "",
             "",
             None,
@@ -208,7 +160,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "UvmSequencer" => s(
             "UVM-NAM-103",
             "UvmSequencer",
-            pat("^[a-zA-Z0-9_]+_(sequencer|sqr)$", false, &[], &["_sequencer", "_sqr"]),
+            pat("^[a-zA-Z0-9_]+_(sequencer|sqr)$"),
             "",
             "",
             None,
@@ -217,7 +169,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "UvmSequence" => s(
             "UVM-NAM-104",
             "UvmSequence",
-            pat("^[a-zA-Z0-9_]+_(seq|sequence)$", false, &[], &["_seq", "_sequence"]),
+            pat("^[a-zA-Z0-9_]+_(seq|sequence)$"),
             "",
             "",
             None,
@@ -226,12 +178,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "UvmSequenceItem" => s(
             "UVM-NAM-105",
             "UvmSequenceItem",
-            pat(
-                "^[a-zA-Z0-9_]+_(item|seq_item|trans|transaction)$",
-                false,
-                &[],
-                &["_item", "_seq_item", "_trans", "_transaction"],
-            ),
+            pat("^[a-zA-Z0-9_]+_(item|seq_item|trans|transaction)$"),
             "",
             "",
             None,
@@ -240,7 +187,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "UvmAgent" => s(
             "UVM-NAM-106",
             "UvmAgent",
-            pat("^[a-zA-Z0-9_]+_agent$", false, &[], &["_agent"]),
+            pat("^[a-zA-Z0-9_]+_agent$"),
             "",
             "_agent",
             None,
@@ -249,7 +196,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "UvmEnv" => s(
             "UVM-NAM-107",
             "UvmEnv",
-            pat("^[a-zA-Z0-9_]+_env$", false, &[], &["_env"]),
+            pat("^[a-zA-Z0-9_]+_env$"),
             "",
             "_env",
             None,
@@ -258,7 +205,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "UvmTest" => s(
             "UVM-NAM-108",
             "UvmTest",
-            pat("^[a-zA-Z0-9_]+_test$", false, &[], &["_test"]),
+            pat("^[a-zA-Z0-9_]+_test$"),
             "",
             "_test",
             None,
@@ -267,7 +214,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "UvmScoreboard" => s(
             "UVM-NAM-109",
             "UvmScoreboard",
-            pat("^[a-zA-Z0-9_]+_(scoreboard|scb)$", false, &[], &["_scoreboard", "_scb"]),
+            pat("^[a-zA-Z0-9_]+_(scoreboard|scb)$"),
             "",
             "",
             None,
@@ -276,7 +223,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "Covergroup" => s(
             "SV-NAM-105",
             "Covergroup",
-            pat("^[a-zA-Z0-9_]+_cg$", false, &[], &["_cg"]),
+            pat("^[a-zA-Z0-9_]+_cg$"),
             "",
             "_cg",
             None,
@@ -285,7 +232,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "Coverpoint" => s(
             "SV-NAM-106",
             "Coverpoint",
-            pat("^cp_[a-zA-Z0-9_]+$", false, &["cp_"], &[]),
+            pat("^cp_[a-zA-Z0-9_]+$"),
             "cp_",
             "",
             None,
@@ -294,7 +241,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "Cross" => s(
             "SV-NAM-107",
             "Cross",
-            pat("^(cross|cx)_[a-zA-Z0-9_]+$", false, &["cross_", "cx_"], &[]),
+            pat("^(cross|cx)_[a-zA-Z0-9_]+$"),
             "",
             "",
             None,
@@ -312,7 +259,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "TypedefEnum" => s(
             "SV-NAM-110",
             "TypedefEnum",
-            pat("^[a-zA-Z0-9_]+_e$", false, &[], &["_e"]),
+            pat("^[a-zA-Z0-9_]+_e$"),
             "",
             "_e",
             None,
@@ -321,7 +268,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "Typedef" => s(
             "SV-NAM-111",
             "Typedef",
-            pat("^[a-zA-Z0-9_]+_t$", false, &[], &["_t"]),
+            pat("^[a-zA-Z0-9_]+_t$"),
             "",
             "_t",
             None,
@@ -330,7 +277,7 @@ fn default_spec(kind: &str) -> Option<Spec> {
         "Constraint" => s(
             "SV-NAM-112",
             "Constraint",
-            pat("^[a-zA-Z0-9_]+_c$", false, &[], &["_c"]),
+            pat("^[a-zA-Z0-9_]+_c$"),
             "",
             "_c",
             None,
@@ -526,5 +473,50 @@ pub(crate) fn naming_engine(d: &Design, csts: &[Cst], out: &mut Sink) {
 /// ("" for none), and whether `name` follows it.
 pub(crate) fn convention(kind: &str, name: &str) -> Option<(&'static str, bool)> {
     let sp = spec(kind)?;
-    sp.enabled.then(|| (sp.pattern.map_or("", |p| p.text), validate(kind, name).is_none()))
+    sp.enabled.then(|| (sp.pattern.as_ref().map_or("", |p| p.text), validate(kind, name).is_none()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const KINDS: [&str; 18] = [
+        "Package",
+        "Interface",
+        "UvmDriver",
+        "UvmMonitor",
+        "UvmSequencer",
+        "UvmSequence",
+        "UvmSequenceItem",
+        "UvmAgent",
+        "UvmEnv",
+        "UvmTest",
+        "UvmScoreboard",
+        "Covergroup",
+        "Coverpoint",
+        "Cross",
+        "Parameter",
+        "TypedefEnum",
+        "Typedef",
+        "Constraint",
+    ];
+
+    #[test]
+    fn default_patterns_compile() {
+        for k in KINDS {
+            let sp = default_spec(k).unwrap();
+            if let Some(p) = sp.pattern {
+                assert!(p.re.is_some(), "{k}: {}", p.text);
+            }
+        }
+    }
+
+    #[test]
+    fn default_patterns_match_whole_names() {
+        let m = |k: &str, n: &str| default_spec(k).unwrap().pattern.unwrap().matches(n);
+        assert!(m("Package", "bus_pkg") && !m("Package", "Bus_pkg") && !m("Package", "_pkg"));
+        assert!(m("UvmDriver", "Bus_drv") && m("UvmDriver", "bus_driver") && !m("UvmDriver", "bus_drv2"));
+        assert!(m("Coverpoint", "cp_a") && !m("Coverpoint", "cp_") && !m("Coverpoint", "xcp_a"));
+        assert!(m("Cross", "cx_ab") && m("Cross", "cross_ab") && !m("Cross", "cr_ab"));
+    }
 }

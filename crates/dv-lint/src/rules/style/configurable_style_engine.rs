@@ -14,8 +14,10 @@ struct Style {
     allow_tabs: bool,
     allow_trailing_whitespace: bool,
     mandatory_matching_end_label: bool,
-    /// `require_file_header` with its pattern's alternatives, lower case.
-    header: Option<(String, Vec<String>)>,
+    /// `require_file_header` with its pattern, compiled case-insensitively
+    /// (`std::regex::icase`); off when the pattern does not compile, as in
+    /// uvmcheck.
+    header: Option<(String, crate::pattern::Pattern)>,
     file_matches_class_name: bool,
 }
 
@@ -24,7 +26,7 @@ impl Style {
         use crate::options::{style_bool, style_int, style_str};
         let pattern = style_str("file_header_pattern", "");
         let header = (style_bool("require_file_header", false) && !pattern.is_empty())
-            .then(|| crate::options::header_alternatives(&pattern).map(|alts| (pattern, alts)))
+            .then(|| crate::pattern::Pattern::new(&pattern, true).ok().map(|re| (pattern, re)))
             .flatten();
         Style {
             max_line_length: style_int("max_line_length", 120).max(0) as usize,
@@ -104,8 +106,8 @@ fn textual(c: &Cst, s: &mut Sink, style: &Style) {
             );
         }
         // The header is looked for in the first 20 lines.
-        if let Some((_, alts)) = &style.header {
-            if line_num <= 20 && alts.iter().any(|a| line.to_lowercase().contains(a.as_str())) {
+        if let Some((_, re)) = &style.header {
+            if line_num <= 20 && re.is_match_anywhere(line) {
                 found_header = true;
             }
         }

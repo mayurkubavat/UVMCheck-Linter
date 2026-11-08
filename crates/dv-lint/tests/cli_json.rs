@@ -174,7 +174,7 @@ fn naming_block_from_the_config() {
         "suffix dropped, pattern kept: {text}"
     );
     assert!(!text.contains("must end with suffix '_pkg'"), "{text}");
-    assert!(err.contains("naming.Coverpoint"), "a regex pattern is reported as not applied: {err}");
+    assert!(!err.contains("naming.Coverpoint"), "a regex pattern is applied: {err}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
