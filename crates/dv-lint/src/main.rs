@@ -46,12 +46,18 @@ fn main() {
     let mut only: Vec<String> = Vec::new();
     let mut preset: Option<String> = None;
     let mut experimental = false;
+    let mut no_config = false;
+    let mut config_file: Option<String> = None;
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         // `--name=value`, as uvmcheck also takes them.
         if let Some(v) = a.strip_prefix("--preset=") {
             preset = Some(v.to_string());
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--config=") {
+            config_file = Some(v.to_string());
             continue;
         }
         if let Some(v) = a.strip_prefix("--json=") {
@@ -74,7 +80,11 @@ fn main() {
             "--experimental" => experimental = true,
             // uvmcheck options with nothing to do here: no project config
             // or result cache yet.
-            "--no-config" | "--no-cache" => {}
+            // The project configuration (docs/guide/project_config.md).
+            "--no-config" => no_config = true,
+            "--config" => config_file = it.next(),
+            // No result cache here.
+            "--no-cache" => {}
             // Also write the findings as uvmcheck's JSON report.
             "--json" => {
                 let path = it.next().unwrap_or_else(|| {
@@ -111,6 +121,24 @@ fn main() {
         eprintln!("error: {e}");
         std::process::exit(2);
     };
+    if !no_config {
+        let first = args.iter().find(|a| !a.starts_with(['-', '+'])).map(String::as_str);
+        if let Some(file) = dv_lint::project::find(config_file.as_deref(), first) {
+            let cfg = dv_lint::project::Config::load(&file).unwrap_or_else(|e| fail(e));
+            for w in &cfg.warnings {
+                eprintln!("Warning: {}: {w}", file.display());
+            }
+            if !cfg.unapplied.is_empty() {
+                eprintln!(
+                    "note: {}: {} not applied by the native engine yet (run uvmcheck-slang for them)",
+                    file.display(),
+                    cfg.unapplied.join(", ")
+                );
+            }
+            args.extend(cfg.compile_args.iter().cloned());
+            let _ = CONFIG.set(cfg);
+        }
+    }
     let headers = if in_context { in_owner(&mut args) } else { Vec::new() };
     let selected = dv_lint::rule_selection(preset.as_deref(), experimental).unwrap_or_else(|e| fail(e));
     // A rule named with --rule runs whatever its profile.
@@ -120,7 +148,7 @@ fn main() {
         let (trees, parse_ms) = sv_sema::parse_args(&args).unwrap_or_else(|e| fail(e.to_string()));
         let t = std::time::Instant::now();
         let (design, (files, found)) = dv_lint::lint_built(|| sv_sema::design_of(&trees, parse_ms), &trees, keep);
-        report(&design, time, frames, t, &files, &only_in(&headers, &files, &found));
+        report(&design, time, frames, t, &files, only_in(&headers, &files, &found));
     }
     let loaded = if slang {
         load_slang(&args).map(|d| (d, Vec::new()))
@@ -143,7 +171,7 @@ fn main() {
     }
     let t = std::time::Instant::now();
     let (files, found) = dv_lint::lint_all(&design, &trees, keep);
-    report(&design, time, frames, t, &files, &only_in(&headers, &files, &found));
+    report(&design, time, frames, t, &files, only_in(&headers, &files, &found));
 }
 
 /// `--in-context`: each header source (`.svh`, `.vh`, ...) is replaced by
@@ -222,6 +250,9 @@ fn only_in(headers: &[std::path::PathBuf], files: &[String], found: &[dv_lint::F
 }
 
 /// Prints the findings (and with `--time` the stage times) and exits.
+/// The project configuration in use, if any.
+static CONFIG: std::sync::OnceLock<dv_lint::project::Config> = std::sync::OnceLock::new();
+
 /// `--json FILE`: where to write the JSON report.
 static JSON_OUT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
@@ -247,11 +278,11 @@ fn json_str(s: &str) -> String {
 /// The findings in uvmcheck's JSON report form (`--json`): `tool`,
 /// `version`, `compileErrors`, `waived` and one `violations` entry per
 /// finding with its rule, severity, position, message and notes.
-fn json_report(files: &[String], found: &[dv_lint::Finding]) -> String {
+fn json_report(files: &[String], found: &[dv_lint::Finding], waived: usize) -> String {
     let mut out = String::from("{\n");
     let compile = found.iter().filter(|f| f.rule == "SV-CMP-001").count();
     out.push_str(&format!(
-        "  \"tool\": \"dv-lint\",\n  \"version\": {},\n  \"compileErrors\": {compile},\n  \"waived\": 0,\n  \"violations\": [",
+        "  \"tool\": \"dv-lint\",\n  \"version\": {},\n  \"compileErrors\": {compile},\n  \"waived\": {waived},\n  \"violations\": [",
         json_str(env!("CARGO_PKG_VERSION"))
     ));
     for (i, f) in found.iter().enumerate() {
@@ -294,8 +325,10 @@ fn report(
     frames: bool,
     t: std::time::Instant,
     files: &[String],
-    found: &[dv_lint::Finding],
+    mut found: Vec<dv_lint::Finding>,
 ) -> ! {
+    let waived = CONFIG.get().map_or(0, |c| c.apply(&mut found, files));
+    let found = &found[..];
     let mut sources = dv_lint::frames::Sources::default();
     if time {
         let tm = design.timings();
@@ -323,7 +356,7 @@ fn report(
         }
     }
     if let Some(path) = JSON_OUT.get() {
-        if let Err(e) = std::fs::write(path, json_report(files, found)) {
+        if let Err(e) = std::fs::write(path, json_report(files, found, waived)) {
             eprintln!("error: cannot write {path}: {e}");
             std::process::exit(2);
         }

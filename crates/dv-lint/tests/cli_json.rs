@@ -42,3 +42,52 @@ fn presets_select_rules_as_uvmcheck() {
     assert_eq!(bad.code(), Some(2));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn project_config_paths_rules_and_waivers() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-config-{}", std::process::id()));
+    for d in [".uvmcheck", "vip", "tb"] {
+        std::fs::create_dir_all(dir.join(d)).unwrap();
+    }
+    std::fs::write(
+        dir.join(".uvmcheck/config.json"),
+        r#"{"library_paths": ["vip/**"], "rules": {"SV-STY-003": "off", "SV-BAN-001": {"severity": "ERROR"}},
+            "waivers": [{"rule": "SV-STY-010", "path": "tb/top.sv", "line": 3, "reason": "known"}]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("tb/top.sv"),
+        "module top; // TODO x\nreg a; integer i;\ninitial i = 5;\ninitial i = 6;\nendmodule\n",
+    )
+    .unwrap();
+    std::fs::write(dir.join("vip/v.sv"), "module v; reg c; endmodule\n").unwrap();
+    let run = |extra: &[&str]| {
+        let out = dir.join("r.json");
+        std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+            .current_dir(&dir)
+            .args(extra)
+            .arg("--json")
+            .arg(&out)
+            .args(["tb/top.sv", "vip/v.sv"])
+            .output()
+            .unwrap();
+        std::fs::read_to_string(&out).unwrap()
+    };
+    let with = run(&[]);
+    assert!(!with.contains("SV-STY-003"), "rule turned off: {with}");
+    assert!(!with.contains("v.sv"), "library code is not reported: {with}");
+    assert!(
+        with.contains(
+            "\"ruleId\": \"SV-BAN-001\", \"ruleName\": \"LegacyRegWireInTestbench\", \"severity\": \"ERROR\""
+        ),
+        "{with}"
+    );
+    assert!(with.contains("\"waived\": 1"), "{with}");
+    assert!(
+        with.contains("\"line\": 4, \"column\": 13, \"message\": \"Unsized decimal literal '6'"),
+        "not waived: {with}"
+    );
+    let without = run(&["--no-config"]);
+    assert!(without.contains("SV-STY-003") && without.contains("v.sv"), "{without}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

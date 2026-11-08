@@ -57,6 +57,10 @@ mod waivers;
 
 mod rule_profiles;
 
+#[allow(dead_code)]
+pub(crate) mod json;
+pub mod project;
+
 /// Which rules run without `--rule`, as uvmcheck selects them: `preset`
 /// (`--preset`: soundness, methodology, performance, style, security,
 /// smells, advisory, reuse, guide, uvm-1800.2, all; none: every profile but
