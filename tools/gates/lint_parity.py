@@ -57,7 +57,9 @@ def files_with_errors(found):
 
 
 def ported(args, slang):
-    res = subprocess.run([DVLINT, *(['--slang'] if slang else []), *args], capture_output=True, text=True,
+    # Every rule, as the reference runs uvmcheck (--preset all --experimental).
+    res = subprocess.run([DVLINT, '--preset', 'all', '--experimental', *(['--slang'] if slang else []), *args],
+                         capture_output=True, text=True,
                          errors='replace')
     got = collections.Counter()
     for line in res.stdout.splitlines():

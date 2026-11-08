@@ -1,7 +1,14 @@
 //! Runs the ported rules over a design, built natively (default) or through
 //! slang (`--slang`, model rules only), and prints findings as uvmcheck does:
 //!
-//!     dv-lint [--slang] [--time] [--history] [--skip-libraries] [--rule ID]... [-top NAME]... [--json FILE] [--list] <compile options>
+//!     dv-lint [--slang] [--time] [--history] [--skip-libraries] [--rule ID]... [--preset NAME] [--experimental]
+//!             [-top NAME]... [--json FILE] [--list] <compile options>
+//!
+//! Rules are selected as uvmcheck selects them: by default every profile but
+//! advisory and no experimental rule; `--preset NAME` and `--experimental`
+//! as uvmcheck's (`--preset all --experimental` runs every rule); `--rule
+//! ID` runs that rule whatever its profile. Rules with no uvmcheck twin
+//! always run.
 //!
 //! `--json FILE` also writes the findings as uvmcheck's JSON report (`tool`,
 //! `version`, `compileErrors`, `waived`, `violations` with `ruleId`,
@@ -37,9 +44,20 @@ fn main() {
     let mut specs = false;
     let mut exprs = false;
     let mut only: Vec<String> = Vec::new();
+    let mut preset: Option<String> = None;
+    let mut experimental = false;
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
+        // `--name=value`, as uvmcheck also takes them.
+        if let Some(v) = a.strip_prefix("--preset=") {
+            preset = Some(v.to_string());
+            continue;
+        }
+        if let Some(v) = a.strip_prefix("--json=") {
+            let _ = JSON_OUT.set(v.to_string());
+            continue;
+        }
         match a.as_str() {
             "--slang" => slang = true,
             "--time" => time = true,
@@ -51,6 +69,12 @@ fn main() {
             // Each expression's type, as tools/oracles/exprdump.cpp prints slang's.
             "--exprs" => exprs = true,
             "--rule" => only.extend(it.next()),
+            // Rule selection as uvmcheck's (default: every profile but advisory).
+            "--preset" => preset = it.next(),
+            "--experimental" => experimental = true,
+            // uvmcheck options with nothing to do here: no project config
+            // or result cache yet.
+            "--no-config" | "--no-cache" => {}
             // Also write the findings as uvmcheck's JSON report.
             "--json" => {
                 let path = it.next().unwrap_or_else(|| {
@@ -88,7 +112,9 @@ fn main() {
         std::process::exit(2);
     };
     let headers = if in_context { in_owner(&mut args) } else { Vec::new() };
-    let keep = |id: &str| only.is_empty() || only.iter().any(|o| o == id);
+    let selected = dv_lint::rule_selection(preset.as_deref(), experimental).unwrap_or_else(|e| fail(e));
+    // A rule named with --rule runs whatever its profile.
+    let keep = |id: &str| if only.is_empty() { selected(id) } else { only.iter().any(|o| o == id) };
     if !slang && !exprs && !specs {
         // The design is built while the rules' shared caches start.
         let (trees, parse_ms) = sv_sema::parse_args(&args).unwrap_or_else(|e| fail(e.to_string()));

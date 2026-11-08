@@ -18,3 +18,27 @@ fn json_report_has_uvmchecks_fields() {
     assert!(text.contains("\\\"quoted\\\""), "{text}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn presets_select_rules_as_uvmcheck() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-preset-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("t.sv");
+    // SV-STY-003 (a TODO comment) is a style rule, not a soundness one.
+    std::fs::write(&src, "module m; // TODO: later\nendmodule\n").unwrap();
+    let run = |extra: &[&str]| {
+        let o = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint")).args(extra).arg(&src).output().unwrap();
+        String::from_utf8_lossy(&o.stdout).contains("SV-STY-003")
+    };
+    assert!(run(&[]), "the default selection has style rules");
+    assert!(!run(&["--preset", "soundness"]));
+    assert!(!run(&["--preset=soundness"]));
+    assert!(run(&["--preset", "soundness", "--rule", "SV-STY-003"]), "--rule wins");
+    let bad = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .args(["--preset", "nope"])
+        .arg(&src)
+        .status()
+        .unwrap();
+    assert_eq!(bad.code(), Some(2));
+    let _ = std::fs::remove_dir_all(&dir);
+}

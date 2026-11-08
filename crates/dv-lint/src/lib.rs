@@ -55,6 +55,55 @@ mod uvm_api;
 
 mod waivers;
 
+mod rule_profiles;
+
+/// Which rules run without `--rule`, as uvmcheck selects them: `preset`
+/// (`--preset`: soundness, methodology, performance, style, security,
+/// smells, advisory, reuse, guide, uvm-1800.2, all; none: every profile but
+/// advisory) and `experimental` (`--experimental`). Rules dv-lint has with no
+/// uvmcheck twin always run. Err for an unknown preset.
+pub fn rule_selection(preset: Option<&str>, experimental: bool) -> Result<impl Fn(&str) -> bool, String> {
+    const ALL: u32 = u32::MAX;
+    const ADVISORY: u32 = 1 << 6;
+    enum Sel {
+        Profiles(u32),
+        Category(&'static str),
+        Guidelines(Vec<&'static str>),
+        AnyGuideline,
+    }
+    let sel = match preset.map(str::to_ascii_lowercase).as_deref() {
+        None => Sel::Profiles(ALL & !ADVISORY),
+        Some("all") => Sel::Profiles(ALL),
+        Some("soundness") => Sel::Profiles(1),
+        Some("methodology") => Sel::Profiles(1 << 1),
+        Some("performance" | "perf") => Sel::Profiles(1 << 2),
+        Some("style") => Sel::Profiles(1 << 3),
+        Some("security") => Sel::Profiles(1 << 4),
+        Some("smells" | "smell" | "maintainability") => Sel::Profiles(1 << 5),
+        Some("advisory") => Sel::Profiles(ADVISORY),
+        Some("uvm-1800.2" | "migration") => Sel::Category("Deprecated"),
+        Some("reuse") => Sel::Guidelines(vec!["MG-1", "MG-2", "MG-3", "MG-4", "MG-5"]),
+        Some("guide") => Sel::AnyGuideline,
+        Some(p) => return Err(format!("unknown preset '{p}'")),
+    };
+    // "MG-4" selects MG-4.1, MG-4.2 ... but not MG-40.1.
+    let matches = |s: &str, g: &str| g == s || (g.len() > s.len() && g.starts_with(s) && g.as_bytes()[s.len()] == b'.');
+    Ok(move |id: &str| {
+        let Some(&(_, category, profiles, guides, exp)) = rule_profiles::RULES.iter().find(|r| r.0 == id) else {
+            return true;
+        };
+        if exp && !experimental {
+            return false;
+        }
+        match &sel {
+            Sel::Profiles(m) => profiles & m != 0,
+            Sel::Category(c) => category == *c,
+            Sel::Guidelines(gs) => guides.iter().any(|g| gs.iter().any(|s| matches(s, g))),
+            Sel::AnyGuideline => !guides.is_empty(),
+        }
+    })
+}
+
 pub mod syntax;
 
 /// How serious a finding is, ordered from least to most.
