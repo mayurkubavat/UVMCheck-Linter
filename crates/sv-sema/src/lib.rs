@@ -633,16 +633,16 @@ struct Scope {
     kind: ScopeKind,
     name: String,
     parent: Option<usize>,
-    classes: HashMap<String, usize>,
-    typedefs: HashMap<String, NodeRef>,
+    classes: crate::fx::FxMap<String, usize>,
+    typedefs: crate::fx::FxMap<String, NodeRef>,
     /// `import p::*` (None) and `import p::x` (Some).
     imports: Vec<(String, Option<String>)>,
     /// Type parameters of a class, with their default type.
-    type_params: HashMap<String, Option<NodeRef>>,
+    type_params: crate::fx::FxMap<String, Option<NodeRef>>,
     /// Variables and subroutines of a package or the unit.
-    values: HashMap<String, Member>,
+    values: crate::fx::FxMap<String, Member>,
     /// Parameters and localparams (value ones): data type and value.
-    consts: HashMap<String, (Option<NodeRef>, Option<NodeRef>)>,
+    consts: crate::fx::FxMap<String, (Option<NodeRef>, Option<NodeRef>)>,
 }
 
 struct ClassDef {
@@ -657,7 +657,7 @@ struct ClassDef {
     /// Parameters in order: name, whether a type, default.
     params: Vec<(String, bool, Option<NodeRef>)>,
     /// Properties and methods by name.
-    members: HashMap<String, Member>,
+    members: crate::fx::FxMap<String, Member>,
 }
 
 /// A named value or subroutine declared in a class or package.
@@ -745,19 +745,19 @@ struct SpecUse {
 struct Builder<'t> {
     trees: &'t [Tree],
     scopes: Vec<Scope>,
-    packages: HashMap<String, usize>,
+    packages: crate::fx::FxMap<String, usize>,
     unit: usize,
     classes: Vec<ClassDef>,
     /// Out-of-block bodies: (class name, method name) -> body.
     bodies: HashMap<(String, String), NodeRef>,
     /// Names used as types anywhere (generic classes with a use have members).
-    used_names: HashSet<String>,
+    used_names: crate::fx::FxSet<String>,
     /// Names declared as types and as subroutines anywhere: a use of
     /// anything else is an error to slang.
-    type_names: HashSet<String>,
-    sub_names: HashSet<String>,
+    type_names: crate::fx::FxSet<String>,
+    sub_names: crate::fx::FxSet<String>,
     /// Interface declarations by name (virtual interface types).
-    interfaces: HashMap<String, NodeRef>,
+    interfaces: crate::fx::FxMap<String, NodeRef>,
     /// The specialization slang reads a parameterized class's members
     /// from: the one that prints first, as its type arguments.
     rep_env: HashMap<usize, Env>,
@@ -817,24 +817,24 @@ impl<'t> Builder<'t> {
             kind: ScopeKind::Unit,
             name: String::new(),
             parent: None,
-            classes: HashMap::new(),
-            typedefs: HashMap::new(),
+            classes: Default::default(),
+            typedefs: Default::default(),
             imports: Vec::new(),
-            type_params: HashMap::new(),
-            values: HashMap::new(),
-            consts: HashMap::new(),
+            type_params: Default::default(),
+            values: Default::default(),
+            consts: Default::default(),
         };
         Builder {
             trees,
             scopes: vec![unit],
-            packages: HashMap::new(),
+            packages: Default::default(),
             unit: 0,
             classes: Vec::new(),
             bodies: HashMap::new(),
-            used_names: HashSet::new(),
-            type_names: HashSet::new(),
-            sub_names: HashSet::new(),
-            interfaces: HashMap::new(),
+            used_names: Default::default(),
+            type_names: Default::default(),
+            sub_names: Default::default(),
+            interfaces: Default::default(),
             rep_env: HashMap::new(),
             keying: Default::default(),
             parent_of: Default::default(),
@@ -984,12 +984,12 @@ impl<'t> Builder<'t> {
             kind,
             name: name.to_string(),
             parent,
-            classes: HashMap::new(),
-            typedefs: HashMap::new(),
+            classes: Default::default(),
+            typedefs: Default::default(),
             imports: Vec::new(),
-            type_params: HashMap::new(),
-            values: HashMap::new(),
-            consts: HashMap::new(),
+            type_params: Default::default(),
+            values: Default::default(),
+            consts: Default::default(),
         });
         self.scopes.len() - 1
     }
@@ -1286,7 +1286,7 @@ impl<'t> Builder<'t> {
                 extends = self.child(e, DataType);
             }
         }
-        let mut members = HashMap::new();
+        let mut members = crate::fx::FxMap::default();
         for m in self.children(r) {
             match self.kind(m) {
                 DataDecl => {
@@ -1415,7 +1415,7 @@ impl<'t> Builder<'t> {
         for i in 0..self.trees.len() {
             self.collect_name_uses(i, &generics, &mut uses);
         }
-        let mut live: HashSet<String> = HashSet::new();
+        let mut live: crate::fx::FxSet<String> = Default::default();
         loop {
             let before = live.len();
             for (name, owner) in &uses {
@@ -1657,40 +1657,59 @@ impl<'t> Builder<'t> {
     /// code in any generic with one is elaborated.
     fn spec_fixpoint(&self, uses: &[SpecUse], defaults: bool) -> SpecSets {
         let mut specs: SpecSets = HashMap::new();
+        // Each class's specialization keys in the order they were added
+        // (entries are only ever added).
+        let mut order: crate::fx::FxMap<usize, Vec<String>> = Default::default();
         if defaults {
             for c in 0..self.classes.len() {
                 if self.classes[c].generic && self.classes[c].params.iter().all(|p| p.2.is_some()) {
                     let env = self.complete_env(c, &Env::default());
                     let key = self.class_key(c, &env);
                     let shown = self.print_class(c, &env, 0);
-                    specs.entry(c).or_default().insert(key, (shown, env));
+                    let m = specs.entry(c).or_default();
+                    if !m.contains_key(&key) {
+                        order.entry(c).or_default().push(key.clone());
+                    }
+                    m.insert(key, (shown, env));
                 }
             }
         }
+        // Whether each class's name is used (code inside an unspecialized
+        // generic is never elaborated).
+        let used: Vec<bool> = self.classes.iter().map(|k| self.used_names.contains(&k.name)).collect();
         // The (use, specialization) pairs already resolved: resolving one
-        // again gives the same key, so only new specializations are visited.
-        let mut done: Vec<std::collections::HashSet<String>> = vec![Default::default(); uses.len()];
+        // again gives the same key, so only new specializations are visited:
+        // a use has seen the first `seen[ui]` keys of its class's `order`
+        // (and its one environment when it depends on none).
+        let mut seen: Vec<usize> = vec![0; uses.len()];
         for _round in 0..32 {
             let mut changed = false;
             for (ui, u) in uses.iter().enumerate() {
                 if let Some(g) = u.owner {
-                    // Code inside an unspecialized generic is never elaborated.
-                    let live = self.used_names.contains(&self.classes[g].name) || (defaults && specs.contains_key(&g));
+                    let live = used[g] || (defaults && specs.contains_key(&g));
                     if !live {
                         continue;
                     }
                 }
                 let envs: Vec<(String, Env)> = match u.dependent {
-                    None => vec![(String::new(), Env::default())],
-                    Some(g) => specs
-                        .get(&g)
-                        .map(|m| m.iter().filter(|(k, _)| !done[ui].contains(*k)).map(|(k, v)| (k.clone(), v.1.clone())).collect())
-                        .unwrap_or_default(),
-                };
-                for (ek, env) in envs {
-                    if !done[ui].insert(ek) {
-                        continue;
+                    None if seen[ui] == 0 => {
+                        seen[ui] = 1;
+                        vec![(String::new(), Env::default())]
                     }
+                    None => Vec::new(),
+                    Some(g) => match (specs.get(&g), order.get(&g)) {
+                        (Some(m), Some(o)) if o.len() > seen[ui] => {
+                            // In key order, as the map lists them.
+                            let mut new: Vec<(String, Env)> =
+                                o[seen[ui]..].iter().map(|k| (k.clone(), m[k].1.clone())).collect();
+                            new.sort_by(|a, b| a.0.cmp(&b.0));
+                            seen[ui] = o.len();
+                            new
+                        }
+                        _ => Vec::new(),
+                    },
+                };
+                for (_ek, env) in envs {
                     let mut info = self.resolve_env(u.r, u.scope, &env, 0);
                     // `C #(..)::member` specializes C.
                     let named = matches!(info.resolved, Resolved::Class(c) if self.classes[c].name == u.head);
@@ -1721,6 +1740,7 @@ impl<'t> Builder<'t> {
                     let key = self.class_key(c, &info.args);
                     let m = specs.entry(c).or_default();
                     if m.len() < 256 && !m.contains_key(&key) {
+                        order.entry(c).or_default().push(key.clone());
                         let shown = self.print_class(c, &info.args, 0);
                         let env = if defaults {
                             self.complete_env(c, &info.args)

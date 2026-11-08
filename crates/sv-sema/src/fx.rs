@@ -56,3 +56,6 @@ impl Hasher for FxHasher {
 
 /// A `HashMap` with [`FxHasher`].
 pub type FxMap<K, V> = std::collections::HashMap<K, V, BuildHasherDefault<FxHasher>>;
+
+/// A `HashSet` with [`FxHasher`].
+pub type FxSet<K> = std::collections::HashSet<K, BuildHasherDefault<FxHasher>>;

@@ -15,15 +15,7 @@ pub(crate) fn case_keyword(c: &Cst, n: NodeId) -> Option<u32> {
 }
 
 pub(crate) fn subtree(c: &Cst, n: NodeId) -> Vec<NodeId> {
-    let mut out = Vec::new();
-    let mut stack = vec![n];
-    while let Some(x) = stack.pop() {
-        out.push(x);
-        let mut k: Vec<NodeId> = c.tree.children(x).collect();
-        k.reverse();
-        stack.extend(k);
-    }
-    out
+    c.tree.subtree(n)
 }
 
 /// A declaration's name (`cls.name`, a routine's last name token).

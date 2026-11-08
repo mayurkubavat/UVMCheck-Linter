@@ -38,9 +38,9 @@ pub(crate) fn for_parts(c: &Cst, l: NodeId) -> (Vec<NodeId>, Option<NodeId>, Opt
 
 /// Every node under `n` (itself included), in source order.
 pub(crate) fn subtree(c: &Cst, n: NodeId, out: &mut Vec<NodeId>) {
-    out.push(n);
-    for k in c.tree.children(n) {
-        subtree(c, k, out);
+    match c.tree.subtree_slice(n) {
+        Some(s) => out.extend_from_slice(s),
+        None => out.extend(c.tree.subtree(n)),
     }
 }
 

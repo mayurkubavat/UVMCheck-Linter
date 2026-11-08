@@ -100,7 +100,7 @@ pub struct Tree {
     /// `token_range` walk the node instead.
     pub(crate) spans: Vec<Option<(u32, u32)>>,
     /// [`Tree::preorder`], computed on first use.
-    pub(crate) preorder_cache: std::sync::OnceLock<Vec<NodeId>>,
+    pub(crate) preorder_cache: std::sync::OnceLock<Preorder>,
 }
 
 impl Tree {
@@ -288,12 +288,51 @@ impl Tree {
 
     /// Pre-order walk of the nodes.
     pub fn preorder(&self) -> Vec<NodeId> {
-        self.preorder_cache.get_or_init(|| self.walk_preorder()).clone()
+        self.preorder_index().order.clone()
     }
 
-    fn walk_preorder(&self) -> Vec<NodeId> {
-        let mut out = Vec::with_capacity(self.nodes.len());
-        let mut stack = vec![self.root];
+    /// `n` and every node under it, in pre-order.
+    pub fn subtree(&self, n: NodeId) -> Vec<NodeId> {
+        self.subtree_slice(n).map_or_else(|| self.walk_preorder(n), <[NodeId]>::to_vec)
+    }
+
+    /// [`Self::subtree`] as a slice of the tree's pre-order (`None` for a
+    /// node the root does not reach).
+    pub fn subtree_slice(&self, n: NodeId) -> Option<&[NodeId]> {
+        let p = self.preorder_index();
+        let (&a, &e) = (p.pos.get(n.0 as usize)?, p.end.get(n.0 as usize)?);
+        (a != u32::MAX).then(|| &p.order[a as usize..e as usize])
+    }
+
+    fn preorder_index(&self) -> &Preorder {
+        self.preorder_cache.get_or_init(|| {
+            let order = self.walk_preorder(self.root);
+            let mut pos = vec![u32::MAX; self.nodes.len()];
+            for (i, n) in order.iter().enumerate() {
+                if let Some(p) = pos.get_mut(n.0 as usize) {
+                    *p = i as u32;
+                }
+            }
+            // A subtree is the run from its node to past its last descendant.
+            let mut end = vec![0u32; self.nodes.len()];
+            for (i, n) in order.iter().enumerate().rev() {
+                let mut e = i as u32 + 1;
+                for c in self.children(*n) {
+                    if let Some(&ce) = end.get(c.0 as usize) {
+                        e = e.max(ce);
+                    }
+                }
+                if let Some(x) = end.get_mut(n.0 as usize) {
+                    *x = e;
+                }
+            }
+            Preorder { order, pos, end }
+        })
+    }
+
+    fn walk_preorder(&self, from: NodeId) -> Vec<NodeId> {
+        let mut out = Vec::new();
+        let mut stack = vec![from];
         while let Some(n) = stack.pop() {
             out.push(n);
             stack.extend(self.node(n).children.iter().rev().filter_map(|c| match c {
@@ -349,4 +388,12 @@ pub(crate) fn tokens_from(out: &sv_preproc::Output) -> Vec<Token> {
             }
         })
         .collect()
+}
+
+/// The tree's pre-order and where each node's subtree runs in it.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct Preorder {
+    order: Vec<NodeId>,
+    pos: Vec<u32>,
+    end: Vec<u32>,
 }

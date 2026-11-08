@@ -289,14 +289,7 @@ pub(crate) fn ident<'t>(c: &Cst<'t>, e: NodeId) -> Option<&'t str> {
 
 /// Every node under `n` (itself included), in source order.
 pub(crate) fn subtree(c: &Cst, n: NodeId) -> Vec<NodeId> {
-    let mut out = Vec::new();
-    let mut stack = vec![n];
-    while let Some(x) = stack.pop() {
-        out.push(x);
-        let kids: Vec<NodeId> = c.tree.children(x).collect();
-        stack.extend(kids.into_iter().rev());
-    }
-    out
+    c.tree.subtree(n)
 }
 
 /// The node's first token location, as slang's `sourceRange.start()`.

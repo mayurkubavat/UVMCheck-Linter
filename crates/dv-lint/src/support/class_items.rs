@@ -27,14 +27,7 @@ pub(crate) fn own<'t>(c: &Cst<'t>, n: NodeId) -> Vec<&'t str> {
 
 /// `n` and every node below it, in pre-order.
 pub(crate) fn subtree(c: &Cst, n: NodeId) -> Vec<NodeId> {
-    let mut out = Vec::new();
-    let mut stack = vec![n];
-    while let Some(x) = stack.pop() {
-        out.push(x);
-        let k: Vec<NodeId> = c.tree.children(x).collect();
-        stack.extend(k.into_iter().rev());
-    }
-    out
+    c.tree.subtree(n)
 }
 
 /// Trims what C++'s `find_first_not_of(" \t\r\n")` trims.

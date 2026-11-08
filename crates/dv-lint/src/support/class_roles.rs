@@ -289,14 +289,7 @@ impl Cst<'_> {
 
     /// Every node under `n` (itself included), in pre-order.
     pub(crate) fn subtree(&self, n: NodeId) -> Vec<NodeId> {
-        let mut out = Vec::new();
-        let mut stack = vec![n];
-        while let Some(x) = stack.pop() {
-            out.push(x);
-            let kids: Vec<NodeId> = self.tree.children(x).collect();
-            stack.extend(kids.into_iter().rev());
-        }
-        out
+        self.tree.subtree(n)
     }
 
     pub(crate) fn node_kids(&self, n: NodeId) -> Vec<NodeId> {

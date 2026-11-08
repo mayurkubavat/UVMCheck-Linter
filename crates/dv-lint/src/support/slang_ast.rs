@@ -169,14 +169,7 @@ pub(crate) fn kids(c: &Cst, n: NodeId) -> Vec<NodeId> {
 
 /// `n` and every node under it, in source order.
 pub(crate) fn subtree(c: &Cst, n: NodeId) -> Vec<NodeId> {
-    let mut out = Vec::new();
-    let mut stack = vec![n];
-    while let Some(x) = stack.pop() {
-        out.push(x);
-        let k: Vec<NodeId> = c.tree.children(x).collect();
-        stack.extend(k.into_iter().rev());
-    }
-    out
+    c.tree.subtree(n)
 }
 
 /// The nodes above `n`, nearest first.
@@ -191,8 +184,30 @@ pub(crate) fn decl_name(c: &Cst, decl: NodeId) -> String {
 
 /// The last identifier of a declaration's name (`f` of `c::f`).
 pub(crate) fn last_name(c: &Cst, decl: NodeId) -> String {
-    let full = decl_name(c, decl);
-    full.rsplit("::").next().unwrap_or("").to_string()
+    let mut full = decl_name(c, decl);
+    // After the last `::` (as `rsplit("::")`).
+    if let Some(i) = full.as_bytes().windows(2).rposition(|w| w == b"::") {
+        full.drain(..i + 2);
+    }
+    full
+}
+
+/// A class's own routines (functions, tasks, prototypes) by last name, in
+/// item order: what [`callee_decl`] scans along the class chain.
+fn class_routines(c: &Cst, cls: NodeId) -> Arc<Vec<(String, NodeId)>> {
+    let all = crate::shared::get("class_routines", c.tree_key(), || Mutex::new(HashMap::<NodeId, Arc<Vec<(String, NodeId)>>>::new()));
+    if let Some(v) = all.lock().unwrap_or_else(|e| e.into_inner()).get(&cls) {
+        return v.clone();
+    }
+    let v: Arc<Vec<(String, NodeId)>> = Arc::new(
+        c.tree
+            .children(cls)
+            .filter(|&m| matches!(c.kind(m), FunctionDecl | TaskDecl | MethodPrototype))
+            .map(|m| (last_name(c, m), m))
+            .collect(),
+    );
+    all.lock().unwrap_or_else(|e| e.into_inner()).insert(cls, v.clone());
+    v
 }
 
 /// A token's leading trivia as slang has it: after a macro expansion, only
@@ -1101,10 +1116,8 @@ pub(crate) fn callee_decl(c: &Cst, call: NodeId) -> Option<NodeId> {
     };
     if let Some(cls) = cls {
         for k in class_chain(c, cls) {
-            for m in kids(c, k) {
-                if matches!(c.kind(m), FunctionDecl | TaskDecl | MethodPrototype) && last_name(c, m) == name {
-                    return Some(m);
-                }
+            if let Some(&(_, m)) = class_routines(c, k).iter().find(|(n, _)| *n == name) {
+                return Some(m);
             }
         }
         if recv.is_some() {
