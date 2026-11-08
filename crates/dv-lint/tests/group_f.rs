@@ -48,8 +48,8 @@ fn deprecated_rules() {
     let src = "module child; initial $display($random); endmodule\n\
                module top; child u1(); child u2(); endmodule\n";
     let got = counts(src);
-    // Once per elaborated instance of `child`.
-    assert_eq!(got.get("SV-DEP-004"), Some(&2), "{got:?}");
+    // Once, however many instances of `child` elaborate it.
+    assert_eq!(got.get("SV-DEP-004"), Some(&1), "{got:?}");
 }
 
 #[test]

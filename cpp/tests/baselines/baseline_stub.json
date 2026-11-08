@@ -2478,7 +2478,6 @@
   ],
   "documentation/SV-STY-007/bad.sv": [
     "SV-MOD-001@14",
-    "SV-STY-008@14",
     "SV-STY-008@14"
   ],
   "documentation/SV-STY-007/good.sv": [
@@ -2848,7 +2847,6 @@
     "SV-STY-104@35",
     "SV-STY-104@36",
     "UVM-LOG-002@31",
-    "UVM-LOG-002@32",
     "UVM-LOG-002@32",
     "UVM-LOG-002@33",
     "UVM-RUS-006@17"
@@ -4046,7 +4044,6 @@
     "SV-STY-005@18",
     "SV-STY-005@19",
     "SV-STY-011@17",
-    "SV-STY-011@17",
     "SV-STY-104@6",
     "SV-STY-104@8",
     "SV-STY-104@9",
@@ -4072,8 +4069,6 @@
     "SV-STY-005@30",
     "SV-STY-005@31",
     "SV-STY-011@18",
-    "SV-STY-011@18",
-    "SV-STY-011@29",
     "SV-STY-011@29",
     "SV-STY-104@6",
     "SV-STY-104@8",
@@ -6621,7 +6616,6 @@
   ],
   "readability/SV-MAC-002/good.sv": [
     "SV-STY-010@11",
-    "SV-STY-010@12",
     "SV-STY-010@12"
   ],
   "readability/SV-RDB-001/bad.sv": [

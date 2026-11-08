@@ -166,8 +166,9 @@ fn syntax_rules_batch_three() {
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
     assert_eq!(count("SV-RND-021"), 1);
     assert_eq!(count("SV-COR-020"), 1);
-    // Once for each enclosing loop; a `new` argument is not slang's NewClassExpression.
-    assert_eq!(count("SV-OOP-010"), 2);
+    // Once (two enclosing loops, one finding); a `new` argument is not
+    // slang's NewClassExpression.
+    assert_eq!(count("SV-OOP-010"), 1);
     assert_eq!(count("SV-CON-013"), 1);
     assert_eq!(count("SVA-CYC-001"), 2);
     assert_eq!(count("SV-SVA-004"), 1);
@@ -749,7 +750,7 @@ fn part_select_reversed() {
 
 #[test]
 fn literal_per_generate_copy() {
-    // One copy per instance and generate block: an untaken branch is
+    // Once per line that some elaborated copy holds: an untaken branch is
     // still built once (with its loops unrolled).
     let src = "module leaf #(parameter int W = 2) (output logic [7:0] y);\n\
                  if (W == 1) begin : g_one\n\
@@ -767,7 +768,7 @@ fn literal_per_generate_copy() {
                endmodule\n";
     let mut lines = rule_lines(src, "SV-STY-010");
     lines.sort();
-    assert_eq!(lines, vec![3, 3, 6, 6, 6, 6, 12]);
+    assert_eq!(lines, vec![3, 6, 12]);
 }
 
 #[test]
@@ -970,8 +971,8 @@ fn queue_concat_append() {
                endfunction\n\
                endclass\n\
                class u; c#(byte) b; endclass\n";
-    // Once per specialization: the default one and c#(byte).
-    assert_eq!(rule_lines(src, "SV-PRF-007"), vec![5, 5, 6, 6]);
+    // Once, though both the default specialization and c#(byte) hold it.
+    assert_eq!(rule_lines(src, "SV-PRF-007"), vec![5, 6]);
 }
 
 fn rule_count(src: &str, rule: &str) -> usize {
@@ -1044,8 +1045,8 @@ fn redundant_cast_in_a_body_that_fails_in_the_default_specialization() {
 
 #[test]
 fn component_new_through_a_type_parameter() {
-    // `T obj; obj = new(...)`: once per specialization where T is a
-    // concrete component, named as slang prints the parameter.
+    // `T obj; obj = new(...)`: where some specialization makes T a
+    // concrete component, named as slang prints the parameter (once).
     let src = "class uvm_object; endclass\n\
                class uvm_component extends uvm_object; function new(string n, uvm_component p); endfunction endclass\n\
                class my_comp extends uvm_component; function new(string n, uvm_component p); super.new(n, p); endfunction endclass\n\
@@ -1058,7 +1059,7 @@ fn component_new_through_a_type_parameter() {
     let d = sv_sema::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "UVM-FAC-001").map(|f| f.message).collect();
-    assert_eq!(msgs.len(), 2, "{msgs:?}");
+    assert_eq!(msgs.len(), 1, "{msgs:?}");
     assert!(msgs.iter().all(|m| m.contains("uvm_component 'reg_t::T'")), "{msgs:?}");
 }
 
@@ -1102,7 +1103,8 @@ fn widths_per_instance() {
                leaf #(.Cfg(cfg_pkg::build(16))) u3 (.p_i(q), .o(o3));\nendmodule\n";
     let m = messages(src, "SV-TYP-001");
     let want = |t: &str| format!("Comparison between signed type 'integer' and unsigned type '{t}'");
-    assert_eq!(m, vec![want("logic[2:0]"), want("logic[2:0]"), want("logic[3:0]")]);
+    // u1 and u2 give the same finding, reported once; u3 differs.
+    assert_eq!(m, vec![want("logic[2:0]"), want("logic[3:0]")]);
 }
 
 /// A struct type parameter passed down two levels: its enum member's case.

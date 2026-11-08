@@ -170,6 +170,23 @@ fn generic_params(c: &Cst, cls: NodeId) -> Option<Vec<(String, Option<NodeId>)>>
 /// Number of specializations slang walks for each generic class (by class
 /// declaration node).
 pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
+    specs(c).iter().map(|(&n, s)| (n, s.tuples.len())).collect()
+}
+
+/// The specializations of one generic class: its parameter names and, for
+/// each specialization, the canonical value of every parameter.
+pub(crate) struct ClassSpecs {
+    pub(crate) params: Vec<String>,
+    pub(crate) tuples: BTreeSet<Vec<String>>,
+}
+
+/// [`ClassSpecs`] of every generic class of the tree, by declaration node
+/// (cached per tree).
+pub(crate) fn specs(c: &Cst) -> std::sync::Arc<HashMap<u32, ClassSpecs>> {
+    crate::shared::get("class_specs", c.tree_key(), || compute(c))
+}
+
+fn compute(c: &Cst) -> HashMap<u32, ClassSpecs> {
     let mut generics = Vec::new();
     let mut by_name = sv_sema::fx::FxMap::default();
     for n in c.nodes(ClassDecl) {
@@ -290,5 +307,10 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
             }
         }
     }
-    engine.generics.iter().zip(specs).map(|(g, s)| (g.node.0, s.len())).collect()
+    engine
+        .generics
+        .iter()
+        .zip(specs)
+        .map(|(g, tuples)| (g.node.0, ClassSpecs { params: g.params.iter().map(|p| p.0.clone()).collect(), tuples }))
+        .collect()
 }

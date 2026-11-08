@@ -459,6 +459,16 @@ void RuleEngine::run(std::span<rules::Rule* const> rules, core::DiagnosticEngine
                          return std::tie(a.filePath, a.line, a.column, a.ruleId, a.message) <
                                 std::tie(b.filePath, b.line, b.column, b.ruleId, b.message);
                      });
+    // One finding per rule, location and message. A walk of the elaborated
+    // design meets the same line once per module instance and class
+    // specialization; the copies say nothing new, and how many there are
+    // depends on elaboration, not on the code. The first copy is kept.
+    auto same = [](const core::Violation& a, const core::Violation& b) {
+        return std::tie(a.filePath, a.line, a.column, a.ruleId, a.message) ==
+               std::tie(b.filePath, b.line, b.column, b.ruleId, b.message);
+    };
+    merged.erase(std::unique(merged.begin() + static_cast<std::ptrdiff_t>(firstNew), merged.end(), same),
+                 merged.end());
     totalSeconds = secondsSince(runStart);
 }
 

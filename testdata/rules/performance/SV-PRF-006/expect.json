@@ -3,6 +3,10 @@
     {
       "rule": "SV-PRF-006",
       "line": 9
+    },
+    {
+      "rule": "SV-PRF-006",
+      "line": 15
     }
   ]
 }

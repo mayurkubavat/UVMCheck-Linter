@@ -18,15 +18,16 @@ fn count(got: &[(u32, u32, &str)], line: u32, rule: &str) -> usize {
 }
 
 #[test]
-fn dead_store_once_per_specialization_and_instance() {
-    // The default specialization plus `gen #(byte)`.
+fn dead_store_once_per_location() {
+    // The default specialization plus `gen #(byte)`, and two instances of
+    // leaf: each copy of the code is the same finding, reported once.
     let src = "class gen #(type T = int);\n int x;\n task t();\n  x = 1;\n  x = 2;\n endtask\nendclass\n\
                class user; gen #(byte) g; gen #(int) h; endclass\n\
                module leaf; int z; initial begin\n z = 1;\n z = 2;\n end endmodule\n\
                module top; leaf u1(); leaf u2(); endmodule\n";
     let got = findings(src);
-    assert_eq!(count(&got, 4, "SV-DED-004"), 2, "{got:?}");
-    assert_eq!(count(&got, 10, "SV-DED-004"), 2, "{got:?}");
+    assert_eq!(count(&got, 4, "SV-DED-004"), 1, "{got:?}");
+    assert_eq!(count(&got, 10, "SV-DED-004"), 1, "{got:?}");
 }
 
 #[test]

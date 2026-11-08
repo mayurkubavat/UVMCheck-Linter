@@ -6,13 +6,35 @@ use crate::{Severity, Sink};
 use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
-/// The first unpacked dimension is `[string]`. A typedef'd associative
-/// type is an alias in slang, which the rule does not look through.
+/// The first unpacked dimension is `[string]`, or `[KEY]` with a type
+/// parameter KEY of the class around it that some specialization sets to
+/// string (slang checks the elaborated type). A typedef'd associative type
+/// is an alias in slang, which the rule does not look through.
 fn string_keyed(c: &Cst, dcl: NodeId) -> bool {
-    c.tree.children(dcl).find(|&d| c.kind(d) == Dim).is_some_and(|d| {
-        c.tree.children(d).count() == 1
-            && c.tree.children(d).next().is_some_and(|k| c.kind(k) == DataType && c.tree.bare_text(k) == "string")
-    })
+    let Some(d) = c.tree.children(dcl).find(|&d| c.kind(d) == Dim) else { return false };
+    let mut kids = c.tree.children(d);
+    let (Some(k), None) = (kids.next(), kids.next()) else { return false };
+    match c.kind(k) {
+        DataType => {
+            let key = c.tree.bare_text(k);
+            key == "string" || param_bound_to_string(c, dcl, &key)
+        }
+        // `[KEY]` parses as an expression; slang resolves it to the type.
+        NameExpr if c.toks(k).count() == 1 => param_bound_to_string(c, dcl, &c.tree.bare_text(k)),
+        _ => false,
+    }
+}
+
+/// `name` is a type parameter of the generic class around `n` and one of the
+/// class's specializations binds it to `string`.
+fn param_bound_to_string(c: &Cst, n: NodeId, name: &str) -> bool {
+    let Some(cls) = std::iter::successors(c.parent(n), |&a| c.parent(a)).find(|&a| c.kind(a) == ClassDecl) else {
+        return false;
+    };
+    let specs = crate::support::specializations::specs(c);
+    let Some(s) = specs.get(&cls.0) else { return false };
+    let Some(ix) = s.params.iter().position(|p| p == name) else { return false };
+    s.tuples.iter().any(|t| t.get(ix).is_some_and(|v| v == "string"))
 }
 
 pub(crate) fn string_key_assoc(c: &Cst, s: &mut Sink) {

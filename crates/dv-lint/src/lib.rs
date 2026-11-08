@@ -389,9 +389,20 @@ pub(crate) fn lint_from(
         let file = x.position_in(&files).0;
         !file.contains("uvm_mock.svh") && !library.contains(file)
     });
+    dedup(&mut f, &files);
     INLINE_WAIVED.fetch_add(waivers::apply(&mut f, &files), std::sync::atomic::Ordering::Relaxed);
     f.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
     (built.into_inner(), (files, f))
+}
+
+/// One finding per rule, position and message. A rule that walks the
+/// elaborated design meets the same line once per module instance and class
+/// specialization; the copies say nothing new, and their number depends on
+/// how often (and in what order) the design is elaborated. uvmcheck merges
+/// them the same way. The first copy, with its related locations, is kept.
+fn dedup(f: &mut Vec<Finding>, files: &[String]) {
+    let mut seen = std::collections::HashSet::new();
+    f.retain(|x| seen.insert((x.position_in(files), x.rule, x.message.clone())));
 }
 
 /// Threads for the rules: `DV_LINT_JOBS`, else the machine's cores.
