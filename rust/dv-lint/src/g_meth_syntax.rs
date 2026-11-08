@@ -46,7 +46,7 @@ fn base_name(p: &str) -> &str {
 /// length, whether a line break came before it).
 struct Lexed<'s> {
     src: &'s str,
-    toks: Vec<(Kind, u32, u32, bool)>,
+    toks: std::sync::Arc<Vec<(Kind, u32, u32, bool)>>,
 }
 
 impl<'s> Lexed<'s> {
@@ -70,7 +70,7 @@ impl<'s> Lexed<'s> {
                 }
             }
         }
-        Lexed { src, toks }
+        Lexed { src, toks: std::sync::Arc::new(toks) }
     }
 
     fn text(&self, i: usize) -> &'s str {
@@ -100,8 +100,25 @@ struct Files<'t> {
     macros: HashMap<String, (u32, usize)>,
 }
 
+/// [`Files`] without its sources, shared by the rules that read it.
+struct FilesData {
+    toks: Vec<std::sync::Arc<Vec<(Kind, u32, u32, bool)>>>,
+    lib: Vec<bool>,
+    macros: HashMap<String, (u32, usize)>,
+}
+
 impl<'t> Files<'t> {
-    fn new(tree: &'t Tree) -> Self {
+    /// The tree's files, lexed once per tree.
+    fn new(c: &crate::syntax::Cst<'t>) -> Self {
+        let d = crate::shared::get("meth_files", c.tree_key(), || {
+            let f = Files::build(c.tree);
+            FilesData { toks: f.lexed.iter().map(|l| l.toks.clone()).collect(), lib: f.lib, macros: f.macros }
+        });
+        let lexed = c.tree.sources.iter().zip(&d.toks).map(|(s, t)| Lexed { src: s, toks: t.clone() }).collect();
+        Files { tree: c.tree, lib: d.lib.clone(), lexed, macros: d.macros.clone() }
+    }
+
+    fn build(tree: &'t Tree) -> Self {
         let lexed: Vec<Lexed> = tree.sources.iter().map(|s| Lexed::new(s)).collect();
         let mut fs = Files { tree, lib: vec![false; lexed.len()], lexed, macros: HashMap::new() };
         if !fs.lexed.is_empty() {
@@ -242,7 +259,7 @@ fn user_defines(csts: &[Cst]) -> Vec<Define> {
     let mut out = Vec::new();
     let mut seen = HashSet::new();
     for (ti, c) in csts.iter().enumerate() {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         let mut defs: Vec<_> = fs.macros.values().copied().collect();
         defs.sort();
         for (f, i) in defs {
@@ -431,7 +448,7 @@ const SHIM_PREFIXES: &[&str] = &[
 
 fn ifdef_in_reusable_class(_: &Design, csts: &[Cst], out: &mut Sink) {
     for c in csts {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         let mut seen = HashSet::new();
         for cls in c.nodes(ClassDecl) {
             let Some((first, last)) = c.tree.token_bounds(cls) else { continue };
@@ -528,7 +545,7 @@ fn user_types(c: &Cst, fs: &Files, kw: &str) -> Vec<(NodeId, u32)> {
 
 fn implicit_enum_base_type(_: &Design, csts: &[Cst], out: &mut Sink) {
     for c in csts {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         for (n, kw) in user_types(c, &fs, "enum") {
             if c.tree.child(n, DataType).is_some() || container_of(c, n) == Container::Module {
                 continue;
@@ -554,7 +571,7 @@ fn implicit_enum_base_type(_: &Design, csts: &[Cst], out: &mut Sink) {
 
 fn legacy_integer_type(_: &Design, csts: &[Cst], out: &mut Sink) {
     for c in csts {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         for (n, kw) in user_types(c, &fs, "integer") {
             if container_of(c, n) != Container::Class {
                 continue;
@@ -584,7 +601,7 @@ fn file_class_name_mismatch(_: &Design, csts: &[Cst], out: &mut Sink) {
     let mut files: BTreeMap<String, ClassFile> = BTreeMap::new();
     let mut seen = HashSet::new();
     for c in csts {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         // Only `include'd user files: the class files of a package.
         let file_of = |t: u32| -> Option<String> {
             let tok = &c.tree.tokens[t as usize];
@@ -675,7 +692,7 @@ fn import_items(c: &Cst, n: NodeId) -> Vec<(u32, u32)> {
 fn wildcard_import_outside_package(_: &Design, csts: &[Cst], out: &mut Sink) {
     let mut seen = HashSet::new();
     for c in csts {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         for n in c.nodes(ImportDecl) {
             let Some(kw) = c.keyword(n) else { continue };
             let Some(up) = c.parent(n) else { continue };
@@ -804,7 +821,7 @@ fn unused_package_import(_: &Design, csts: &[Cst], out: &mut Sink) {
     let packages = package_exports(csts);
     let mut seen = HashSet::new();
     for c in csts {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         for n in c.nodes(ImportDecl) {
             let Some(kw) = c.keyword(n) else { continue };
             if c.text_of(kw) != "import" || !user_tok(c, &fs, kw) {
@@ -959,7 +976,7 @@ fn package_graph(d: &Design, csts: &[Cst]) -> PackageGraph {
     let mut layers: HashMap<String, i32> = HashMap::new();
     let mut imports: Vec<(String, String, Loc)> = Vec::new();
     for c in csts {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         for p in c.nodes(PackageDecl) {
             let Some(name) = c.tree.child(p, Name).map(|n| c.tree.bare_text(n)) else { continue };
             let user = c.first_tok(p).is_some_and(|t| user_tok(c, &fs, t)) && !name.starts_with("uvm_");
@@ -1089,7 +1106,7 @@ Another UVM implementation, or a later Accellera release, need not have it. Keep
     };
     let mut seen = HashSet::new();
     for c in csts {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         for e in c.nodes(CallExpr) {
             let Some(t) = c.first_tok(e) else { continue };
             if c.text_of(t).starts_with('$') || !user_tok(c, &fs, t) {
@@ -1144,7 +1161,7 @@ fn deprecated_uvm_macro(_: &Design, csts: &[Cst], out: &mut Sink) {
     let Some(pack) = api_pack(csts) else { return };
     let mut seen = HashSet::new();
     for c in csts {
-        let fs = Files::new(c.tree);
+        let fs = Files::new(c);
         for (f, lx) in fs.lexed.iter().enumerate() {
             if fs.lib[f] {
                 continue;

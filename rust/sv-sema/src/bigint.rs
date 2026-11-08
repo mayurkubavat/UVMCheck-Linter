@@ -9,7 +9,102 @@ use std::cmp::Ordering;
 pub struct Int {
     /// Never empty; no redundant top word (one equal to the sign extension
     /// of the word below it).
-    w: Vec<u64>,
+    w: Words,
+}
+
+/// Words of an [`Int`]: up to [`INLINE`] in place (most values), more on
+/// the heap.
+#[derive(Clone)]
+enum Words {
+    Inline(u8, [u64; INLINE]),
+    Heap(Vec<u64>),
+}
+
+const INLINE: usize = 4;
+
+impl Words {
+    fn new() -> Words {
+        Words::Inline(0, [0; INLINE])
+    }
+
+    fn push(&mut self, v: u64) {
+        match self {
+            Words::Inline(n, a) if (*n as usize) < INLINE => {
+                a[*n as usize] = v;
+                *n += 1;
+            }
+            Words::Inline(n, a) => {
+                let mut h = a[..*n as usize].to_vec();
+                h.push(v);
+                *self = Words::Heap(h);
+            }
+            Words::Heap(h) => h.push(v),
+        }
+    }
+
+    fn pop(&mut self) -> Option<u64> {
+        match self {
+            Words::Inline(0, _) => None,
+            Words::Inline(n, a) => {
+                *n -= 1;
+                Some(a[*n as usize])
+            }
+            Words::Heap(h) => h.pop(),
+        }
+    }
+}
+
+impl std::ops::Deref for Words {
+    type Target = [u64];
+    fn deref(&self) -> &[u64] {
+        match self {
+            Words::Inline(n, a) => &a[..*n as usize],
+            Words::Heap(h) => h,
+        }
+    }
+}
+
+impl std::ops::DerefMut for Words {
+    fn deref_mut(&mut self) -> &mut [u64] {
+        match self {
+            Words::Inline(n, a) => &mut a[..*n as usize],
+            Words::Heap(h) => h,
+        }
+    }
+}
+
+impl PartialEq for Words {
+    fn eq(&self, o: &Words) -> bool {
+        **self == **o
+    }
+}
+
+impl Eq for Words {}
+
+impl std::fmt::Debug for Words {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        (**self).fmt(f)
+    }
+}
+
+impl FromIterator<u64> for Words {
+    fn from_iter<I: IntoIterator<Item = u64>>(it: I) -> Words {
+        let mut w = Words::new();
+        for v in it {
+            w.push(v);
+        }
+        w
+    }
+}
+
+impl From<Vec<u64>> for Words {
+    fn from(v: Vec<u64>) -> Words {
+        if v.len() <= INLINE {
+            v.into_iter().collect()
+        } else {
+            Words::Heap(v)
+        }
+    }
 }
 
 impl Default for Int {
@@ -20,7 +115,7 @@ impl Default for Int {
 
 impl From<i128> for Int {
     fn from(v: i128) -> Int {
-        Int { w: vec![v as u64, (v >> 64) as u64] }.trim()
+        Int { w: [v as u64, (v >> 64) as u64].into_iter().collect() }.trim()
     }
 }
 
@@ -117,7 +212,7 @@ impl Int {
     pub fn trunc(&self, width: u32, signed: bool) -> Int {
         let width = width.max(1);
         let words = width.div_ceil(64) as usize;
-        let mut w: Vec<u64> = (0..words).map(|i| self.word(i)).collect();
+        let mut w: Words = (0..words).map(|i| self.word(i)).collect();
         let top = width % 64;
         if top != 0 {
             w[words - 1] &= (1u64 << top) - 1;
@@ -154,7 +249,7 @@ impl Int {
 
     pub fn add(&self, o: &Int) -> Int {
         let n = self.w.len().max(o.w.len()) + 1;
-        let mut out = Vec::with_capacity(n);
+        let mut out = Words::new();
         let mut carry = 0u64;
         for i in 0..n {
             let (s1, c1) = self.word(i).overflowing_add(o.word(i));
@@ -162,7 +257,7 @@ impl Int {
             out.push(s2);
             carry = (c1 || c2) as u64;
         }
-        Int { w: out }.trim()
+        Int { w: out.into() }.trim()
     }
 
     pub fn neg(&self) -> Int {
@@ -175,14 +270,14 @@ impl Int {
 
     pub fn shl(&self, n: u32) -> Int {
         let (ws, bs) = ((n / 64) as usize, n % 64);
-        let mut out = vec![0u64; ws];
+        let mut out: Words = std::iter::repeat_n(0u64, ws).collect();
         let len = self.w.len() + 1;
         for i in 0..len {
             let lo = self.word(i);
             let below = if i == 0 { 0 } else { self.word(i - 1) };
             out.push(if bs == 0 { lo } else { (lo << bs) | (below >> (64 - bs)) });
         }
-        Int { w: out }.trim()
+        Int { w: out.into() }.trim()
     }
 
     /// Arithmetic shift right (the sign repeats).
@@ -190,20 +285,20 @@ impl Int {
         let (ws, bs) = ((n / 64) as usize, n % 64);
         let len = self.w.len();
         if ws >= len {
-            return Int { w: vec![self.sign_word()] };
+            return Int { w: std::iter::once(self.sign_word()).collect() };
         }
-        let mut out = Vec::with_capacity(len - ws);
+        let mut out = Words::new();
         for i in ws..len {
             let lo = self.word(i);
             let hi = self.word(i + 1);
             out.push(if bs == 0 { lo } else { (lo >> bs) | (hi << (64 - bs)) });
         }
-        Int { w: out }.trim()
+        Int { w: out.into() }.trim()
     }
 
     fn magnitude(&self) -> Vec<u64> {
         let m = if self.is_neg() { self.neg() } else { self.clone() };
-        let mut w = m.w;
+        let mut w = m.w.to_vec();
         while w.len() > 1 && *w.last().unwrap() == 0 {
             w.pop();
         }
@@ -212,7 +307,7 @@ impl Int {
 
     fn from_mag(mut m: Vec<u64>, neg: bool) -> Int {
         m.push(0);
-        let v = Int { w: m }.trim();
+        let v = Int { w: m.into() }.trim();
         if neg {
             v.neg()
         } else {

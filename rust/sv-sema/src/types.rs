@@ -1660,6 +1660,19 @@ impl<'t> Builder<'t> {
     }
 
     fn enum_string(&self, dt: NodeRef, scope: usize, env: &Env, alias: Option<&str>) -> String {
+        if !env.is_empty() {
+            return self.enum_string_of(dt, scope, env, alias);
+        }
+        let key = (dt.tree, dt.node, scope, alias.map(str::to_string));
+        if let Some(v) = self.enum_strings.borrow().get(&key) {
+            return v.clone();
+        }
+        let v = self.enum_string_of(dt, scope, env, alias);
+        self.enum_strings.borrow_mut().insert(key, v.clone());
+        v
+    }
+
+    fn enum_string_of(&self, dt: NodeRef, scope: usize, env: &Env, alias: Option<&str>) -> String {
         let vals = self.enum_values(dt, scope, env, 0);
         let body: Vec<String> = vals
             .iter()

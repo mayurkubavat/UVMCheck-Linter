@@ -30,7 +30,7 @@ impl TypeInfo {
 /// The builder's scopes and constant evaluation, read-only.
 pub struct TypeOracle<'t> {
     b: Builder<'t>,
-    regions: Vec<Vec<(u32, u32, usize)>>,
+    regions: Vec<crate::ScopeMap>,
     /// Answers already given (constant functions make some slow).
     decls: std::cell::RefCell<HashMap<(usize, Option<sv_syntax::NodeId>, Option<sv_syntax::NodeId>), TypeInfo>>,
     values: std::cell::RefCell<HashMap<(usize, sv_syntax::NodeId), TypeInfo>>,
@@ -52,13 +52,13 @@ impl<'t> TypeOracle<'t> {
         b.block_consts = true;
         b.collect_names();
         b.collect();
-        let regions = (0..trees.len()).map(|t| b.regions(t)).collect();
+        let regions = (0..trees.len()).map(|t| b.scope_map(t)).collect();
         TypeOracle { b, regions, decls: Default::default(), values: Default::default(), consts: Default::default(), members: Default::default(), spec: Default::default(), enum_types: Default::default() }
     }
 
     fn scope_of(&self, tree: usize, n: sv_syntax::NodeId) -> usize {
-        match self.b.trees[tree].token_range(n).first() {
-            Some(&tok) => Builder::scope_at(&self.regions[tree], tok, self.b.unit),
+        match self.b.trees[tree].token_bounds(n).map(|b| b.0) {
+            Some(tok) => Builder::scope_at(&self.regions[tree], tok, self.b.unit),
             None => self.b.unit,
         }
     }

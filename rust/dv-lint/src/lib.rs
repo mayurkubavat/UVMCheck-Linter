@@ -473,9 +473,11 @@ fn lint_parallel(
     let next = std::sync::atomic::AtomicUsize::new(0);
     let found: Vec<std::sync::Mutex<Vec<Finding>>> = all.iter().map(|_| Default::default()).collect();
     let same_files = std::sync::atomic::AtomicBool::new(true);
+    let profile = std::env::var_os("DV_LINT_PROFILE").is_some();
+    let t0 = std::time::Instant::now();
     std::thread::scope(|s| {
-        for _ in 0..jobs {
-            let (next, found, files, same_files, tasks) = (&next, &found, &files, &same_files, &tasks);
+        for job in 0..jobs {
+            let (next, found, files, same_files, tasks, t0) = (&next, &found, &files, &same_files, &tasks, &t0);
             std::thread::Builder::new()
                 .stack_size(256 << 20)
                 .spawn_scoped(s, move || {
@@ -487,14 +489,19 @@ fn lint_parallel(
                         let i = match tasks.get(k) {
                             None => break,
                             Some(Task::Warm(w)) => {
+                                let a = t0.elapsed().as_secs_f64() * 1e3;
                                 if let Some(c) = mix.get_or_insert_with(|| mixed_csts(trees, files)).first() {
                                     w(c);
+                                }
+                                if profile {
+                                    eprintln!("ptask warm{k} {job} {a:.0} {:.0}", t0.elapsed().as_secs_f64() * 1e3);
                                 }
                                 continue;
                             }
                             Some(&Task::Rule(i)) => i,
                         };
                         let r = &all[i];
+                        let a = t0.elapsed().as_secs_f64() * 1e3;
                         let mut sink = Sink::default();
                         match r.check {
                             Check::Model(run) => run(design, &mut sink),
@@ -504,6 +511,9 @@ fn lint_parallel(
                                 }
                             }
                             Check::Mixed(run) => run(design, mix.get_or_insert_with(|| mixed_csts(trees, files)), &mut sink),
+                        }
+                        if profile {
+                            eprintln!("ptask {} {job} {a:.0} {:.0}", r.id, t0.elapsed().as_secs_f64() * 1e3);
                         }
                         if let Ok(mut f) = found[i].lock() {
                             *f = sink.findings;

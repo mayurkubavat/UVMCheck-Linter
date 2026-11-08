@@ -994,8 +994,9 @@ pub(crate) fn class_metrics(c: &Cst, classes: &Classes) -> Vec<ClassMetrics> {
 
 fn each_class(c: &Cst, mut f: impl FnMut(&Classes, &ClassMetrics)) {
     let classes = Classes::new(c);
-    for cm in class_metrics(c, &classes) {
-        f(&classes, &cm);
+    let all = crate::shared::get("class_metrics", c.tree_key(), || class_metrics(c, &classes));
+    for cm in all.iter() {
+        f(&classes, cm);
     }
 }
 

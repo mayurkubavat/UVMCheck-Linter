@@ -266,18 +266,24 @@ pub struct SemaChecks {
 impl SemaChecks {
     pub fn new(trees: &[Tree]) -> SemaChecks {
         let scopes = scopes::build(trees);
-        SemaChecks {
-            names: names::check(trees, &scopes),
-            checks: checks::check(trees, &scopes),
-            bind: bind::check(trees),
-            iclass: iclass::check(trees),
-            udp: udp::check(trees),
-            sva: sva::check(trees),
-            calls: calls::check(trees),
-            order: order::check(trees, &scopes),
-            classes: classes::check(trees),
-            typed: typed::check(trees, &scopes),
-        }
+        // The checks are independent: the slowest run on threads of their own.
+        std::thread::scope(|s| {
+            let big = || std::thread::Builder::new().stack_size(256 << 20);
+            let scopes = &scopes;
+            let typed = big().spawn_scoped(s, move || typed::check(trees, scopes)).expect("spawn a check thread");
+            let rest = big()
+                .spawn_scoped(s, move || (classes::check(trees), bind::check(trees), order::check(trees, scopes)))
+                .expect("spawn a check thread");
+            let names = names::check(trees, scopes);
+            let checks = checks::check(trees, scopes);
+            let iclass = iclass::check(trees);
+            let udp = udp::check(trees);
+            let sva = sva::check(trees);
+            let calls = calls::check(trees);
+            let (classes, bind, order) = rest.join().unwrap_or_else(|e| std::panic::resume_unwind(e));
+            let typed = typed.join().unwrap_or_else(|e| std::panic::resume_unwind(e));
+            SemaChecks { names, checks, bind, iclass, udp, sva, calls, order, classes, typed }
+        })
     }
 
     /// Every semantic error, in [`semantic_diags`]'s order, given the
@@ -479,7 +485,7 @@ pub fn spec_counts(trees: &[Tree]) -> HashMap<(usize, sv_syntax::NodeId), usize>
 /// bindings, for rules that look at what a type names in each of them.
 pub struct SpecModel<'t> {
     b: Builder<'t>,
-    regions: Vec<Vec<(u32, u32, usize)>>,
+    regions: Vec<ScopeMap>,
 }
 
 impl<'t> SpecModel<'t> {
@@ -488,7 +494,7 @@ impl<'t> SpecModel<'t> {
         b.designs = true;
         b.collect_names();
         b.collect();
-        let regions = (0..trees.len()).map(|t| b.regions(t)).collect();
+        let regions = (0..trees.len()).map(|t| b.scope_map(t)).collect();
         SpecModel { b, regions }
     }
 
@@ -508,7 +514,7 @@ impl<'t> SpecModel<'t> {
     fn per_spec(&self, tree: usize, dt: sv_syntax::NodeId, named: bool) -> Vec<Option<(usize, sv_syntax::NodeId)>> {
         let b = &self.b;
         let r = NodeRef { tree, node: dt };
-        let Some(&first) = b.trees[tree].token_range(dt).first() else {
+        let Some((first, _)) = b.trees[tree].token_bounds(dt) else {
             return Vec::new();
         };
         let scope = Builder::scope_at(&self.regions[tree], first, b.unit);
@@ -531,7 +537,7 @@ impl<'t> SpecModel<'t> {
     /// outside one).
     pub fn visits(&self, tree: usize, n: sv_syntax::NodeId) -> usize {
         let b = &self.b;
-        let Some(&first) = b.trees[tree].token_range(n).first() else {
+        let Some((first, _)) = b.trees[tree].token_bounds(n) else {
             return 1;
         };
         let scope = Builder::scope_at(&self.regions[tree], first, b.unit);
@@ -640,6 +646,35 @@ struct TypeInfo {
     args: Env,
 }
 
+/// Each token's innermost scope region (the smallest region around it,
+/// the first listed on a tie); `u32::MAX`: none.
+pub(crate) struct ScopeMap {
+    by_tok: Vec<u32>,
+}
+
+impl ScopeMap {
+    fn new(regions: &[(u32, u32, usize)], ntok: usize) -> ScopeMap {
+        let mut order: Vec<usize> = (0..regions.len()).collect();
+        // Larger first, and on a tie the later first, so that the region
+        // painted last is the one the old scan chose.
+        order.sort_by(|&a, &b| {
+            let (la, lb) = (regions[a].1 - regions[a].0, regions[b].1 - regions[b].0);
+            lb.cmp(&la).then(b.cmp(&a))
+        });
+        let mut by_tok = vec![u32::MAX; ntok];
+        for i in order {
+            let (lo, hi, s) = regions[i];
+            let hi = (hi as usize).min(ntok.saturating_sub(1));
+            for t in lo as usize..=hi {
+                if t < ntok {
+                    by_tok[t] = s as u32;
+                }
+            }
+        }
+        ScopeMap { by_tok }
+    }
+}
+
 type SpecSets = HashMap<usize, std::collections::BTreeMap<String, (String, Env)>>;
 
 struct SpecUse {
@@ -679,6 +714,8 @@ struct Builder<'t> {
     enum_cache: std::cell::RefCell<HashMap<usize, std::rc::Rc<HashMap<String, types::CVal>>>>,
     /// Scope -> member name -> the enum typedef declared in it that names it, first wins.
     enum_typedefs: std::cell::RefCell<HashMap<usize, std::rc::Rc<HashMap<String, NodeRef>>>>,
+    /// Enum type strings outside any specialization, by (tree, node, scope, alias).
+    enum_strings: std::cell::RefCell<HashMap<(usize, NodeId, usize, Option<String>), String>>,
     /// Typedefs declared in blocks and routines, by name: tree, the
     /// block's token bounds, the declaration's first token, the decl.
     block_typedefs: HashMap<String, Vec<(usize, u32, u32, u32, NodeRef)>>,
@@ -745,6 +782,7 @@ impl<'t> Builder<'t> {
             const_cache: Default::default(),
             enum_cache: Default::default(),
             enum_typedefs: Default::default(),
+            enum_strings: Default::default(),
             block_typedefs: HashMap::new(),
             spec_counts: HashMap::new(),
             spec_sets: HashMap::new(),
@@ -1360,12 +1398,16 @@ impl<'t> Builder<'t> {
         out
     }
 
-    fn scope_at(regions: &[(u32, u32, usize)], tok: u32, unit: usize) -> usize {
-        regions
-            .iter()
-            .filter(|(lo, hi, _)| *lo <= tok && tok <= *hi)
-            .min_by_key(|(lo, hi, _)| hi - lo)
-            .map_or(unit, |r| r.2)
+    fn scope_at(regions: &ScopeMap, tok: u32, unit: usize) -> usize {
+        match regions.by_tok.get(tok as usize) {
+            Some(&s) if s != u32::MAX => s as usize,
+            _ => unit,
+        }
+    }
+
+    /// [`Self::regions`] indexed by token.
+    fn scope_map(&self, tree: usize) -> ScopeMap {
+        ScopeMap::new(&self.regions(tree), self.trees[tree].tokens.len())
     }
 
     /// The generic class whose (unspecialized) body holds `scope`, if any.
@@ -1392,19 +1434,21 @@ impl<'t> Builder<'t> {
         // Keyed by the canonical form (bindings resolved through typedefs
         // and parameters), holding the printed form and the bindings.
         let mut uses = Vec::new();
+        let generic: std::collections::HashSet<&str> =
+            self.classes.iter().filter(|c| c.generic).map(|c| c.name.as_str()).collect();
         for tree in 0..self.trees.len() {
-            let regions = self.regions(tree);
+            let regions = self.scope_map(tree);
             let t = &self.trees[tree];
             for n in t.preorder() {
                 if !matches!(t.kind(n), DataType | NameExpr) {
                     continue;
                 }
                 let r = NodeRef { tree, node: n };
-                let toks = t.token_range(n);
-                let Some(&first) = toks.first() else { continue };
+                let Some((first, _)) = t.token_bounds(n) else { continue };
                 if t.tokens[first as usize].kind != sv_syntax::TokenKind::Identifier {
                     continue;
                 }
+                let toks = t.token_range(n);
                 // Only a class named right here specializes it (not one a
                 // typedef or parameter stands for).
                 let head = toks
@@ -1413,7 +1457,7 @@ impl<'t> Builder<'t> {
                     .last()
                     .unwrap_or(&first);
                 let head = &*t.tokens[*head as usize].text;
-                if !self.classes.iter().any(|c| c.generic && c.name == head) {
+                if !generic.contains(head) {
                     continue;
                 }
                 let scope = Self::scope_at(&regions, first, self.unit);
@@ -1498,7 +1542,7 @@ impl<'t> Builder<'t> {
 
     /// A typedef declared earlier in a block around `at`, innermost first.
     pub(crate) fn block_typedef(&self, name: &str, at: NodeRef) -> Option<NodeRef> {
-        let first = self.trees[at.tree].token_range(at.node).first().copied()?;
+        let first = self.trees[at.tree].token_bounds(at.node)?.0;
         self.block_typedefs
             .get(name)?
             .iter()
@@ -1546,9 +1590,12 @@ impl<'t> Builder<'t> {
                 }
             }
         }
+        // The (use, specialization) pairs already resolved: resolving one
+        // again gives the same key, so only new specializations are visited.
+        let mut done: Vec<std::collections::HashSet<String>> = vec![Default::default(); uses.len()];
         for _round in 0..32 {
             let mut changed = false;
-            for u in uses {
+            for (ui, u) in uses.iter().enumerate() {
                 if let Some(g) = u.owner {
                     // Code inside an unspecialized generic is never elaborated.
                     let live = self.used_names.contains(&self.classes[g].name) || (defaults && specs.contains_key(&g));
@@ -1556,14 +1603,17 @@ impl<'t> Builder<'t> {
                         continue;
                     }
                 }
-                let envs: Vec<Env> = match u.dependent {
-                    None => vec![Env::default()],
+                let envs: Vec<(String, Env)> = match u.dependent {
+                    None => vec![(String::new(), Env::default())],
                     Some(g) => specs
                         .get(&g)
-                        .map(|m| m.values().map(|v| v.1.clone()).collect())
+                        .map(|m| m.iter().filter(|(k, _)| !done[ui].contains(*k)).map(|(k, v)| (k.clone(), v.1.clone())).collect())
                         .unwrap_or_default(),
                 };
-                for env in envs {
+                for (ek, env) in envs {
+                    if !done[ui].insert(ek) {
+                        continue;
+                    }
                     let mut info = self.resolve_env(u.r, u.scope, &env, 0);
                     // `C #(..)::member` specializes C.
                     let named = matches!(info.resolved, Resolved::Class(c) if self.classes[c].name == u.head);

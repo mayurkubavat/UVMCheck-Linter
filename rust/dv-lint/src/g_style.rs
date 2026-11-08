@@ -332,6 +332,10 @@ fn last_directive(text: &str, base: u32) -> u32 {
 /// not taken, in a `define line or right before a macro use; but those in
 /// a macro body after its first token, at each expansion (see SV-STY-003).
 pub(crate) fn trivia_comments(c: &Cst) -> Vec<(u32, u32, u32, Loc)> {
+    crate::shared::get("trivia_comments", c.tree_key(), || build_trivia_comments(c)).to_vec()
+}
+
+fn build_trivia_comments(c: &Cst) -> Vec<(u32, u32, u32, Loc)> {
     let t = c.tree;
     let mut out = Vec::new();
     let mut uses: HashMap<u32, Vec<u32>> = HashMap::new();
