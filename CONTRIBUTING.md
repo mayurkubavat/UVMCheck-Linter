@@ -27,7 +27,7 @@ git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
 cd UVMCheck-Linter
 
 # Configure using Release preset
-cmake --preset default
+cmake --preset reference
 
 # Build with bounded concurrency (peak RAM stays < 1.8 GB)
 cmake --build build -j 4
@@ -203,7 +203,7 @@ python3 cpp/tests/regression.py --mode all-rules --uvm-home ../uvm-core \
     --baseline cpp/tests/baselines/baseline_uvm_core.json
 
 # Everything via CTest (suite 3 only when UVMCHECK_UVM_HOME is set at configure time)
-cmake --preset default -DUVMCHECK_UVM_HOME=$PWD/../uvm-core
+cmake --preset reference -DUVMCHECK_UVM_HOME=$PWD/../uvm-core
 ctest --test-dir build --output-on-failure
 ```
 

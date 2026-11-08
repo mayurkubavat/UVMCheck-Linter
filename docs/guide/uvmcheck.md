@@ -62,7 +62,7 @@ git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
 cd UVMCheck-Linter
 
 # Configure using Release preset
-cmake --preset default
+cmake --preset reference
 
 # Build binary (peak RAM strictly bounded < 1.8 GB)
 cmake --build build -j 4

@@ -26,7 +26,7 @@ jobs:
           restore-keys: ccache-${{ runner.os }}-
 
       - name: Configure
-        run: cmake --preset default
+        run: cmake --preset reference
 
       - name: Build
         run: cmake --build build -j 4

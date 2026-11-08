@@ -1,7 +1,7 @@
 #!/bin/sh
 # Copies locally built servers into bin/<platform>-<arch>/ so `npm run package`
 # makes a self-contained .vsix for this machine. Build them first:
-#   cmake --preset default && cmake --build build          # uvmcheck
+#   cmake --preset reference && cmake --build build          # uvmcheck
 #   cargo build --release -p dv-lsp                        # dv-lsp
 set -e
 here=$(cd "$(dirname "$0")/.." && pwd)

@@ -76,7 +76,7 @@ the canary below tells you before a bump what breaks.
    review the diff:
 
    ```sh
-   cmake --preset default && cmake --build build && ctest --test-dir build
+   cmake --preset reference && cmake --build build && ctest --test-dir build
    python3 cpp/tests/regression.py --mode all-rules --update-baseline \
        --baseline cpp/tests/baselines/baseline_stub.json
    cmake --preset model && cmake --build build-model && ctest --test-dir build-model

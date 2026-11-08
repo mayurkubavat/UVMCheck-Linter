@@ -75,9 +75,12 @@ our own code, in the overlay under `cpp/src/compat/`
 
 | Command | Output |
 |---|---|
-| `cmake --preset default && cmake --build build` | `build/uvmcheck`, the oracles |
+| `cargo build --release` (repository root) | `target/release/dv-lint`, `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist`: the tools |
+| `cmake --preset reference && cmake --build build` | `build/uvmcheck` (the C++ reference engine on Slang) and the oracles, for the parity gates |
 | `cmake --preset model && cmake --build build-model` | the same plus `build-model/libuvmcheck_model.so` (position independent, no mimalloc) |
-| `cargo build --release` (repository root) | `target/release/dv-lint`, `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist` |
+
+There is no default CMake preset: the tools build with cargo, and the Slang
+builds exist to check them.
 
 A plain `cargo build` needs neither CMake build. Only with
 `--features slang` (the parity gates) does the Rust build link the model

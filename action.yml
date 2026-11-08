@@ -54,7 +54,7 @@ runs:
       if: steps.cache.outputs.cache-hit != 'true'
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: cmake --preset default && cmake --build build -j 4 --target uvmcheck
+      run: cmake --preset reference && cmake --build build -j 4 --target uvmcheck
 
     - name: Lint
       id: lint

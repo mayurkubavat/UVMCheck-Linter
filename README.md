@@ -33,8 +33,9 @@ cd UVMCheck-Linter
 # dv-lint and the other Rust tools (native front end, no C++ build)
 cargo build --release            # -> target/release/dv-lint, dv-lsp, dv-build, dv-map, dv-filelist
 
-# uvmcheck, the C++ engine on Slang (optional)
-cmake --preset default
+# uvmcheck, the C++ reference engine on Slang (optional: the parity
+# gates, and the fallback for options dv-lint does not take)
+cmake --preset reference
 cmake --build build -j 4         # -> build/uvmcheck
 ```
 

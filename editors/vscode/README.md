@@ -25,7 +25,7 @@ Release builds of the extension (`.vsix` per platform, attached to each GitHub r
 ```bash
 git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
 cd UVMCheck-Linter
-cmake --preset default && cmake --build build
+cmake --preset reference && cmake --build build
 export PATH="$(pwd)/build:$PATH"
 ```
 
