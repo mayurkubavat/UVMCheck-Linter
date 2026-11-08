@@ -19,7 +19,7 @@ model and rules, N0-N6 builder phases), with what was measured then.
 tools                                                      Python: uvmcheck.model
   └─ dv-model     safe, owned Rust snapshot of the design
        └─ sv-slang   raw FFI to libuvmcheck_model (C ABI)  <- Python uses the same ABI
-            └─ uvmcheck::model  (C++ facade, include/uvmcheck/model/)
+            └─ uvmcheck::model  (C++ facade, cpp/include/uvmcheck/model/)
                  └─ slang
 ```
 

@@ -1,5 +1,5 @@
-//! Group E (builder slice N6.3): OOP rules (`src/rules/oop/`) and the
-//! timescale and tautology checks of `src/rules/correctness/`. See
+//! Group E (builder slice N6.3): OOP rules (`cpp/src/rules/oop/`) and the
+//! timescale and tautology checks of `cpp/src/rules/correctness/`. See
 //! [`crate::g_random`].
 
 use std::collections::{HashMap, HashSet};

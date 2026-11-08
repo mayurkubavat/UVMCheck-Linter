@@ -1,6 +1,6 @@
 //! Group G of builder slice N6.3: performance, error handling, dead code,
 //! portability, security, DPI and file rules, ported from
-//! `src/rules/{performance,errors,deadcode,portability,security,dpi}`.
+//! `cpp/src/rules/{performance,errors,deadcode,portability,security,dpi}`.
 //!
 //! The C++ rules that walk slang's syntax are matched node for node; the
 //! ones that walk the AST are matched on the syntax that AST comes from

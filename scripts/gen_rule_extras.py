@@ -43,7 +43,7 @@ def main():
         )
 
     options = {}
-    for src in sorted((repo / "src").rglob("*.cpp")):
+    for src in sorted((repo / "cpp" / "src").rglob("*.cpp")):
         text = src.read_text(errors="replace")
         ids = ID_RE.findall(text)
         for m in OPTION_RE.finditer(text):

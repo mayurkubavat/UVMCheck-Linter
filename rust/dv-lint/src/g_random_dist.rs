@@ -1,5 +1,5 @@
 //! Group E (builder slice N6.3): the dist and solve-before checks of
-//! `src/rules/random/RandomizationGotchas.cpp`. See [`crate::g_random`].
+//! `cpp/src/rules/random/RandomizationGotchas.cpp`. See [`crate::g_random`].
 
 use std::collections::{HashMap, HashSet};
 

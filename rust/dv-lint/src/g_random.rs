@@ -1,5 +1,5 @@
 //! Group E (builder slice N6.3): randomization rules. Syntax ports of the
-//! C++ rules under `src/rules/random/`, and of the ones there that walk
+//! C++ rules under `cpp/src/rules/random/`, and of the ones there that walk
 //! slang's AST where the syntax tree carries the same facts. Messages are
 //! verbatim. See [`crate::syntax`] for how sv-syntax shapes stand for
 //! slang's.

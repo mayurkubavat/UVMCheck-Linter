@@ -1,5 +1,5 @@
 //! UVM and RAL rules (builder slice N6.3, group B), ported from
-//! `src/rules/uvm/` and `src/rules/ral/`. Syntax rules here walk the
+//! `cpp/src/rules/uvm/` and `cpp/src/rules/ral/`. Syntax rules here walk the
 //! sv-syntax tree the way the C++ walks slang's syntax; see
 //! [`crate::syntax`] for the shape differences. Messages are verbatim.
 

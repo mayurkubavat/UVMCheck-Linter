@@ -40,7 +40,7 @@ cmake --build build -j 4
 UVMCheck's architecture makes it straightforward to add new rules without modifying core engine logic.
 
 ### 1. Choose Rule Category & ID
-Locate the relevant category directory under `src/rules/`:
+Locate the relevant category directory under `cpp/src/rules/`:
 - `concurrency/` - Race conditions, clocking blocks, fork-join pitfalls
 - `correctness/` - Timescales, bitwidth mismatches, off-by-one errors
 - `coverage/` - Covergroup syntax, bin limits, illegal bins
@@ -74,7 +74,7 @@ them per rule. Opinionated rules use the category `Advisory`: they are off unles
 Assign a unique rule ID conforming to the standard naming scheme (e.g. `UVM-XYZ-001`, `SV-PRF-013`).
 
 ### 2. Implement the Rule Class
-Create `src/rules/<category>/YourRule.cpp`. Rules hand their visitor to the
+Create `cpp/src/rules/<category>/YourRule.cpp`. Rules hand their visitor to the
 engine's shared walk instead of walking the design themselves:
 
 ```cpp
@@ -154,20 +154,20 @@ Rules that need a custom traversal can still override
 `run(compilation, uvmModel, diags)`; they run as independent parallel jobs. Querying the
 UVM model there (classes, methods) is fine, but a `run()` that walks the whole design
 (`compilation.getRoot().visit(...)` or a loop over `getSyntaxTrees()`) fails
-`tests/test_engine_gate.py` unless its file is on `tests/engine_legacy_allowlist.txt`,
+`cpp/tests/test_engine_gate.py` unless its file is on `cpp/tests/engine_legacy_allowlist.txt`,
 which only shrinks. `swe::UserCodeVisitor` takes part in the shared walk.
-`tests/engine_equivalence.py` checks that both styles give the same findings
+`cpp/tests/engine_equivalence.py` checks that both styles give the same findings
 as the reference `--engine isolated` mode.
 
 ### 3. Register and Document the Rule
 The `UVMCHECK_REGISTER_RULE` line at the end of the rule file registers it; there is no central
 list to edit. If the rule enforces a guideline of the
 [UVM Methodology Guide](docs/methodology/README.md), add its ID to that guideline in
-`src/rules/Guidelines.cpp`. Then regenerate the docs from the rules' own metadata:
+`cpp/src/rules/Guidelines.cpp`. Then regenerate the docs from the rules' own metadata:
 
 ```bash
 python3 scripts/gen_rule_docs.py          # docs/rules/catalog.json, docs/rules/README.md, MG "Enforced by" lines
-python3 scripts/gen_rule_docs.py --check  # what CI runs (tests/test_catalog.py): fails if any of them is stale
+python3 scripts/gen_rule_docs.py --check  # what CI runs (cpp/tests/test_catalog.py): fails if any of them is stale
 ```
 
 The guide also describes how to turn a software-engineering principle into a rule and how to
@@ -182,7 +182,7 @@ Every rule in UVMCheck **must** have paired `bad.sv` and `good.sv` test cases pl
    ```json
    { "bad.sv": [ { "rule": "UVM-XYZ-001", "line": 17 } ] }
    ```
-   `python3 tests/regression.py --rule <RULE_ID> --update-expectations` writes it from the
+   `python3 cpp/tests/regression.py --rule <RULE_ID> --update-expectations` writes it from the
    current output. Check every line it records before committing: it captures what the
    rule does, not what it should do.
 
@@ -192,15 +192,15 @@ slang's `--diag-json`. It has three suites, all of which run in CI:
 
 ```bash
 # 1. Isolated: only the rule under test, against the UVM stub (testdata/common/uvm_mock.svh)
-python3 tests/regression.py --rule <RULE_ID>
+python3 cpp/tests/regression.py --rule <RULE_ID>
 
 # 2. All rules enabled, against the UVM stub
-python3 tests/regression.py --mode all-rules --baseline tests/baselines/baseline_stub.json
+python3 cpp/tests/regression.py --mode all-rules --baseline cpp/tests/baselines/baseline_stub.json
 
 # 3. All rules enabled, against the real Accellera library
 git clone --depth 1 --branch 2020.3.1 https://github.com/accellera-official/uvm-core.git ../uvm-core
-python3 tests/regression.py --mode all-rules --uvm-home ../uvm-core \
-    --baseline tests/baselines/baseline_uvm_core.json
+python3 cpp/tests/regression.py --mode all-rules --uvm-home ../uvm-core \
+    --baseline cpp/tests/baselines/baseline_uvm_core.json
 
 # Everything via CTest (suite 3 only when UVMCHECK_UVM_HOME is set at configure time)
 cmake --preset default -DUVMCHECK_UVM_HOME=$PWD/../uvm-core

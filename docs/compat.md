@@ -59,7 +59,7 @@ result-cache key.
 ## Adding an override
 
 An override is a class derived from `compat::Override`
-(`include/uvmcheck/compat/Overlay.h`) registered in `src/compat/Overlay.cpp`.
+(`cpp/include/uvmcheck/compat/Overlay.h`) registered in `cpp/src/compat/Overlay.cpp`.
 It hooks into one stage:
 
 - `configureDriver`: after the command line and project config are read, before

@@ -1,5 +1,5 @@
 //! Group E (builder slice N6.3): the correctness checks of
-//! `src/rules/correctness/` that read the syntax alone. See
+//! `cpp/src/rules/correctness/` that read the syntax alone. See
 //! [`crate::g_random`].
 
 use std::collections::{HashMap, HashSet};

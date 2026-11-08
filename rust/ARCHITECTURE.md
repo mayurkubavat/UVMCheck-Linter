@@ -48,7 +48,7 @@ the reference the parity gates compare against and as `dv-lint --slang`.
 | `sv-syntax` | lib | Event-based recovering parser. A `Tree` is a token array plus a node arena (`SyntaxKind` per node); trivia rides on tokens, so `Tree::file_text` rebuilds each file byte for byte. |
 | `sv-sema` | lib | Everything slang did above syntax: scopes and name resolution, constant evaluation (arbitrary width, four-state), type strings, the class model, elaboration and the semantic checks a compiler makes. |
 | `dv-model` | lib | The design model tools read: classes, UVM roles, properties, methods and body facts, all owned. Filled by `sv-sema` (native) or by slang through `sv-slang`. |
-| `sv-slang` | lib | Raw FFI to `libuvmcheck_model` (`include/uvmcheck/model/CApi.h`). Only `dv-model` uses it. |
+| `sv-slang` | lib | Raw FFI to `libuvmcheck_model` (`cpp/include/uvmcheck/model/CApi.h`). Only `dv-model` uses it. |
 | `dv-lint` | lib + bin | The linter: every uvmcheck rule ported to Rust, run in parallel over the model and the syntax trees. |
 | `dv-build` | bin | The native builder: reports file list, preprocessor, syntax and semantic errors like a compiler; dumps symbols, types, values and hierarchy for the gates. |
 | `dv-lsp` | bin | Language server for code browsing (symbols, definition, references, hover, completion) on `sv-syntax`. Lint diagnostics come from `uvmcheck --lsp`. |
@@ -107,7 +107,7 @@ the serial order and sorted by position and rule, then inline waivers are
 applied, so output is the same for any thread count. `DV_LINT_PROFILE=1`
 prints the cost of each rule.
 
-Every rule is a port of a C++ rule under `src/rules/` with the same id,
+Every rule is a port of a C++ rule under `cpp/src/rules/` with the same id,
 name, severity and message text; `tools/lint_parity.py` compares the two
 finding for finding.
 

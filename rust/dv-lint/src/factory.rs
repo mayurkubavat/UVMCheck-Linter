@@ -1,5 +1,5 @@
 //! Wave 2: factory registration, phase super calls and do_* hooks, on the
-//! model's macro uses and typedefs (ported from src/rules/uvm/).
+//! model's macro uses and typedefs (ported from cpp/src/rules/uvm/).
 
 use std::collections::HashMap;
 

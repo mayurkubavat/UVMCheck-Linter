@@ -1,7 +1,7 @@
 //! Readability rules that read only the source and syntax (builder slice
 //! N6.3, group F): dense inline properties, comments that repeat the code,
 //! commented-out code and unparenthesized expression macros. Ported from
-//! `src/rules/readability/`; messages are verbatim.
+//! `cpp/src/rules/readability/`; messages are verbatim.
 
 use std::collections::{BTreeSet, HashMap, HashSet};
 

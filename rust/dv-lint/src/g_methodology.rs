@@ -1,5 +1,5 @@
 //! Group A of builder slice N6.3: the methodology-guide rules of
-//! `src/rules/methodology/` (MG-1 to MG-9: reuse, roles, coupling,
+//! `cpp/src/rules/methodology/` (MG-1 to MG-9: reuse, roles, coupling,
 //! patterns, configuration, constructs, packages, duplication), ported from
 //! their C++ twins with the same ids, names, severities and messages.
 //!

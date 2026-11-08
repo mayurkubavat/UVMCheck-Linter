@@ -48,7 +48,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: ${{ github.action_path }}/build/uvmcheck
-        key: uvmcheck-${{ runner.os }}-${{ hashFiles(format('{0}/src/**', github.action_path), format('{0}/include/**', github.action_path), format('{0}/CMakeLists.txt', github.action_path)) }}
+        key: uvmcheck-${{ runner.os }}-${{ hashFiles(format('{0}/cpp/**', github.action_path), format('{0}/CMakeLists.txt', github.action_path)) }}
 
     - name: Build uvmcheck
       if: steps.cache.outputs.cache-hit != 'true'

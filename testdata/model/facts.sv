@@ -1,4 +1,4 @@
-// Fixture for the model's C ABI test (tests/model/capi_smoke.c): one class
+// Fixture for the model's C ABI test (cpp/tests/capi_smoke.c): one class
 // that carries each fact the ABI reports. Line numbers are checked there.
 `include "uvm_mock.svh"
 

@@ -1,5 +1,5 @@
 //! Group E (builder slice N6.3): the real-number checks of
-//! `src/rules/correctness/` (SV-BUG-005, SV-BUG-006). Expression types come
+//! `cpp/src/rules/correctness/` (SV-BUG-005, SV-BUG-006). Expression types come
 //! from the declarations the syntax names; an expression whose type the
 //! syntax does not give is left alone. See [`crate::g_random`].
 

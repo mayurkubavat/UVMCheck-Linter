@@ -1,4 +1,4 @@
-//! Raw bindings to `include/uvmcheck/model/CApi.h`. Keep this file in step
+//! Raw bindings to `cpp/include/uvmcheck/model/CApi.h`. Keep this file in step
 //! with that header; `dv-model` is the safe API tools should use.
 #![allow(non_camel_case_types)]
 

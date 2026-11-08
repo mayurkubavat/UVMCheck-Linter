@@ -25,7 +25,7 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-CODE_DIRS = ["src", "include", "python"]
+CODE_DIRS = ["cpp/src", "cpp/include", "python"]
 CATEGORIES = [
     # (macro in slang headers, kind enum, class-name suffix)
     ("SYMBOLKIND", "SymbolKind", "Symbol"),

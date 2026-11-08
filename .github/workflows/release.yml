@@ -38,7 +38,7 @@ jobs:
       - name: Smoke test
         run: |
           ./build/uvmcheck --list-rules --json > /dev/null
-          python3 tests/regression.py --binary build/uvmcheck
+          python3 cpp/tests/regression.py --binary build/uvmcheck
 
       - name: Package
         run: |

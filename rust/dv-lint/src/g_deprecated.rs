@@ -1,5 +1,5 @@
 //! Deprecated system functions and UVM APIs (builder slice N6.3, group F),
-//! ported from `src/rules/deprecated/`. The C++ rules visit slang's AST, so
+//! ported from `cpp/src/rules/deprecated/`. The C++ rules visit slang's AST, so
 //! a call is reported once per elaborated copy of the code around it: per
 //! instance of its module and per specialization of its class (see
 //! [`copies`]). Messages are verbatim.

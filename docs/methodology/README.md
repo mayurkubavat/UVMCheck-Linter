@@ -53,7 +53,7 @@ uvmcheck --conformance --json report.json -f files.f
 
 With guideline selection or `--conformance`, the console summary ends with a pass/fail line per guideline and a tally per chapter, and the JSON report gains a `conformance` array. Every finding in the JSON report also lists the guidelines its rule enforces.
 
-The mapping from guidelines to rules lives in `src/rules/Guidelines.cpp`. `tests/test_guidelines.py` checks that every rule named there exists and that the chapter pages list the same rules.
+The mapping from guidelines to rules lives in `cpp/src/rules/Guidelines.cpp`. `cpp/tests/test_guidelines.py` checks that every rule named there exists and that the chapter pages list the same rules.
 
 ## Turning a principle into a rule
 
@@ -64,7 +64,7 @@ Every new rule goes through the same steps, in order. A rule without a bad snipp
 3. **Find a static signature**: the evidence the linter can see. That is syntax, a semantic fact from slang, a cross-file fact from the UVM model, or (later) git history.
 4. **Measure precision** on uvm-core, open-source VIPs and internal code. Count false positives and define the escape hatches (exempt roles, phases, thresholds).
 5. **Assign a level and a profile**: Shall and Should rules report warnings and run by default; May rules go to the Advisory profile.
-6. **Encode** the rule with bad and good tests, add it to its guideline in `src/rules/Guidelines.cpp` and to the chapter page, and give the message a concrete fix.
+6. **Encode** the rule with bad and good tests, add it to its guideline in `cpp/src/rules/Guidelines.cpp` and to the chapter page, and give the message a concrete fix.
 
 ### Scoring a candidate
 

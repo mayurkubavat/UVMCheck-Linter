@@ -1,8 +1,8 @@
 //! Style rules (builder slice N6.3, group F): whitespace and line length,
 //! include guards, banners, end labels, inline method size, one statement
 //! per line, keyword spacing, macro semicolons and UVM naming suffixes.
-//! Each is a port of its C++ twin under `src/rules/style/` (and the banned
-//! macro scanner under `src/rules/deprecated/`); messages are verbatim.
+//! Each is a port of its C++ twin under `cpp/src/rules/style/` (and the banned
+//! macro scanner under `cpp/src/rules/deprecated/`); messages are verbatim.
 
 use std::collections::HashMap;
 

@@ -4,7 +4,7 @@ Regenerates the rule documentation from the rules themselves.
 
 Each rule declares its metadata once, in its own source file (ID, name, category,
 severity, profiles, description; sub-rules for the configurable naming and style
-engines; guideline tags from src/rules/Guidelines.cpp). This script asks the built
+engines; guideline tags from cpp/src/rules/Guidelines.cpp). This script asks the built
 binary for that metadata and writes:
 
   docs/rules/catalog.json           machine-readable catalog (uvmcheck --list-rules --json)

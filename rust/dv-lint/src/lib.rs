@@ -1,6 +1,6 @@
 //! UVMCheck's rules in Rust, over [`dv_model::Design`] and `sv-syntax` trees.
 //!
-//! Each rule is a line-for-line port of its C++ twin under `src/rules/`.
+//! Each rule is a line-for-line port of its C++ twin under `cpp/src/rules/`.
 //! Model rules read only the class model, so any front end that fills a
 //! `Design` (slang or the native sv-sema) can feed them; syntax rules (see
 //! [`syntax`]) read the native syntax tree. Messages are copied verbatim so

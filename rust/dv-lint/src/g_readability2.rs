@@ -1,5 +1,5 @@
 //! Class-level readability rules (builder slice N6.3, group F), ported
-//! from `src/rules/readability/`: undocumented extension points and
+//! from `cpp/src/rules/readability/`: undocumented extension points and
 //! testbench classes, names that say nothing and vowel-dropped
 //! abbreviations. The C++ rules walk the classes of slang's AST that
 //! are user code (`swe::userClasses`); here the classes come from the

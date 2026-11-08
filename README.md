@@ -2,7 +2,7 @@
 
 [![C++20](https://img.shields.io/badge/Language-C%2B%2B20-blue.svg)](https://en.cppreference.com/w/cpp/20)
 [![Slang](https://img.shields.io/badge/Powered%20By-Slang-orange.svg)](https://github.com/MikePopoloski/slang)
-[![Tests](https://img.shields.io/badge/Tests-456%2F456%20Passing-brightgreen.svg)](tests/regression.py)
+[![Tests](https://img.shields.io/badge/Tests-456%2F456%20Passing-brightgreen.svg)](cpp/tests/regression.py)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
 **UVMCheck** is a blazing-fast, static analysis and linting engine designed specifically for modern **IEEE 1800 (SystemVerilog)** and **IEEE 1800.2 (UVM)** design verification codebases. Built on modern C++20 and leveraging the high-speed Slang compiler frontend, UVMCheck provides deep semantic AST and CST analysis, full factory and phasing validation, simulation-race detection, and automated fix-it capabilities.
@@ -177,7 +177,7 @@ Each fix is `safe`, `unsafe`, or `display-only`. `--fix` writes only safe fixes 
 ./build/uvmcheck tb/legacy_code.sv --fix --unsafe-fixes   # also apply behaviour-changing fixes
 ./build/uvmcheck tb/legacy_code.sv --fix --fix-rule SV-COR-009,SV-STY-005   # only these rules' fixes
 ```
-Fixes land in the file that holds the code, including included `.svh` files. Waived and baselined findings are not fixed. A file edited after it was read is skipped, and a file with compile errors is never rewritten. Fixes inside macro expansions are left alone, and a fix whose replacement would drop a macro call the code wrote (for example `` d[1+`MSB:7] `` rewritten from the expansion) becomes display-only. One `--fix` run repeats passes until nothing changes: overlapping fixes and findings that a fix uncovers are handled in the next pass, and the final report shows what is left in the fixed code. It stops after 10 passes, or as soon as fixes start undoing each other, with a warning. `tests/test_fix_invariants.py` checks on every rule test file, and on mutated copies, that `--fix` never crashes or hangs, adds no compile errors, keeps every macro call, and settles in one run. Each file is written to a temporary copy and renamed into place. In the editor a safe fix is the preferred quick fix; unsafe and display-only fixes are offered as ordinary code actions.
+Fixes land in the file that holds the code, including included `.svh` files. Waived and baselined findings are not fixed. A file edited after it was read is skipped, and a file with compile errors is never rewritten. Fixes inside macro expansions are left alone, and a fix whose replacement would drop a macro call the code wrote (for example `` d[1+`MSB:7] `` rewritten from the expansion) becomes display-only. One `--fix` run repeats passes until nothing changes: overlapping fixes and findings that a fix uncovers are handled in the next pass, and the final report shows what is left in the fixed code. It stops after 10 passes, or as soon as fixes start undoing each other, with a warning. `cpp/tests/test_fix_invariants.py` checks on every rule test file, and on mutated copies, that `--fix` never crashes or hangs, adds no compile errors, keeps every macro call, and settles in one run. Each file is written to a temporary copy and renamed into place. In the editor a safe fix is the preferred quick fix; unsafe and display-only fixes are offered as ordinary code actions.
 
 ### Reporting (SARIF, JSON & HTML)
 ```bash
@@ -398,19 +398,19 @@ UVMCheck features a modular unit test suite with 648 test cases covering 324 rul
 
 ```bash
 # Run entire testsuite via Python runner (~2.8 seconds)
-python3 tests/regression.py
+python3 cpp/tests/regression.py
 
 # Run only UVM methodology tests (~0.5 seconds)
-python3 tests/regression.py --category uvm
+python3 cpp/tests/regression.py --category uvm
 
 # Run single-rule test (~7 ms)
-python3 tests/regression.py --rule UVM-CFG-002
+python3 cpp/tests/regression.py --rule UVM-CFG-002
 
 # Check the parallel engine gives identical findings to the reference engine
-python3 tests/engine_equivalence.py
+python3 cpp/tests/engine_equivalence.py
 
 # Git-history rules (SV-EVO-001/002) against throwaway repositories
-python3 tests/test_history.py
+python3 cpp/tests/test_history.py
 
 # Run via CTest
 ctest --test-dir build --output-on-failure
@@ -421,11 +421,11 @@ ctest --test-dir build --output-on-failure
 ## Contributing & Adding New Rules
 
 Every rule in UVMCheck inherits from `uvmcheck::rules::Rule`:
-1. Create `src/rules/<category>/YourRule.cpp`.
+1. Create `cpp/src/rules/<category>/YourRule.cpp`.
 2. Implement either `slang::ast::ASTVisitor` (typed AST) or `slang::syntax::SyntaxVisitor` (CST/tokens).
-3. Register the rule factory in `src/rules/BuiltinRules.cpp`.
+3. Register the rule factory in `cpp/src/rules/BuiltinRules.cpp`.
 4. Add unit tests in `testdata/rules/<category>/<RULE_ID>/bad.sv` and `good.sv`.
-5. Run `python3 tests/regression.py --rule <RULE_ID>` to verify.
+5. Run `python3 cpp/tests/regression.py --rule <RULE_ID>` to verify.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full development guidelines, memory-bounded compilation instructions, and pull request conventions.
 

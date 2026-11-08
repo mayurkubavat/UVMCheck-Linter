@@ -1,6 +1,6 @@
 // How often uvmcheck's shared AST walk visits the body of each generic class:
 // once per specialization, after the engine's DefaultSpecializer (copied
-// from src/engine/RuleEngine.cpp) has made every default specialization.
+// from cpp/src/engine/RuleEngine.cpp) has made every default specialization.
 // Prints `<count> <name>@<file>:<line>`. The reference for tools/spec_gate.py.
 //
 //   B=build/_deps; c++ -std=c++20 -O1 -I$B/slang-src/include -I$B/slang-build/source \
