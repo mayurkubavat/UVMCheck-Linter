@@ -2,7 +2,9 @@
 #include "uvmcheck/rules/RuleRegistry.h"
 #include "slang/ast/ASTVisitor.h"
 #include "slang/ast/expressions/LiteralExpressions.h"
+#include "slang/ast/symbols/MemberSymbols.h"
 #include "slang/ast/symbols/ParameterSymbols.h"
+#include "slang/syntax/SyntaxPrinter.h"
 #include "slang/syntax/SyntaxVisitor.h"
 #include "slang/syntax/AllSyntax.h"
 #include <algorithm>
@@ -12,7 +14,24 @@ namespace uvmcheck::rules::style {
 
 class ExplicitLiteralWidthVisitor : public engine::AstVisitor<ExplicitLiteralWidthVisitor> {
 public:
-    explicit ExplicitLiteralWidthVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
+    /// A literal's text: its tokens, without whitespace or comments.
+    static std::string tokenText(const slang::syntax::SyntaxNode& n) {
+        std::string text = slang::syntax::SyntaxPrinter().setIncludeTrivia(false).print(n).str();
+        text.erase(std::remove_if(text.begin(), text.end(), [](unsigned char c) { return std::isspace(c); }), text.end());
+        return text;
+    }
+
+    ExplicitLiteralWidthVisitor(core::DiagnosticEngine& diags, const slang::SourceManager& sm)
+        : diags(diags), sm(sm) {}
+
+    // `__LINE__ (as in `uvm_error's `uvm_line): a number the preprocessor
+    // wrote, not a literal anyone can size.
+    bool fromLineMacro(slang::SourceLocation loc) const {
+        while (loc.valid() && sm.isMacroLoc(loc)) loc = sm.getOriginalLoc(loc);
+        if (!loc.valid()) return false;
+        auto text = sm.getSourceText(loc.buffer());
+        return loc.offset() < text.size() && text.substr(loc.offset()).starts_with("`__LINE__");
+    }
 
     // 'hFF and 32'hFF are the same value with the same signedness, so writing the width the
     // literal already has is safe. Not for x/z digits: an unsized 'x fills any width it is
@@ -63,18 +82,41 @@ public:
         if (p.isOverridden() && syn && syn->kind == slang::syntax::SyntaxKind::Declarator) {
             const auto& d = syn->as<slang::syntax::DeclaratorSyntax>();
             if (d.initializer) {
-                DefaultLiterals lits;
-                d.initializer->expr->visit(lits);
-                for (const auto& [outer, inner] : lits.found) {
-                    std::string text = outer->toString();
-                    text.erase(std::remove_if(text.begin(), text.end(),
-                                              [](unsigned char c) { return std::isspace(c); }),
-                               text.end());
-                    report(text, decimalAboveOne(*inner), inner->getFirstToken().location(), {});
-                }
+                reportWritten(*d.initializer->expr);
             }
         }
         visitDefault(p);
+    }
+
+    /// Reports the unsized literals written in `syntax` (an expression or a
+    /// task's arguments) that the AST does not hold.
+    void reportWritten(const slang::syntax::SyntaxNode& syntax) {
+        DefaultLiterals lits;
+        syntax.visit(lits);
+        for (const auto& [outer, inner] : lits.found) {
+            auto loc = inner->getFirstToken().location();
+            if (fromLineMacro(loc)) continue;
+            report(tokenText(*outer), decimalAboveOne(*inner), loc, {});
+        }
+    }
+
+    // In a generate block no instance takes, slang drops an assignment whose
+    // selects are out of range for these parameters (`c[63:W]` with W = 64)
+    // and never binds an elaboration task's arguments. That code is live under
+    // other parameters, so its literals are reported as written.
+    void handle(const slang::ast::ContinuousAssignSymbol& a) {
+        if (const auto* syn = a.getSyntax(); syn && a.getParentScope() &&
+            a.getParentScope()->isUninstantiated() && a.getAssignment().bad()) {
+            reportWritten(*syn);
+        }
+        visitDefault(a);
+    }
+
+    void handle(const slang::ast::ElabSystemTaskSymbol& t) {
+        if (const auto* syn = t.getSyntax(); syn && t.getParentScope() && t.getParentScope()->isUninstantiated()) {
+            if (const auto* args = syn->as<slang::syntax::ElabSystemTaskSyntax>().arguments) reportWritten(*args);
+        }
+        visitDefault(t);
     }
 
     static bool decimalAboveOne(const slang::syntax::SyntaxNode& lit) {
@@ -113,9 +155,8 @@ public:
     }
 
     void handle(const slang::ast::IntegerLiteral& lit) {
-        if (lit.isDeclaredUnsized && lit.syntax) {
-            std::string text = lit.syntax->toString();
-            text.erase(std::remove_if(text.begin(), text.end(), [](unsigned char c) { return std::isspace(c); }), text.end());
+        if (lit.isDeclaredUnsized && lit.syntax && !fromLineMacro(lit.sourceRange.start())) {
+            std::string text = tokenText(*lit.syntax);
             report(text, static_cast<bool>(lit.getValue() > 1), lit.sourceRange.start(), widthFix(lit, text));
         }
         visitDefault(lit);
@@ -123,6 +164,7 @@ public:
 
 private:
     core::DiagnosticEngine& diags;
+    const slang::SourceManager& sm;
 };
 
 class ExplicitLiteralWidth : public Rule {
@@ -138,7 +180,7 @@ public:
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
         auto& diags = ctx.diags();
-        ExplicitLiteralWidthVisitor visitor(diags);
+        ExplicitLiteralWidthVisitor visitor(diags, *ctx.compilation().getSourceManager());
         co_await ctx.visitAst(visitor);
     }
 };

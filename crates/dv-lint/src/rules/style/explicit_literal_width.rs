@@ -1,7 +1,7 @@
 //! SV-STY-010 (ExplicitLiteralWidth): Disallow unsized integer and numeric
 //! literals without explicit bit-width declarations.
 
-use crate::support::literals::{compact, integer_literal, written_times};
+use crate::support::literals::{integer_literal, written_times};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::{NodeId, SyntaxKind};
@@ -17,6 +17,11 @@ fn above_one(digits: &str) -> bool {
 pub(crate) fn explicit_literal_width(c: &Cst, s: &mut Sink) {
     for n in c.nodes(Literal) {
         let Some(lit) = integer_literal(c, n) else { continue };
+        // `__LINE__ (as in `uvm_error's `uvm_line): a number the
+        // preprocessor wrote, not a literal anyone can size.
+        if c.first_tok(n).is_some_and(|t| line_macro(c, t)) {
+            continue;
+        }
         if lit.sized || (!lit.based && !above_one(&lit.digits)) {
             continue;
         }
@@ -26,7 +31,8 @@ pub(crate) fn explicit_literal_width(c: &Cst, s: &mut Sink) {
             continue;
         }
         let outer = outer_paren(c, n);
-        let mut text = compact(c, outer);
+        // Its tokens, without whitespace or comments (uvmcheck the same).
+        let mut text: String = c.tree.token_range(outer).into_iter().map(|t| c.text_of(t)).collect();
         // `#(50)`: slang keeps the parentheses as an expression.
         if c.parent(outer).is_some_and(|p| {
             c.kind(p) == TimingControl
@@ -74,6 +80,17 @@ pub(crate) fn explicit_literal_width(c: &Cst, s: &mut Sink) {
         let f = s.add("SV-STY-010", "ExplicitLiteralWidth", sev, msg, c.loc(at));
         f.fixes.extend(fix);
     }
+}
+
+/// The token is the expansion of `__LINE__.
+fn line_macro(c: &Cst, tok: u32) -> bool {
+    let t = &c.tree.tokens[tok as usize];
+    t.from_macro
+        && c.tree
+            .sources
+            .get(t.written.file as usize)
+            .and_then(|s| s.get(t.written.offset as usize..))
+            .is_some_and(|s| s.starts_with("`__LINE__"))
 }
 
 /// The node slang keeps as a literal's syntax: the parentheses around it.

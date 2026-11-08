@@ -29,3 +29,18 @@ module literal_width_top;
     literal_width_leaf #(.MASK(8'h01)) u_a (.y(a));
     literal_width_leaf #(.MASK(8'h02)) u_b (.y(b));
 endmodule
+
+// VIOLATION SV-STY-010: the 40 in a branch this instance does not take, whose
+// select is out of range for W = 8; it is live code for a wider W.
+module literal_width_wide #(parameter int unsigned W = 8'd8) (output logic [63:0] c);
+    if (W > 8'd40) begin : g_wide
+        assign c[W-1:40] = '0;
+    end else begin : g_narrow
+        assign c = 64'(W);
+    end
+endmodule : literal_width_wide
+
+module literal_width_wide_top;
+    logic [63:0] c;
+    literal_width_wide #(.W(8'd8)) u_wide (.c(c));
+endmodule : literal_width_wide_top
