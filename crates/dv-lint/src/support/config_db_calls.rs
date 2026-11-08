@@ -113,6 +113,9 @@ pub(crate) struct CfgCall {
     pub(crate) field: String,
     pub(crate) loc: dv_model::Loc,
     pub(crate) visits: usize,
+    /// The field name is a string literal (not a variable a wrapper
+    /// forwards).
+    pub(crate) literal: bool,
 }
 
 /// The field-name argument: a string literal's value, else its text.
@@ -151,6 +154,7 @@ pub(crate) fn config_db_calls(csts: &[Cst]) -> Vec<CfgCall> {
             if field.is_empty() {
                 continue;
             }
+            let literal = c.kind(strip(c, f)) == Literal && c.tree.bare_text(strip(c, f)).starts_with('"');
             let set = name == "set";
             let v = strip(c, args[3]);
             let unbased = c.kind(v) == Literal && c.tree.bare_text(v).starts_with('\'');
@@ -162,7 +166,15 @@ pub(crate) fn config_db_calls(csts: &[Cst]) -> Vec<CfgCall> {
             let visits = if *generic { 1 } else { ast_visits(c, e) };
             for (ty, _, converted) in entries {
                 let ty = if set && (unbased || *converted) { formal.to_string() } else { ty.text.clone() };
-                out.push(CfgCall { set, ty, class: class.clone(), field: field.clone(), loc: c.loc(t), visits });
+                out.push(CfgCall {
+                    set,
+                    ty,
+                    class: class.clone(),
+                    field: field.clone(),
+                    loc: c.loc(t),
+                    visits,
+                    literal,
+                });
             }
         }
     }

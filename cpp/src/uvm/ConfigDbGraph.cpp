@@ -29,6 +29,14 @@ static std::string extractStringArg(const slang::ast::Expression* expr) {
     return "";
 }
 
+static bool isStringLiteral(const slang::ast::Expression* expr) {
+    if (!expr) return false;
+    while (expr->kind == slang::ast::ExpressionKind::Conversion) {
+        expr = &expr->as<slang::ast::ConversionExpression>().operand();
+    }
+    return expr->kind == slang::ast::ExpressionKind::StringLiteral;
+}
+
 class ConfigDbCollector : public slang::ast::ASTVisitor<ConfigDbCollector, slang::ast::VisitFlags::AllGood> {
 public:
     explicit ConfigDbCollector(std::vector<ConfigDbNode>& nodes) : outNodes(nodes) {}
@@ -78,7 +86,8 @@ public:
                             currentClass,
                             instStr,
                             fieldStr,
-                            expr.sourceRange.start()
+                            expr.sourceRange.start(),
+                            isStringLiteral(args[2])
                         });
                     }
                 }
@@ -110,7 +119,7 @@ std::vector<ConfigDbMismatch> ConfigDbGraph::findMismatches() const {
         for (const auto& setNode : nodes) {
             if (setNode.kind != ConfigDbNode::Kind::Set) continue;
 
-            if (setNode.fieldName == getNode.fieldName) {
+            if (setNode.literalField && getNode.literalField && setNode.fieldName == getNode.fieldName) {
                 // If the types differ across components, report mismatch
                 if (setNode.typeName != getNode.typeName) {
                     mismatches.push_back({

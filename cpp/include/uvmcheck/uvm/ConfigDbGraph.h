@@ -15,6 +15,10 @@ struct ConfigDbNode {
     std::string instName;
     std::string fieldName;
     slang::SourceLocation location;
+    /// The field name is a string literal. A variable (`field_name` in a
+    /// wrapper that forwards it) names no particular field, so two such
+    /// calls are never compared.
+    bool literalField = true;
 };
 
 struct ConfigDbMismatch {

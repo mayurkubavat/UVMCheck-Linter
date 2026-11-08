@@ -8,8 +8,10 @@ use crate::{Severity, Sink};
 
 pub(crate) fn config_db_cross_component(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {
     let calls = config_db_calls(csts);
-    for g in calls.iter().filter(|k| !k.set) {
-        for s in calls.iter().filter(|k| k.set && k.field == g.field && k.ty != g.ty) {
+    // Only literal field names name a field: two wrappers forwarding a
+    // `field_name` variable are not the same configuration.
+    for g in calls.iter().filter(|k| !k.set && k.literal) {
+        for s in calls.iter().filter(|k| k.set && k.literal && k.field == g.field && k.ty != g.ty) {
             let msg = format!(
                 "Cross-component 'uvm_config_db' type mismatch for field '{}': configured in class '{}' with type '{}', but retrieved in class '{}' with incompatible type '{}'. Mismatched type parameters break runtime config lookup and leave fields uninitialized.",
                 g.field, s.class, s.ty, g.class, g.ty
