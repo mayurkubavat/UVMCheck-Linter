@@ -4,7 +4,7 @@
 use crate::{Check, Rule};
 
 mod class_member_prefix;
-mod configurable_naming_engine;
+pub(crate) mod configurable_naming_engine;
 mod configurable_style_engine;
 mod constraint_name_suffix;
 mod explicit_literal_width;

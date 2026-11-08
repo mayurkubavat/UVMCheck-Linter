@@ -8,9 +8,10 @@
 //! A Python config (`.uvmcheck/config.py`) is evaluated by the uvmcheck
 //! Python SDK (`python3 -m uvmcheck.config_runner`), as the C++ engine does,
 //! into the same JSON a `.json` config holds. Integer and boolean rule
-//! options and the `style` block go to [`crate::options`]; the `naming`
-//! block and other options are not applied by the native rules yet:
-//! [`Config::unapplied`] names them so the caller can say so.
+//! options and the `style` and `naming` blocks go to [`crate::options`];
+//! what the native rules cannot apply (other option types, a header or
+//! naming pattern that is a regex) is named in [`Config::unapplied`] so the
+//! caller can say so.
 
 use std::path::{Path, PathBuf};
 
@@ -221,6 +222,8 @@ pub struct Config {
     pub options: Vec<(String, String, i64)>,
     /// The `style` block.
     pub style: Vec<(String, crate::options::StyleValue)>,
+    /// The `naming` block.
+    pub naming: Vec<(String, crate::options::NamingOverride)>,
 }
 
 fn severity(s: &str) -> Option<Severity> {
@@ -409,8 +412,24 @@ impl Config {
                 c.style.push((k.clone(), val));
             }
         }
-        if matches!(root.get("naming"), Json::Obj(o) if !o.is_empty()) {
-            c.unapplied.push("naming".to_string());
+        if let Json::Obj(naming) = root.get("naming") {
+            for (target, block) in naming {
+                let s = |k: &str| block.get(k).as_str().map(str::to_string);
+                let o = crate::options::NamingOverride {
+                    prefix: s("prefix"),
+                    suffix: s("suffix"),
+                    pattern: s("pattern"),
+                    casing: s("casing"),
+                    severity: s("severity"),
+                    enabled: block.get("enabled").as_bool(),
+                };
+                if o.enabled != Some(false)
+                    && !crate::naming_pattern_supported(target, o.pattern.as_deref().unwrap_or(""))
+                {
+                    c.unapplied.push(format!("naming.{target} (a target or pattern the native engine cannot check)"));
+                }
+                c.naming.push((target.clone(), o));
+            }
         }
         c.add_waivers(root.get("waivers"), &base)?;
         let wfile = project.join(".uvmcheck").join("waivers.json");

@@ -59,3 +59,8 @@ pub(crate) fn all() -> Vec<Rule> {
     v.extend(uvm::rules());
     v
 }
+
+/// See [`crate::naming_pattern_supported`].
+pub(crate) fn naming_pattern_supported(target: &str, pattern: &str) -> bool {
+    style::configurable_naming_engine::target_supported(target, pattern)
+}

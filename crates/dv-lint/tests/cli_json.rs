@@ -144,3 +144,36 @@ fn style_block_from_the_config() {
     assert!(has("SV-STY-106", "bar.sv") && !has("SV-STY-106", "ok.sv"), "{text}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn naming_block_from_the_config() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-naming-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("uvmcheck.json"),
+        r#"{"naming": {"Class": {"enabled": true}, "Typedef": {"suffix": "_type", "severity": "ERROR"},
+            "Package": {"suffix": ""}, "Coverpoint": {"pattern": "^x_.*$"}}}"#,
+    )
+    .unwrap();
+    std::fs::write(dir.join("t.sv"), "package my_stuff; endpackage\nclass myThing; endclass\ntypedef int count;\n")
+        .unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .current_dir(&dir)
+        .args(["--rule", "SV-NAM-100", "t.sv"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        text.contains("Class identifier 'myThing' does not satisfy naming convention: must follow PascalCase."),
+        "{text}"
+    );
+    assert!(text.contains("[ERROR] SV-NAM-111") && text.contains("must end with suffix '_type'"), "{text}");
+    assert!(
+        text.contains("Package identifier 'my_stuff' does not satisfy naming convention: must match pattern"),
+        "suffix dropped, pattern kept: {text}"
+    );
+    assert!(!text.contains("must end with suffix '_pkg'"), "{text}");
+    assert!(err.contains("naming.Coverpoint"), "a regex pattern is reported as not applied: {err}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

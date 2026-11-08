@@ -80,3 +80,27 @@ pub(crate) fn header_alternatives(pattern: &str) -> Option<Vec<String>> {
     }
     Some(pattern.split('|').map(str::to_lowercase).collect())
 }
+
+/// One `naming.<Target>` block: the keys it sets.
+#[derive(Clone, Debug, Default)]
+pub struct NamingOverride {
+    pub prefix: Option<String>,
+    pub suffix: Option<String>,
+    pub pattern: Option<String>,
+    pub casing: Option<String>,
+    pub severity: Option<String>,
+    pub enabled: Option<bool>,
+}
+
+static NAMING: RwLock<Option<HashMap<String, NamingOverride>>> = RwLock::new(None);
+
+/// Sets the `naming` block (target, settings).
+pub fn set_naming(naming: &[(String, NamingOverride)]) {
+    if let Ok(mut n) = NAMING.write() {
+        *n = Some(naming.iter().cloned().collect());
+    }
+}
+
+pub(crate) fn naming(target: &str) -> Option<NamingOverride> {
+    NAMING.read().ok().and_then(|n| n.as_ref().and_then(|m| m.get(target).cloned()))
+}

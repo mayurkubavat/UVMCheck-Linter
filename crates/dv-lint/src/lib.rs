@@ -61,6 +61,12 @@ mod rule_profiles;
 pub(crate) mod json;
 pub mod options;
 
+/// A `naming.<target>.pattern` the native naming engine can check, and
+/// whether the target is one it knows.
+pub fn naming_pattern_supported(target: &str, pattern: &str) -> bool {
+    rules::naming_pattern_supported(target, pattern)
+}
+
 /// A `style.file_header_pattern` the native style engine can match.
 pub fn header_pattern_supported(p: &str) -> bool {
     options::header_alternatives(p).is_some()

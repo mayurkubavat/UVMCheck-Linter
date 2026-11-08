@@ -12,6 +12,8 @@ use sv_syntax::SyntaxKind::*;
 enum Casing {
     None,
     Snake,
+    Pascal,
+    Camel,
     AllCaps,
 }
 
@@ -44,15 +46,18 @@ impl Pattern {
     }
 }
 
-/// `NamingTargetSpec` (the defaults of `loadDefaultRules`).
+/// `NamingTargetSpec`: the defaults of `loadDefaultRules`, with the project
+/// config's `naming.<Target>` settings over them.
 struct Spec {
     id: &'static str,
     kind: &'static str,
     pattern: Option<Pattern>,
-    prefix: &'static str,
-    suffix: &'static str,
+    prefix: String,
+    suffix: String,
     casing: Casing,
     message: &'static str,
+    severity: Severity,
+    enabled: bool,
 }
 
 const fn pat(
@@ -64,16 +69,68 @@ const fn pat(
     Some(Pattern { text, lower_only, starts, ends })
 }
 
+/// The spec of `kind` under the project config; None when there is none or
+/// it cannot be checked here (a pattern the config replaces with another
+/// regex: no regex engine here, and the config reports it as not applied).
 fn spec(kind: &str) -> Option<Spec> {
+    let mut sp = default_spec(kind)?;
+    let Some(o) = crate::options::naming(kind) else { return Some(sp) };
+    if let Some(p) = o.prefix {
+        sp.prefix = p;
+    }
+    if let Some(s) = o.suffix {
+        sp.suffix = s;
+    }
+    if let Some(p) = o.pattern {
+        if p.is_empty() {
+            sp.pattern = Option::None;
+        } else if sp.pattern.as_ref().is_none_or(|d| d.text != p) {
+            return Option::None;
+        }
+    }
+    match o.casing.as_deref() {
+        Some("snake_case") => sp.casing = Casing::Snake,
+        Some("PascalCase") => sp.casing = Casing::Pascal,
+        Some("camelCase") => sp.casing = Casing::Camel,
+        Some("ALL_CAPS") => sp.casing = Casing::AllCaps,
+        _ => {}
+    }
+    match o.severity.as_deref().map(str::to_ascii_uppercase).as_deref() {
+        Some("ERROR") => sp.severity = Severity::Error,
+        Some("WARNING") => sp.severity = Severity::Warning,
+        Some("INFO") => sp.severity = Severity::Info,
+        _ => {}
+    }
+    if let Some(e) = o.enabled {
+        sp.enabled = e;
+    }
+    Some(sp)
+}
+
+/// Whether `naming.<kind>` (with `pattern`, empty when not set) can be
+/// checked here: a target the engine knows (VirtualInterface is known to
+/// uvmcheck but checks nothing there either), and its default pattern or
+/// none.
+pub(crate) fn target_supported(kind: &str, pattern: &str) -> bool {
+    if kind == "VirtualInterface" {
+        return true;
+    }
+    let Some(d) = default_spec(kind) else { return false };
+    pattern.is_empty() || d.pattern.is_some_and(|p| p.text == pattern)
+}
+
+fn default_spec(kind: &str) -> Option<Spec> {
     use Casing::*;
-    let s = |id, kind, pattern, prefix, suffix, casing, message| Spec {
+    let s = |id, kind, pattern, prefix: &str, suffix: &str, casing, message| Spec {
         id,
         kind,
         pattern,
-        prefix,
-        suffix,
+        prefix: prefix.to_string(),
+        suffix: suffix.to_string(),
         casing,
         message,
+        severity: Severity::Warning,
+        enabled: true,
     };
     Some(match kind {
         "Package" => s(
@@ -243,14 +300,31 @@ fn spec(kind: &str) -> Option<Spec> {
             None,
             "Class constraint blocks should end with '_c' suffix.",
         ),
+        // Off by default; the config can turn it on.
+        "Class" => Spec {
+            enabled: false,
+            ..s(
+                "SV-NAM-104",
+                "Class",
+                Option::None,
+                "",
+                "",
+                Pascal,
+                "General classes should follow PascalCase naming conventions.",
+            )
+        },
         _ => return Option::None,
     })
 }
 
+/// `isSnakeCase`, `isPascalCase`, `isCamelCase`, `isAllCaps`.
 fn casing_ok(c: Casing, name: &str) -> bool {
+    let first = name.bytes().next();
     match c {
         Casing::None => true,
         Casing::Snake => !name.is_empty() && !name.bytes().any(|b| b.is_ascii_uppercase()),
+        Casing::Pascal => first.is_some_and(|b| b.is_ascii_uppercase()) && !name.contains('_'),
+        Casing::Camel => first.is_some_and(|b| b.is_ascii_lowercase()) && !name.contains('_'),
         Casing::AllCaps => !name.is_empty() && !name.bytes().any(|b| b.is_ascii_lowercase()),
     }
 }
@@ -258,28 +332,34 @@ fn casing_ok(c: Casing, name: &str) -> bool {
 /// `NamingEngine::validate`: the violation reason, or None when `name` fits.
 fn validate(kind: &str, name: &str) -> Option<(Spec, String)> {
     let sp = spec(kind)?;
+    if !sp.enabled {
+        return None;
+    }
     let fits = sp.pattern.as_ref().is_none_or(|p| p.matches(name))
-        && name.starts_with(sp.prefix)
-        && name.ends_with(sp.suffix)
+        && name.starts_with(sp.prefix.as_str())
+        && name.ends_with(sp.suffix.as_str())
         && casing_ok(sp.casing, name);
     if fits {
         return None;
     }
     let mut req: Vec<String> = Vec::new();
-    if !sp.prefix.is_empty() && !name.starts_with(sp.prefix) {
+    if !sp.prefix.is_empty() && !name.starts_with(sp.prefix.as_str()) {
         req.push(format!("must begin with prefix '{}'", sp.prefix));
     }
-    if !sp.suffix.is_empty() && !name.ends_with(sp.suffix) {
+    if !sp.suffix.is_empty() && !name.ends_with(sp.suffix.as_str()) {
         req.push(format!("must end with suffix '{}'", sp.suffix));
     }
     if let Some(p) = &sp.pattern {
         req.push(format!("must match pattern '{}'", p.text));
     }
+    // camelCase adds no requirement to the message, as in uvmcheck.
     if !casing_ok(sp.casing, name) {
-        req.push(match sp.casing {
-            Casing::Snake => "must follow snake_case".into(),
-            _ => "must follow ALL_CAPS".into(),
-        });
+        match sp.casing {
+            Casing::Snake => req.push("must follow snake_case".into()),
+            Casing::Pascal => req.push("must follow PascalCase".into()),
+            Casing::AllCaps => req.push("must follow ALL_CAPS".into()),
+            Casing::Camel | Casing::None => {}
+        }
     }
     let reason = format!(
         "{} identifier '{name}' does not satisfy naming convention: {}. {}",
@@ -292,7 +372,7 @@ fn validate(kind: &str, name: &str) -> Option<(Spec, String)> {
 
 fn report(out: &mut Sink, kind: &str, rule_name: &'static str, name: &str, loc: dv_model::Loc) {
     if let Some((sp, reason)) = validate(kind, name) {
-        out.add(sp.id, rule_name, Severity::Warning, reason, loc);
+        out.add(sp.id, rule_name, sp.severity, reason, loc);
     }
 }
 
@@ -317,6 +397,8 @@ fn class_kind(d: &Design, id: dv_model::ClassId) -> Option<&'static str> {
         "UvmTest"
     } else if derived("uvm_scoreboard") {
         "UvmScoreboard"
+    } else if spec("Class").is_some_and(|s| s.enabled) {
+        "Class"
     } else {
         return None;
     })
