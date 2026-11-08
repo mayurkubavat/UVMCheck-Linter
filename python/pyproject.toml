@@ -15,3 +15,7 @@ dependencies = []
 [project.scripts]
 uvmcheck-plugins = "uvmcheck.plugin_runner:main"
 uvmcheck-report = "uvmcheck.report:main"
+
+# Only the SDK is packaged; examples/ and tests/ stay in the repository.
+[tool.setuptools]
+packages = ["uvmcheck"]

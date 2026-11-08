@@ -95,7 +95,7 @@ jobs:
           python3 cpp/tests/test_map.py --binary build/uvmcheck
           python3 cpp/tests/test_explain.py --binary build/uvmcheck
           python3 cpp/tests/test_engine_gate.py
-          python3 cpp/tests/test_python_rules.py --binary build/uvmcheck
+          python3 python/tests/test_python_rules.py --binary build/uvmcheck
           python3 cpp/tests/test_guidelines.py --binary build/uvmcheck
           python3 cpp/tests/test_history.py --binary build/uvmcheck
           python3 cpp/tests/engine_equivalence.py --binary build/uvmcheck

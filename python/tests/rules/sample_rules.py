@@ -1,4 +1,4 @@
-"""Rules used by cpp/tests/test_python_rules.py to exercise the Python rule API."""
+"""Rules used by python/tests/test_python_rules.py to exercise the Python rule API."""
 
 from uvmcheck import Rule, Severity
 

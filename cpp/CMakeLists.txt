@@ -233,7 +233,7 @@ add_test(
 )
 add_test(
     NAME python_rules_test
-    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/cpp/tests/test_python_rules.py --binary $<TARGET_FILE:uvmcheck>
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/python/tests/test_python_rules.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 add_test(
@@ -269,7 +269,7 @@ if(UVMCHECK_BUILD_MODEL_LIB)
     # The Python binding (python/uvmcheck/model.py) over the same ABI.
     add_test(
         NAME model_python_test
-        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/cpp/tests/test_model_python.py
+        COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/python/tests/test_model_python.py
                 --lib $<TARGET_FILE:uvmcheck_model>
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     )

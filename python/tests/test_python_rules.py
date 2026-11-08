@@ -2,7 +2,7 @@
 """
 Python rule API checks:
 
-- the sample rules in tests/python_rules pass their bad/good tests through uvmcheck.testing,
+- the sample rules in python/tests pass their bad/good tests through uvmcheck.testing,
   run from outside the repository (the SDK is found wherever uvmcheck runs);
 - a rule customized by subclassing replaces its base (only the leaf runs);
 - rule options come from the project config (RuleConfig attributes);
@@ -18,8 +18,8 @@ import tempfile
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-CASES = REPO / "tests" / "python_rules" / "cases"
-RULES = REPO / "tests" / "python_rules" / "rules"
+CASES = REPO / "python" / "tests" / "cases"
+RULES = REPO / "python" / "tests" / "rules"
 COMMON = REPO / "testdata" / "common"
 
 failures = []
