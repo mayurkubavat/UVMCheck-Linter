@@ -5,6 +5,7 @@
 
 use crate::Rule;
 
+mod analysis;
 mod compiler;
 mod concurrency;
 mod correctness;
@@ -32,6 +33,7 @@ mod uvm;
 /// Every rule of every category, unsorted.
 pub(crate) fn all() -> Vec<Rule> {
     let mut v = Vec::new();
+    v.extend(analysis::rules());
     v.extend(compiler::rules());
     v.extend(concurrency::rules());
     v.extend(correctness::rules());

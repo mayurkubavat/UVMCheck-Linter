@@ -8,3 +8,14 @@ C++ twin: `dv-lint --list` marks them `native`, and the parity gates
 | Rule | Name | Severity | What it flags |
 |---|---|---|---|
 | `UVM-API-003` | DeprecatedUvmApi | WARNING | Calls to UVM methods, and classes extending UVM classes, that the compiled UVM release keeps only as deprecated API (UVM 1.1d/1.2: what `UVM_NO_DEPRECATED` removes, such as `uvm_component::set_config_int` or `uvm_random_sequence`). Read from the release's API pack in `data/uvm-api/`. |
+| `SV-RND-030` | ContradictoryConstraints | ERROR | A rand variable whose hard constraints leave no legal value (`len > 10` on a `bit [3:0]`; `x < 5` with `x inside {[8:9]}`). Bounds in different constraint blocks count together only when no user code calls `constraint_mode()`. |
+| `SV-RND-031` | SoftConstraintNeverHolds | WARNING | A `soft` constraint the class's hard constraints always override. |
+| `SV-RND-032` | DeadDistItem | WARNING | A `dist` item whose values the hard constraints or the type never allow, so its weight is dropped. |
+| `SV-COV-018` | CrossBinCountTooLarge | WARNING | A cross whose bin count, computed as a simulator builds the bins (explicit, `[N]`, `[]`, automatic up to `auto_bin_max`), is above 10,000. |
+| `SV-RCE-002` | ClockedBlockingRace | WARNING | A variable written with `=` in one edge-triggered always block and read by another on the same edge: a race (IEEE 1800 4.7). |
+| `DPI-PRT-001` | ConflictingDpiPrototypes | ERROR | One C function imported with two different prototypes. |
+
+The constraint analyzers only read bounds of one variable against constants
+(comparisons, `inside`, `!`, `&&`, `soft`, `dist`) and leave everything else
+out, so what they report is certain: if a subset of the constraints has no
+solution, neither do all of them.

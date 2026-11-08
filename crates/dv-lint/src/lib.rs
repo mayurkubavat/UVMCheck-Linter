@@ -205,7 +205,8 @@ pub(crate) fn tops() -> Vec<String> {
 
 /// Rules with no uvmcheck (C++) twin: dv-lint's own. `--list` marks them
 /// `native`, and the parity gates leave them out.
-pub const NATIVE_ONLY: &[&str] = &["UVM-API-003"];
+pub const NATIVE_ONLY: &[&str] =
+    &["UVM-API-003", "SV-RND-030", "SV-RND-031", "SV-RND-032", "SV-COV-018", "SV-RCE-002", "DPI-PRT-001"];
 
 /// Ids a rule reports under besides its own (a rule engine's sub-rules).
 pub fn sub_rules(id: &str) -> &'static [(&'static str, &'static str)] {
