@@ -1,5 +1,6 @@
 //! SV-INT-001 (BlockingAssignmentToInterface): Disallows blocking assignments
-//! ('=') when driving virtual interface or clocking block signals.
+//! ('=') when driving virtual interface or clocking block signals from
+//! procedural code.
 
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
@@ -11,6 +12,12 @@ pub(crate) fn blocking_to_interface(c: &Cst, s: &mut Sink) {
     for b in c.nodes(BinaryExpr) {
         let Some(op) = c.keyword(b) else { continue };
         if c.text_of(op) != "=" {
+            continue;
+        }
+        // A continuous assignment drives the signal outside any process, so
+        // there is no Active-region race to avoid, and `assign x <= y` is not
+        // legal SystemVerilog.
+        if crate::support::slang_ast::ancestors(c, b).any(|a| c.kind(a) == ContinuousAssign) {
             continue;
         }
         let Some(&l) = kids(c, b).first() else { continue };

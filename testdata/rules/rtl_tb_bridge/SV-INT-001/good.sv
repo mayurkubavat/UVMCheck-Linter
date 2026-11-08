@@ -7,3 +7,15 @@ class compliant_blockingassignmenttointerface extends uvm_object;
         super.new(name);
     endfunction
 endclass
+
+// A continuous assignment to an interface signal is not a procedural drive:
+// there is no race to avoid, and 'assign x <= y' would not compile.
+interface blk_if;
+    logic r;
+endinterface
+
+module blk_top;
+    blk_if vif();
+    logic rst_n;
+    assign vif.r = ~rst_n;
+endmodule

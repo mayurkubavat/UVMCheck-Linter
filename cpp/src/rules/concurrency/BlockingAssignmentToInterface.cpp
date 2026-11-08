@@ -18,7 +18,20 @@ public:
         return false;
     }
 
+    static bool insideContinuousAssign(const slang::syntax::SyntaxNode& node) {
+        for (const auto* p = node.parent.get(); p; p = p->parent.get()) {
+            if (p->kind == slang::syntax::SyntaxKind::ContinuousAssign) return true;
+        }
+        return false;
+    }
+
     void handle(const slang::syntax::BinaryExpressionSyntax& expr) {
+        // A continuous assignment drives the signal outside any process, so there is no
+        // Active-region race to avoid, and 'assign x <= y' is not legal SystemVerilog.
+        if (insideContinuousAssign(expr)) {
+            visitDefault(expr);
+            return;
+        }
         if (expr.kind == slang::syntax::SyntaxKind::AssignmentExpression &&
             expr.operatorToken.kind == slang::parsing::TokenKind::Equals) {
             std::string lhs = std::string(expr.left->toString());
