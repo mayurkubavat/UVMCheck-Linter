@@ -806,6 +806,11 @@ pub(crate) fn expr_types(c: &Cst) -> Arc<HashMap<(usize, NodeId), ETy>> {
     facts(c).0
 }
 
+/// Expression types per instance, where instances of a module differ.
+pub(crate) fn inst_types(c: &Cst) -> Arc<InstTypes> {
+    facts(c).5
+}
+
 /// The routine formals (their declarators) of one bit.
 pub(crate) fn one_bit_formals(c: &Cst) -> Arc<sv_sema::fx::FxSet<(usize, NodeId)>> {
     facts(c).2
@@ -875,7 +880,25 @@ type Facts = (
     Arc<sv_sema::fx::FxSet<(usize, NodeId)>>,
     Arc<SpecTypes>,
     Arc<CfgDbTypes>,
+    Arc<InstTypes>,
 );
+
+/// Module bodies typed per instance (see [`type_instances`]): the
+/// expressions whose types differ from the defaults, with their type (and
+/// matching-type form, for casts) in each group of instances that type
+/// alike; and for each definition with such expressions, each group's
+/// copies of its body and generate items.
+/// A type and, for a cast or its operand, its matching-type form.
+pub(crate) type Typed = Option<(ETy, Option<String>)>;
+
+/// Instances of a definition that type alike: (representative, members).
+type InstGroups = Vec<(usize, Vec<usize>)>;
+
+#[derive(Default)]
+pub(crate) struct InstTypes {
+    pub types: HashMap<(usize, NodeId), Vec<Typed>>,
+    pub defs: HashMap<(usize, NodeId), Vec<HashMap<NodeId, usize>>>,
+}
 
 /// For each `uvm_config_db#(T)::set/get` call: the value argument's own
 /// type and matching form, and the matching form of `T`.
@@ -954,7 +977,9 @@ fn facts(c: &Cst) -> Facts {
 const TYPE_PART: usize = 20_000;
 
 fn build_facts(c: &Cst) -> Facts {
-    let o = TypeOracle::new(c.all);
+    let mut o = TypeOracle::new(c.all);
+    o.elaborate(&crate::tops());
+    let o = o;
     let mut out = HashMap::default();
     let mut canon = HashMap::default();
     let mut one_bit = sv_sema::fx::FxSet::default();
@@ -1072,6 +1097,7 @@ fn build_facts(c: &Cst) -> Facts {
             }
         }
     }
+    let inst = type_instances(c, &o, &mut out, &mut canon);
     let mut specs: SpecTypes = HashMap::default();
     let mut groups: Vec<_> = in_generic.into_iter().collect();
     groups.sort_by_key(|g| g.0);
@@ -1160,7 +1186,178 @@ fn build_facts(c: &Cst) -> Facts {
         }
     }
     o.set_spec(None);
-    (Arc::new(out), Arc::new(canon), Arc::new(one_bit), Arc::new(specs), Arc::new(cfgdb))
+    (Arc::new(out), Arc::new(canon), Arc::new(one_bit), Arc::new(specs), Arc::new(cfgdb), Arc::new(inst))
+}
+
+/// The types of a module body's expressions per instance, where they
+/// differ from those its parameters' defaults give (see [`InstTypes`]).
+/// Where every instance sees one type, `out` (the default answers) and
+/// `canon` take it instead.
+fn type_instances<'t>(
+    c: &Cst<'t>,
+    o: &TypeOracle<'t>,
+    out: &mut HashMap<(usize, NodeId), ETy>,
+    canon: &mut HashMap<(usize, NodeId), String>,
+) -> InstTypes {
+    let mut res = InstTypes::default();
+    // Instances that type alike, by definition: (representative, members).
+    let mut defs: HashMap<(usize, NodeId), InstGroups> = HashMap::default();
+    let mut by_key: HashMap<u64, usize> = HashMap::default();
+    for i in 0..o.instance_count() {
+        let groups = defs.entry(o.instance_decl(i)).or_default();
+        match by_key.get(&o.instance_key(i)) {
+            Some(&g) => groups[g].1.push(i),
+            None => {
+                by_key.insert(o.instance_key(i), groups.len());
+                groups.push((i, vec![i]));
+            }
+        }
+    }
+    let mut defs: Vec<_> = defs.into_iter().collect();
+    defs.sort_by_key(|((t, n), _)| (*t, n.0));
+    for ((ti, decl), groups) in defs {
+        let t = &c.all[ti];
+        let mut own;
+        let tc = if std::ptr::eq(t, c.tree) {
+            c
+        } else {
+            own = Cst::new(t, ti, sv_sema::Locator::default());
+            own.all = c.all;
+            &own
+        };
+        let exprs: Vec<NodeId> = t.subtree(decl).into_iter().filter(|&n| is_expr(tc.kind(n))).collect();
+        let casts: sv_sema::fx::FxSet<NodeId> = cast_nodes(tc).into_iter().collect();
+        let mut per: Vec<Vec<Typed>> = Vec::new();
+        let mut copies = Vec::new();
+        for (rep, members) in &groups {
+            o.set_instance(Some(*rep));
+            let mut ty = Typer::new(tc, o);
+            per.push(
+                exprs
+                    .iter()
+                    .map(|&n| {
+                        let x = ty.final_type(n)?;
+                        let m = casts.contains(&n).then(|| o.canonical(&x));
+                        Some((x, m))
+                    })
+                    .collect(),
+            );
+            // Copies of each body and generate item, over the members.
+            let mut k: HashMap<NodeId, usize> = HashMap::default();
+            for &m in members {
+                for n in t.subtree(decl) {
+                    let x = o.instance_copies(m, ti, n);
+                    if x > 0 {
+                        *k.entry(n).or_default() += x;
+                    }
+                }
+            }
+            copies.push(k);
+        }
+        let mut differ = false;
+        for (k, &n) in exprs.iter().enumerate() {
+            let dflt = out.get(&(ti, n));
+            if per.iter().all(|ts| ts[k].as_ref().map(|x| &x.0) == dflt) {
+                continue;
+            }
+            differ = true;
+            let first = &per[0][k];
+            if per.iter().all(|ts| ts[k] == *first) {
+                match first {
+                    Some((x, m)) => {
+                        out.insert((ti, n), x.clone());
+                        if let Some(m) = m {
+                            canon.insert((ti, n), m.clone());
+                        }
+                    }
+                    None => {
+                        out.remove(&(ti, n));
+                    }
+                }
+            }
+            res.types.insert((ti, n), per.iter().map(|ts| ts[k].clone()).collect());
+        }
+        if differ {
+            res.defs.insert((ti, decl), copies);
+        }
+    }
+    o.set_instance(None);
+    res
+}
+
+/// The casts, their operands and `$cast` arguments of a tree: the
+/// expressions whose matching-type form rules compare.
+fn cast_nodes(tc: &Cst) -> Vec<NodeId> {
+    let mut want = Vec::new();
+    for n in 0..tc.tree.nodes.len() {
+        let n = NodeId(n as u32);
+        match tc.kind(n) {
+            CastExpr => {
+                want.push(n);
+                let mut x = kids(tc, n).get(1).copied();
+                while let Some(p) = x.filter(|&p| tc.kind(p) == ParenExpr) {
+                    want.push(p);
+                    x = kids(tc, p).first().copied();
+                }
+                want.extend(x);
+            }
+            CallExpr if kids(tc, n).first().is_some_and(|&f| tc.tree.bare_text(f) == "$cast") => {
+                want.extend(call_args(tc, n).into_iter().take(2));
+            }
+            _ => {}
+        }
+    }
+    want
+}
+
+/// The visits slang's AST makes of `e` (as [`ast_visits`] counts them),
+/// split by the types `nodes` have in them: (visits, each node's type and
+/// matching-type form). One part with the default types outside module
+/// bodies, or where every instance types `nodes` alike.
+///
+/// [`ast_visits`]: crate::support::style_config::ast_visits
+pub(crate) fn visit_types(c: &Cst, e: NodeId, nodes: &[NodeId]) -> Vec<(usize, Vec<Typed>)> {
+    let ix = c.index();
+    let total = crate::support::style_config::ast_visits(c, e);
+    let types = expr_types(c);
+    let canon = cast_canon(c);
+    let dflt = |n: NodeId| types.get(&(ix, n)).map(|t| (t.clone(), canon.get(&(ix, n)).cloned()));
+    let whole = || vec![(total, nodes.iter().map(|&n| dflt(n)).collect())];
+    let it = inst_types(c);
+    if !nodes.iter().any(|&n| it.types.contains_key(&(ix, n))) {
+        return whole();
+    }
+    let Some(groups) = crate::support::slang_ast::ancestors(c, e)
+        .find(|&a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl))
+        .and_then(|d| it.defs.get(&(ix, d)))
+    else {
+        return whole();
+    };
+    let Some(anchor) = std::iter::once(e)
+        .chain(crate::support::slang_ast::ancestors(c, e))
+        .find(|a| groups.iter().any(|g| g.contains_key(a)))
+    else {
+        return whole();
+    };
+    let mut parts: Vec<(usize, Vec<Typed>)> = Vec::new();
+    for (g, copies) in groups.iter().enumerate() {
+        let k = copies.get(&anchor).copied().unwrap_or(0);
+        if k == 0 {
+            continue;
+        }
+        let ts: Vec<_> =
+            nodes.iter().map(|&n| it.types.get(&(ix, n)).map_or_else(|| dflt(n), |v| v[g].clone())).collect();
+        match parts.iter_mut().find(|p| p.1 == ts) {
+            Some(p) => p.0 += k,
+            None => parts.push((k, ts)),
+        }
+    }
+    // Visits no elaborated instance accounts for (a `bind`): as before.
+    let sum: usize = parts.iter().map(|p| p.0).sum();
+    if sum != total {
+        return whole();
+    }
+    parts
 }
 
 pub(crate) fn is_expr(k: sv_syntax::SyntaxKind) -> bool {

@@ -60,6 +60,11 @@ impl Vals {
         }
     }
 
+    /// This scope's own values, printed in full (to compare instances).
+    pub(crate) fn pairs(&self) -> Vec<(String, String)> {
+        self.0.own.iter().map(|(k, v)| (k.clone(), format!("{v:?}"))).collect()
+    }
+
     fn insert(&mut self, k: String, v: Option<CVal>) {
         Rc::make_mut(&mut self.0).own.insert(k, Some(v));
     }
@@ -125,6 +130,19 @@ pub(crate) struct Elab<'b, 't> {
     /// can repeat one iteration's copies instead of walking them again.
     recording: usize,
     rec: Vec<(NodeRef, usize)>,
+    /// Each instance elaborated (not bound): its definition, the values and
+    /// type parameters its body sees, and the copies counted inside it.
+    pub(crate) inst_log: Vec<InstLog>,
+    /// The instances being walked, as indexes into `inst_log`.
+    inst_stack: Vec<usize>,
+}
+
+/// One elaborated instance (see `Elab::inst_log`).
+pub(crate) struct InstLog {
+    pub decl: NodeRef,
+    pub vals: Vals,
+    pub env: Env,
+    pub copies: HashMap<NodeRef, usize>,
 }
 
 impl<'b, 't> Elab<'b, 't> {
@@ -183,6 +201,8 @@ impl<'b, 't> Elab<'b, 't> {
             bound: 0,
             recording: 0,
             rec: Vec::new(),
+            inst_log: Vec::new(),
+            inst_stack: Vec::new(),
         }
     }
 
@@ -196,6 +216,9 @@ impl<'b, 't> Elab<'b, 't> {
         if self.uninst == 0 {
             e.1 += 1;
         }
+        if let Some(&i) = self.inst_stack.last() {
+            *self.inst_log[i].copies.entry(n).or_default() += 1;
+        }
         if self.recording > 0 {
             self.rec.push((n, 1));
         }
@@ -208,6 +231,9 @@ impl<'b, 't> Elab<'b, 't> {
         }
         for &(n, c) in log {
             self.copies.entry(n).or_default().0 += c * times;
+            if let Some(&i) = self.inst_stack.last() {
+                *self.inst_log[i].copies.entry(n).or_default() += c * times;
+            }
             if self.recording > 0 {
                 self.rec.push((n, c * times));
             }
@@ -398,6 +424,11 @@ impl<'b, 't> Elab<'b, 't> {
         let Some(d) = self.defs.get(def) else { return };
         let (decl, scope) = (d.decl, d.scope);
         self.reached.insert(decl);
+        let logged = self.bound == 0;
+        if logged {
+            self.inst_log.push(InstLog { decl, vals: Vals::default(), env: self.env(), copies: HashMap::default() });
+            self.inst_stack.push(self.inst_log.len() - 1);
+        }
         self.copy(decl);
         let b = self.b;
         let mut vals = Vals::default();
@@ -433,6 +464,11 @@ impl<'b, 't> Elab<'b, 't> {
         self.defparams_of(&body, scope, over, header.is_none(), &vals);
         self.items(&body, path, scope, over, header.is_none(), &mut vals, depth);
         self.check_selects(decl, scope, &vals);
+        if logged {
+            if let Some(i) = self.inst_stack.pop() {
+                self.inst_log[i].vals = vals.clone();
+            }
+        }
         // Instances bound into this one.
         let binds: Vec<NodeRef> = self
             .binds

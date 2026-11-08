@@ -78,6 +78,20 @@ fn enum_of(c: &Cst, dt: NodeId) -> Option<EnumMembers> {
     None
 }
 
+/// The enum the expression's type is, as the expression typer gives it
+/// (a member of a struct, a port of a type parameter's type, as the
+/// instances bind it): through the data type it was declared with.
+fn typed_enum(c: &Cst, e: NodeId) -> Option<EnumMembers> {
+    let ty = crate::expr_types::expr_types(c).get(&(c.index(), e))?.clone();
+    let (tree, dt) = ty.src?;
+    if tree == c.index() {
+        return enum_of(c, dt);
+    }
+    let mut other = Cst::new(c.all.get(tree)?, tree, sv_sema::Locator::default());
+    other.all = c.all;
+    enum_of(&other, dt)
+}
+
 pub(crate) fn non_exhaustive_enum_case(c: &Cst, s: &mut Sink) {
     for cs in c.nodes(CaseStmt) {
         if !c.toks(cs).any(|t| matches!(c.text_of(t), "case" | "casex" | "casez")) {
@@ -92,13 +106,15 @@ pub(crate) fn non_exhaustive_enum_case(c: &Cst, s: &mut Sink) {
                 .and_then(|r| c.tree.child(r, ReturnType))
                 .and_then(|r| c.tree.child(r, DataType))
         } else {
-            let Some((d, _)) = decl_of_expr(c, e) else { continue };
-            if c.kind(d.node) == Declarator && c.tree.children(d.node).any(|x| c.kind(x) == Dim) {
-                continue;
+            match decl_of_expr(c, e) {
+                Some((d, _)) if c.kind(d.node) == Declarator && c.tree.children(d.node).any(|x| c.kind(x) == Dim) => {
+                    continue
+                }
+                Some((d, _)) => d.dtype,
+                None => None,
             }
-            d.dtype
         };
-        let Some((name, members)) = dtype.and_then(|t| enum_of(c, t)) else { continue };
+        let Some((name, members)) = dtype.and_then(|t| enum_of(c, t)).or_else(|| typed_enum(c, e)) else { continue };
         if !parts.items.iter().any(|(_, _, def)| *def) {
             continue;
         }

@@ -51,6 +51,10 @@ pub struct TypeOracle<'t> {
     /// An enum typedef's type, by (tree, typedef, scope), where no
     /// specialization applies.
     enum_types: std::cell::RefCell<HashMap<(usize, sv_syntax::NodeId, usize), Option<TypeInfo>>>,
+    /// The instances [`Self::elaborate`] found, and the one being typed
+    /// (see [`Self::set_instance`]): its definition's scope.
+    instances: Vec<crate::elab::InstLog>,
+    inst: std::cell::Cell<Option<(usize, usize)>>,
 }
 
 impl<'t> TypeOracle<'t> {
@@ -72,7 +76,74 @@ impl<'t> TypeOracle<'t> {
             members: Default::default(),
             spec: Default::default(),
             enum_types: Default::default(),
+            instances: Vec::new(),
+            inst: Default::default(),
         }
+    }
+
+    /// Elaborates the design from `tops` (as `-top` names them; empty:
+    /// every module nothing instantiates), so that module bodies can be
+    /// typed per instance ([`Self::set_instance`]).
+    pub fn elaborate(&mut self, tops: &[String]) {
+        let mut e = crate::elab::Elab::new(&self.b);
+        e.top = tops.to_vec();
+        e.run();
+        self.instances = std::mem::take(&mut e.inst_log);
+        *self.b.inst.borrow_mut() = Default::default();
+    }
+
+    /// How many instances [`Self::elaborate`] found.
+    pub fn instance_count(&self) -> usize {
+        self.instances.len()
+    }
+
+    /// Instance `i`'s definition (its module, interface or program).
+    pub fn instance_decl(&self, i: usize) -> (usize, sv_syntax::NodeId) {
+        let d = self.instances[i].decl;
+        (d.tree, d.node)
+    }
+
+    /// How many copies slang builds of a body or generate item in instance
+    /// `i` (generate loops unrolled, branches no condition takes included).
+    pub fn instance_copies(&self, i: usize, tree: usize, n: sv_syntax::NodeId) -> usize {
+        self.instances[i].copies.get(&NodeRef { tree, node: n }).copied().unwrap_or(0)
+    }
+
+    /// What instance `i`'s body is typed with: its parameter values and type
+    /// parameters. Instances with equal keys type alike.
+    pub fn instance_key(&self, i: usize) -> u64 {
+        use std::hash::{Hash, Hasher};
+        let x = &self.instances[i];
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        (x.decl.tree, x.decl.node.0).hash(&mut h);
+        let mut vals = x.vals.pairs();
+        vals.sort();
+        vals.hash(&mut h);
+        let mut env: Vec<String> = x
+            .env
+            .iter()
+            .map(|(k, b)| format!("{k}={}:{}@{}#{}", b.node.tree, b.node.node.0, b.scope, b.env.len()))
+            .collect();
+        env.sort();
+        env.hash(&mut h);
+        h.finish()
+    }
+
+    /// Types module bodies as instance `i` sees them (its parameter values
+    /// and type parameters), or with their defaults with `None`. Answers
+    /// already given are dropped.
+    pub fn set_instance(&self, i: Option<usize>) {
+        let at = i.and_then(|i| Some((i, *self.b.node_scope.get(&self.instances.get(i)?.decl)?)));
+        self.inst.set(at);
+        *self.b.inst.borrow_mut() = match at {
+            Some((i, _)) => self.instances[i].vals.clone(),
+            None => Default::default(),
+        };
+        self.decls.borrow_mut().clear();
+        self.values.borrow_mut().clear();
+        self.consts.borrow_mut().clear();
+        self.members.borrow_mut().clear();
+        self.enum_types.borrow_mut().clear();
     }
 
     fn scope_of(&self, tree: usize, n: sv_syntax::NodeId) -> usize {
@@ -105,7 +176,11 @@ impl<'t> TypeOracle<'t> {
     /// (or as the specialization being typed binds them).
     fn env_of(&self, scope: usize) -> Env {
         let mut cur = Some(scope);
+        let inst = self.inst.get();
         while let Some(s) = cur {
+            if let Some((i, _)) = inst.filter(|x| x.1 == s) {
+                return self.instances[i].env.clone();
+            }
             if let ScopeKind::Class(c) = self.b.scopes[s].kind {
                 if let Some(env) = self.spec.borrow().as_ref().filter(|x| x.0 == c).map(|x| x.1.clone()) {
                     return env;
@@ -386,6 +461,7 @@ impl<'t> TypeOracle<'t> {
         }
         let (tree, node) = base.src?;
         let mut dt = NodeRef { tree, node };
+        let mut env = None;
         for _ in 0..16 {
             if matches!(b.own_tokens(dt).first().copied(), Some("struct" | "union")) {
                 for m in b.children(dt) {
@@ -401,10 +477,22 @@ impl<'t> TypeOracle<'t> {
                 return None;
             }
             let scope = self.scope_of(dt.tree, dt.node);
+            // A type parameter, as the instance being typed binds it (and
+            // its parents bind theirs).
+            let e: Env = env.take().unwrap_or_else(|| self.env_of(scope));
+            if let [n] = b.toks_of(dt).as_slice() {
+                if let Some(bd) = e.get(*n) {
+                    dt = bd.node;
+                    env = Some(bd.env.clone());
+                    continue;
+                }
+            }
             match b.lookup_type(dt, scope) {
                 Some(Found::Typedef(t, _)) if b.children(t).into_iter().all(|c| b.kind(c) != Dim) => {
                     dt = b.child(t, DataType)?
                 }
+                // `localparam type t = struct packed {...}`
+                Some(Found::Param(Some(d), _)) if b.kind(d) == DataType => dt = d,
                 _ => return None,
             }
         }

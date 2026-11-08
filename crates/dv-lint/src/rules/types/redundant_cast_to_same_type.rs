@@ -2,10 +2,8 @@
 //! type casts where the source and destination already have identical static
 //! types.
 
-use crate::expr_types::{expr_types, ETy};
 use crate::support::config_db_calls::{in_generate_header, strip_parens};
 use crate::support::slang_ast::kids;
-use crate::support::style_config::ast_visits;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::NodeId;
@@ -14,13 +12,8 @@ use sv_syntax::SyntaxKind::*;
 /// `$cast(a, b)` on matching types, or a cast to the operand's own type:
 /// once per AST visit.
 pub(crate) fn redundant_cast(c: &Cst, out: &mut Sink) {
-    let types = expr_types(c);
-    let canon = crate::expr_types::cast_canon(c);
     let specs = crate::expr_types::spec_types(c);
     let ix = c.index();
-    let matching = |a: (NodeId, &ETy), b: (NodeId, &ETy)| {
-        a.1.text == b.1.text || canon.get(&(ix, a.0)).is_some_and(|x| canon.get(&(ix, b.0)) == Some(x))
-    };
     // The type `a` has in each copy where `a` and `b` match: per
     // specialization in a generic class, else every AST visit.
     let matches = |e: NodeId, a: NodeId, b: NodeId| -> Vec<String> {
@@ -34,11 +27,15 @@ pub(crate) fn redundant_cast(c: &Cst, out: &mut Sink) {
                 })
                 .collect();
         }
-        let (Some(at), Some(bt)) = (types.get(&(ix, a)), types.get(&(ix, b))) else { return Vec::new() };
-        if !matching((a, at), (b, bt)) {
-            return Vec::new();
+        // Per instance where a module's instances type them differently.
+        let mut v = Vec::new();
+        for (k, ts) in crate::expr_types::visit_types(c, e, &[a, b]) {
+            let (Some((at, ac)), Some((bt, bc))) = (&ts[0], &ts[1]) else { continue };
+            if at.text == bt.text || (ac.is_some() && ac == bc) {
+                v.extend(std::iter::repeat_n(at.text.clone(), k));
+            }
         }
-        vec![at.text.clone(); ast_visits(c, e)]
+        v
     };
     for e in c.nodes(CallExpr) {
         let ks = kids(c, e);

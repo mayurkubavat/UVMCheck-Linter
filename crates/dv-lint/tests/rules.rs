@@ -1075,3 +1075,47 @@ fn reg_keyword_and_non_ansi_ports_in_expression_types() {
         assert!(lines.iter().any(|l| l.ends_with(want)), "{want} in {lines:?}");
     }
 }
+
+fn messages(src: &str, rule: &str) -> Vec<String> {
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |r| r == rule);
+    let mut m: Vec<String> = found.iter().map(|f| f.message.split(". ").next().unwrap_or("").to_string()).collect();
+    m.sort();
+    m
+}
+
+/// Widths come from each instance's parameters (a struct parameter built by
+/// a constant function here), not the definition's defaults.
+#[test]
+fn widths_per_instance() {
+    let src = "package cfg_pkg;\n\
+               typedef struct packed { int unsigned N; int unsigned W; } cfg_t;\n\
+               localparam cfg_t empty = cfg_t'(0);\n\
+               function automatic cfg_t build(int unsigned n); cfg_t c; c.N = n; c.W = $clog2(n); return c; endfunction\n\
+               endpackage\n\
+               module leaf #(parameter cfg_pkg::cfg_t Cfg = cfg_pkg::empty) (input logic [Cfg.W-1:0] p_i, output logic o);\n\
+               integer k;\n  assign o = (k < p_i);\nendmodule\n\
+               module top;\n  logic [2:0] p; logic [3:0] q; logic o1, o2, o3;\n\
+               leaf #(.Cfg(cfg_pkg::build(8))) u1 (.p_i(p), .o(o1));\n\
+               leaf #(.Cfg(cfg_pkg::build(8))) u2 (.p_i(p), .o(o2));\n\
+               leaf #(.Cfg(cfg_pkg::build(16))) u3 (.p_i(q), .o(o3));\nendmodule\n";
+    let m = messages(src, "SV-TYP-001");
+    let want = |t: &str| format!("Comparison between signed type 'integer' and unsigned type '{t}'");
+    assert_eq!(m, vec![want("logic[2:0]"), want("logic[2:0]"), want("logic[3:0]")]);
+}
+
+/// A struct type parameter passed down two levels: its enum member's case.
+#[test]
+fn enum_case_through_type_parameters() {
+    let src = "package p; typedef enum logic [1:0] {ADD, SUB, MUL} op_t; endpackage\n\
+               module alu #(parameter type fu_data_t = logic) (input fu_data_t fu_data_i, output logic [3:0] r);\n\
+               always_comb begin unique case (fu_data_i.operation) p::ADD: r = 1; default: r = 0; endcase end\nendmodule\n\
+               module mid #(parameter type fu_data_t = logic) (input fu_data_t f, output logic [3:0] r);\n\
+               alu #(.fu_data_t(fu_data_t)) u (.fu_data_i(f), .r(r));\nendmodule\n\
+               module top;\n  localparam type fu_t = struct packed { p::op_t operation; logic [3:0] a; };\n\
+               fu_t f; logic [3:0] r; mid #(.fu_data_t(fu_t)) u (.f(f), .r(r));\nendmodule\n";
+    let m = messages(src, "SV-FSM-001");
+    assert_eq!(m.len(), 1);
+    assert!(m[0].contains("enum 'op_t'") && m[0].contains("'SUB', 'MUL'"), "{m:?}");
+}
