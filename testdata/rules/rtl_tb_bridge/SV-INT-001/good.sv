@@ -12,7 +12,7 @@ endclass
 // there is no race to avoid, and 'assign x <= y' would not compile.
 interface blk_if;
     logic r;
-endinterface
+endinterface : blk_if
 
 module blk_top;
     blk_if vif();

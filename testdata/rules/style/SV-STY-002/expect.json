@@ -2,11 +2,11 @@
   "bad.sv": [
     {
       "rule": "SV-STY-002",
-      "line": 13
+      "line": 11
     },
     {
       "rule": "SV-STY-002",
-      "line": 18
+      "line": 15
     }
   ]
 }

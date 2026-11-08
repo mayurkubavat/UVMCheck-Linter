@@ -7156,10 +7156,11 @@
     "UVM-FAC-003@5"
   ],
   "style/SV-STY-002/bad.sv": [
-    "SV-STY-005@10",
-    "SV-STY-005@14",
-    "SV-STY-104@10",
-    "SV-STY-104@14"
+    "SV-STY-005@12",
+    "SV-STY-005@16",
+    "SV-STY-010@11",
+    "SV-STY-104@12",
+    "SV-STY-104@16"
   ],
   "style/SV-STY-002/good.sv": [
     "SV-STY-005@8",
@@ -7912,7 +7913,8 @@
     "SV-STY-104@17",
     "SV-STY-104@25",
     "SV-STY-104@32",
-    "SV-STY-104@33"
+    "SV-STY-104@33",
+    "UVM-CFG-001@49"
   ],
   "uvm/UVM-CFG-006/bad.sv": [
     "SV-DED-005@6",

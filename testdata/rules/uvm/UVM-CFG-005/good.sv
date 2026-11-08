@@ -39,13 +39,13 @@ class good_cfg_wrappers_c extends uvm_component;
 
   function new(string name, uvm_component parent);
     super.new(name, parent);
-  endfunction
+  endfunction : new
 
   function void set_int(string field_name, int value);
     uvm_config_db#(int)::set(this, "", field_name, value);
-  endfunction
+  endfunction : set_int
 
   function bit get_str(string field_name, inout string value);
     return uvm_config_db#(string)::get(this, "", field_name, value);
-  endfunction
-endclass
+  endfunction : get_str
+endclass : good_cfg_wrappers_c
