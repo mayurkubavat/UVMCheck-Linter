@@ -99,6 +99,8 @@ pub struct Tree {
     /// contiguous run (always, for trees the parser builds); `None` makes
     /// `token_range` walk the node instead.
     pub(crate) spans: Vec<Option<(u32, u32)>>,
+    /// [`Tree::preorder`], computed on first use.
+    pub(crate) preorder_cache: std::sync::OnceLock<Vec<NodeId>>,
 }
 
 impl Tree {
@@ -133,6 +135,11 @@ impl Tree {
         let mut out = Vec::new();
         self.collect(id, &mut out);
         out
+    }
+
+    /// Whether the node's tokens are known to be one contiguous run.
+    pub fn spans_known(&self, id: NodeId) -> bool {
+        matches!(self.spans.get(id.0 as usize), Some(Some(_)))
     }
 
     /// The node's first and last token, without collecting the rest.
@@ -219,6 +226,17 @@ impl Tree {
 
     /// The node's tokens joined without trivia: `uvm_object::print`.
     pub fn bare_text(&self, id: NodeId) -> String {
+        if let Some(&Some((first, len))) = self.spans.get(id.0 as usize) {
+            let toks = &self.tokens[first as usize..(first + len) as usize];
+            if let [t] = toks {
+                return t.text.to_string();
+            }
+            let mut s = String::with_capacity(toks.iter().map(|t| t.text.len()).sum());
+            for t in toks {
+                s.push_str(&t.text);
+            }
+            return s;
+        }
         self.token_range(id).iter().map(|&t| &*self.tokens[t as usize].text).collect()
     }
 
@@ -270,12 +288,18 @@ impl Tree {
 
     /// Pre-order walk of the nodes.
     pub fn preorder(&self) -> Vec<NodeId> {
-        let mut out = Vec::new();
+        self.preorder_cache.get_or_init(|| self.walk_preorder()).clone()
+    }
+
+    fn walk_preorder(&self) -> Vec<NodeId> {
+        let mut out = Vec::with_capacity(self.nodes.len());
         let mut stack = vec![self.root];
         while let Some(n) = stack.pop() {
             out.push(n);
-            let kids: Vec<NodeId> = self.children(n).collect();
-            stack.extend(kids.into_iter().rev());
+            stack.extend(self.node(n).children.iter().rev().filter_map(|c| match c {
+                Child::Node(k) => Some(*k),
+                Child::Token(_) => None,
+            }));
         }
         out
     }

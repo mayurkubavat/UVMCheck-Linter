@@ -227,9 +227,7 @@ fn constraint_blocks<'a, 't>(ix: &Index<'a, 't>, c: &'a Cst<'t>, decl: NodeId) -
             ConstraintPrototype => {
                 let full = format!("{cname}::{name}");
                 let body = ix.csts.iter().find_map(|k| {
-                    k.nodes(ConstraintDecl)
-                        .into_iter()
-                        .find(|&n| k.tree.child(n, Name).is_some_and(|nm| k.tree.bare_text(nm) == full))
+                    k.first_named(ConstraintDecl, &full)
                         .and_then(|n| k.tree.child(n, ConstraintBlock))
                         .map(|b| (k, b))
                 });

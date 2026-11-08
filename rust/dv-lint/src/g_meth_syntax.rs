@@ -755,21 +755,33 @@ fn package_exports(csts: &[Cst]) -> HashMap<String, HashSet<String>> {
 
 /// The names a range of tokens looks up without a scope prefix: not after
 /// `::` or `.`, not a package name before `::`, and not declared there.
-fn looked_up(c: &Cst, lo: u32, hi: u32, packages: &HashMap<String, HashSet<String>>, skip: &[(u32, u32)]) -> HashSet<String> {
+/// The token bounds of each `Name` directly under a node other than a
+/// `DataType` or `Name`, by first token.
+fn declared_names(c: &Cst) -> Vec<(u32, u32)> {
     let t = c.tree;
-    let mut declared = HashSet::new();
-    let mut decl_toks = HashSet::new();
+    let mut out = Vec::new();
     for n in t.preorder() {
         if c.kind(n) == DataType || c.kind(n) == Name {
             continue;
         }
         for nm in t.children(n).filter(|&x| c.kind(x) == Name) {
-            if let Some((a, b)) = t.token_bounds(nm) {
-                if a >= lo && b <= hi {
-                    decl_toks.insert(b);
-                    declared.insert(c.text_of(b).to_string());
-                }
-            }
+            out.extend(t.token_bounds(nm));
+        }
+    }
+    out.sort_unstable();
+    out
+}
+
+fn looked_up(c: &Cst, lo: u32, hi: u32, packages: &HashMap<String, HashSet<String>>, skip: &[(u32, u32)]) -> HashSet<String> {
+    let t = c.tree;
+    let mut declared = HashSet::new();
+    let mut decl_toks = HashSet::new();
+    let names = crate::shared::get("declared_names", c.tree_key(), || declared_names(c));
+    let from = names.partition_point(|&(a, _)| a < lo);
+    for &(a, b) in names[from..].iter().take_while(|&&(a, _)| a <= hi) {
+        if a >= lo && b <= hi {
+            decl_toks.insert(b);
+            declared.insert(c.text_of(b).to_string());
         }
     }
     let mut out = HashSet::new();

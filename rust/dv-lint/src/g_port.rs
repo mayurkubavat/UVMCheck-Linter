@@ -30,10 +30,16 @@ pub(crate) fn rules() -> Vec<Rule> {
 // ---- SV-API-001 ----
 
 /// The routine declaration whose name token is `tok`.
-fn routine_decl(c: &Cst, tok: u32) -> Option<NodeId> {
-    c.kind_nodes(FunctionDecl).iter().chain(c.kind_nodes(TaskDecl)).copied().find(|&d| {
-        c.tree.child(d, Name).and_then(|n| c.tree.token_bounds(n)).is_some_and(|(_, b)| b == tok)
-    })
+/// Routine declarations by the last token of their name (the first
+/// function, then task, of a token).
+fn routine_decls(c: &Cst) -> std::collections::HashMap<u32, NodeId> {
+    let mut out = std::collections::HashMap::new();
+    for &d in c.kind_nodes(FunctionDecl).iter().chain(c.kind_nodes(TaskDecl)) {
+        if let Some((_, b)) = c.tree.child(d, Name).and_then(|n| c.tree.token_bounds(n)) {
+            out.entry(b).or_insert(d);
+        }
+    }
+    out
 }
 
 /// The name token of port `name` in a routine's port list.
@@ -80,9 +86,10 @@ fn ref_ports(c: &Cst, decl: NodeId) -> Vec<String> {
 fn ref_argument_never_written(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);
     let g = crate::g_design_types::globals(c);
+    let decls = routine_decls(c);
     for r in user_routines(c, &classes) {
         let Some(body) = r.body else { continue };
-        let Some(decl) = routine_decl(c, r.tok) else { continue };
+        let Some(&decl) = decls.get(&r.tok) else { continue };
         if let Some(i) = r.class {
             let m = classes.list[i].methods.iter().find(|m| m.tok == r.tok);
             if m.is_some_and(|m| m.virtual_kw) || classes.override_of(i, &r.name).is_some() {
@@ -367,7 +374,7 @@ fn fixed_range(c: &Cst, d: &crate::g_c_support::Decl) -> Option<(i64, i64)> {
             break;
         }
         let name = c.text_of(t);
-        let Some(td) = c.nodes(TypedefDecl).into_iter().find(|&td| c.tree.child(td, Name).is_some_and(|n| c.tree.bare_text(n) == name))
+        let Some(td) = c.first_named(TypedefDecl, name)
         else {
             return None;
         };

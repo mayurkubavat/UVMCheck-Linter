@@ -298,10 +298,12 @@ fn int_width(k: &str) -> (u32, bool) {
 
 impl<'t> Builder<'t> {
     pub(crate) fn toks_of(&self, n: NodeRef) -> Vec<&'t str> {
-        self.tokens(n)
-            .iter()
-            .map(|&t| self.text(n.tree, t))
-            .collect()
+        let t = self.tree(n);
+        match t.token_bounds(n.node) {
+            Some((a, b)) if t.spans_known(n.node) => (a..=b).map(|i| &*t.tokens[i as usize].text).collect(),
+            Some(_) => self.tokens(n).iter().map(|&i| self.text(n.tree, i)).collect(),
+            None => Vec::new(),
+        }
     }
 
     /// `pkg::cls::` for a scope (empty for the compilation unit).
@@ -689,37 +691,41 @@ impl<'t> Builder<'t> {
         if depth > MAX_EVAL_DEPTH {
             return None;
         }
-        let kids: Vec<NodeRef> = self
-            .children(e)
-            .into_iter()
-            .filter(|c| body_is_expr(self.kind(*c)))
-            .collect();
         match self.kind(e) {
             Literal => {
-                let toks = self.toks_of(e);
-                if let [lit] = toks.as_slice() {
-                    if lit.starts_with('"') {
-                        return string_value(lit);
-                    }
+                if let Some(v) = self.lit_cache.borrow().get(&e) {
+                    return v.clone();
                 }
-                literal(&toks)
+                let toks = self.toks_of(e);
+                let v = match toks.as_slice() {
+                    [lit] if lit.starts_with('"') => string_value(lit),
+                    _ => literal(&toks),
+                };
+                self.lit_cache.borrow_mut().insert(e, v.clone());
+                return v;
             }
             NameExpr => {
-                let toks = self.toks_of(e);
-                match toks.as_slice() {
-                    [n] => {
-                        if let Some(v) = self.get_local(n) {
-                            return Some(v);
-                        }
-                        let here = self.inst.borrow().get(*n).cloned();
-                        match here {
-                            Some(v) => v,
-                            None => self.const_named(n, scope, env, depth + 1),
-                        }
-                    }
-                    _ => None,
+                let n = self.single_tok(e)?;
+                if let Some(v) = self.get_local(n) {
+                    return Some(v);
                 }
+                let here = self.inst.borrow().get(n).cloned();
+                return match here {
+                    Some(v) => v,
+                    None => self.const_named(n, scope, env, depth + 1),
+                };
             }
+            _ => {}
+        }
+        // The first three operands (all `eval` reads), without allocating.
+        let mut kids: [Option<NodeRef>; 3] = [None; 3];
+        let t = self.tree(e);
+        for (slot, n) in kids.iter_mut().zip(t.children(e.node).filter(|&c| body_is_expr(t.kind(c)))) {
+            *slot = Some(NodeRef { tree: e.tree, node: n });
+        }
+        let kids = Kids(kids);
+        match self.kind(e) {
+            Literal | NameExpr => None,
             ScopedExpr => {
                 let toks = self.toks_of(e);
                 if toks.len() == 3 && toks[1] == "::" {
@@ -764,12 +770,12 @@ impl<'t> Builder<'t> {
                 .or_else(|| self.eval_packed_select(e, scope, env, depth + 1)),
             MemberExpr => self.eval_packed_select(e, scope, env, depth + 1),
             PrefixExpr => {
-                let op = *self.own_tokens(e).first()?;
+                let op = self.first_own_tok(e)?;
                 let a = self.eval(*kids.first()?, scope, env, depth + 1)?;
                 Some(unary(op, a)?)
             }
             BinaryExpr => {
-                let op = *self.own_tokens(e).first()?;
+                let op = self.first_own_tok(e)?;
                 let (l, r) = (*kids.first()?, *kids.get(1)?);
                 let a = self.eval(l, scope, env, depth + 1)?;
                 let b = self.eval(r, scope, env, depth + 1)?;
@@ -1778,6 +1784,19 @@ fn is_context_op(op: &str) -> bool {
 
 pub(crate) fn binary_op(op: &str, a: CVal, b: CVal) -> Option<CVal> {
     binary(op, a, b)
+}
+
+/// Up to three operands of an expression (see [`Builder::eval`]).
+struct Kids([Option<NodeRef>; 3]);
+
+impl Kids {
+    fn first(&self) -> Option<&NodeRef> {
+        self.0[0].as_ref()
+    }
+
+    fn get(&self, i: usize) -> Option<&NodeRef> {
+        self.0.get(i)?.as_ref()
+    }
 }
 
 fn body_is_expr(k: SyntaxKind) -> bool {

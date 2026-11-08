@@ -413,7 +413,7 @@ fn packed_concat(c: &Cst, n: NodeId) -> bool {
     if c.kind(p) == BinaryExpr && c.tok(p, "=").is_some() && c.tree.children(p).nth(1) == Some(n) {
         if let Some(lhs) = c.tree.children(p).next().filter(|&l| c.kind(l) == NameExpr) {
             let name = c.tree.bare_text(lhs);
-            let decl = c.nodes(Declarator).into_iter().find(|&d| c.tree.child(d, Name).is_some_and(|x| c.tree.bare_text(x) == name));
+            let decl = c.first_named(Declarator, &name);
             if decl.is_some_and(unpacked) {
                 return false;
             }

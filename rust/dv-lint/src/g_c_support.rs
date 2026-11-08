@@ -332,10 +332,6 @@ pub(crate) fn enclosing_class(c: &Cst, n: NodeId) -> Option<NodeId> {
 
 #[derive(Default)]
 struct TreeInfo {
-    /// Instance paths of each definition.
-    instances: HashMap<String, Vec<String>>,
-    /// Generate block paths (`top.gl[0]`).
-    generates: HashMap<String, Vec<String>>,
     /// Class declarations by name.
     classes: HashMap<String, Vec<NodeId>>,
     /// Routines declared outside classes, by name.
@@ -349,21 +345,37 @@ fn info(c: &Cst) -> std::sync::Arc<TreeInfo> {
     crate::shared::get("tree_info", c.tree_key(), || build_info(c))
 }
 
-fn build_info(c: &Cst) -> TreeInfo {
-    let mut ti = TreeInfo::default();
-    for n in c.nodes(ClassDecl) {
-        ti.classes.entry(decl_name(c, n)).or_default().push(n);
-    }
-    for k in [FunctionDecl, TaskDecl] {
-        for n in c.nodes(k) {
-            if enclosing_class_decl(c, n).is_none() && !decl_name(c, n).contains("::") {
-                ti.routines.entry(decl_name(c, n)).or_default().push(n);
-            }
-        }
-    }
+/// The tree's elaborated instances and generate blocks, kept apart from
+/// [`TreeInfo`] so that class and routine lookups never wait for
+/// elaboration.
+#[derive(Default)]
+struct TreeHier {
+    /// Instance paths of each definition.
+    instances: HashMap<String, Vec<String>>,
+    /// Generate block paths (`top.gl[0]`).
+    generates: HashMap<String, Vec<String>>,
+}
+
+fn tree_hier(c: &Cst) -> std::sync::Arc<TreeHier> {
+    crate::shared::get("tree_hier", c.tree_key(), || build_tree_hier(c))
+}
+
+fn build_tree_hier(c: &Cst) -> TreeHier {
+    let mut ti = TreeHier::default();
     let needs_hier = c.nodes(ModuleDecl).len() + c.nodes(InterfaceDecl).len() + c.nodes(ProgramDecl).len() > 0;
     if needs_hier {
-        for line in sv_sema::hierarchy(std::slice::from_ref(c.tree)) {
+        // A compile of this one tree with no `-top`: the shared elaboration.
+        let same = c.all.len() == 1 && std::ptr::eq(&c.all[0], c.tree) && crate::tops().is_empty();
+        let shared;
+        let own;
+        let lines: &[String] = if same {
+            shared = crate::shared::elaboration(c);
+            &shared.hierarchy
+        } else {
+            own = sv_sema::hierarchy(std::slice::from_ref(c.tree));
+            &own
+        };
+        for line in lines {
             let mut it = line.splitn(3, ' ');
             let (Some(parent), Some(kind), Some(rest)) = (it.next(), it.next(), it.next()) else { continue };
             let path = |name: &str| if parent == "$root" { name.to_string() } else { format!("{parent}.{name}") };
@@ -375,6 +387,21 @@ fn build_info(c: &Cst) -> TreeInfo {
                 }
                 "generate" => ti.generates.entry(parent.to_string()).or_default().push(path(rest)),
                 _ => {}
+            }
+        }
+    }
+    ti
+}
+
+fn build_info(c: &Cst) -> TreeInfo {
+    let mut ti = TreeInfo::default();
+    for n in c.nodes(ClassDecl) {
+        ti.classes.entry(decl_name(c, n)).or_default().push(n);
+    }
+    for k in [FunctionDecl, TaskDecl] {
+        for n in c.nodes(k) {
+            if enclosing_class_decl(c, n).is_none() && !decl_name(c, n).contains("::") {
+                ti.routines.entry(decl_name(c, n)).or_default().push(n);
             }
         }
     }
@@ -471,6 +498,7 @@ fn spec_key(c: &Cst, cls: NodeId, list: Option<NodeId>) -> Option<Vec<String>> {
 /// times the specializations of the parameterized class it is in.
 pub(crate) fn times(c: &Cst, n: NodeId) -> usize {
     let ti = info(c);
+    let th = tree_hier(c);
     let chain: Vec<NodeId> = {
         let mut v: Vec<NodeId> = std::iter::once(n).chain(ancestors(c, n)).collect();
         v.reverse();
@@ -482,7 +510,7 @@ pub(crate) fn times(c: &Cst, n: NodeId) -> usize {
         match c.kind(a) {
             ModuleDecl | InterfaceDecl | ProgramDecl if paths.is_none() => {
                 let name = decl_name(c, a);
-                paths = Some(ti.instances.get(&name).cloned().unwrap_or_else(|| vec![name]));
+                paths = Some(th.instances.get(&name).cloned().unwrap_or_else(|| vec![name]));
             }
             LoopGenerate => {
                 let label = chain.get(i + 1).and_then(|&b| block_label(c, b));
@@ -490,7 +518,7 @@ pub(crate) fn times(c: &Cst, n: NodeId) -> usize {
                     let mut next = Vec::new();
                     for p in ps.iter() {
                         let pre = format!("{p}.{l}[");
-                        if let Some(g) = ti.generates.get(p) {
+                        if let Some(g) = th.generates.get(p) {
                             next.extend(g.iter().filter(|x| x.starts_with(&pre)).cloned());
                         }
                     }
@@ -504,7 +532,7 @@ pub(crate) fn times(c: &Cst, n: NodeId) -> usize {
                 if let (Some(ps), Some(l)) = (paths.as_mut(), label) {
                     for p in ps.iter_mut() {
                         let q = format!("{p}.{l}");
-                        if ti.generates.get(p).is_some_and(|g| g.contains(&q)) {
+                        if th.generates.get(p).is_some_and(|g| g.contains(&q)) {
                             *p = q;
                         }
                     }
@@ -797,11 +825,23 @@ pub(crate) fn class_methods(c: &Cst, cls: NodeId) -> Vec<NodeId> {
 }
 
 fn out_of_block(c: &Cst, cls: &str, m: &str, at: NodeId) -> Option<NodeId> {
-    [FunctionDecl, TaskDecl].into_iter().flat_map(|k| c.nodes(k)).find(|&d| {
+    let index = crate::shared::get("out_of_block", c.tree_key(), || out_of_block_index(c));
+    let v = index.get(&(cls.to_string(), m.to_string()))?;
+    v.iter().copied().find(|&d| enclosing_class(c, d).is_some_and(|x| x == at))
+}
+
+/// Routines named `..::cls::m`, by (cls, m): functions first, then tasks,
+/// each in tree order.
+fn out_of_block_index(c: &Cst) -> HashMap<(String, String), Vec<NodeId>> {
+    let mut out: HashMap<(String, String), Vec<NodeId>> = HashMap::new();
+    for d in [FunctionDecl, TaskDecl].into_iter().flat_map(|k| c.nodes(k)) {
         let full = decl_name(c, d);
         let mut parts = full.rsplit("::");
-        parts.next() == Some(m) && parts.next() == Some(cls) && enclosing_class(c, d).is_some_and(|x| x == at)
-    })
+        if let (Some(m), Some(cls)) = (parts.next(), parts.next()) {
+            out.entry((cls.to_string(), m.to_string())).or_default().push(d);
+        }
+    }
+    out
 }
 
 /// `swe::allUserRoutines`: the methods of user classes, then routines of

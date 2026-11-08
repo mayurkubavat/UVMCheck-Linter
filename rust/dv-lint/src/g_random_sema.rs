@@ -478,7 +478,8 @@ fn new_target_class(c: &Cst, nx: NodeId) -> Option<String> {
 /// How many formals the constructor of the one class of this name in the
 /// tree declares, when it declares one.
 fn ctor_formals(c: &Cst, class: &str) -> Option<usize> {
-    let mut classes = c.nodes(ClassDecl).into_iter().filter(|&k| c.tree.child(k, Name).is_some_and(|n| c.tree.bare_text(n) == class));
+    let named = c.named(ClassDecl);
+    let mut classes = named.get(class).into_iter().flatten().copied();
     let k = classes.next()?;
     if classes.next().is_some() {
         return None;

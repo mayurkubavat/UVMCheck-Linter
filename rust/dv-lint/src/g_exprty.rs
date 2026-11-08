@@ -897,6 +897,9 @@ fn facts(c: &Cst) -> Facts {
     (*crate::shared::get("facts", c.compile_key(), || build_facts(c))).clone()
 }
 
+/// Expressions in a tree from which [`build_facts`] types it on threads.
+const TYPE_PART: usize = 20_000;
+
 fn build_facts(c: &Cst) -> Facts {
     let o = TypeOracle::new(c.all);
     let mut out = HashMap::new();
@@ -915,16 +918,41 @@ fn build_facts(c: &Cst) -> Facts {
             own = Cst::new(t, i, sv_sema::Locator::default());
             &own
         };
-        let mut ty = Typer::new(tc, &o);
-        for n in 0..t.nodes.len() {
-            let n = NodeId(n as u32);
-            if !is_expr(tc.kind(n)) {
-                continue;
+        let exprs: Vec<NodeId> = (0..t.nodes.len() as u32).map(NodeId).filter(|&n| is_expr(tc.kind(n))).collect();
+        // A large tree is typed in parts on threads of their own, each with
+        // its own oracle (answers do not depend on what was asked before).
+        let parts = if exprs.len() >= TYPE_PART { 3 } else { 1 };
+        let chunk = exprs.len().div_ceil(parts).max(1);
+        let (all, gen) = (c.all, crate::shared::current());
+        std::thread::scope(|s| {
+            let rest: Vec<_> = exprs
+                .chunks(chunk)
+                .skip(1)
+                .map(|ch| {
+                    std::thread::Builder::new()
+                        .stack_size(256 << 20)
+                        .spawn_scoped(s, move || {
+                            crate::shared::enter(gen);
+                            let o = TypeOracle::new(all);
+                            let tc = Cst::new(t, i, sv_sema::Locator::default());
+                            let mut ty = Typer::new(&tc, &o);
+                            ch.iter().filter_map(|&n| ty.final_type(n).map(|x| (n, x))).collect::<Vec<_>>()
+                        })
+                        .expect("spawn a typing thread")
+                })
+                .collect();
+            let mut ty = Typer::new(tc, &o);
+            for &n in exprs.chunks(chunk).next().unwrap_or(&[]) {
+                if let Some(x) = ty.final_type(n) {
+                    out.insert((i, n), x);
+                }
             }
-            if let Some(x) = ty.final_type(n) {
-                out.insert((i, n), x);
+            for h in rest {
+                for (n, x) in h.join().unwrap_or_else(|e| std::panic::resume_unwind(e)) {
+                    out.insert((i, n), x);
+                }
             }
-        }
+        });
         // `X::set/get(...)` calls, typed as config_db calls at the end.
         for n in 0..t.nodes.len() {
             let n = NodeId(n as u32);

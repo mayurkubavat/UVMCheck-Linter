@@ -1290,9 +1290,7 @@ fn find_in_items(c: &Cst, scope: NodeId, name: &str, kind: DeclKind) -> Option<D
 }
 
 fn class_named(c: &Cst, name: &str) -> Option<NodeId> {
-    c.nodes(ClassDecl)
-        .into_iter()
-        .find(|&k| c.tree.child(k, Name).is_some_and(|x| c.tree.bare_text(x) == name))
+    c.first_named(ClassDecl, name)
 }
 
 /// The class `k` extends, by name, within the tree.
@@ -1400,9 +1398,7 @@ fn type_head<'t>(c: &Cst<'t>, dt: NodeId) -> Option<&'t str> {
 }
 
 fn typedef_named(c: &Cst, name: &str) -> Option<NodeId> {
-    c.nodes(TypedefDecl)
-        .into_iter()
-        .find(|&t| c.tree.child(t, Name).is_some_and(|x| c.tree.bare_text(x) == name))
+    c.first_named(TypedefDecl, name)
 }
 
 /// The declared type is a class handle.

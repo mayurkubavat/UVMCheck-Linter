@@ -46,6 +46,7 @@ pub mod checks;
 pub mod classes;
 mod consteval;
 mod elab;
+pub mod fx;
 mod packed;
 pub mod iclass;
 pub mod names;
@@ -65,6 +66,13 @@ pub fn load<S: AsRef<str>>(args: &[S]) -> Result<Design, Error> {
 
 /// [`load`], also giving back the parsed trees (for syntax-level tools).
 pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>), Error> {
+    let (trees, parse_ms) = parse_args(args)?;
+    let design = design_of(&trees, parse_ms);
+    Ok((design, trees))
+}
+
+/// The parse half of [`load_with_trees`]: the trees, and the time taken (ms).
+pub fn parse_args<S: AsRef<str>>(args: &[S]) -> Result<(Vec<Tree>, f64), Error> {
     // The options are read as a compiler reads them: -f/-F file lists,
     // $VAR/${VAR} from the environment, +incdir+, +define+, -I, -D.
     // `--single-unit` reads every file into one compilation unit and tree.
@@ -107,12 +115,17 @@ pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>),
         sv_syntax::parse_files(&files, opts)
     };
     let parse_ms = t0.elapsed().as_secs_f64() * 1e3;
+    Ok((trees, parse_ms))
+}
+
+/// The model half of [`load_with_trees`]: the design of parsed trees.
+pub fn design_of(trees: &[Tree], parse_ms: f64) -> Design {
     let errors = trees
         .iter()
         .map(|t| t.errors.len() + t.pp_diagnostics.len())
         .sum::<usize>() as u32;
     let t1 = Instant::now();
-    let design = build(&trees);
+    let design = build(trees);
     let model_ms = t1.elapsed().as_secs_f64() * 1e3;
     let counts = design.specialization_counts().to_vec();
     let mut design = Design::from_parts(
@@ -127,7 +140,7 @@ pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<Tree>),
         },
     );
     design.set_specializations(counts);
-    Ok((design, trees))
+    design
 }
 
 /// Turns token positions of parsed trees into [`Loc`]s, numbering files as
@@ -753,7 +766,9 @@ struct Builder<'t> {
     /// Each node's parent, per tree, built on first use.
     parent_of: std::cell::OnceCell<Vec<Vec<u32>>>,
     /// Values of parameters outside class specializations, by scope.
-    const_cache: std::cell::RefCell<HashMap<(usize, String), Option<types::CVal>>>,
+    const_cache: std::cell::RefCell<fx::FxMap<(usize, String), Option<types::CVal>>>,
+    /// Literal values by node.
+    lit_cache: std::cell::RefCell<fx::FxMap<NodeRef, Option<types::CVal>>>,
     /// Scope -> the members of the enum typedefs declared in it, first wins.
     enum_cache: std::cell::RefCell<HashMap<usize, std::rc::Rc<HashMap<String, types::CVal>>>>,
     /// Scope -> member name -> the enum typedef declared in it that names it, first wins.
@@ -824,6 +839,7 @@ impl<'t> Builder<'t> {
             keying: Default::default(),
             parent_of: Default::default(),
             const_cache: Default::default(),
+            lit_cache: Default::default(),
             enum_cache: Default::default(),
             enum_typedefs: Default::default(),
             enum_strings: Default::default(),
@@ -918,8 +934,25 @@ impl<'t> Builder<'t> {
             .collect()
     }
 
+    /// The node's first own token (see [`Self::own_tokens`]).
+    fn first_own_tok(&self, r: NodeRef) -> Option<&'t str> {
+        let t = self.tree(r);
+        t.node(r.node).children.iter().find_map(|c| match *c {
+            sv_syntax::Child::Token(i) => Some(&*t.tokens[i as usize].text),
+            _ => None,
+        })
+    }
+
     fn tokens(&self, r: NodeRef) -> Vec<u32> {
         self.tree(r).token_range(r.node)
+    }
+
+    /// The node's only token, if it has exactly one.
+    fn single_tok(&self, r: NodeRef) -> Option<&'t str> {
+        match self.tree(r).token_bounds(r.node)? {
+            (a, b) if a == b => Some(self.text(r.tree, a)),
+            _ => None,
+        }
     }
 
     fn text(&self, tree: usize, tok: u32) -> &'t str {

@@ -233,6 +233,25 @@ pub(crate) struct MethodInfo {
     pub name: String,
 }
 
+/// Every routine by its declared name: the first of a name over the
+/// trees (functions, then tasks, of each tree).
+fn routine_index(csts: &[Cst]) -> std::sync::Arc<HashMap<String, (usize, NodeId)>> {
+    let build = || {
+        let mut out = HashMap::new();
+        for (ix, cc) in csts.iter().enumerate() {
+            for n in cc.nodes(FunctionDecl).into_iter().chain(cc.nodes(TaskDecl)) {
+                out.entry(decl_name(cc, n)).or_insert((ix, n));
+            }
+        }
+        out
+    };
+    match csts.first() {
+        // The same for every set of all the compile's trees.
+        Some(c) if csts.len() == c.all.len() => crate::shared::get("routine_index", c.compile_key(), build),
+        _ => std::sync::Arc::new(build()),
+    }
+}
+
 pub(crate) fn class_methods(csts: &[Cst], k: &ClassInfo) -> Vec<MethodInfo> {
     let c = &csts[k.ix];
     let mut out = Vec::new();
@@ -250,13 +269,8 @@ pub(crate) fn class_methods(csts: &[Cst], k: &ClassInfo) -> Vec<MethodInfo> {
                 }
                 let name = decl_name(c, m);
                 let full = format!("{}::{}", k.name, name);
-                'find: for (ix, cc) in csts.iter().enumerate() {
-                    for n in cc.nodes(FunctionDecl).into_iter().chain(cc.nodes(TaskDecl)) {
-                        if decl_name(cc, n) == full {
-                            out.push(MethodInfo { ix, node: n, name: name.clone() });
-                            break 'find;
-                        }
-                    }
+                if let Some(&(ix, node)) = routine_index(csts).get(&full) {
+                    out.push(MethodInfo { ix, node, name: name.clone() });
                 }
             }
             _ => {}

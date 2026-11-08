@@ -194,7 +194,7 @@ pub(crate) fn is_system_call(c: &Cst, call: NodeId) -> bool {
             match expr_type(c, r) {
                 Some(t) => {
                     BUILTIN_TYPES.contains(&t.as_str())
-                        || c.nodes(TypedefDecl).into_iter().any(|td| c.tree.child(td, Name).is_some_and(|x| c.tree.bare_text(x) == t))
+                        || c.named(TypedefDecl).contains_key(&t)
                 }
                 None => !matches!(name.as_str(), "randomize"),
             }

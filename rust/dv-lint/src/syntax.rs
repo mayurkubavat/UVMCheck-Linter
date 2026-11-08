@@ -89,6 +89,26 @@ impl<'t> Cst<'t> {
         self.kind_nodes(kind).to_vec()
     }
 
+    /// The nodes of `kind` by the text of their `Name` child, each list in
+    /// tree order (built once per tree and kind).
+    pub fn named(&self, kind: SyntaxKind) -> std::sync::Arc<std::collections::HashMap<String, Vec<NodeId>>> {
+        let (a, b) = self.tree_key();
+        crate::shared::get("named", (a, b ^ ((kind as u16 as usize) << 48)), || {
+            let mut out: std::collections::HashMap<String, Vec<NodeId>> = std::collections::HashMap::new();
+            for &n in self.kind_nodes(kind) {
+                if let Some(x) = self.tree.child(n, Name) {
+                    out.entry(self.tree.bare_text(x)).or_default().push(n);
+                }
+            }
+            out
+        })
+    }
+
+    /// The first node of `kind` whose `Name` child reads `name`.
+    pub fn first_named(&self, kind: SyntaxKind, name: &str) -> Option<NodeId> {
+        self.named(kind).get(name).and_then(|v| v.first().copied())
+    }
+
     /// [`Self::nodes`] without the copy.
     pub fn kind_nodes(&self, kind: SyntaxKind) -> &[NodeId] {
         let by = self.by_kind.get_or_init(|| {

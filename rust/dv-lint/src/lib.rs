@@ -369,12 +369,49 @@ pub fn lint_all(
     trees: &[sv_syntax::Tree],
     keep: impl Fn(&str) -> bool,
 ) -> (Vec<String>, Vec<Finding>) {
+    lint_from(Source::Ready(design), trees, keep).1
+}
+
+/// [`lint_all`] for a design that `build` makes from `trees`: with several
+/// threads, the caches the rules share start building on them while this
+/// thread builds the design. Returns the design too.
+pub fn lint_built(
+    build: impl FnOnce() -> Design,
+    trees: &[sv_syntax::Tree],
+    keep: impl Fn(&str) -> bool,
+) -> (Design, (Vec<String>, Vec<Finding>)) {
+    let (d, out) = lint_from(Source::Build(Box::new(build)), trees, keep);
+    (d.expect("a built design"), out)
+}
+
+/// The design rules run on: one given, or one to build.
+enum Source<'d> {
+    Ready(&'d Design),
+    Build(Box<dyn FnOnce() -> Design + 'd>),
+}
+
+fn lint_from(
+    design: Source<'_>,
+    trees: &[sv_syntax::Tree],
+    keep: impl Fn(&str) -> bool,
+) -> (Option<Design>, (Vec<String>, Vec<Finding>)) {
     let all: Vec<Rule> = rules().into_iter().filter(|r| keep(r.id)).collect();
     let gen = shared::begin();
     let jobs = jobs().min(all.len());
+    let built = std::sync::OnceLock::new();
+    let given = match &design {
+        Source::Ready(d) => Some(*d),
+        Source::Build(_) => None,
+    };
     let out = if jobs > 1 {
-        lint_parallel(design, trees, &all, jobs, gen).unwrap_or_else(|| lint_serial(design, trees, &all))
+        let out = lint_parallel(design, &built, trees, &all, jobs, gen);
+        let design = given.unwrap_or_else(|| built.get().expect("the design, once the rules ran"));
+        out.unwrap_or_else(|| lint_serial(design, trees, &all))
     } else {
+        let design = match design {
+            Source::Ready(d) => d,
+            Source::Build(b) => built.get_or_init(b),
+        };
         lint_serial(design, trees, &all)
     };
     shared::end(gen);
@@ -382,7 +419,7 @@ pub fn lint_all(
     f.retain(|x| !x.position_in(&files).0.contains("uvm_mock.svh"));
     waivers::apply(&mut f, &files);
     f.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
-    (files, f)
+    (built.into_inner(), (files, f))
 }
 
 /// Threads for the rules: `DV_LINT_JOBS`, else the machine's cores.
@@ -494,22 +531,42 @@ const SLOW: &[&str] = &[
 /// [`shared`] are built once for all of them. Every thread numbers files
 /// from one table made up front; `None` (run serially instead) if a thread
 /// had to number a file that table lacks.
-fn lint_parallel(
-    design: &Design,
+fn lint_parallel<'d>(
+    source: Source<'d>,
+    built: &'d std::sync::OnceLock<Design>,
     trees: &[sv_syntax::Tree],
     all: &[Rule],
     jobs: usize,
     gen: usize,
 ) -> Option<(Vec<String>, Vec<Finding>)> {
-    let mut locator = sv_sema::Locator::new(design.files().to_vec());
-    for (ix, tree) in trees.iter().enumerate() {
-        let cst = syntax::Cst::new(tree, ix, locator);
-        for f in 0..tree.files.len() as u32 {
-            cst.loc_at(sv_syntax::Origin { file: f, offset: 0 });
+    // The design and the file table, once this thread has them; the
+    // workers build shared caches until then.
+    // `Some(None)`: building the design failed (its panic is resumed).
+    type Ready<'a> = Option<Option<(&'a Design, std::sync::Arc<Vec<String>>)>>;
+    let ready: (std::sync::Mutex<Ready>, std::sync::Condvar) = Default::default();
+    let wait = || {
+        let mut g = ready.0.lock().unwrap_or_else(|e| e.into_inner());
+        loop {
+            if let Some(r) = &*g {
+                return r.clone();
+            }
+            g = ready.1.wait(g).unwrap_or_else(|e| e.into_inner());
         }
-        locator = cst.into_locator();
-    }
-    let files = locator.into_files();
+    };
+    let publish = |design: &'d Design| {
+        let mut locator = sv_sema::Locator::new(design.files().to_vec());
+        for (ix, tree) in trees.iter().enumerate() {
+            let cst = syntax::Cst::new(tree, ix, locator);
+            for f in 0..tree.files.len() as u32 {
+                cst.loc_at(sv_syntax::Origin { file: f, offset: 0 });
+            }
+            locator = cst.into_locator();
+        }
+        let files = std::sync::Arc::new(locator.into_files());
+        *ready.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(Some((design, files.clone())));
+        ready.1.notify_all();
+        files
+    };
     // The work, in order: first the caches most rules wait for (when many
     // rules run), then the slowest rules, then the rest as registered.
     let warm: &[fn(&syntax::Cst)] = if all.len() >= 32 {
@@ -532,23 +589,28 @@ fn lint_parallel(
     let same_files = std::sync::atomic::AtomicBool::new(true);
     let profile = std::env::var_os("DV_LINT_PROFILE").is_some();
     let t0 = std::time::Instant::now();
-    std::thread::scope(|s| {
+    let files = std::thread::scope(|s| {
         for job in 0..jobs {
-            let (next, found, files, same_files, tasks, t0) = (&next, &found, &files, &same_files, &tasks, &t0);
+            let (next, found, same_files, tasks, t0, wait) = (&next, &found, &same_files, &tasks, &t0, &wait);
             std::thread::Builder::new()
                 .stack_size(256 << 20)
                 .spawn_scoped(s, move || {
                     shared::enter(gen);
                     let mut syn: Option<Vec<syntax::Cst>> = None;
                     let mut mix: Option<Vec<syntax::Cst>> = None;
+                    let mut files: Option<std::sync::Arc<Vec<String>>> = None;
+                    let mut design: Option<&Design> = None;
                     loop {
                         let k = next.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
                         let i = match tasks.get(k) {
                             None => break,
                             Some(Task::Warm(w)) => {
                                 let a = t0.elapsed().as_secs_f64() * 1e3;
-                                if let Some(c) = mix.get_or_insert_with(|| mixed_csts(trees, files)).first() {
-                                    w(c);
+                                // The caches do not depend on the file table.
+                                if let Some(t) = trees.first() {
+                                    let mut c = syntax::Cst::new(t, 0, sv_sema::Locator::default());
+                                    c.all = trees;
+                                    w(&c);
                                 }
                                 if profile {
                                     eprintln!("ptask warm{k} {job} {a:.0} {:.0}", t0.elapsed().as_secs_f64() * 1e3);
@@ -559,6 +621,12 @@ fn lint_parallel(
                         };
                         let r = &all[i];
                         let a = t0.elapsed().as_secs_f64() * 1e3;
+                        if design.is_none() {
+                            let Some((d, f)) = wait() else { break };
+                            design = Some(d);
+                            files = Some(f);
+                        }
+                        let (Some(design), Some(files)) = (design, files.as_deref()) else { break };
                         let mut sink = Sink::default();
                         match r.check {
                             Check::Model(run) => run(design, &mut sink),
@@ -576,15 +644,29 @@ fn lint_parallel(
                             *f = sink.findings;
                         }
                     }
+                    let n = files.map_or(0, |f| f.len());
                     for c in syn.into_iter().chain(mix).flatten() {
-                        if c.into_locator().into_files().len() != files.len() {
+                        if c.into_locator().into_files().len() != n {
                             same_files.store(false, std::sync::atomic::Ordering::Relaxed);
                         }
                     }
                 })
                 .expect("spawn a rule thread");
         }
+        let design = match source {
+            Source::Ready(d) => d,
+            Source::Build(b) => match std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| built.get_or_init(b))) {
+                Ok(d) => d,
+                Err(e) => {
+                    *ready.0.lock().unwrap_or_else(|e| e.into_inner()) = Some(None);
+                    ready.1.notify_all();
+                    std::panic::resume_unwind(e)
+                }
+            },
+        };
+        publish(design)
     });
+    let files = std::sync::Arc::try_unwrap(files).unwrap_or_else(|f| (*f).clone());
     if !same_files.into_inner() {
         return None;
     }

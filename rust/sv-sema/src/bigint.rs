@@ -215,6 +215,18 @@ impl Int {
     /// The low `width` bits, sign-extended from the top one when `signed`.
     pub fn trunc(&self, width: u32, signed: bool) -> Int {
         let width = width.max(1);
+        if self.w.len() == 1 {
+            let x = self.w[0];
+            if width < 64 {
+                let m = x & ((1u64 << width) - 1);
+                let neg = signed && (m >> (width - 1)) & 1 == 1;
+                let v = if neg { m | !((1u64 << width) - 1) } else { m };
+                return Int { w: Words::Inline(1, [v, 0, 0, 0]) };
+            }
+            if signed || (x as i64) >= 0 {
+                return self.clone();
+            }
+        }
         let words = width.div_ceil(64) as usize;
         let mut w: Words = (0..words).map(|i| self.word(i)).collect();
         let top = width % 64;

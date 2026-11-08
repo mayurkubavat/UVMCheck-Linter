@@ -463,7 +463,7 @@ fn handle_type(c: &Cst, dtype: NodeId, ctx: Option<NodeId>, depth: u32) -> Optio
         let dt = kids(c, d.node).into_iter().find(|&k| c.kind(k) == DataType && c.first_tok(k).is_some_and(|f| f > eq))?;
         return handle_type(c, dt, ctx, depth + 1);
     }
-    let td = c.nodes(TypedefDecl).into_iter().find(|&td| c.tree.child(td, Name).is_some_and(|x| c.tree.bare_text(x) == t))?;
+    let td = c.first_named(TypedefDecl, t)?;
     let dt = c.tree.child(td, DataType)?;
     handle_type(c, dt, ctx, depth + 1)
 }

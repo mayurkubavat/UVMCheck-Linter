@@ -37,14 +37,14 @@ pub(crate) struct Vals(Rc<Scope>);
 #[derive(Clone, Default)]
 struct Scope {
     /// `None`: removed here (hides a parent's value).
-    own: HashMap<String, Option<Option<CVal>>>,
+    own: crate::fx::FxMap<String, Option<Option<CVal>>>,
     parent: Option<Vals>,
 }
 
 impl Vals {
     /// A new scope below this one.
     fn child(&self) -> Vals {
-        Vals(Rc::new(Scope { own: HashMap::new(), parent: Some(self.clone()) }))
+        Vals(Rc::new(Scope { own: Default::default(), parent: Some(self.clone()) }))
     }
 
     pub(crate) fn get(&self, k: &str) -> Option<&Option<CVal>> {
@@ -465,6 +465,7 @@ impl<'b, 't> Elab<'b, 't> {
                         *b.inst.borrow_mut() = o.vals.clone();
                         let val = dt.and_then(|t| b.eval_typed(o.node, Ty::of(t, scope), o.scope, &o.env, 0));
                         let text = match &val {
+                            _ if self.uninst > 0 => None,
                             Some(v) => Some(v.show()),
                             None => b.value_text(dt, o.node, o.scope, &o.env),
                         };
@@ -475,7 +476,8 @@ impl<'b, 't> Elab<'b, 't> {
                     let v = b.children(d).into_iter().find(|c| !matches!(b.kind(*c), Name | Dim));
                     match v {
                         Some(v) => {
-                            let text = b.value_text(dt, v, scope, &empty);
+                            // The text is only printed where instantiated.
+                            let text = if self.uninst == 0 { b.value_text(dt, v, scope, &empty) } else { None };
                             let two = dt.is_some_and(|t| b.two_state(t));
                             let val = match dt {
                                 Some(t) if b.kind(v) == AssignPattern => {
@@ -687,11 +689,20 @@ impl<'b, 't> Elab<'b, 't> {
         construct: usize,
     ) {
         let b = self.b;
-        let (label, items) = if b.kind(item) == GenerateBlock {
-            (self.label(item), b.children(item).into_iter().filter(|k| !matches!(b.kind(*k), EndLabel | StmtLabel)).collect())
+        let items: Vec<NodeRef> = if b.kind(item) == GenerateBlock {
+            b.children(item).into_iter().filter(|k| !matches!(b.kind(*k), EndLabel | StmtLabel)).collect()
         } else {
-            (None, vec![item])
+            vec![item]
         };
+        if self.uninst > 0 {
+            // Nothing under an uninstantiated block prints or is
+            // instantiated, so its path is not needed.
+            self.copy(item);
+            let mut v = vals.child();
+            self.items(&items, path, scope, &Overrides::new(), false, &mut v, depth);
+            return;
+        }
+        let label = if b.kind(item) == GenerateBlock { self.label(item) } else { None };
         let mut name = label.unwrap_or_else(|| format!("genblk{construct}"));
         if let Some(i) = index {
             name = format!("{name}[{i}]");

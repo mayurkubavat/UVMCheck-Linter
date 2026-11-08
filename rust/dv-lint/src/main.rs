@@ -52,18 +52,24 @@ fn main() {
             _ => args.push(a),
         }
     }
+    let fail = |e: String| -> ! {
+        eprintln!("error: {e}");
+        std::process::exit(2);
+    };
+    let keep = |id: &str| only.is_empty() || only.iter().any(|o| o == id);
+    if !slang && !exprs && !specs {
+        // The design is built while the rules' shared caches start.
+        let (trees, parse_ms) = sv_sema::parse_args(&args).unwrap_or_else(|e| fail(e.to_string()));
+        let t = std::time::Instant::now();
+        let (design, (files, found)) = dv_lint::lint_built(|| sv_sema::design_of(&trees, parse_ms), &trees, keep);
+        report(&design, time, t, &files, &found);
+    }
     let loaded = if slang {
         load_slang(&args).map(|d| (d, Vec::new()))
     } else {
         sv_sema::load_with_trees(&args).map_err(|e| e.to_string())
     };
-    let (design, trees) = match loaded {
-        Ok(d) => d,
-        Err(e) => {
-            eprintln!("error: {e}");
-            std::process::exit(2);
-        }
-    };
+    let (design, trees) = loaded.unwrap_or_else(|e| fail(e));
     if exprs {
         for l in dv_lint::g_exprty::expr_dump(design.files().to_vec(), &trees) {
             println!("{l}");
@@ -78,9 +84,12 @@ fn main() {
         return;
     }
     let t = std::time::Instant::now();
-    let (files, found) = dv_lint::lint_all(&design, &trees, |id| {
-        only.is_empty() || only.iter().any(|o| o == id)
-    });
+    let (files, found) = dv_lint::lint_all(&design, &trees, keep);
+    report(&design, time, t, &files, &found);
+}
+
+/// Prints the findings (and with `--time` the stage times) and exits.
+fn report(design: &Design, time: bool, t: std::time::Instant, files: &[String], found: &[dv_lint::Finding]) -> ! {
     if time {
         let tm = design.timings();
         eprintln!(
@@ -92,8 +101,8 @@ fn main() {
             t.elapsed().as_secs_f64() * 1e3
         );
     }
-    for f in &found {
-        let (file, line, column) = f.position_in(&files);
+    for f in found {
+        let (file, line, column) = f.position_in(files);
         println!(
             "{}:{}:{}: [{}] {} ({}): {}",
             file,
