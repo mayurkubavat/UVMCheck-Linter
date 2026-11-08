@@ -11,15 +11,11 @@ use sv_syntax::{NodeId, SyntaxKind, TokenKind};
 
 use std::collections::HashMap;
 
-
 use crate::support::statements::Units;
-
 
 use crate::support::sema_facts::{ast_ok, is_expr};
 
 use crate::syntax::Cst;
-
-
 
 use SyntaxKind::*;
 
@@ -59,11 +55,13 @@ pub(crate) fn decl_name(c: &Cst, n: NodeId) -> String {
 /// its module overrides it (slang then never binds the default).
 pub(crate) fn overridden_everywhere(c: &Cst, unit: NodeId, param: NodeId) -> Option<usize> {
     let module = decl_name(c, unit);
-    let Some(name) = c.tree.child(param, Declarator).and_then(|d| c.tree.child(d, Name)).map(|x| c.tree.bare_text(x)) else {
+    let Some(name) = c.tree.child(param, Declarator).and_then(|d| c.tree.child(d, Name)).map(|x| c.tree.bare_text(x))
+    else {
         return None;
     };
     // Its position among the unit's header parameters, for positional lists.
-    let header = c.tree.child(unit, ParamList).or_else(|| c.tree.child(unit, Header).and_then(|h| c.tree.child(h, ParamList)));
+    let header =
+        c.tree.child(unit, ParamList).or_else(|| c.tree.child(unit, Header).and_then(|h| c.tree.child(h, ParamList)));
     let pos = header.and_then(|h| c.tree.children(h).filter(|&p| c.kind(p) == ParamDecl).position(|p| p == param));
     let insts = instantiations(c);
     let recs = insts.get(&module)?;
@@ -72,7 +70,8 @@ pub(crate) fn overridden_everywhere(c: &Cst, unit: NodeId, param: NodeId) -> Opt
     let overrides = |list: &Option<String>| {
         let Some(text) = list else { return false };
         let named = text.contains(&format!(".{name}("));
-        let positional = !text.contains("(.") && pos.is_some_and(|p| text.trim_start_matches("#(").trim_end_matches(')').split(',').count() > p);
+        let positional = !text.contains("(.")
+            && pos.is_some_and(|p| text.trim_start_matches("#(").trim_end_matches(')').split(',').count() > p);
         named || positional
     };
     let Some(paths) = crate::support::slang_ast::instances_of(c, &module) else {
@@ -178,19 +177,30 @@ pub(crate) fn ast_times(c: &Cst, n: NodeId) -> usize {
             // A base's parameters bind once.
             Extends => class_param = true,
             ParamDecl if c.keyword(p).is_some_and(|k| c.text_of(k) == "defparam") => return 0,
-            TimingControl if c.tok(p, "##").is_some() && c.parent(p).is_some_and(|q| matches!(c.kind(q), SequenceExpr | PropertyExpr)) => {
+            TimingControl
+                if c.tok(p, "##").is_some()
+                    && c.parent(p).is_some_and(|q| matches!(c.kind(q), SequenceExpr | PropertyExpr)) =>
+            {
                 return 0
             }
             // Sequence, property and let formals and actuals are
             // substituted into the body.
-            PortList if c.parent(p).is_some_and(|q| matches!(c.kind(q), SequenceDecl | PropertyDecl | LetDecl)) => return 0,
-            ArgList if c.parent(p).is_some_and(|call| c.kind(call) == CallExpr && is_instance_call(c, call)) => return 0,
+            PortList if c.parent(p).is_some_and(|q| matches!(c.kind(q), SequenceDecl | PropertyDecl | LetDecl)) => {
+                return 0
+            }
+            ArgList if c.parent(p).is_some_and(|call| c.kind(call) == CallExpr && is_instance_call(c, call)) => {
+                return 0
+            }
 
             DataType if c.tok(p, "enum").is_some() => return 0,
             // `virtual bus #(8) vif`: matched against instances, not bound.
             DataType if c.first_tok(p).is_some_and(|t| c.text_of(t) == "virtual") => return 0,
             // `'{3{1}}` for a struct: the count is a constant.
-            AssignPattern if c.tree.children(p).next() == Some(x) && c.tree.child(p, ConcatExpr).is_some() && struct_target(c, p) => {
+            AssignPattern
+                if c.tree.children(p).next() == Some(x)
+                    && c.tree.child(p, ConcatExpr).is_some()
+                    && struct_target(c, p) =>
+            {
                 return 0
             }
             // A streaming concatenation's slice size is a constant, not an

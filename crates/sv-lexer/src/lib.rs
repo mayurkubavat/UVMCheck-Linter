@@ -115,13 +115,13 @@ pub fn lex(src: &str) -> Vec<Token> {
 // Longest first within each length class.
 const PUNCT4: &[&[u8]] = &[b"<<<=", b">>>="];
 const PUNCT3: &[&[u8]] = &[
-    b"<<<", b">>>", b"===", b"!==", b"==?", b"!=?", b"<<=", b">>=", b"->>", b"|->", b"|=>", b"#-#", b"#=#",
-    b"&&&", b"<->", b"+/-", b"+%-",
+    b"<<<", b">>>", b"===", b"!==", b"==?", b"!=?", b"<<=", b">>=", b"->>", b"|->", b"|=>", b"#-#", b"#=#", b"&&&",
+    b"<->", b"+/-", b"+%-",
 ];
 const PUNCT2: &[&[u8]] = &[
-    b"==", b"!=", b"<=", b">=", b"&&", b"||", b"**", b"<<", b">>", b"->", b"++", b"--", b"+=", b"-=", b"*=",
-    b"/=", b"%=", b"&=", b"|=", b"^=", b"~&", b"~|", b"~^", b"^~", b"::", b":=", b":/", b"##", b"@@", b"+:",
-    b"-:", b"'{", b"*>", b"=>",
+    b"==", b"!=", b"<=", b">=", b"&&", b"||", b"**", b"<<", b">>", b"->", b"++", b"--", b"+=", b"-=", b"*=", b"/=",
+    b"%=", b"&=", b"|=", b"^=", b"~&", b"~|", b"~^", b"^~", b"::", b":=", b":/", b"##", b"@@", b"+:", b"-:", b"'{",
+    b"*>", b"=>",
 ];
 const PUNCT1: &[u8] = b"()[]{};:,.?#@=+-*/%&|^~!<>$'";
 
@@ -190,18 +190,16 @@ impl<'a> Lexer<'a> {
                 self.eat_while(|c| c != b'\n' && c != b'\r');
                 Kind::LineComment
             }
-            b'/' if self.peek(1) == b'*' => {
-                match self.b[self.pos + 2..].windows(2).position(|w| w == b"*/") {
-                    Some(i) => {
-                        self.pos += 2 + i + 2;
-                        Kind::BlockComment
-                    }
-                    None => {
-                        self.pos = self.b.len();
-                        Kind::Unknown
-                    }
+            b'/' if self.peek(1) == b'*' => match self.b[self.pos + 2..].windows(2).position(|w| w == b"*/") {
+                Some(i) => {
+                    self.pos += 2 + i + 2;
+                    Kind::BlockComment
                 }
-            }
+                None => {
+                    self.pos = self.b.len();
+                    Kind::Unknown
+                }
+            },
             b'\\' => {
                 if self.peek(1) == b'\n' || self.peek(1) == b'\r' {
                     self.pos += 1;
@@ -336,8 +334,7 @@ impl<'a> Lexer<'a> {
             kind = Kind::RealLiteral;
         }
         if matches!(self.peek(0), b'e' | b'E')
-            && (self.peek(1).is_ascii_digit()
-                || (matches!(self.peek(1), b'+' | b'-') && self.peek(2).is_ascii_digit()))
+            && (self.peek(1).is_ascii_digit() || (matches!(self.peek(1), b'+' | b'-') && self.peek(2).is_ascii_digit()))
         {
             self.pos += 2;
             self.eat_while(|c| c.is_ascii_digit() || c == b'_');
@@ -454,7 +451,13 @@ mod tests {
     #[test]
     fn operators_longest_match() {
         let k: Vec<_> = kinds("a <<<= b; c |-> d; e[->1]; f '{1}; g ==? h").into_iter().map(|(_, t)| t).collect();
-        assert_eq!(k, ["a", "<<<=", "b", ";", "c", "|->", "d", ";", "e", "[", "->", "1", "]", ";", "f", "'{", "1", "}", ";", "g", "==?", "h"]);
+        assert_eq!(
+            k,
+            [
+                "a", "<<<=", "b", ";", "c", "|->", "d", ";", "e", "[", "->", "1", "]", ";", "f", "'{", "1", "}", ";",
+                "g", "==?", "h"
+            ]
+        );
     }
 
     #[test]

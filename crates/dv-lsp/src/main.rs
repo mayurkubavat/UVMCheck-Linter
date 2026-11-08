@@ -20,19 +20,12 @@ fn main() {
         return;
     }
     if args.first().map(String::as_str) == Some("--index") {
-        let roots: Vec<std::path::PathBuf> =
-            args[1..].iter().map(std::path::PathBuf::from).collect();
+        let roots: Vec<std::path::PathBuf> = args[1..].iter().map(std::path::PathBuf::from).collect();
         let mut ws = workspace::Workspace::default();
         let t0 = std::time::Instant::now();
         let n = ws.scan(&roots, &[]);
         let syms: usize = ws.files.iter().flatten().map(|f| f.symbols.len()).sum();
-        println!(
-            "{} files, {} symbols, {} names, {} ms",
-            n,
-            syms,
-            ws.globals.len(),
-            t0.elapsed().as_millis()
-        );
+        println!("{} files, {} symbols, {} names, {} ms", n, syms, ws.globals.len(), t0.elapsed().as_millis());
         return;
     }
     let stdin = std::io::stdin();

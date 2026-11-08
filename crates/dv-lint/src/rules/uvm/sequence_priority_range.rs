@@ -1,9 +1,9 @@
 //! UVM-SEQ-007 (SequencePriorityRange): Flags sequence start() calls passing
 //! invalid negative priority values (< -1) which corrupt sequencer arbitration.
 
-use sv_syntax::Child;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::Child;
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn sequence_priority(c: &Cst, s: &mut Sink) {

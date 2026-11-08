@@ -3,9 +3,9 @@
 //! shutdown and their pre_/post_ phases). run_phase runs in parallel with all
 //! of them, so the two schedules race and readers cannot tell the order.
 
-use dv_model::Design;
 use crate::support::class_roles::{role, user_classes};
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn run_phase_with_runtime_phases(d: &Design, out: &mut Sink) {
     for cls in user_classes(d) {

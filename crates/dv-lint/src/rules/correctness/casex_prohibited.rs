@@ -2,8 +2,8 @@
 //! treats unknown simulation 'x' values as wildcards, masking uninitialized
 //! logic bugs and timing errors.
 
+use crate::syntax::{case_statements, Cst};
 use crate::{Severity, Sink};
-use crate::syntax::{Cst, case_statements};
 
 pub(crate) fn casex_prohibited(c: &Cst, s: &mut Sink) {
     for (_, kw) in case_statements(c) {

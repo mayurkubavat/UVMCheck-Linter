@@ -1,11 +1,8 @@
 //! Operators, keywords and for-loop parts.
 
-
 use sv_syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 

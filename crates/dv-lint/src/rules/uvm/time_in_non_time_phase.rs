@@ -2,11 +2,11 @@
 //! wait, ##) inside non-time-consuming UVM phases (e.g. build_phase,
 //! connect_phase, check_phase).
 
-use sv_syntax::NodeId;
+use crate::support::uvm_syntax::{body_items, name_node, routine_last_name, routines, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::uvm_syntax::{body_items, name_node, routine_last_name, routines, subtree};
 
 /// slang's TimingControlStatement, WaitStatement or WaitForkStatement.
 fn timing_kind(c: &Cst, n: NodeId) -> Option<&'static str> {

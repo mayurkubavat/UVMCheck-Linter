@@ -2,9 +2,9 @@
 //! named *cfg* or *config*) that declares more than max_knobs (default 12) data
 //! members of its own.
 
-use dv_model::Design;
 use crate::support::class_roles::{role, user_classes, Role};
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn config_knob_budget(d: &Design, out: &mut Sink) {
     const LIMIT: usize = 12;

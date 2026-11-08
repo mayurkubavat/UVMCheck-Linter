@@ -2,11 +2,11 @@
 //! the UVM factory (type_name::type_id::create) instead of direct new() calls
 //! to support testbench overrides.
 
-use sv_syntax::{NodeId, SyntaxKind};
 use crate::support::class_index::{type_name, Classes};
 use crate::support::literals::ast_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A class type as slang prints it: `name#(args)`, without a package.
@@ -36,7 +36,9 @@ pub(crate) fn component_direct_new(c: &Cst, s: &mut Sink) {
                 let routine = crate::support::class_index::routine_of(c, nx);
                 let env = crate::support::class_metrics::Env::new(c, &classes, cls, routine, &g);
                 let k = env.expr_type(l).filter(|t| !t.array).and_then(|t| t.class);
-                k.map(|k| (k, env.decl_type(l).map(|t| class_type_text(c, t)).unwrap_or_else(|| classes.list[k].name.clone())))
+                k.map(|k| {
+                    (k, env.decl_type(l).map(|t| class_type_text(c, t)).unwrap_or_else(|| classes.list[k].name.clone()))
+                })
             }
             Declarator => {
                 let Some(dt) = c.parent(p).and_then(|d| c.tree.child(d, DataType)) else { continue };

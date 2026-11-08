@@ -2,10 +2,10 @@
 //! `uvm_* macro invocations that create empty statements in declarative or
 //! procedural scopes.
 
-use sv_syntax::Origin;
+use crate::support::source_layout::at;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::source_layout::{at};
+use sv_syntax::Origin;
 
 pub(crate) fn macro_trailing_semicolon(c: &Cst, s: &mut Sink) {
     let t = c.tree;

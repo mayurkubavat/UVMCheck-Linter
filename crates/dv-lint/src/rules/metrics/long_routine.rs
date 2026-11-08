@@ -2,11 +2,11 @@
 //! threshold (default 100; clang-tidy readability-function-size, Checkstyle
 //! MethodLength).
 
-use crate::support::statements::*;
 use crate::support::class_index::*;
+use crate::support::routine_metrics::each_routine;
+use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::routine_metrics::{each_routine};
 
 pub(crate) fn long_routine(c: &Cst, s: &mut Sink) {
     let limit = 100;

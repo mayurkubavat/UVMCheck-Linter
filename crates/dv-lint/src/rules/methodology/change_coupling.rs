@@ -2,13 +2,13 @@
 //! packages that change together in at least three commits and in at least half
 //! of the commits touching either.
 
+use crate::support::history::{base_name, file_of, log_for, Log, HISTORY, MAX_COMMITS};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
 use sv_syntax::SyntaxKind::*;
-use crate::support::history::{HISTORY, Log, MAX_COMMITS, base_name, file_of, log_for};
 
 /// SV-EVO-002: two files in different packages that keep changing together.
 pub(crate) fn change_coupling(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {

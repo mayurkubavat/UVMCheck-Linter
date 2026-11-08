@@ -2,9 +2,9 @@
 //! must use `uvm_component_utils, and classes derived from uvm_object
 //! (non-component) must use `uvm_object_utils.
 
-use dv_model::Design;
-use crate::{Severity, Sink};
 use crate::support::uvm_kinds::{is_component, is_object};
+use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn uvm_factory_macro_mismatch(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

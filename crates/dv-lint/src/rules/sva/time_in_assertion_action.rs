@@ -2,12 +2,12 @@
 //! concurrent assertions must not consume simulation time (# delays, @ event
 //! controls, or wait statements) per IEEE 1800 § 16.
 
-use crate::support::slang_ast::*;
 use crate::support::procedural::start;
+use crate::support::slang_ast::*;
+use crate::support::sva_cov::{actions, add_n, ast_asserts};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{actions, add_n, ast_asserts};
 
 pub(crate) fn time_in_action(c: &Cst, s: &mut Sink) {
     for (kind, label) in [(AssertStmt, "immediate"), (ConcurrentAssert, "concurrent")] {
@@ -19,7 +19,10 @@ pub(crate) fn time_in_action(c: &Cst, s: &mut Sink) {
                 for x in subtree(c, act) {
                     let timed = match c.kind(x) {
                         TimedStmt => true,
-                        WaitStmt => c.keyword(x).is_some_and(|k| c.text_of(k) == "wait") && !c.toks(x).any(|t| c.text_of(t) == "fork"),
+                        WaitStmt => {
+                            c.keyword(x).is_some_and(|k| c.text_of(k) == "wait")
+                                && !c.toks(x).any(|t| c.text_of(t) == "fork")
+                        }
                         _ => false,
                     };
                     if timed {

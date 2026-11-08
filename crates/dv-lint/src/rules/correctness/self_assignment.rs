@@ -2,13 +2,12 @@
 //! constructor or setter whose argument shadows the property it was meant to
 //! set (clang-tidy bugprone-self-assignment, Sonar S1656).
 
-use sv_syntax::NodeId;
-use crate::support::class_items::{declarators, kids, op,
-    user_code};
+use crate::support::class_items::{declarators, kids, op, user_code};
 use crate::support::data_items::strip_conv;
 use crate::support::sema_facts::ast_ok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 /// `x = x;` (blocking, plain `=`) where x is a name or a member access.

@@ -1,12 +1,12 @@
 //! SV-DED-012 (UnreferencedParameter): Flags parameter and localparam
 //! declarations that are never referenced within their scope or testbench.
 
+use crate::support::slang_ast::kids;
+use crate::syntax::Cst;
+use crate::{Severity, Sink};
 use std::collections::{HashMap, HashSet};
 use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::syntax::Cst;
-use crate::{Severity, Sink};
-use crate::support::slang_ast::kids;
 
 /// One finding of SV-DED-012: tree, name token, name, scope.
 type ParamFinding = (usize, u32, String, String);
@@ -33,7 +33,9 @@ fn param_scope(c: &Cst, n: NodeId) -> String {
                 }
                 // Unnamed: genblk<N>, N counting the scope's generate constructs.
                 let mut top = p;
-                while let Some(q) = c.parent(top).filter(|_| matches!(c.kind(top), IfGenerate | CaseGenerate | ElseClause)) {
+                while let Some(q) =
+                    c.parent(top).filter(|_| matches!(c.kind(top), IfGenerate | CaseGenerate | ElseClause))
+                {
                     if matches!(c.kind(q), IfGenerate | ElseClause) {
                         top = q;
                     } else {
@@ -49,7 +51,8 @@ fn param_scope(c: &Cst, n: NodeId) -> String {
                 return format!("genblk{n}");
             }
             LoopGenerate => return "global".into(),
-            ModuleDecl | InterfaceDecl | ProgramDecl | ClassDecl | PackageDecl | FunctionDecl | TaskDecl | CheckerDecl => {
+            ModuleDecl | InterfaceDecl | ProgramDecl | ClassDecl | PackageDecl | FunctionDecl | TaskDecl
+            | CheckerDecl => {
                 return crate::support::slang_ast::last_name(c, a);
             }
             _ => {}
@@ -110,7 +113,10 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
         let rank = |n: NodeId| {
             crate::support::slang_ast::ancestors(tc, n)
                 .find(|&a| matches!(tc.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl))
-                .map_or(0, |u| 1 + crate::support::slang_ast::last_instance_rank(tc, &crate::support::slang_ast::decl_name(tc, u)).unwrap_or(0))
+                .map_or(0, |u| {
+                    1 + crate::support::slang_ast::last_instance_rank(tc, &crate::support::slang_ast::decl_name(tc, u))
+                        .unwrap_or(0)
+                })
         };
         let declare = |nm: NodeId, decls: &mut HashMap<String, ((usize, usize, u32), usize, u32, String)>| {
             let Some(tok) = tc.first_tok(nm) else { return };
@@ -131,9 +137,16 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
         // A generic class with a parameter lacking a default has no
         // default specialization to visit.
         let no_default = |p: NodeId| {
-            let Some(cls) = crate::support::slang_ast::ancestors(tc, p).find(|&a| tc.kind(a) == ClassDecl) else { return false };
+            let Some(cls) = crate::support::slang_ast::ancestors(tc, p).find(|&a| tc.kind(a) == ClassDecl) else {
+                return false;
+            };
             let Some(pl) = tc.tree.child(cls, Header).and_then(|h| tc.tree.child(h, ParamList)) else { return false };
-            !specialized.contains(&crate::support::slang_ast::decl_name(tc, cls)) && tc.tree.children(pl).filter(|&q| tc.kind(q) == ParamDecl).any(|q| !tc.tree.token_range(q).iter().any(|&t| tc.text_of(t) == "="))
+            !specialized.contains(&crate::support::slang_ast::decl_name(tc, cls))
+                && tc
+                    .tree
+                    .children(pl)
+                    .filter(|&q| tc.kind(q) == ParamDecl)
+                    .any(|q| !tc.tree.token_range(q).iter().any(|&t| tc.text_of(t) == "="))
         };
         // `#(type A = int, B = A)`: B is a type parameter too.
         let mut type_params: HashSet<NodeId> = HashSet::new();
@@ -143,10 +156,16 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
                 let toks: Vec<&str> = tc.toks(q).map(|t| tc.text_of(t)).collect();
                 if toks.contains(&"type") {
                     sticky = true;
-                } else if toks.contains(&"parameter") || toks.contains(&"localparam") || tc.tree.child(q, DataType).is_some_and(|d| {
-                    let name = tc.tree.child(q, Name).or_else(|| tc.tree.child(q, Declarator).and_then(|x| tc.tree.child(x, Name)));
-                    tc.first_tok(d) < name.and_then(|n| tc.first_tok(n))
-                }) {
+                } else if toks.contains(&"parameter")
+                    || toks.contains(&"localparam")
+                    || tc.tree.child(q, DataType).is_some_and(|d| {
+                        let name = tc
+                            .tree
+                            .child(q, Name)
+                            .or_else(|| tc.tree.child(q, Declarator).and_then(|x| tc.tree.child(x, Name)));
+                        tc.first_tok(d) < name.and_then(|n| tc.first_tok(n))
+                    })
+                {
                     sticky = false;
                 }
                 if sticky {
@@ -193,7 +212,9 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
                             matches!(tc.kind(q), Instantiation | BindDirective | Extends)
                                 || (tc.kind(q) == ParamDecl && tc.toks(q).any(|k| tc.text_of(k) == "type"))
                                 || (tc.kind(q) == Declarator
-                                    && tc.parent(q).is_some_and(|r| tc.kind(r) == ParamDecl && tc.toks(r).any(|k| tc.text_of(k) == "type")))
+                                    && tc.parent(q).is_some_and(|r| {
+                                        tc.kind(r) == ParamDecl && tc.toks(r).any(|k| tc.text_of(k) == "type")
+                                    }))
                         }) => {}
                     DataType | Dim => {
                         skip = true;
@@ -218,7 +239,9 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
                 continue;
             }
             let root = crate::support::sema_facts::bind_root(tc, e);
-            if !*roots.entry(root).or_insert_with(|| crate::support::sema_facts::root_ok(tc, root)) || !crate::support::sema_facts::no_bad_expr(tc, e) {
+            if !*roots.entry(root).or_insert_with(|| crate::support::sema_facts::root_ok(tc, root))
+                || !crate::support::sema_facts::no_bad_expr(tc, e)
+            {
                 continue;
             }
             let name = if tc.kind(e) == ScopedExpr { tc.last_text(e).to_string() } else { tc.tree.bare_text(e) };
@@ -227,7 +250,10 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
     }
     let mut out: Vec<ParamFinding> = decls
         .into_iter()
-        .filter(|(n, _)| !referenced.contains(n) && !matches!(n.as_str(), "UVM_NONE" | "UVM_LOW" | "UVM_MEDIUM" | "UVM_HIGH" | "UVM_FULL" | "UVM_DEBUG"))
+        .filter(|(n, _)| {
+            !referenced.contains(n)
+                && !matches!(n.as_str(), "UVM_NONE" | "UVM_LOW" | "UVM_MEDIUM" | "UVM_HIGH" | "UVM_FULL" | "UVM_DEBUG")
+        })
         .map(|(n, (_, t, tok, scope))| (t, tok, n, scope))
         .collect();
     out.sort();

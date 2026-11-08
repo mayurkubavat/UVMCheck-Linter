@@ -2,10 +2,10 @@
 //! containing complex boolean expressions or multi-variable logic instead of
 //! simple reset conditions.
 
-use sv_syntax::NodeId;
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 fn is_ident_name(c: &Cst, e: NodeId) -> bool {
@@ -15,7 +15,8 @@ fn is_ident_name(c: &Cst, e: NodeId) -> bool {
     let toks: Vec<u32> = c.toks(e).collect();
     toks.len() == 1 && {
         let t = c.text_of(toks[0]);
-        t.starts_with(|ch: char| ch.is_ascii_alphabetic() || ch == '_' || ch == '\\') && !matches!(t, "this" | "super" | "null")
+        t.starts_with(|ch: char| ch.is_ascii_alphabetic() || ch == '_' || ch == '\\')
+            && !matches!(t, "this" | "super" | "null")
     }
 }
 

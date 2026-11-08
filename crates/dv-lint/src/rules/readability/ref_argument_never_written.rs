@@ -2,11 +2,11 @@
 //! only reads; declare them const ref so callers know they are not modified
 //! (clang-tidy readability-non-const-parameter).
 
-use sv_syntax::{NodeId, SyntaxKind};
 use crate::support::class_index::{written_names, Classes};
 use crate::support::routine_metrics::user_routines;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The routine declaration whose name token is `tok`.

@@ -1,12 +1,12 @@
 //! SV-LANG-002 (BitSelectOutOfBounds): Detects static out-of-bounds bit or
 //! element selects on vectors and arrays with fixed ranges.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::literal_values::{decl_of_expr, int_value};
 use crate::support::literals::ast_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::literal_values::{decl_of_expr, int_value};
 
 /// `[left:right]` of the first dimension a select on the declaration
 /// indexes: its first unpacked dimension, else its first packed one, else
@@ -39,8 +39,7 @@ fn fixed_range(c: &Cst, d: &crate::support::slang_ast::Decl) -> Option<(i64, i64
             break;
         }
         let name = c.text_of(t);
-        let Some(td) = c.first_named(TypedefDecl, name)
-        else {
+        let Some(td) = c.first_named(TypedefDecl, name) else {
             return None;
         };
         if let Some(dim) = c.tree.children(td).find(|&x| c.kind(x) == Dim) {

@@ -26,38 +26,38 @@
 //! `packed`, [`bigint`]) and fills the model (`types` for type strings,
 //! `body` for method bodies); `elab` elaborates on the same builder.
 
-use sv_source::{Dialect, FileList, ProcessEnv};
 use crate::fx::{FxMap as HashMap, FxSet as HashSet};
 use std::path::PathBuf;
 use std::rc::Rc;
 use std::time::Instant;
+use sv_source::{Dialect, FileList, ProcessEnv};
 
 use dv_model::{
-    Argument, Class, ClassId, Constraint, Design, Direction, Error, Loc, Local, MacroUse, Method,
-    PhaseKind, Property, Timings, TypeShape, Typedef, UvmKind, Visibility,
+    Argument, Class, ClassId, Constraint, Design, Direction, Error, Loc, Local, MacroUse, Method, PhaseKind, Property,
+    Timings, TypeShape, Typedef, UvmKind, Visibility,
 };
 use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
 pub mod bigint;
 pub mod bind;
-pub mod calls;
 mod body;
+pub mod calls;
 pub mod checks;
 pub mod classes;
 mod consteval;
 mod elab;
 pub mod fx;
-mod packed;
 pub mod iclass;
 pub mod library;
 pub mod names;
+pub mod oracle;
 pub mod order;
+mod packed;
 pub mod scopes;
 pub mod sva;
-pub mod udp;
 pub mod typed;
 mod types;
-pub mod oracle;
+pub mod udp;
 use SyntaxKind::*;
 
 /// Loads and models a design from compile options, as `Design::load` does.
@@ -104,10 +104,7 @@ pub fn parse_args<S: AsRef<str>>(args: &[S]) -> Result<(Vec<Tree>, f64), Error> 
     let t0 = Instant::now();
     for f in &files {
         if !f.exists() {
-            return Err(Error(format!(
-                "could not read the sources: {}",
-                f.display()
-            )));
+            return Err(Error(format!("could not read the sources: {}", f.display())));
         }
     }
     let mut trees = if single {
@@ -123,10 +120,7 @@ pub fn parse_args<S: AsRef<str>>(args: &[S]) -> Result<(Vec<Tree>, f64), Error> 
 
 /// The model half of [`load_with_trees`]: the design of parsed trees.
 pub fn design_of(trees: &[Tree], parse_ms: f64) -> Design {
-    let errors = trees
-        .iter()
-        .map(|t| t.errors.len() + t.pp_diagnostics.len())
-        .sum::<usize>() as u32;
+    let errors = trees.iter().map(|t| t.errors.len() + t.pp_diagnostics.len()).sum::<usize>() as u32;
     let t1 = Instant::now();
     let design = build(trees);
     let model_ms = t1.elapsed().as_secs_f64() * 1e3;
@@ -135,12 +129,7 @@ pub fn design_of(trees: &[Tree], parse_ms: f64) -> Design {
         design.files().to_vec(),
         design.classes().to_vec(),
         errors,
-        Timings {
-            parse_ms,
-            elaborate_ms: 0.0,
-            model_ms,
-            copy_ms: 0.0,
-        },
+        Timings { parse_ms, elaborate_ms: 0.0, model_ms, copy_ms: 0.0 },
     );
     design.set_specializations(counts);
     design
@@ -166,11 +155,7 @@ impl Locator {
     /// A locator with `files` as its file table (start it with `[""]` so 0
     /// stays "no file").
     pub fn new(files: Vec<String>) -> Self {
-        Locator {
-            files,
-            file_ids: Default::default(),
-            line_starts: Default::default(),
-        }
+        Locator { files, file_ids: Default::default(), line_starts: Default::default() }
     }
 
     /// File names by index, the table [`Loc::file`] indexes.
@@ -197,12 +182,7 @@ impl Locator {
             let (f, l, _) = self.position(tree_ix, tree, origin);
             (f, l)
         });
-        Loc {
-            file,
-            line,
-            column,
-            expansion,
-        }
+        Loc { file, line, column, expansion }
     }
 
     /// Design file index, line and column of a preprocessor origin.
@@ -227,12 +207,7 @@ impl Locator {
         let off = (o.offset as usize).min(src.len()) as u32;
         let starts = self.line_starts.entry(key).or_insert_with(|| {
             std::iter::once(0)
-                .chain(
-                    src.bytes()
-                        .enumerate()
-                        .filter(|&(_, b)| b == b'\n')
-                        .map(|(i, _)| i as u32 + 1),
-                )
+                .chain(src.bytes().enumerate().filter(|&(_, b)| b == b'\n').map(|(i, _)| i as u32 + 1))
                 .collect()
         });
         // The last line start at or before the offset.
@@ -347,15 +322,17 @@ impl SemaChecks {
         out.extend(self.checks.iter().cloned());
         out.extend(elab.diags.iter().cloned());
         // Names in what no instance elaborates are not checked (as in slang).
-        let skipped: Vec<(usize, u32, u32)> = elab
-            .skipped
-            .iter()
-            .filter_map(|&(tr, n)| trees[tr].token_bounds(n).map(|(a, b)| (tr, a, b)))
-            .collect();
-        out.extend(self.bind.iter().filter(|d| {
-            let Some((a, _)) = trees[d.tree].token_bounds(d.node) else { return true };
-            !skipped.iter().any(|&(tr, s, e)| tr == d.tree && s <= a && a <= e)
-        }).cloned());
+        let skipped: Vec<(usize, u32, u32)> =
+            elab.skipped.iter().filter_map(|&(tr, n)| trees[tr].token_bounds(n).map(|(a, b)| (tr, a, b))).collect();
+        out.extend(
+            self.bind
+                .iter()
+                .filter(|d| {
+                    let Some((a, _)) = trees[d.tree].token_bounds(d.node) else { return true };
+                    !skipped.iter().any(|&(tr, s, e)| tr == d.tree && s <= a && a <= e)
+                })
+                .cloned(),
+        );
         for v in [&self.iclass, &self.udp, &self.sva, &self.calls, &self.order, &self.classes, &self.typed] {
             out.extend(v.iter().cloned());
         }
@@ -381,10 +358,7 @@ pub fn elaborate_full(trees: &[Tree], tops: &[String]) -> Elaborated {
 /// Types (as [`symbol_types`]) and the values of parameters, specparams
 /// and enum values as slang prints them (phase N3); `None` where a symbol
 /// has none or it is not evaluated.
-pub fn symbol_info(
-    trees: &[Tree],
-    s: &scopes::Scopes,
-) -> (Vec<Option<String>>, Vec<Option<String>>) {
+pub fn symbol_info(trees: &[Tree], s: &scopes::Scopes) -> (Vec<Option<String>>, Vec<Option<String>>) {
     use scopes::SymKind as K;
     let mut b = Builder::new(trees);
     b.designs = true;
@@ -398,13 +372,7 @@ pub fn symbol_info(
         map[i] = match sc.symbol {
             Some(y) => {
                 let y = &s.symbols[y];
-                b.node_scope
-                    .get(&NodeRef {
-                        tree: y.tree,
-                        node: y.node,
-                    })
-                    .copied()
-                    .unwrap_or(parent)
+                b.node_scope.get(&NodeRef { tree: y.tree, node: y.node }).copied().unwrap_or(parent)
             }
             None => b.unit,
         };
@@ -426,14 +394,7 @@ pub fn symbol_info(
         let mut m = HashMap::default();
         for (name, is_type, default) in &c.params {
             if let (true, Some(d)) = (is_type, default) {
-                m.insert(
-                    name.clone(),
-                    Bound {
-                        node: *d,
-                        scope: c.parent,
-                        env: empty.clone(),
-                    },
-                );
+                m.insert(name.clone(), Bound { node: *d, scope: c.parent, env: empty.clone() });
             }
         }
         envs.insert(c.scope, Rc::new(m));
@@ -455,9 +416,7 @@ pub fn symbol_info(
         .symbols
         .iter()
         .map(|y| {
-            if !matches!(y.kind, K::Parameter | K::Specparam | K::EnumValue)
-                || in_generic(map[y.scope])
-            {
+            if !matches!(y.kind, K::Parameter | K::Specparam | K::EnumValue) || in_generic(map[y.scope]) {
                 return None;
             }
             let scope = map[y.scope];
@@ -469,10 +428,7 @@ pub fn symbol_info(
         .symbols
         .iter()
         .map(|y| {
-            if !matches!(
-                y.kind,
-                K::Net | K::Variable | K::Parameter | K::Argument | K::Typedef
-            ) {
+            if !matches!(y.kind, K::Net | K::Variable | K::Parameter | K::Argument | K::Typedef) {
                 return None;
             }
             let scope = map[y.scope];
@@ -480,10 +436,7 @@ pub fn symbol_info(
                 return None;
             }
             let env = envs.get(&scope).cloned().unwrap_or_else(|| empty.clone());
-            let r = |n: NodeId| NodeRef {
-                tree: y.tree,
-                node: n,
-            };
+            let r = |n: NodeId| NodeRef { tree: y.tree, node: n };
             if y.kind == K::Typedef {
                 return y.item.map(|t| b.typedef_target(r(t), scope, &env));
             }
@@ -499,14 +452,10 @@ pub fn symbol_info(
                 }
             }
             if y.kind == K::Parameter {
-                let value = y.item.and_then(|d| {
-                    t.children(d)
-                        .find(|&c| !matches!(t.kind(c), SyntaxKind::Name | SyntaxKind::Dim))
-                });
-                if value.is_none()
-                    && y.dtype.is_none()
-                    && matches!(b.scopes[scope].kind, ScopeKind::Class(_))
-                {
+                let value = y
+                    .item
+                    .and_then(|d| t.children(d).find(|&c| !matches!(t.kind(c), SyntaxKind::Name | SyntaxKind::Dim)));
+                if value.is_none() && y.dtype.is_none() && matches!(b.scopes[scope].kind, ScopeKind::Class(_)) {
                     // A class parameter with no default: slang's invalid specialization.
                     return Some("<error>".into());
                 }
@@ -531,10 +480,7 @@ pub fn spec_counts(trees: &[Tree]) -> HashMap<(usize, sv_syntax::NodeId), usize>
     b.designs = true;
     b.collect_names();
     b.collect();
-    b.spec_counts
-        .iter()
-        .map(|(&c, &n)| ((b.classes[c].node.tree, b.classes[c].node.node), n))
-        .collect()
+    b.spec_counts.iter().map(|(&c, &n)| ((b.classes[c].node.tree, b.classes[c].node.node), n)).collect()
 }
 
 /// The specializations slang elaborates (see [`spec_counts`]) with their
@@ -873,17 +819,13 @@ impl<'t> Builder<'t> {
                 if k == InterfaceDecl {
                     if let Some(n) = t.child(id, Name) {
                         if let Some(&tok) = t.token_range(n).last() {
-                            self.interfaces
-                                .entry(t.tokens[tok as usize].text.to_string())
-                                .or_insert(r);
+                            self.interfaces.entry(t.tokens[tok as usize].text.to_string()).or_insert(r);
                         }
                     }
                 }
                 let set = match k {
-                    ClassDecl | TypedefDecl | ForwardTypedef | InterfaceDecl | ModuleDecl
-                    | ProgramDecl | CovergroupDecl | PackageDecl | NetTypeDecl | CheckerDecl => {
-                        &mut self.type_names
-                    }
+                    ClassDecl | TypedefDecl | ForwardTypedef | InterfaceDecl | ModuleDecl | ProgramDecl
+                    | CovergroupDecl | PackageDecl | NetTypeDecl | CheckerDecl => &mut self.type_names,
                     FunctionDecl | TaskDecl | MethodPrototype | DpiImport => &mut self.sub_names,
                     _ => continue,
                 };
@@ -912,16 +854,11 @@ impl<'t> Builder<'t> {
     }
 
     fn child(&self, r: NodeRef, k: SyntaxKind) -> Option<NodeRef> {
-        self.tree(r)
-            .child(r.node, k)
-            .map(|node| NodeRef { tree: r.tree, node })
+        self.tree(r).child(r.node, k).map(|node| NodeRef { tree: r.tree, node })
     }
 
     fn children(&self, r: NodeRef) -> Vec<NodeRef> {
-        self.tree(r)
-            .children(r.node)
-            .map(|node| NodeRef { tree: r.tree, node })
-            .collect()
+        self.tree(r).children(r.node).map(|node| NodeRef { tree: r.tree, node }).collect()
     }
 
     /// The node's own tokens (not its children's), in order.
@@ -1001,10 +938,7 @@ impl<'t> Builder<'t> {
 
     fn collect(&mut self) {
         for i in 0..self.trees.len() {
-            let root = NodeRef {
-                tree: i,
-                node: self.trees[i].root,
-            };
+            let root = NodeRef { tree: i, node: self.trees[i].root };
             self.collect_scope(root, self.unit);
         }
         self.specialized_generics();
@@ -1050,7 +984,9 @@ impl<'t> Builder<'t> {
                     self.collect_scope(c, s);
                 }
                 GenerateRegion if self.designs => self.collect_scope(c, scope),
-                IfGenerate | LoopGenerate | CaseGenerate | GenerateBlock | ElseClause if self.designs && self.block_consts => {
+                IfGenerate | LoopGenerate | CaseGenerate | GenerateBlock | ElseClause
+                    if self.designs && self.block_consts =>
+                {
                     self.collect_block_consts(c, scope)
                 }
                 TypedefDecl => {
@@ -1059,9 +995,7 @@ impl<'t> Builder<'t> {
                     }
                 }
                 ImportDecl => self.collect_import(c, scope),
-                ParamDecl if self.designs && self.own_tokens(c).contains(&"type") => {
-                    self.collect_type_params(c, scope)
-                }
+                ParamDecl if self.designs && self.own_tokens(c).contains(&"type") => self.collect_type_params(c, scope),
                 ParamDecl => self.collect_consts(c, scope),
                 FunctionDecl | TaskDecl => {
                     // `function T C::f(...)`: an out-of-block body.
@@ -1073,29 +1007,20 @@ impl<'t> Builder<'t> {
                             self.bodies.entry((class, method)).or_insert(c);
                         } else if let Some(&t) = toks.last() {
                             let name = self.text(c.tree, t).to_string();
-                            self.scopes[scope]
-                                .values
-                                .entry(name)
-                                .or_insert(Member::Sub { decl: c });
+                            self.scopes[scope].values.entry(name).or_insert(Member::Sub { decl: c });
                         }
                     }
                 }
                 DpiImport => {
                     if let Some((name, _)) = self.name_of(c) {
-                        self.scopes[scope]
-                            .values
-                            .entry(name)
-                            .or_insert(Member::Sub { decl: c });
+                        self.scopes[scope].values.entry(name).or_insert(Member::Sub { decl: c });
                     }
                 }
                 DataDecl => {
                     for item in self.children(c) {
                         if self.kind(item) == Declarator {
                             if let Some((name, _)) = self.name_of(item) {
-                                self.scopes[scope]
-                                    .values
-                                    .entry(name)
-                                    .or_insert(Member::Var { decl: c, item });
+                                self.scopes[scope].values.entry(name).or_insert(Member::Var { decl: c, item });
                             }
                         }
                     }
@@ -1136,8 +1061,7 @@ impl<'t> Builder<'t> {
             let own = self.own_tokens(p);
             if own.contains(&"type") {
                 ty = true;
-            } else if own.iter().any(|t| matches!(*t, "parameter" | "localparam"))
-                || self.child(p, DataType).is_some()
+            } else if own.iter().any(|t| matches!(*t, "parameter" | "localparam")) || self.child(p, DataType).is_some()
             {
                 ty = false;
             }
@@ -1153,11 +1077,7 @@ impl<'t> Builder<'t> {
     fn collect_type_params(&mut self, p: NodeRef, s: usize) {
         {
             if let Some(n) = self.child(p, Name) {
-                if let Some((name, _)) = self
-                    .tokens(n)
-                    .last()
-                    .map(|&t| (self.text(n.tree, t).to_string(), t))
-                {
+                if let Some((name, _)) = self.tokens(n).last().map(|&t| (self.text(n.tree, t).to_string(), t)) {
                     let d = self.child(p, DataType);
                     self.scopes[s].type_params.insert(name, d);
                 }
@@ -1165,10 +1085,7 @@ impl<'t> Builder<'t> {
             for d in self.children(p) {
                 if self.kind(d) == Declarator {
                     if let Some((name, _)) = self.name_of(d) {
-                        let v = self
-                            .children(d)
-                            .into_iter()
-                            .find(|c| !matches!(self.kind(*c), Name | Dim));
+                        let v = self.children(d).into_iter().find(|c| !matches!(self.kind(*c), Name | Dim));
                         self.scopes[s].type_params.insert(name, v);
                     }
                 }
@@ -1187,30 +1104,19 @@ impl<'t> Builder<'t> {
                 continue;
             }
             if let Some((n, _)) = self.name_of(d) {
-                let v = self
-                    .children(d)
-                    .into_iter()
-                    .find(|c| !matches!(self.kind(*c), Name | Dim));
+                let v = self.children(d).into_iter().find(|c| !matches!(self.kind(*c), Name | Dim));
                 self.scopes[scope].consts.entry(n).or_insert((dt, v));
             }
         }
     }
 
     fn collect_import(&mut self, r: NodeRef, scope: usize) {
-        let toks: Vec<&str> = self
-            .tokens(r)
-            .iter()
-            .map(|&t| self.text(r.tree, t))
-            .collect();
+        let toks: Vec<&str> = self.tokens(r).iter().map(|&t| self.text(r.tree, t)).collect();
         // import a::*, b::x;
         let mut i = 1;
         while i + 2 < toks.len() {
             if toks[i + 1] == "::" {
-                let item = if toks[i + 2] == "*" {
-                    None
-                } else {
-                    Some(toks[i + 2].to_string())
-                };
+                let item = if toks[i + 2] == "*" { None } else { Some(toks[i + 2].to_string()) };
                 self.scopes[scope].imports.push((toks[i].to_string(), item));
                 i += 3;
             } else {
@@ -1245,26 +1151,16 @@ impl<'t> Builder<'t> {
                     let own_toks = self.own_tokens(p);
                     if own_toks.contains(&"type") {
                         sticky_type = true;
-                    } else if own_toks
-                        .iter()
-                        .any(|t| matches!(*t, "parameter" | "localparam"))
+                    } else if own_toks.iter().any(|t| matches!(*t, "parameter" | "localparam"))
                         || self.child(p, DataType).is_some()
                     {
                         sticky_type = false;
                     }
                     let (pname, default) = if let Some(n) = self.child(p, Name) {
-                        (
-                            self.tokens(n)
-                                .last()
-                                .map(|&t| self.text(n.tree, t).to_string()),
-                            self.child(p, DataType),
-                        )
+                        (self.tokens(n).last().map(|&t| self.text(n.tree, t).to_string()), self.child(p, DataType))
                     } else if let Some(d) = self.child(p, Declarator) {
                         let n = self.name_of(d).map(|(n, _)| n);
-                        let v = self
-                            .children(d)
-                            .into_iter()
-                            .find(|c| !matches!(self.kind(*c), Name | Dim));
+                        let v = self.children(d).into_iter().find(|c| !matches!(self.kind(*c), Name | Dim));
                         (n, v)
                     } else {
                         (None, None)
@@ -1281,10 +1177,10 @@ impl<'t> Builder<'t> {
             }
             // `implements` lists share the Extends node kind; only the
             // `extends` clause names a base class.
-            let base = self.children(h).into_iter().find(|&e| {
-                self.tree(e).node(e.node).kind == Extends
-                    && self.own_tokens(e).first() == Some(&"extends")
-            });
+            let base = self
+                .children(h)
+                .into_iter()
+                .find(|&e| self.tree(e).node(e.node).kind == Extends && self.own_tokens(e).first() == Some(&"extends"));
             if let Some(e) = base {
                 extends = self.child(e, DataType);
             }
@@ -1343,12 +1239,7 @@ impl<'t> Builder<'t> {
 
     /// Identifiers used outside the name of their own declaration, each
     /// with the parameterized class whose body it is in (if any).
-    fn collect_name_uses(
-        &self,
-        tree: usize,
-        generics: &HashSet<&str>,
-        uses: &mut HashSet<(String, Option<String>)>,
-    ) {
+    fn collect_name_uses(&self, tree: usize, generics: &HashSet<&str>, uses: &mut HashSet<(String, Option<String>)>) {
         let t = &self.trees[tree];
         let mut own = HashSet::default();
         // Token ranges of generic class bodies (and their out-of-block
@@ -1368,9 +1259,7 @@ impl<'t> Builder<'t> {
                 _ => {}
             }
             let owner = match k {
-                ClassDecl => t
-                    .child(n, Name)
-                    .and_then(|x| t.token_range(x).last().copied()),
+                ClassDecl => t.child(n, Name).and_then(|x| t.token_range(x).last().copied()),
                 FunctionDecl | TaskDecl => t.child(n, Name).and_then(|x| {
                     let r = t.token_range(x);
                     (r.len() >= 3).then(|| r[r.len() - 3])
@@ -1389,10 +1278,7 @@ impl<'t> Builder<'t> {
         }
         for (i, tok) in t.tokens.iter().enumerate() {
             let i = i as u32;
-            if tok.kind != sv_syntax::TokenKind::Identifier
-                || own.contains(&i)
-                || !generics.contains(&*tok.text)
-            {
+            if tok.kind != sv_syntax::TokenKind::Identifier || own.contains(&i) || !generics.contains(&*tok.text) {
                 continue;
             }
             // The innermost generic region holding the use.
@@ -1408,12 +1294,7 @@ impl<'t> Builder<'t> {
     /// Parameterized classes something specializes: used from code that is
     /// itself elaborated (anything outside an unspecialized generic class).
     fn specialized_generics(&mut self) {
-        let generics: HashSet<&str> = self
-            .classes
-            .iter()
-            .filter(|c| c.generic)
-            .map(|c| c.name.as_str())
-            .collect();
+        let generics: HashSet<&str> = self.classes.iter().filter(|c| c.generic).map(|c| c.name.as_str()).collect();
         let mut uses = HashSet::default();
         for i in 0..self.trees.len() {
             self.collect_name_uses(i, &generics, &mut uses);
@@ -1422,10 +1303,7 @@ impl<'t> Builder<'t> {
         loop {
             let before = live.len();
             for (name, owner) in &uses {
-                if owner
-                    .as_ref()
-                    .map_or(true, |o| live.contains(o) && o != name)
-                {
+                if owner.as_ref().map_or(true, |o| live.contains(o) && o != name) {
                     live.insert(name.clone());
                 }
             }
@@ -1465,11 +1343,7 @@ impl<'t> Builder<'t> {
                     out.push((lo, hi, inner));
                 }
             }
-            if matches!(
-                t.kind(n),
-                ClassDecl | PackageDecl | SourceFile | FunctionDecl | TaskDecl
-            ) || inner != scope
-            {
+            if matches!(t.kind(n), ClassDecl | PackageDecl | SourceFile | FunctionDecl | TaskDecl) || inner != scope {
                 for c in t.children(n) {
                     stack.push((c, inner));
                 }
@@ -1531,11 +1405,7 @@ impl<'t> Builder<'t> {
                 let toks = t.token_range(n);
                 // Only a class named right here specializes it (not one a
                 // typedef or parameter stands for).
-                let head = toks
-                    .iter()
-                    .take_while(|&&k| &*t.tokens[k as usize].text != "#")
-                    .last()
-                    .unwrap_or(&first);
+                let head = toks.iter().take_while(|&&k| &*t.tokens[k as usize].text != "#").last().unwrap_or(&first);
                 let head = &*t.tokens[*head as usize].text;
                 if !generic.contains(head) {
                     continue;
@@ -1555,13 +1425,7 @@ impl<'t> Builder<'t> {
                         .parent
                         .and_then(|_| self.generic_owner(self.classes[g].parent));
                 }
-                uses.push(SpecUse {
-                    r,
-                    scope,
-                    head: head.to_string(),
-                    owner,
-                    dependent,
-                });
+                uses.push(SpecUse { r, scope, head: head.to_string(), owner, dependent });
             }
         }
         // Representatives come from the named specializations only.
@@ -1598,10 +1462,8 @@ impl<'t> Builder<'t> {
         for (ti, t) in self.trees.iter().enumerate() {
             let mut stack = vec![t.root];
             while let Some(n) = stack.pop() {
-                let in_block = !matches!(
-                    t.kind(n),
-                    ClassDecl | PackageDecl | ModuleDecl | InterfaceDecl | ProgramDecl
-                ) && n != t.root;
+                let in_block = !matches!(t.kind(n), ClassDecl | PackageDecl | ModuleDecl | InterfaceDecl | ProgramDecl)
+                    && n != t.root;
                 for c in t.children(n) {
                     if in_block && t.kind(c) == TypedefDecl {
                         let (Some(nm), Some((lo, hi)), Some((at, _))) =
@@ -1609,9 +1471,7 @@ impl<'t> Builder<'t> {
                         else {
                             continue;
                         };
-                        out.entry(t.bare_text(nm))
-                            .or_default()
-                            .push((ti, lo, hi, at, NodeRef { tree: ti, node: c }));
+                        out.entry(t.bare_text(nm)).or_default().push((ti, lo, hi, at, NodeRef { tree: ti, node: c }));
                     }
                     stack.push(c);
                 }
@@ -1641,14 +1501,7 @@ impl<'t> Builder<'t> {
             }
             if let Some(d) = d {
                 let prev = std::rc::Rc::new(full.clone());
-                full.insert(
-                    name.clone(),
-                    Bound {
-                        node: *d,
-                        scope: self.classes[c].scope,
-                        env: prev,
-                    },
-                );
+                full.insert(name.clone(), Bound { node: *d, scope: self.classes[c].scope, env: prev });
             }
         }
         std::rc::Rc::new(full)
@@ -1719,11 +1572,8 @@ impl<'t> Builder<'t> {
                     if defaults && !named && self.child(u.r, ParamList).is_some() {
                         let toks = self.own_tokens(u.r);
                         let at = toks.iter().position(|t| *t == u.head.as_str());
-                        let path: Vec<&str> = toks[..at.map_or(0, |a| a + 1)]
-                            .iter()
-                            .copied()
-                            .filter(|t| *t != "::")
-                            .collect();
+                        let path: Vec<&str> =
+                            toks[..at.map_or(0, |a| a + 1)].iter().copied().filter(|t| *t != "::").collect();
                         let found = match path.len() {
                             0 => None,
                             1 => self.lookup(path[0], u.scope, 0),
@@ -1745,11 +1595,7 @@ impl<'t> Builder<'t> {
                     if m.len() < 256 && !m.contains_key(&key) {
                         order.entry(c).or_default().push(key.clone());
                         let shown = self.print_class(c, &info.args, 0);
-                        let env = if defaults {
-                            self.complete_env(c, &info.args)
-                        } else {
-                            info.args
-                        };
+                        let env = if defaults { self.complete_env(c, &info.args) } else { info.args };
                         m.insert(key, (shown, env));
                         changed = true;
                     }
@@ -1777,11 +1623,7 @@ impl<'t> Builder<'t> {
             return false;
         }
         let gscope = self.classes[g].scope;
-        let toks: Vec<&str> = self
-            .tokens(r)
-            .iter()
-            .map(|&t| self.text(r.tree, t))
-            .collect();
+        let toks: Vec<&str> = self.tokens(r).iter().map(|&t| self.text(r.tree, t)).collect();
         // Every identifier in the use (names, arguments, dimensions).
         for (k, name) in toks.iter().enumerate() {
             if k > 0 && toks[k - 1] == "::" {
@@ -1908,11 +1750,7 @@ impl<'t> Builder<'t> {
         let parent = self.classes[c].parent;
         // The class's own type parameters are visible in its extends clause
         // (`extends BASE`); nothing else of its scope is.
-        let first = self
-            .tokens(dt)
-            .first()
-            .map(|&t| self.text(dt.tree, t))
-            .unwrap_or("");
+        let first = self.tokens(dt).first().map(|&t| self.text(dt.tree, t)).unwrap_or("");
         let own = self.classes[c].scope;
         // The extends clause sees the class's own parameters: bound by
         // `env`, else their defaults.
@@ -1922,14 +1760,7 @@ impl<'t> Builder<'t> {
                 if let Some(d) = default {
                     // A default sees the parameters before it.
                     let prev = std::rc::Rc::new(full.clone());
-                    full.insert(
-                        name.clone(),
-                        Bound {
-                            node: *d,
-                            scope: parent,
-                            env: prev,
-                        },
-                    );
+                    full.insert(name.clone(), Bound { node: *d, scope: parent, env: prev });
                 }
             }
         }
@@ -1964,41 +1795,23 @@ impl<'t> Builder<'t> {
     /// Resolves a type (a DataType, or a name expression standing for a
     /// type) seen from `scope`, with type parameters bound by `env`.
     fn resolve_env(&self, dt: NodeRef, scope: usize, env: &Env, depth: usize) -> TypeInfo {
-        let other = TypeInfo {
-            resolved: Resolved::Other,
-            shape: TypeShape::Other,
-            args: Env::default(),
-        };
+        let other = TypeInfo { resolved: Resolved::Other, shape: TypeShape::Other, args: Env::default() };
         if depth > 32 {
             return other;
         }
-        let toks: Vec<&str> = self
-            .tokens(dt)
-            .iter()
-            .map(|&t| self.text(dt.tree, t))
-            .collect();
+        let toks: Vec<&str> = self.tokens(dt).iter().map(|&t| self.text(dt.tree, t)).collect();
         let Some(&first) = toks.first() else {
             return other;
         };
         if first == "virtual" || first == "interface" {
-            return TypeInfo {
-                resolved: Resolved::Vif,
-                ..other
-            };
+            return TypeInfo { resolved: Resolved::Vif, ..other };
         }
         if matches!(first, "struct" | "union") {
-            let packed = toks.get(1).is_some_and(|t| *t == "packed")
-                || toks.get(2).is_some_and(|t| *t == "packed");
-            let shape = if packed {
-                TypeShape::Other
-            } else {
-                TypeShape::UnpackedStruct
-            };
+            let packed = toks.get(1).is_some_and(|t| *t == "packed") || toks.get(2).is_some_and(|t| *t == "packed");
+            let shape = if packed { TypeShape::Other } else { TypeShape::UnpackedStruct };
             return TypeInfo { shape, ..other };
         }
-        if self.trees[dt.tree].tokens[self.tokens(dt)[0] as usize].kind
-            != sv_syntax::TokenKind::Identifier
-        {
+        if self.trees[dt.tree].tokens[self.tokens(dt)[0] as usize].kind != sv_syntax::TokenKind::Identifier {
             let resolved = match first {
                 "string" => Resolved::Str,
                 "event" => Resolved::Event,
@@ -2062,24 +1875,11 @@ impl<'t> Builder<'t> {
                 self.resolve_env(d, s, env, depth + 1)
             }
             None => {
-                let name = if path.len() == 2 && path[0] == "std" {
-                    path[1]
-                } else {
-                    path[0]
-                };
+                let name = if path.len() == 2 && path[0] == "std" { path[1] } else { path[0] };
                 match (path.len() == 1 || path[0] == "std", name) {
-                    (true, "process") => TypeInfo {
-                        resolved: Resolved::Std("process"),
-                        ..other
-                    },
-                    (true, "semaphore") => TypeInfo {
-                        resolved: Resolved::Std("semaphore"),
-                        ..other
-                    },
-                    (true, "mailbox") => TypeInfo {
-                        resolved: Resolved::Std("mailbox"),
-                        ..other
-                    },
+                    (true, "process") => TypeInfo { resolved: Resolved::Std("process"), ..other },
+                    (true, "semaphore") => TypeInfo { resolved: Resolved::Std("semaphore"), ..other },
+                    (true, "mailbox") => TypeInfo { resolved: Resolved::Std("mailbox"), ..other },
                     _ => other,
                 }
             }
@@ -2114,14 +1914,7 @@ impl<'t> Builder<'t> {
                 continue;
             };
             if params.iter().any(|p| p.0 == name) {
-                map.insert(
-                    name,
-                    Bound {
-                        node: value,
-                        scope,
-                        env: env.clone(),
-                    },
-                );
+                map.insert(name, Bound { node: value, scope, env: env.clone() });
             }
         }
         std::rc::Rc::new(map)
@@ -2135,10 +1928,7 @@ impl<'t> Builder<'t> {
             match self.lookup(path[0], scope, depth)? {
                 Found::Class(c) => self.classes[c].scope,
                 // `typedef C #(T) t;` then `t::x`.
-                Found::Typedef(t, s) => match self
-                    .resolve_typedef(t, s, &Env::default(), depth + 1)
-                    .resolved
-                {
+                Found::Typedef(t, s) => match self.resolve_typedef(t, s, &Env::default(), depth + 1).resolved {
                     Resolved::Class(c) => self.classes[c].scope,
                     _ => return None,
                 },
@@ -2161,11 +1951,7 @@ impl<'t> Builder<'t> {
 
     fn resolve_typedef(&self, td: NodeRef, scope: usize, env: &Env, depth: usize) -> TypeInfo {
         let Some(dt) = self.child(td, DataType) else {
-            return TypeInfo {
-                resolved: Resolved::Other,
-                shape: TypeShape::Other,
-                args: Env::default(),
-            };
+            return TypeInfo { resolved: Resolved::Other, shape: TypeShape::Other, args: Env::default() };
         };
         let mut info = self.resolve_env(dt, scope, env, depth + 1);
         // Unpacked dimensions after the typedef's name.
@@ -2177,11 +1963,7 @@ impl<'t> Builder<'t> {
 
     /// The array kind of one unpacked dimension.
     fn dim_shape(&self, d: NodeRef, scope: usize, depth: usize) -> TypeShape {
-        let toks: Vec<&str> = self
-            .tokens(d)
-            .iter()
-            .map(|&t| self.text(d.tree, t))
-            .collect();
+        let toks: Vec<&str> = self.tokens(d).iter().map(|&t| self.text(d.tree, t)).collect();
         let inner = &toks[1..toks.len().saturating_sub(1)];
         match inner {
             [] => TypeShape::DynamicArray,
@@ -2192,8 +1974,7 @@ impl<'t> Builder<'t> {
                 // `[name]`: a type makes it associative, a value fixed.
                 let first = inner[0];
                 let is_type = inner.len() == 1
-                    && self.tree(d).tokens[self.tokens(d)[1] as usize].kind
-                        == sv_syntax::TokenKind::Identifier
+                    && self.tree(d).tokens[self.tokens(d)[1] as usize].kind == sv_syntax::TokenKind::Identifier
                     && matches!(
                         self.lookup(first, scope, depth + 1),
                         Some(Found::Class(_)) | Some(Found::Typedef(..)) | Some(Found::Param(..))
@@ -2212,9 +1993,7 @@ impl<'t> Builder<'t> {
     fn finish(mut self) -> Design {
         // Ids: plain classes first, then parameterized definitions, as in
         // slang's model.
-        let mut order: Vec<usize> = (0..self.classes.len())
-            .filter(|&c| !self.classes[c].generic)
-            .collect();
+        let mut order: Vec<usize> = (0..self.classes.len()).filter(|&c| !self.classes[c].generic).collect();
         order.extend((0..self.classes.len()).filter(|&c| self.classes[c].generic));
         let mut ids = vec![0 as ClassId; self.classes.len()];
         for (id, &c) in order.iter().enumerate() {
@@ -2239,38 +2018,25 @@ impl<'t> Builder<'t> {
         // specialized has none.
         for (id, &c) in order.iter().enumerate() {
             if !self.classes[c].generic || self.used_names.contains(&self.classes[c].name) {
-                let chain: Vec<&str> = self
-                    .chain(c)
-                    .into_iter()
-                    .map(|x| self.classes[x].name.as_str())
-                    .collect();
+                let chain: Vec<&str> = self.chain(c).into_iter().map(|x| self.classes[x].name.as_str()).collect();
                 out[id].uvm = classify(&chain);
             }
         }
         let files = std::mem::take(&mut self.locator).into_files();
-        let counts = order
-            .iter()
-            .map(|c| self.spec_counts.get(c).map_or(1, |&n| n as u32))
-            .collect();
+        let counts = order.iter().map(|c| self.spec_counts.get(c).map_or(1, |&n| n as u32)).collect();
         let mut d = Design::from_parts(files, out, 0, Timings::default());
         d.set_specializations(counts);
         d
     }
 
     fn make_class(&mut self, c: usize, id: ClassId, ids: &[ClassId]) -> Class {
-        let (r, generic, scope_idx, parent) = (
-            self.classes[c].node,
-            self.classes[c].generic,
-            self.classes[c].scope,
-            self.classes[c].parent,
-        );
+        let (r, generic, scope_idx, parent) =
+            (self.classes[c].node, self.classes[c].generic, self.classes[c].scope, self.classes[c].parent);
         let name = self.classes[c].name.clone();
         let (_, name_tok) = self.name_of(r).unwrap_or_default();
         let loc = self.loc(r.tree, name_tok);
         let scope = match self.scopes[parent].kind {
-            ScopeKind::Package | ScopeKind::Class(_) | ScopeKind::Design => {
-                self.scopes[parent].name.clone()
-            }
+            ScopeKind::Package | ScopeKind::Class(_) | ScopeKind::Design => self.scopes[parent].name.clone(),
             ScopeKind::Unit => String::new(),
         };
         let own = self.own_tokens(r);
@@ -2301,11 +2067,7 @@ impl<'t> Builder<'t> {
             class.is_virtual = false;
             class.is_interface = false;
             if let Some(dt) = self.classes[c].extends {
-                let toks: Vec<&str> = self
-                    .tokens(dt)
-                    .iter()
-                    .map(|&t| self.text(dt.tree, t))
-                    .collect();
+                let toks: Vec<&str> = self.tokens(dt).iter().map(|&t| self.text(dt.tree, t)).collect();
                 let end = toks.iter().position(|t| *t == "#").unwrap_or(toks.len());
                 class.base_name = toks[..end].last().copied().unwrap_or("").to_string();
             }
@@ -2345,9 +2107,8 @@ impl<'t> Builder<'t> {
                 MethodPrototype => {
                     let own = self.own_tokens(m);
                     let pure = own.contains(&"pure");
-                    let body = self.name_of(m).and_then(|(n, _)| {
-                        self.bodies.get(&(self.classes[c].name.clone(), n)).copied()
-                    });
+                    let body =
+                        self.name_of(m).and_then(|(n, _)| self.bodies.get(&(self.classes[c].name.clone(), n)).copied());
                     let body = if pure { Some(m) } else { body };
                     if let Some(b) = body {
                         if let Some(method) = self.method(m, b, true, c, &env, ids) {
@@ -2385,11 +2146,7 @@ impl<'t> Builder<'t> {
         if a.from_macro || b.from_macro || a.origin.file != b.origin.file {
             return Vec::new();
         }
-        let (file, start, end) = (
-            a.origin.file,
-            a.origin.offset,
-            b.origin.offset + b.text.len() as u32,
-        );
+        let (file, start, end) = (a.origin.file, a.origin.offset, b.origin.offset + b.text.len() as u32);
         let uses: Vec<_> = t
             .macro_uses
             .iter()
@@ -2399,15 +2156,7 @@ impl<'t> Builder<'t> {
         uses.into_iter()
             .map(|u| {
                 let (f, line, column) = self.position(r.tree, u.origin);
-                MacroUse {
-                    name: u.name.to_string(),
-                    loc: Loc {
-                        file: f,
-                        line,
-                        column,
-                        expansion: None,
-                    },
-                }
+                MacroUse { name: u.name.to_string(), loc: Loc { file: f, line, column, expansion: None } }
             })
             .collect()
     }
@@ -2419,21 +2168,12 @@ impl<'t> Builder<'t> {
         }
     }
 
-    fn properties(
-        &mut self,
-        d: NodeRef,
-        scope: usize,
-        env: &Env,
-        ids: &[ClassId],
-        out: &mut Vec<Property>,
-    ) {
+    fn properties(&mut self, d: NodeRef, scope: usize, env: &Env, ids: &[ClassId], out: &mut Vec<Property>) {
         let own = self.own_tokens(d);
         let visibility = visibility(&own);
         let (is_static, is_const) = (own.contains(&"static"), own.contains(&"const"));
         let is_rand = own.contains(&"rand") || own.contains(&"randc");
-        let info = self
-            .child(d, DataType)
-            .map(|dt| self.resolve_env(dt, scope, env, 0));
+        let info = self.child(d, DataType).map(|dt| self.resolve_env(dt, scope, env, 0));
         let resolved = info.as_ref().map_or(Resolved::Other, |i| i.resolved);
         let array_type = info.as_ref().is_some_and(|i| i.shape != TypeShape::Other);
         for decl in self.children(d) {
@@ -2450,11 +2190,7 @@ impl<'t> Builder<'t> {
             out.push(Property {
                 name,
                 ty,
-                type_class: if array {
-                    None
-                } else {
-                    self.class_id(resolved, ids)
-                },
+                type_class: if array { None } else { self.class_id(resolved, ids) },
                 visibility,
                 is_static,
                 is_const,
@@ -2486,13 +2222,9 @@ impl<'t> Builder<'t> {
         let is_static = own[..kw].contains(&"static");
         let scope = self.classes[c].scope;
         let returns_void = is_task
-            || self.child(body, ReturnType).is_some_and(|r| {
-                self.tokens(r)
-                    .iter()
-                    .map(|&t| self.text(r.tree, t))
-                    .collect::<Vec<_>>()
-                    == ["void"]
-            })
+            || self
+                .child(body, ReturnType)
+                .is_some_and(|r| self.tokens(r).iter().map(|&t| self.text(r.tree, t)).collect::<Vec<_>>() == ["void"])
             || name == "new";
         let overrides = name != "new" && self.overrides_virtual(c, &name);
         let is_virtual = name != "new" && (declared_virtual || overrides);
@@ -2509,9 +2241,7 @@ impl<'t> Builder<'t> {
         let return_type = if is_task || name == "new" {
             "void".to_string()
         } else {
-            let dt = self
-                .child(body, ReturnType)
-                .and_then(|r| self.child(r, DataType));
+            let dt = self.child(body, ReturnType).and_then(|r| self.child(r, DataType));
             self.type_string(dt, None, scope, env, false)
         };
         let arguments = self.arguments(body, scope, env, ids);
@@ -2551,9 +2281,7 @@ impl<'t> Builder<'t> {
                     return true;
                 }
                 // Not declared virtual: virtual if it overrides in turn.
-                return chain[k + 1..]
-                    .iter()
-                    .any(|&x| self.method_decls(x).get(name).is_some_and(|d| d.1));
+                return chain[k + 1..].iter().any(|&x| self.method_decls(x).get(name).is_some_and(|d| d.1));
             }
         }
         false
@@ -2592,13 +2320,7 @@ impl<'t> Builder<'t> {
         v
     }
 
-    fn arguments(
-        &mut self,
-        body: NodeRef,
-        scope: usize,
-        env: &Env,
-        ids: &[ClassId],
-    ) -> Vec<Argument> {
+    fn arguments(&mut self, body: NodeRef, scope: usize, env: &Env, ids: &[ClassId]) -> Vec<Argument> {
         let mut out = Vec::new();
         let Some(pl) = self.child(body, PortList) else {
             return out;
@@ -2637,18 +2359,11 @@ impl<'t> Builder<'t> {
             let loc = self.loc(decl.tree, t);
             let info = ty.map(|d| self.resolve_env(d, scope, env, 0));
             let mut shape = info.as_ref().map_or(TypeShape::Other, |i| i.shape);
-            if let Some(d) = self
-                .children(decl)
-                .into_iter()
-                .find(|c| self.kind(*c) == Dim)
-            {
+            if let Some(d) = self.children(decl).into_iter().find(|c| self.kind(*c) == Dim) {
                 shape = self.dim_shape(d, scope, 0);
             }
-            let type_class = if shape == TypeShape::Other {
-                info.and_then(|i| self.class_id(i.resolved, ids))
-            } else {
-                None
-            };
+            let type_class =
+                if shape == TypeShape::Other { info.and_then(|i| self.class_id(i.resolved, ids)) } else { None };
             out.push(Argument {
                 name,
                 ty: self.type_string(ty, Some(decl), scope, env, false),
@@ -2671,23 +2386,16 @@ impl<'t> Builder<'t> {
             if self.kind(d) != DataDecl {
                 continue;
             }
-            let vif = self
-                .child(d, DataType)
-                .is_some_and(|dt| self.resolve_env(dt, scope, env, 0).resolved == Resolved::Vif);
+            let vif =
+                self.child(d, DataType).is_some_and(|dt| self.resolve_env(dt, scope, env, 0).resolved == Resolved::Vif);
             for decl in self.children(d) {
                 if self.kind(decl) != Declarator {
                     continue;
                 }
                 if let Some((name, t)) = self.name_of(decl) {
                     let loc = self.loc(decl.tree, t);
-                    let ty =
-                        self.type_string(self.child(d, DataType), Some(decl), scope, env, false);
-                    out.push(Local {
-                        name,
-                        ty,
-                        is_virtual_interface: vif,
-                        loc,
-                    });
+                    let ty = self.type_string(self.child(d, DataType), Some(decl), scope, env, false);
+                    out.push(Local { name, ty, is_virtual_interface: vif, loc });
                 }
             }
         }

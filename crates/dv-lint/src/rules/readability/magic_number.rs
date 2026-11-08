@@ -2,12 +2,12 @@
 //! class method bodies: conditions, loop bounds and sizes; delays are left to
 //! the magic-delay rules (Checkstyle MagicNumber, Sonar S109).
 
-use sv_syntax::{NodeId, SyntaxKind};
 use crate::support::class_index::Classes;
+use crate::support::literal_values::literal_value;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::literal_values::{literal_value};
 
 fn is_display_call(n: &str) -> bool {
     n.starts_with("$display")
@@ -34,9 +34,7 @@ pub(crate) fn magic_number(c: &Cst, s: &mut Sink) {
             continue;
         }
         // The model indexes classes of packages and $unit, not of modules.
-        if classes.role(i) == Role::RegModel
-            || in_module(cls.node)
-        {
+        if classes.role(i) == Role::RegModel || in_module(cls.node) {
             continue;
         }
         for m in &cls.methods {

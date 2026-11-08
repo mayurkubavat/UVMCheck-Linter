@@ -1,10 +1,10 @@
 //! UVM-ARC-004 (StringHierarchyLookup): Flags uvm_root/uvm_component find(),
 //! find_all() and lookup() calls outside tests and end_of_elaboration_phase.
 
+use crate::support::class_index::{calls, normalized, Classes, Role};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_index::{Classes, Role, calls, normalized};
 
 pub(crate) fn string_hierarchy_lookup(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);

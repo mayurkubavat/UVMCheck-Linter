@@ -1,11 +1,11 @@
 //! SV-LOC-001 (ArrayLocatorEmptyQueueDeref): Disallows immediate element
 //! dereferencing on array locator methods (e.g., q.find()[0]).
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::ast::{is_name, kids};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::ast::{is_name, kids};
 
 const LOCATORS: &[&str] = &[
     "find",

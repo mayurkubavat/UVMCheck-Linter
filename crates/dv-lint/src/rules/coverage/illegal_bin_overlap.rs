@@ -1,12 +1,12 @@
 //! SV-COV-004 (IllegalBinOverlap): Detects overlapping values between regular
 //! 'bins' and 'illegal_bins' or 'ignore_bins' within a coverpoint.
 
-use crate::support::slang_ast::*;
 use crate::support::procedural::start;
+use crate::support::slang_ast::*;
+use crate::support::sva_cov::{bins_kw, bins_name, bins_values, label_of};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{bins_kw, bins_name, bins_values, label_of};
 
 pub(crate) fn illegal_bin_overlap(c: &Cst, s: &mut Sink) {
     for cp in c.nodes(Coverpoint) {
@@ -20,7 +20,8 @@ pub(crate) fn illegal_bin_overlap(c: &Cst, s: &mut Sink) {
             let kw = bins_kw(c, b).to_string();
             let name = bins_name(c, b).map(|x| x.0).unwrap_or_else(|| "unnamed".into());
             let Some(loc) = start(c, b) else { continue };
-            let vals: Vec<String> = bins_values(c, b).into_iter().map(|v| slang_trimmed(c, v)).filter(|v| !v.is_empty()).collect();
+            let vals: Vec<String> =
+                bins_values(c, b).into_iter().map(|v| slang_trimmed(c, v)).filter(|v| !v.is_empty()).collect();
             let Some(vals) = std_unordered_order(&vals) else { continue };
             if kw == "bins" {
                 regular.push((name, vals));

@@ -2,10 +2,10 @@
 //! enforcing tab prohibitions, trailing whitespace limits, maximum line
 //! lengths, matching block end labels, and file naming.
 
-use sv_syntax::SyntaxKind::*;
 use crate::support::source_layout::{at, end_and_label, end_loc, routine_name, routines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind::*;
 
 /// `StyleConfiguration` defaults.
 const MAX_LINE_LENGTH: usize = 120;

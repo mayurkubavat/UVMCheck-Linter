@@ -1,9 +1,9 @@
 //! SV-DEP-002 (DefparamDeprecation): Disallow 'defparam' statements.
 
-use sv_syntax::SyntaxKind;
+use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::syntax::{Cst};
 
 pub(crate) fn defparam(c: &Cst, s: &mut Sink) {
     for n in c.nodes(ParamDecl) {

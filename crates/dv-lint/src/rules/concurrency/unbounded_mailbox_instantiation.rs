@@ -2,10 +2,10 @@
 //! unbounded mailboxes without a capacity limit to prevent memory bloat and
 //! missed producer-consumer synchronization.
 
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use crate::syntax::{assignments, Cst};
 use crate::{Severity, Sink};
+use sv_syntax::{Child, NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::syntax::{Cst, assignments};
 
 /// slang's `NewClassExpression`: `new`, `new(...)` or `pkg::cls::new(...)`,
 /// with its argument list.

@@ -2,13 +2,13 @@
 //! are token-identical to an earlier branch of the same statement (clang-tidy
 //! bugprone-branch-clone, Sonar S1871).
 
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::statements::{case_parts, if_parts, in_bad_body, list, report, stmt, St};
 use crate::support::class_index::{count_statements, strongest_report, Level};
 use crate::support::sema_facts::ast_ok;
+use crate::support::statements::{case_parts, if_parts, in_bad_body, list, report, stmt, St};
 use crate::support::sva_cov::user_code_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The end offset of the macro use whose backtick is at `at`: past its
@@ -185,10 +185,7 @@ fn bound_stmt(c: &Cst, n: NodeId) -> NodeId {
 
 /// An `if` that is the `else` of another `if` (part of its chain).
 fn chained(c: &Cst, n: NodeId) -> bool {
-    c.parent(n)
-        .filter(|&p| c.kind(p) == ElseClause)
-        .and_then(|p| c.parent(p))
-        .is_some_and(|g| c.kind(g) == IfStmt)
+    c.parent(n).filter(|&p| c.kind(p) == ElseClause).and_then(|p| c.parent(p)).is_some_and(|g| c.kind(g) == IfStmt)
 }
 
 pub(crate) fn identical_branches(c: &Cst, s: &mut Sink) {

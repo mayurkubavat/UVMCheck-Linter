@@ -1,13 +1,13 @@
 //! SV-DUP-003 (DuplicatedConstraint): Flags a constraint body repeated in two
 //! classes that do not inherit from each other.
 
-use std::collections::HashMap;
-use dv_model::{Class, Design};
 use crate::support::class_roles::{derives, user_classes, Index};
+use crate::support::written_tokens::{tok_where, token_key, written_tokens, Generated};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Class, Design};
+use std::collections::HashMap;
 use sv_syntax::SyntaxKind::*;
-use crate::support::written_tokens::{Generated, tok_where, token_key, written_tokens};
 
 pub(crate) fn duplicated_constraint(d: &Design, csts: &[Cst], out: &mut Sink) {
     const MIN_TOKENS: usize = 8;
@@ -37,9 +37,8 @@ pub(crate) fn duplicated_constraint(d: &Design, csts: &[Cst], out: &mut Sink) {
                 continue;
             }
             let firsts = seen.entry(token_key(&toks, false)).or_default();
-            let found = firsts
-                .iter()
-                .find(|(k, ..)| k.id != cls.id && !derives(d, cls.id, k.id) && !derives(d, k.id, cls.id));
+            let found =
+                firsts.iter().find(|(k, ..)| k.id != cls.id && !derives(d, cls.id, k.id) && !derives(d, k.id, cls.id));
             match found {
                 Some((k, kname, kat)) => {
                     out.add(

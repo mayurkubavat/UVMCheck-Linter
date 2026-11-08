@@ -1,11 +1,11 @@
 //! SV-DED-005 (UnreadClassProperty): Flags class properties that are assigned
 //! or written to, but never read anywhere in the class.
 
-use sv_syntax::SyntaxKind;
+use crate::support::ast::class_properties;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::ast::{class_properties};
 
 pub(crate) fn unread_property(c: &Cst, s: &mut Sink) {
     for cls in c.nodes(ClassDecl) {

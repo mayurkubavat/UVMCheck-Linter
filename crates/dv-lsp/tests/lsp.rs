@@ -57,17 +57,9 @@ impl Client {
             .unwrap();
         let stdin = child.stdin.take().unwrap();
         let stdout = BufReader::new(child.stdout.take().unwrap());
-        let mut c = Client {
-            child,
-            stdin,
-            stdout,
-            next: 1,
-        };
+        let mut c = Client { child, stdin, stdout, next: 1 };
         let root_uri = format!("file://{}", root.display());
-        c.request(
-            "initialize",
-            &format!(r#"{{"rootUri":"{}","capabilities":{{}}}}"#, root_uri),
-        );
+        c.request("initialize", &format!(r#"{{"rootUri":"{}","capabilities":{{}}}}"#, root_uri));
         c.notify("initialized", "{}");
         c
     }
@@ -78,10 +70,7 @@ impl Client {
     }
 
     fn notify(&mut self, method: &str, params: &str) {
-        self.send(&format!(
-            r#"{{"jsonrpc":"2.0","method":"{}","params":{}}}"#,
-            method, params
-        ));
+        self.send(&format!(r#"{{"jsonrpc":"2.0","method":"{}","params":{}}}"#, method, params));
     }
 
     fn read(&mut self) -> String {
@@ -106,10 +95,7 @@ impl Client {
     fn request(&mut self, method: &str, params: &str) -> String {
         let id = self.next;
         self.next += 1;
-        self.send(&format!(
-            r#"{{"jsonrpc":"2.0","id":{},"method":"{}","params":{}}}"#,
-            id, method, params
-        ));
+        self.send(&format!(r#"{{"jsonrpc":"2.0","id":{},"method":"{}","params":{}}}"#, id, method, params));
         loop {
             let m = self.read();
             if m.contains(&format!(r#""id":{}"#, id)) {
@@ -119,7 +105,15 @@ impl Client {
     }
 
     fn at(&mut self, method: &str, file: &Path, line: u32, col: u32) -> String {
-        self.request(method, &format!(r#"{{"textDocument":{{"uri":"file://{}"}},"position":{{"line":{},"character":{}}}}}"#, file.display(), line, col))
+        self.request(
+            method,
+            &format!(
+                r#"{{"textDocument":{{"uri":"file://{}"}},"position":{{"line":{},"character":{}}}}}"#,
+                file.display(),
+                line,
+                col
+            ),
+        )
     }
 }
 
@@ -134,21 +128,13 @@ fn workspace() -> PathBuf {
     std::fs::create_dir_all(dir.join("lib")).unwrap();
     std::fs::write(dir.join("pkg.sv"), PKG).unwrap();
     std::fs::write(dir.join("lib/uvm_base.sv"), BASE).unwrap();
-    std::fs::write(
-        dir.join("macros.svh"),
-        "// Prints its argument.\n`define my_macro(a) $display(a)\n",
-    )
-    .unwrap();
+    std::fs::write(dir.join("macros.svh"), "// Prints its argument.\n`define my_macro(a) $display(a)\n").unwrap();
     dir
 }
 
 /// Line and column of the `nth` occurrence of `needle` (plus `delta` columns).
 fn pos(text: &str, needle: &str, nth: usize, delta: u32) -> (u32, u32) {
-    let off = text
-        .match_indices(needle)
-        .nth(nth)
-        .unwrap_or_else(|| panic!("{needle}"))
-        .0;
+    let off = text.match_indices(needle).nth(nth).unwrap_or_else(|| panic!("{needle}")).0;
     let line = text[..off].matches('\n').count() as u32;
     let col = (off - text[..off].rfind('\n').map(|i| i + 1).unwrap_or(0)) as u32;
     (line, col + delta)
@@ -157,14 +143,7 @@ fn pos(text: &str, needle: &str, nth: usize, delta: u32) -> (u32, u32) {
 fn line_of(resp: &str) -> Vec<u32> {
     // "range":{"start":{"line":N
     resp.match_indices(r#""range":{"start":{"line":"#)
-        .map(|(i, m)| {
-            resp[i + m.len()..]
-                .split(|c: char| !c.is_ascii_digit())
-                .next()
-                .unwrap()
-                .parse()
-                .unwrap()
-        })
+        .map(|(i, m)| resp[i + m.len()..].split(|c: char| !c.is_ascii_digit()).next().unwrap().parse().unwrap())
         .collect()
 }
 
@@ -202,10 +181,7 @@ fn navigation_and_completion() {
     // Hover shows the declaration and its trailing comment
     let (l, k) = pos(PKG, "local_it.addr", 0, 10);
     let r = c.at("textDocument/hover", &pkg, l, k);
-    assert!(
-        r.contains("target address") && r.contains("rand bit [7:0] addr;"),
-        "{r}"
-    );
+    assert!(r.contains("target address") && r.contains("rand bit [7:0] addr;"), "{r}");
 
     // Completion after `item.`: own and inherited members
     let (l, k) = pos(PKG, "item.\n", 0, 5);
@@ -218,10 +194,7 @@ fn navigation_and_completion() {
     // Completion of plain names sees locals and members
     let (l, k) = pos(PKG, "local_it.addr", 0, 0);
     let r = c.at("textDocument/completion", &pkg, l, k);
-    assert!(
-        r.contains("\"local_it\"") && r.contains("\"item\"") && r.contains("\"get_name\""),
-        "{r}"
-    );
+    assert!(r.contains("\"local_it\"") && r.contains("\"item\"") && r.contains("\"get_name\""), "{r}");
     let (l, k) = pos(PKG, "local_it.addr", 0, 3);
     let r = c.at("textDocument/completion", &pkg, l, k);
     assert!(r.contains("\"local_it\"") && !r.contains("\"item\""), "{r}");
@@ -229,10 +202,7 @@ fn navigation_and_completion() {
     // Backtick completion lists workspace macros
     let (l, k) = pos(PKG, "`my_macro", 0, 1);
     let r = c.at("textDocument/completion", &pkg, l, k);
-    assert!(
-        r.contains("\"my_macro\"") && r.contains("\"uvm_info\""),
-        "{r}"
-    );
+    assert!(r.contains("\"my_macro\"") && r.contains("\"uvm_info\""), "{r}");
 
     // References to my_item: class, uses, scope prefix
     let (l, k) = pos(PKG, "class my_item", 0, 7);
@@ -240,10 +210,8 @@ fn navigation_and_completion() {
     assert_eq!(line_of(&r).len(), 5, "{r}");
 
     // Outline: package > classes > members
-    let r = c.request(
-        "textDocument/documentSymbol",
-        &format!(r#"{{"textDocument":{{"uri":"file://{}"}}}}"#, pkg.display()),
-    );
+    let r = c
+        .request("textDocument/documentSymbol", &format!(r#"{{"textDocument":{{"uri":"file://{}"}}}}"#, pkg.display()));
     assert!(
         r.starts_with(r#"{"jsonrpc":"2.0","id""#)
             && r.contains(r#""name":"my_pkg""#)

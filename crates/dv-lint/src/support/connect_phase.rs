@@ -2,7 +2,6 @@
 
 use dv_model::Design;
 
-
 /// Every `lhs = rhs` in any class's connect_phase, parameterized ones included.
 pub(crate) fn connect_phase_assignments(d: &Design) -> Vec<String> {
     d.classes()

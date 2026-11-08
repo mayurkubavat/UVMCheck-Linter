@@ -124,10 +124,40 @@ pub struct FileList {
 /// Options that take the next token as their value and mean nothing to a
 /// front end. Matched case-sensitively, as the simulators do.
 const SKIP_WITH_VALUE: &[&str] = &[
-    "-l", "-o", "-log", "-logfile", "-work", "-access", "-cm", "-cm_dir", "-cm_name", "-licqueue_timeout",
-    "-xmlibdirname", "-xmlibdirpath", "-input", "-ucli", "-do", "-gui_config", "-assert", "-covoverwrite",
-    "-covfile", "-covtest", "-covworkdir", "-seed", "-svseed", "-snapshot", "-reflib", "-makelib", "-lib",
-    "-Mdir", "-P", "-ntb_define", "-ntb_incdir", "-errormax", "-timeout", "-profile",
+    "-l",
+    "-o",
+    "-log",
+    "-logfile",
+    "-work",
+    "-access",
+    "-cm",
+    "-cm_dir",
+    "-cm_name",
+    "-licqueue_timeout",
+    "-xmlibdirname",
+    "-xmlibdirpath",
+    "-input",
+    "-ucli",
+    "-do",
+    "-gui_config",
+    "-assert",
+    "-covoverwrite",
+    "-covfile",
+    "-covtest",
+    "-covworkdir",
+    "-seed",
+    "-svseed",
+    "-snapshot",
+    "-reflib",
+    "-makelib",
+    "-lib",
+    "-Mdir",
+    "-P",
+    "-ntb_define",
+    "-ntb_incdir",
+    "-errormax",
+    "-timeout",
+    "-profile",
 ];
 
 /// A C, C++ or object file by its extension.
@@ -623,9 +653,28 @@ mod tests {
         let env: BTreeMap<String, String> = [("ROOT".into(), root.display().to_string())].into();
         let fl = FileList::read_args(
             [
-                "+incdir+$ROOT/inc+${ROOT}/inc2", "-incdir", "inc", "+define+A=1+B", "-define", "C=x", "-DA=2",
-                "+undefine+B", "-y", "lib", "-v", "cells.v", "+libext+.v+.sv", "-l", "run.log", "+acc",
-                "-ntb_opts", "uvm-1.2", "-timescale=1ns/1ps", "-top", "tb", "tb.sv",
+                "+incdir+$ROOT/inc+${ROOT}/inc2",
+                "-incdir",
+                "inc",
+                "+define+A=1+B",
+                "-define",
+                "C=x",
+                "-DA=2",
+                "+undefine+B",
+                "-y",
+                "lib",
+                "-v",
+                "cells.v",
+                "+libext+.v+.sv",
+                "-l",
+                "run.log",
+                "+acc",
+                "-ntb_opts",
+                "uvm-1.2",
+                "-timescale=1ns/1ps",
+                "-top",
+                "tb",
+                "tb.sv",
             ],
             root,
             Dialect::Any,
@@ -658,7 +707,8 @@ mod tests {
         let root = &d.0;
         fs::write(root.join("loop.f"), "-f loop.f\n").unwrap();
         fs::write(root.join("top.f"), "missing.sv\n$UNSET_SV_SOURCE_VAR/x.sv\n-F loop.f\n").unwrap();
-        let fl = FileList::read_args(["-F", &root.join("top.f").display().to_string()], root, Dialect::Any, &ProcessEnv);
+        let fl =
+            FileList::read_args(["-F", &root.join("top.f").display().to_string()], root, Dialect::Any, &ProcessEnv);
         let msgs: Vec<String> = fl.diagnostics.iter().map(|d| format!("{} {}", d.origin.line, d.message)).collect();
         assert!(msgs.iter().any(|m| m.starts_with("1 source file not found")), "{msgs:?}");
         assert!(msgs.iter().any(|m| m.starts_with("2 undefined variable $UNSET_SV_SOURCE_VAR")), "{msgs:?}");

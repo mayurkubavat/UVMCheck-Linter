@@ -2,13 +2,13 @@
 //! long (25 statements or more; option min_statements) while the class and its
 //! user bases declare no virtual hook methods and use no callbacks.
 
-use dv_model::Design;
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::{if_parts, is_report_guard, is_stmt};
-use crate::support::overrides::overrides_base;
 use crate::support::class_roles::{class_methods, is_library, role, user_classes, Index, Role};
+use crate::support::overrides::overrides_base;
+use crate::support::routine_bodies::{if_parts, is_report_guard, is_stmt};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 fn is_scaffolding(c: &Cst, s: NodeId) -> bool {
@@ -92,7 +92,9 @@ pub(crate) fn no_extension_point(d: &Design, csts: &[Cst], out: &mut Sink) {
             hooks |= class_methods(k).any(|m| m.is_virtual && !overrides_base(d, k, &m.name) && m.name != "new");
             if let Some((kc, kn)) = ix.decl(k.loc) {
                 let text = kc.text(kn);
-                hooks |= text.contains("uvm_callback") || text.contains("uvm_do_callbacks") || text.contains("uvm_register_cb");
+                hooks |= text.contains("uvm_callback")
+                    || text.contains("uvm_do_callbacks")
+                    || text.contains("uvm_register_cb");
             }
         }
         if hooks {

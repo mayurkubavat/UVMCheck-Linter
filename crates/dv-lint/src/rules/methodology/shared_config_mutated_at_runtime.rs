@@ -2,14 +2,14 @@
 //! config object that the class got from uvm_config_db and did not create, made
 //! outside new() and the build phases.
 
-use std::collections::{HashMap, HashSet};
-use dv_model::{ClassId, Design, Method};
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::{factory_create_type, is_config_db_call, Calls};
-use crate::support::free_routines::{assignment_lhs, skip_selects};
 use crate::support::class_roles::{class_methods, key, user_classes, Ctx, Index};
+use crate::support::free_routines::{assignment_lhs, skip_selects};
+use crate::support::routine_bodies::{factory_create_type, is_config_db_call, Calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{ClassId, Design, Method};
+use std::collections::{HashMap, HashSet};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 fn is_build_time(m: &str) -> bool {
@@ -103,7 +103,10 @@ pub(crate) fn shared_config_mutated_at_runtime(d: &Design, csts: &[Cst], out: &m
                     let creates = c.kind(rhs) == NewExpr
                         || (c.kind(rhs) == CallExpr && factory_create_type(&ctx, &calls, c, rhs).is_some())
                         || (c.kind(rhs) == CallExpr
-                            && c.tree.children(rhs).next().is_some_and(|k| c.kind(k) == ScopedExpr && c.last_text(k) == "new"));
+                            && c.tree
+                                .children(rhs)
+                                .next()
+                                .is_some_and(|k| c.kind(k) == ScopedExpr && c.last_text(k) == "new"));
                     if creates {
                         if let Some(s) = referenced_sym(&ctx, m, c, skip_selects(c, lhs)) {
                             created.insert(s);

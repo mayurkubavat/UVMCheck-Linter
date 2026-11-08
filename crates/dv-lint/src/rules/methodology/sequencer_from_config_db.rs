@@ -1,11 +1,11 @@
 //! UVM-SEQ-016 (SequencerFromConfigDb): Flags uvm_config_db/uvm_resource_db
 //! get() calls in a sequence that fetch a sequencer handle.
 
-use dv_model::Design;
-use crate::support::routine_bodies::{bodies, calls_in, Calls};
 use crate::support::class_roles::{role, Ctx, Index, Role};
+use crate::support::routine_bodies::{bodies, calls_in, Calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn sequencer_from_config_db(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);

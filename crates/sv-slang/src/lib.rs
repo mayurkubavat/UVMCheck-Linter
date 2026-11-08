@@ -274,20 +274,11 @@ extern "C" {
     pub fn uvmcheck_get_class(d: *const uvmcheck_design, cls: u32, out: *mut uvmcheck_class) -> c_int;
     /// Fills `*out` with property `index` (of class `cls`) and returns 1,
     /// or returns 0 when an id is out of range.
-    pub fn uvmcheck_get_property(
-        d: *const uvmcheck_design,
-        cls: u32,
-        index: u32,
-        out: *mut uvmcheck_property,
-    ) -> c_int;
+    pub fn uvmcheck_get_property(d: *const uvmcheck_design, cls: u32, index: u32, out: *mut uvmcheck_property)
+        -> c_int;
     /// Fills `*out` with method `index` (of class `cls`) and returns 1,
     /// or returns 0 when an id is out of range.
-    pub fn uvmcheck_get_method(
-        d: *const uvmcheck_design,
-        cls: u32,
-        index: u32,
-        out: *mut uvmcheck_method,
-    ) -> c_int;
+    pub fn uvmcheck_get_method(d: *const uvmcheck_design, cls: u32, index: u32, out: *mut uvmcheck_method) -> c_int;
     /// Fills `*out` with argument `index` (of class `cls`, method `method`) and returns 1,
     /// or returns 0 when an id is out of range.
     pub fn uvmcheck_get_argument(
@@ -347,12 +338,7 @@ extern "C" {
     pub fn uvmcheck_get_macro(d: *const uvmcheck_design, cls: u32, index: u32, out: *mut uvmcheck_macro) -> c_int;
     /// Fills `*out` with typedef `index` (of class `cls`) and returns 1,
     /// or returns 0 when an id is out of range.
-    pub fn uvmcheck_get_typedef(
-        d: *const uvmcheck_design,
-        cls: u32,
-        index: u32,
-        out: *mut uvmcheck_typedef,
-    ) -> c_int;
+    pub fn uvmcheck_get_typedef(d: *const uvmcheck_design, cls: u32, index: u32, out: *mut uvmcheck_typedef) -> c_int;
     /// The whole model as JSON (schema `uvmcheck.model/1`), made on first call.
     pub fn uvmcheck_design_json(d: *mut uvmcheck_design) -> *const c_char;
 }

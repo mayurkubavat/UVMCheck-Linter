@@ -1,10 +1,10 @@
 //! SEC-LOG-001 (PlaintextKeyInLogs): Detects plaintext logging of sensitive
 //! cryptographic assets (keys, seeds, secrets) via $sformatf/$display.
 
+use crate::support::ast::{call_site, source_text, string_value, subtree, unparen, Ast};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use crate::support::ast::{Ast, call_site, source_text, string_value, subtree, unparen};
 
 fn plaintext_key(c: &Cst, a: &Ast, s: &mut Sink) {
     for n in subtree(c, c.tree.root) {

@@ -73,6 +73,13 @@ fn main() {
                 eprintln!("round-trip differs: {}", tree.files[f as usize].display());
             }
         }
-        eprintln!("{} files, {} tokens, {} nodes, {:.1} ms, round-trip failures {}", tree.files.len(), tree.tokens.len(), tree.nodes.len(), ms, bad);
+        eprintln!(
+            "{} files, {} tokens, {} nodes, {:.1} ms, round-trip failures {}",
+            tree.files.len(),
+            tree.tokens.len(),
+            tree.nodes.len(),
+            ms,
+            bad
+        );
     }
 }

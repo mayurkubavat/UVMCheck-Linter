@@ -1,6 +1,5 @@
 //! Whether a class is a UVM component or a UVM object.
 
-
 use dv_model::{Class, Design};
 
 use crate::derives_from;

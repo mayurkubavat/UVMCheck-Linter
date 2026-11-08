@@ -2,20 +2,13 @@
 
 use std::collections::HashSet;
 
-
 use sv_syntax::NodeId;
 
 use sv_syntax::SyntaxKind::*;
 
-
-
 use crate::syntax::Cst;
 
-
-
-
 use crate::support::slang_ast::{class_member, expr_type, find_class, kids, lookup, Decl};
-
 
 /// What a type name names: a class (its declaration, when in the tree), or
 /// another handle type (virtual interface, built-in class). Follows type
@@ -46,7 +39,8 @@ pub(crate) fn handle_type(c: &Cst, dtype: NodeId, ctx: Option<NodeId>, depth: u3
         // `type T = cls`: the default type.
         let toks = c.tree.token_range(d.node);
         let eq = *toks.iter().find(|&&x| c.text_of(x) == "=")?;
-        let dt = kids(c, d.node).into_iter().find(|&k| c.kind(k) == DataType && c.first_tok(k).is_some_and(|f| f > eq))?;
+        let dt =
+            kids(c, d.node).into_iter().find(|&k| c.kind(k) == DataType && c.first_tok(k).is_some_and(|f| f > eq))?;
         return handle_type(c, dt, ctx, depth + 1);
     }
     let td = c.first_named(TypedefDecl, t)?;
@@ -67,7 +61,11 @@ pub(crate) fn param_override(c: &Cst, param: NodeId, name: &str, ctx: NodeId) ->
     let args: Vec<NodeId> = c.tree.children(al).filter(|&a| c.kind(a) == Arg).collect();
     let named = |a: NodeId| {
         let t: Vec<&str> = c.toks(a).map(|t| c.text_of(t)).collect();
-        if t.first() == Some(&".") { t.get(1).copied() } else { None }
+        if t.first() == Some(&".") {
+            t.get(1).copied()
+        } else {
+            None
+        }
     };
     let arg = if args.iter().any(|&a| named(a).is_some()) {
         *args.iter().find(|&&a| named(a) == Some(name))?
@@ -117,7 +115,9 @@ pub(crate) fn expr_decl(c: &Cst, e: NodeId) -> Option<Decl> {
 /// [`body_refs`], None when the body is bad.
 pub(crate) fn body_refs_if_good(c: &Cst, body: NodeId) -> Option<HashSet<NodeId>> {
     let mut used: HashSet<NodeId> = HashSet::new();
-    let in_decl = |e: NodeId| crate::support::slang_ast::ancestors(c, e).take_while(|&a| a != body).any(|a| c.kind(a) == Declarator);
+    let in_decl = |e: NodeId| {
+        crate::support::slang_ast::ancestors(c, e).take_while(|&a| a != body).any(|a| c.kind(a) == Declarator)
+    };
     let all = crate::support::slang_ast::subtree(c, body);
     let decls: Vec<(u32, u32)> =
         all.iter().filter(|&&d| c.kind(d) == DataDecl).filter_map(|&d| c.tree.token_bounds(d)).collect();
@@ -179,7 +179,9 @@ pub(crate) fn body_refs_if_good(c: &Cst, body: NodeId) -> Option<HashSet<NodeId>
 pub(crate) fn reads_bad_typed_local(c: &Cst, e: NodeId, body: NodeId) -> bool {
     let Some(t) = c.first_tok(e) else { return false };
     let Some(d) = lookup(c, e, c.text_of(t)) else { return false };
-    let Some(dd) = crate::support::slang_ast::ancestors(c, d.node).find(|&a| c.kind(a) == DataDecl) else { return false };
+    let Some(dd) = crate::support::slang_ast::ancestors(c, d.node).find(|&a| c.kind(a) == DataDecl) else {
+        return false;
+    };
     if !crate::support::slang_ast::ancestors(c, dd).any(|a| a == body) {
         return false;
     }
@@ -189,8 +191,7 @@ pub(crate) fn reads_bad_typed_local(c: &Cst, e: NodeId, body: NodeId) -> bool {
 
 /// The `local` of a `local::x` name.
 pub(crate) fn is_local_qualifier(c: &Cst, e: NodeId) -> bool {
-    c.first_tok(e).is_some_and(|t| c.text_of(t) == "local")
-        && c.parent(e).is_some_and(|p| c.kind(p) == ScopedExpr)
+    c.first_tok(e).is_some_and(|t| c.text_of(t) == "local") && c.parent(e).is_some_and(|p| c.kind(p) == ScopedExpr)
 }
 
 /// `name` at `e` is inside the `with` constraint of `obj.randomize()` and
@@ -240,9 +241,10 @@ pub(crate) fn foreach_var_in_scope(c: &Cst, e: NodeId, name: &str, stop: NodeId)
 
 /// The class's declaration of method `name` (prototype or body).
 pub(crate) fn method_decl_in(c: &Cst, cls: NodeId, name: &str) -> Option<NodeId> {
-    kids(c, cls)
-        .into_iter()
-        .find(|&m| matches!(c.kind(m), FunctionDecl | TaskDecl | MethodPrototype) && crate::support::slang_ast::last_name(c, m) == name)
+    kids(c, cls).into_iter().find(|&m| {
+        matches!(c.kind(m), FunctionDecl | TaskDecl | MethodPrototype)
+            && crate::support::slang_ast::last_name(c, m) == name
+    })
 }
 
 /// slang's `isVirtual()`: declared virtual (on the body or its
@@ -261,5 +263,8 @@ pub(crate) fn routine_is_virtual(c: &Cst, r: NodeId) -> bool {
         }
     }
     let name = last_name(c, r);
-    class_chain(c, cls).into_iter().skip(1).any(|b| method_decl_in(c, b, &name).is_some_and(|m| has_kw(c, m, "virtual")))
+    class_chain(c, cls)
+        .into_iter()
+        .skip(1)
+        .any(|b| method_decl_in(c, b, &name).is_some_and(|m| has_kw(c, m, "virtual")))
 }

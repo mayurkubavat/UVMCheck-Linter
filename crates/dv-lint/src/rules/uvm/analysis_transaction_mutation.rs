@@ -1,15 +1,13 @@
 //! UVM-TLM-005 (AnalysisTransactionMutation): Detects in-place modification of
 //! transactions received via analysis write() methods.
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
-use crate::support::uvm_syntax::{
-    name_node, routine_last_name, subtree,
-};
+use crate::support::uvm_classes::assign_parts;
+use crate::support::uvm_syntax::{name_node, routine_last_name, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{assign_parts};
 
 pub(crate) fn analysis_mutation(_d: &Design, csts: &[Cst], s: &mut Sink) {
     for c in csts {

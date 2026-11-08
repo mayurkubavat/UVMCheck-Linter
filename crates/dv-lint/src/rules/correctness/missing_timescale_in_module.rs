@@ -2,12 +2,12 @@
 //! procedural delays (#) that lack an explicit `timescale or timeunit
 //! declaration.
 
-use sv_syntax::NodeId;
 use crate::support::class_items::{op, own};
+use crate::support::data_items::main_files;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::data_items::{main_files};
 
 fn has_timescale(src: &str) -> bool {
     for (word, len) in [("`timescale", 10), ("timeunit", 8)] {

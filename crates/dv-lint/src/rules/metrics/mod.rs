@@ -15,9 +15,17 @@ mod too_many_arguments;
 /// Every rule of this category.
 pub(crate) fn rules() -> Vec<Rule> {
     vec![
-        Rule { id: "SV-MET-001", name: "CognitiveComplexity", check: Check::Syntax(cognitive_complexity::cognitive_complexity) },
+        Rule {
+            id: "SV-MET-001",
+            name: "CognitiveComplexity",
+            check: Check::Syntax(cognitive_complexity::cognitive_complexity),
+        },
         Rule { id: "SV-MET-002", name: "LongRoutine", check: Check::Syntax(long_routine::long_routine) },
-        Rule { id: "SV-MET-003", name: "TooManyArguments", check: Check::Syntax(too_many_arguments::too_many_arguments) },
+        Rule {
+            id: "SV-MET-003",
+            name: "TooManyArguments",
+            check: Check::Syntax(too_many_arguments::too_many_arguments),
+        },
         Rule { id: "SV-MET-004", name: "DeepNesting", check: Check::Syntax(deep_nesting::deep_nesting) },
         Rule { id: "SV-MET-005", name: "ComplexCondition", check: Check::Syntax(complex_condition::complex_condition) },
         Rule { id: "SV-MET-006", name: "LargeClass", check: Check::Syntax(large_class::large_class) },

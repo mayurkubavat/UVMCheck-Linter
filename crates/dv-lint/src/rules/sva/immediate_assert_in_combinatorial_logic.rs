@@ -2,13 +2,13 @@
 //! assertions in always_comb or combinatorial blocks evaluate transient delta
 //! glitches.
 
-use sv_syntax::NodeId;
-use crate::support::slang_ast::*;
 use crate::support::procedural::start;
+use crate::support::slang_ast::*;
+use crate::support::sva_cov::add_n;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{add_n};
 
 fn proc_kind<'a>(c: &'a Cst, p: NodeId) -> &'a str {
     c.keyword(p).map_or("", |k| c.text_of(k))

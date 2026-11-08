@@ -1,13 +1,13 @@
 //! SV-SML-001 (ScratchpadClassProperty): Disallow declaring scratchpad
 //! variables or loop induction counters as class properties.
 
-use std::collections::HashSet;
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::class_index::{local_or_port, property_owner, referenced_name, routine_of, Classes};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::class_index::{Classes, local_or_port, property_owner, referenced_name, routine_of};
 
 pub(crate) fn scratchpad_property(c: &Cst, s: &mut Sink) {
     let units = Units::new(c);

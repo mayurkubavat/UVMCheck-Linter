@@ -2,13 +2,16 @@
 //! constant #delay between tests, instead of wait(), @ or an event (busy-wait
 //! smell, Sonar S2925).
 
-use std::collections::HashSet;
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::procedural::{
+    add_n, if_parts, is_task_call, is_wait_loop, loop_body, loop_kw, name_sym, routine_name, start, timing_kind,
+    timing_of, written, Sym,
+};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::procedural::{Sym, add_n, if_parts, is_task_call, is_wait_loop, loop_body, loop_kw, name_sym, routine_name, start, timing_kind, timing_of, written};
 
 /// A `while` or `do ... while` condition.
 pub(crate) fn loop_cond(c: &Cst, l: NodeId) -> Option<NodeId> {

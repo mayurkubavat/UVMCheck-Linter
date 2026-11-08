@@ -1,10 +1,10 @@
 //! SV-COV-008 (CrossWithEmptyBins): Detects degenerate covergroup cross
 //! constructs specifying fewer than 2 coverpoints or empty cross products.
 
+use crate::support::names::cross_parts;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::names::{cross_parts};
 
 pub(crate) fn cross_with_empty_bins(c: &Cst, s: &mut Sink) {
     for n in c.nodes(Cross) {

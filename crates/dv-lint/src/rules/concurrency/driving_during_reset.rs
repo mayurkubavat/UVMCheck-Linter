@@ -1,10 +1,10 @@
 //! SV-DRV-001 (DrivingDuringReset): Disallow driving virtual interface control
 //! signals without an active reset check or synchronization guard.
 
-use sv_syntax::SyntaxKind;
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn driving_during_reset(c: &Cst, s: &mut Sink) {

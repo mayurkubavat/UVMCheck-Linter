@@ -4,9 +4,9 @@
 //! R0902/R0904).
 
 use crate::support::class_index::*;
+use crate::support::class_metrics::each_class;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_metrics::{each_class};
 
 pub(crate) fn large_class(c: &Cst, s: &mut Sink) {
     let (max_fields, max_data_fields, max_methods) = (30, 80, 30);

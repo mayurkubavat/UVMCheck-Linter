@@ -1,8 +1,8 @@
 //! SV-OOP-007 (StaticMemberInUvmComponent): Non-const static variable declared
 //! in a uvm_component subclass is shared across all instances simulation-wide.
 
-use dv_model::Design;
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn static_member_in_uvm_component(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

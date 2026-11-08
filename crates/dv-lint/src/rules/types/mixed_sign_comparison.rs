@@ -1,14 +1,14 @@
 //! SV-TYP-001 (MixedSignComparison): Comparing signed and unsigned integers
 //! causes implicit unsigned coercion of the signed operand.
 
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
-use crate::support::slang_ast::kids;
 use crate::expr_types::{expr_types, ETy};
+use crate::support::config_db_calls::{in_generate_header, strip};
+use crate::support::slang_ast::kids;
 use crate::support::style_config::ast_visits;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::config_db_calls::{in_generate_header, strip};
+use sv_syntax::NodeId;
+use sv_syntax::SyntaxKind::*;
 
 /// An integer literal (not `'0`) whose value is not negative.
 fn non_negative_literal(c: &Cst, e: NodeId, t: &ETy) -> bool {

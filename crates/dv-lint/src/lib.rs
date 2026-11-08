@@ -42,10 +42,10 @@
 
 use dv_model::{Class, ClassId, Design, Loc, Method, PhaseKind, Property};
 
-mod rules;
-mod support;
 pub mod expr_types;
 pub mod frames;
+mod rules;
+mod support;
 
 pub(crate) mod shared;
 
@@ -132,14 +132,7 @@ impl Sink {
         message: String,
         loc: Loc,
     ) -> &mut Finding {
-        self.findings.push(Finding {
-            rule,
-            name,
-            severity,
-            message,
-            loc,
-            related: Vec::new(),
-        });
+        self.findings.push(Finding { rule, name, severity, message, loc, related: Vec::new() });
         self.findings.last_mut().unwrap()
     }
 }
@@ -406,8 +399,19 @@ pub(crate) enum Task {
 /// Rules that take longest on large designs, started first so that they
 /// do not finish last.
 pub(crate) const SLOW: &[&str] = &[
-    "SV-STY-010", "SV-BUG-001", "SV-CMP-001", "SV-LANG-003", "SV-CNC-003", "SV-DED-004", "SV-DED-001",
-    "SV-DED-012", "SV-PKG-003", "SV-PRF-007", "SV-API-001", "SV-LANG-002", "SV-RDB-006",
+    "SV-STY-010",
+    "SV-BUG-001",
+    "SV-CMP-001",
+    "SV-LANG-003",
+    "SV-CNC-003",
+    "SV-DED-004",
+    "SV-DED-001",
+    "SV-DED-012",
+    "SV-PKG-003",
+    "SV-PRF-007",
+    "SV-API-001",
+    "SV-LANG-002",
+    "SV-RDB-006",
 ];
 
 /// The rules on `jobs` threads, each taking the next rule; the caches in
@@ -518,7 +522,9 @@ pub(crate) fn lint_parallel<'d>(
                                     run(c, &mut sink);
                                 }
                             }
-                            Check::Mixed(run) => run(design, mix.get_or_insert_with(|| mixed_csts(trees, files)), &mut sink),
+                            Check::Mixed(run) => {
+                                run(design, mix.get_or_insert_with(|| mixed_csts(trees, files)), &mut sink)
+                            }
                         }
                         if profile {
                             eprintln!("ptask {} {job} {a:.0} {:.0}", r.id, t0.elapsed().as_secs_f64() * 1e3);
@@ -590,12 +596,8 @@ pub fn spec_report(design: &Design, trees: &[sv_syntax::Tree]) -> Vec<String> {
         locator = cst.into_locator();
     }
     let files = locator.into_files();
-    let base = |f: u32| {
-        files
-            .get(f as usize)
-            .map(|p| p.rsplit('/').next().unwrap_or("").to_string())
-            .unwrap_or_default()
-    };
+    let base =
+        |f: u32| files.get(f as usize).map(|p| p.rsplit('/').next().unwrap_or("").to_string()).unwrap_or_default();
     let _ = design;
     let model = sv_sema::spec_counts(trees);
     let mut out: Vec<String> = rows

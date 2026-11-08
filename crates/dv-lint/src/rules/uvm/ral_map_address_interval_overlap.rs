@@ -2,20 +2,19 @@
 //! overlaps and register aliasing collisions within the same uvm_reg_map in a
 //! uvm_reg_block, preventing silent register corruption in hardware.
 
-use std::collections::{HashMap, HashSet};
-use dv_model::{Design, Loc};
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::uvm_syntax::{
-    decl_name, trim_ws,
-};
+use crate::support::uvm_classes::{args, call_name, calls_in, derived, int_value, unparen, Ix};
+use crate::support::uvm_syntax::{decl_name, trim_ws};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use std::collections::{HashMap, HashSet};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, args, call_name, calls_in, derived, int_value, unparen};
 
 /// Names a `X::` scope may start with: classes, packages and typedefs.
 fn scope_names(csts: &[Cst]) -> HashSet<String> {
-    let mut out: HashSet<String> = ["std", "$unit", "local", "super", "this", "$root"].iter().map(|s| s.to_string()).collect();
+    let mut out: HashSet<String> =
+        ["std", "$unit", "local", "super", "this", "$root"].iter().map(|s| s.to_string()).collect();
     for c in csts {
         for k in [PackageDecl, ClassDecl, ForwardTypedef] {
             for n in c.nodes(k) {
@@ -58,7 +57,8 @@ pub(crate) fn ral_map_overlap(d: &Design, csts: &[Cst], s: &mut Sink) {
                 4
             }
         };
-        let sizes: HashMap<&str, u64> = cls.properties.iter().map(|p| (p.name.as_str(), width(&p.name, &p.ty))).collect();
+        let sizes: HashMap<&str, u64> =
+            cls.properties.iter().map(|p| (p.name.as_str(), width(&p.name, &p.ty))).collect();
         let mut entries: Vec<(String, u64, u64, Loc)> = Vec::new();
         for at in ix.own_routines(cls.id) {
             let c = ix.cst(at);

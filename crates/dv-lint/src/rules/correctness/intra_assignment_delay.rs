@@ -1,10 +1,10 @@
 //! SV-DLY-002 (IntraAssignmentDelay): Disallows intra-assignment timing
 //! controls (e.g., a = #5 b; or a <= #5 b;) on procedural assignments.
 
-use sv_syntax::SyntaxKind;
+use crate::syntax::{assignments, Cst};
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::syntax::{Cst, assignments};
 
 pub(crate) fn intra_assignment_delay(c: &Cst, s: &mut Sink) {
     // slang gives `<=` its own kind, so only the blocking form is reached.

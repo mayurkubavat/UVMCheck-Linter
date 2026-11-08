@@ -130,17 +130,9 @@ pub struct FileIndex {
 impl FileIndex {
     pub fn build(path: &Path, text: String) -> FileIndex {
         // max_include_depth 1: the file alone, no `include followed.
-        let opts = sv_syntax::Options {
-            max_include_depth: 1,
-            ..Default::default()
-        };
+        let opts = sv_syntax::Options { max_include_depth: 1, ..Default::default() };
         let tree = sv_syntax::parse_source(&text, &path.to_string_lossy(), opts);
-        let mut b = Builder {
-            tree: &tree,
-            text: &text,
-            syms: Vec::new(),
-            imports: Vec::new(),
-        };
+        let mut b = Builder { tree: &tree, text: &text, syms: Vec::new(), imports: Vec::new() };
         b.walk(tree.root, None, false);
         let mut idents: HashMap<String, Vec<u32>> = HashMap::new();
         for t in &tree.tokens {
@@ -148,32 +140,17 @@ impl FileIndex {
                 continue;
             }
             if matches!(t.kind, TokenKind::Identifier | TokenKind::EscapedIdentifier) {
-                idents
-                    .entry(t.text.to_string())
-                    .or_default()
-                    .push(t.origin.offset);
+                idents.entry(t.text.to_string()).or_default().push(t.origin.offset);
             }
         }
         for m in &tree.macro_uses {
             if m.origin.file == 0 {
-                idents
-                    .entry(format!("`{}", m.name))
-                    .or_default()
-                    .push(m.origin.offset);
+                idents.entry(format!("`{}", m.name)).or_default().push(m.origin.offset);
             }
         }
-        let Builder {
-            mut syms, imports, ..
-        } = b;
+        let Builder { mut syms, imports, .. } = b;
         macro_defs(&text, &mut syms, &mut idents);
-        FileIndex {
-            path: path.to_path_buf(),
-            lines: LineIndex::new(&text),
-            text,
-            symbols: syms,
-            idents,
-            imports,
-        }
+        FileIndex { path: path.to_path_buf(), lines: LineIndex::new(&text), text, symbols: syms, idents, imports }
     }
 
     pub fn position(&self, offset: u32) -> (u32, u32) {
@@ -185,11 +162,7 @@ impl FileIndex {
     }
 
     pub fn children(&self, parent: Option<u32>) -> impl Iterator<Item = (u32, &Symbol)> {
-        self.symbols
-            .iter()
-            .enumerate()
-            .filter(move |(_, s)| s.parent == parent)
-            .map(|(i, s)| (i as u32, s))
+        self.symbols.iter().enumerate().filter(move |(_, s)| s.parent == parent).map(|(i, s)| (i as u32, s))
     }
 
     /// Symbols whose declaration contains `offset`, outermost first.
@@ -202,19 +175,11 @@ impl FileIndex {
                     && (s.kind.is_scope()
                         || matches!(
                             s.kind,
-                            SymKind::Function
-                                | SymKind::Task
-                                | SymKind::Covergroup
-                                | SymKind::Clocking
+                            SymKind::Function | SymKind::Task | SymKind::Covergroup | SymKind::Clocking
                         ))
             })
             .collect();
-        out.sort_by_key(|&i| {
-            (
-                self.symbols[i as usize].start,
-                std::cmp::Reverse(self.symbols[i as usize].end),
-            )
-        });
+        out.sort_by_key(|&i| (self.symbols[i as usize].start, std::cmp::Reverse(self.symbols[i as usize].end)));
         out
     }
 }
@@ -236,16 +201,8 @@ impl Builder<'_> {
         };
         // Shrink to tokens written here (a macro may end a declaration).
         let toks = self.tree.token_range(n);
-        let first = if ok(f) {
-            f
-        } else {
-            *toks.iter().find(|&&t| ok(t))?
-        };
-        let last = if ok(l) {
-            l
-        } else {
-            *toks.iter().rev().find(|&&t| ok(t))?
-        };
+        let first = if ok(f) { f } else { *toks.iter().find(|&&t| ok(t))? };
+        let last = if ok(l) { l } else { *toks.iter().rev().find(|&&t| ok(t))? };
         let a = &self.tree.tokens[first as usize];
         let b = &self.tree.tokens[last as usize];
         Some((a.origin.offset, b.origin.offset + b.text.len() as u32))
@@ -256,10 +213,8 @@ impl Builder<'_> {
         let toks = self.tree.token_range(name);
         let idx = *toks.iter().rev().find(|&&t| {
             let k = self.tree.tokens[t as usize].kind;
-            matches!(
-                k,
-                TokenKind::Identifier | TokenKind::EscapedIdentifier | TokenKind::SystemIdentifier
-            ) || self.tree.tokens[t as usize].text.as_ref() == "new"
+            matches!(k, TokenKind::Identifier | TokenKind::EscapedIdentifier | TokenKind::SystemIdentifier)
+                || self.tree.tokens[t as usize].text.as_ref() == "new"
         })?;
         let tok = &self.tree.tokens[idx as usize];
         if tok.from_macro || tok.origin.file != 0 {
@@ -270,12 +225,7 @@ impl Builder<'_> {
         if pos >= 2 && self.tree.tokens[toks[pos - 1] as usize].text.as_ref() == "::" {
             scope = Some(self.tree.tokens[toks[pos - 2] as usize].text.to_string());
         }
-        Some((
-            tok.text.to_string(),
-            scope,
-            tok.origin.offset,
-            tok.origin.offset + tok.text.len() as u32,
-        ))
+        Some((tok.text.to_string(), scope, tok.origin.offset, tok.origin.offset + tok.text.len() as u32))
     }
 
     /// The declaration text up to its first `;` (or the whole node),
@@ -283,10 +233,7 @@ impl Builder<'_> {
     fn detail(&self, n: NodeId, stop_at_semicolon: bool) -> String {
         let toks = self.tree.token_range(n);
         join_tokens(
-            toks.iter()
-                .map(|&t| &self.tree.tokens[t as usize])
-                .filter(|t| !t.from_macro)
-                .map(|t| t.text.as_ref()),
+            toks.iter().map(|&t| &self.tree.tokens[t as usize]).filter(|t| !t.from_macro).map(|t| t.text.as_ref()),
             stop_at_semicolon,
         )
     }
@@ -396,10 +343,7 @@ impl Builder<'_> {
             let line = after.split('\n').next().unwrap_or("");
             if let Some(i) = line.find("//") {
                 if line[..i].trim().trim_start_matches(';').trim().is_empty()
-                    || line[..i]
-                        .trim()
-                        .chars()
-                        .all(|c| matches!(c, ';' | ',' | ')'))
+                    || line[..i].trim().chars().all(|c| matches!(c, ';' | ',' | ')'))
                 {
                     doc.push(clean_comment(&line[i..]));
                 }
@@ -499,27 +443,13 @@ impl Builder<'_> {
             }
         }
         join_tokens(
-            toks.iter()
-                .map(|&t| &tree.tokens[t as usize])
-                .filter(|t| !t.from_macro)
-                .map(|t| t.text.as_ref()),
+            toks.iter().map(|&t| &tree.tokens[t as usize]).filter(|t| !t.from_macro).map(|t| t.text.as_ref()),
             true,
         )
     }
 
-    fn declarators(
-        &mut self,
-        n: NodeId,
-        kind: SymKind,
-        parent: Option<u32>,
-        local: bool,
-        ty: Option<String>,
-    ) {
-        let decls: Vec<NodeId> = self
-            .tree
-            .children(n)
-            .filter(|&c| self.tree.kind(c) == K::Declarator)
-            .collect();
+    fn declarators(&mut self, n: NodeId, kind: SymKind, parent: Option<u32>, local: bool, ty: Option<String>) {
+        let decls: Vec<NodeId> = self.tree.children(n).filter(|&c| self.tree.kind(c) == K::Declarator).collect();
         let detail = self.detail(n, true);
         for d in decls {
             if let Some(i) = self.decl(d, kind, parent, local, None) {
@@ -567,21 +497,8 @@ impl Builder<'_> {
         }
         match kind {
             K::MethodPrototype => {
-                let is_task = tree
-                    .token_range(n)
-                    .iter()
-                    .any(|&t| tree.tokens[t as usize].text.as_ref() == "task");
-                let me = self.decl(
-                    n,
-                    if is_task {
-                        SymKind::Task
-                    } else {
-                        SymKind::Function
-                    },
-                    parent,
-                    local,
-                    None,
-                );
+                let is_task = tree.token_range(n).iter().any(|&t| tree.tokens[t as usize].text.as_ref() == "task");
+                let me = self.decl(n, if is_task { SymKind::Task } else { SymKind::Function }, parent, local, None);
                 if let Some(i) = me {
                     self.syms[i as usize].detail = self.detail(n, true);
                 }
@@ -626,11 +543,7 @@ impl Builder<'_> {
             }
             K::Instantiation => {
                 let ty = tree.child(n, K::DataType).and_then(|d| self.type_name(d));
-                for inst in tree
-                    .children(n)
-                    .filter(|&c| tree.kind(c) == K::Instance)
-                    .collect::<Vec<_>>()
-                {
+                for inst in tree.children(n).filter(|&c| tree.kind(c) == K::Instance).collect::<Vec<_>>() {
                     if let Some(i) = self.decl(inst, SymKind::Instance, parent, local, None) {
                         self.syms[i as usize].type_name = ty.clone();
                         let d = self.detail(n, true);
@@ -647,11 +560,7 @@ impl Builder<'_> {
             }
             K::ImportDecl => {
                 let txt = tree.bare_text(n);
-                for part in txt
-                    .trim_start_matches("import")
-                    .trim_end_matches(';')
-                    .split(',')
-                {
+                for part in txt.trim_start_matches("import").trim_end_matches(';').split(',') {
                     if let Some((pkg, _)) = part.split_once("::") {
                         self.imports.push(pkg.trim().to_string());
                     }
@@ -673,10 +582,7 @@ impl Builder<'_> {
     /// `enum {A, B}` members: Declarators directly under a DataType.
     fn enum_members(&mut self, dt: NodeId, parent: Option<u32>, local: bool, typedef: Option<u32>) {
         let tree = self.tree;
-        let decls: Vec<NodeId> = tree
-            .children(dt)
-            .filter(|&c| tree.kind(c) == K::Declarator)
-            .collect();
+        let decls: Vec<NodeId> = tree.children(dt).filter(|&c| tree.kind(c) == K::Declarator).collect();
         for d in decls {
             if let Some(i) = self.decl(d, SymKind::EnumMember, typedef.or(parent), local, None) {
                 if let Some(t) = typedef {
@@ -713,9 +619,7 @@ fn join_tokens<'a>(toks: impl Iterator<Item = &'a str>, stop_at_semicolon: bool)
     let mut prev = "";
     for txt in toks {
         let word = |x: &str| {
-            x.chars().next().is_some_and(|c| {
-                c.is_alphanumeric() || c == '_' || c == '$' || c == '`' || c == '\''
-            })
+            x.chars().next().is_some_and(|c| c.is_alphanumeric() || c == '_' || c == '$' || c == '`' || c == '\'')
         };
         let glue = s.is_empty()
             || matches!(txt, ")" | "]" | "," | ";" | "::" | "." | "'")
@@ -755,16 +659,11 @@ fn join_tokens<'a>(toks: impl Iterator<Item = &'a str>, stop_at_semicolon: bool)
 
 fn clean_comment(l: &str) -> String {
     let l = l.trim();
-    let l = l
-        .trim_start_matches("///")
-        .trim_start_matches("//!")
-        .trim_start_matches("//");
+    let l = l.trim_start_matches("///").trim_start_matches("//!").trim_start_matches("//");
     let l = l.trim_start_matches("/**").trim_start_matches("/*");
     let l = l.trim_end_matches("*/");
     let l = l.trim();
-    let l = l
-        .strip_prefix("* ")
-        .unwrap_or(if l == "*" { "" } else { l });
+    let l = l.strip_prefix("* ").unwrap_or(if l == "*" { "" } else { l });
     l.to_string()
 }
 
@@ -787,10 +686,7 @@ fn macro_defs(text: &str, syms: &mut Vec<Symbol>, idents: &mut HashMap<String, V
         if let Some(rest) = t.strip_prefix("`define") {
             let ws = rest.len() - rest.trim_start().len();
             let rest2 = rest.trim_start();
-            let n = rest2
-                .bytes()
-                .take_while(|&b| crate::text::is_ident_byte(b))
-                .count();
+            let n = rest2.bytes().take_while(|&b| crate::text::is_ident_byte(b)).count();
             if n > 0 && ws > 0 {
                 let name = &rest2[..n];
                 let name_off = (line_off + (line.len() - t.len()) + "`define".len() + ws) as u32;
@@ -816,10 +712,7 @@ fn macro_defs(text: &str, syms: &mut Vec<Symbol>, idents: &mut HashMap<String, V
                     detail.push_str("\n ...");
                 }
                 i = j;
-                idents
-                    .entry(format!("`{}", name))
-                    .or_default()
-                    .push(name_off);
+                idents.entry(format!("`{}", name)).or_default().push(name_off);
                 syms.push(Symbol {
                     name: name.to_string(),
                     kind: SymKind::Macro,
@@ -851,11 +744,7 @@ mod tests {
     #[test]
     fn class_members_and_types() {
         let f = idx("package p;\n// An item.\nclass c extends base #(int);\n  int x, y; // two ints\n  local my_item item;\n  extern function void f(int a);\n  task run(); int k; endtask\nendclass\nfunction void c::f(int a); endfunction\nendpackage\n");
-        let names: Vec<(&str, SymKind, bool)> = f
-            .symbols
-            .iter()
-            .map(|s| (s.name.as_str(), s.kind, s.local))
-            .collect();
+        let names: Vec<(&str, SymKind, bool)> = f.symbols.iter().map(|s| (s.name.as_str(), s.kind, s.local)).collect();
         assert!(names.contains(&("c", SymKind::Class, false)));
         assert!(names.contains(&("item", SymKind::Variable, false)));
         assert!(names.contains(&("k", SymKind::Variable, true)));
@@ -875,12 +764,7 @@ mod tests {
     #[test]
     fn modules_enums_macros() {
         let f = idx("`define MAX(a,b) ((a)>(b)?(a):(b))\ntypedef enum {RED, GREEN} color_t;\nmodule m #(parameter W=8) (input logic clk);\n  sub u_sub(.a(clk));\n  int z = `MAX(1,2);\nendmodule\n");
-        let get = |n: &str| {
-            f.symbols
-                .iter()
-                .find(|s| s.name == n)
-                .unwrap_or_else(|| panic!("{n}"))
-        };
+        let get = |n: &str| f.symbols.iter().find(|s| s.name == n).unwrap_or_else(|| panic!("{n}"));
         assert_eq!(get("MAX").kind, SymKind::Macro);
         assert_eq!(get("RED").kind, SymKind::EnumMember);
         assert_eq!(get("color_t").kind, SymKind::Typedef);

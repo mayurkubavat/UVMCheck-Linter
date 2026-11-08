@@ -1,13 +1,13 @@
 //! SV-PRF-009 (NbaOnClassProperty): Disallow non-blocking assignments ('<=') on
 //! class properties.
 
-use std::collections::HashSet;
-use sv_syntax::SyntaxKind;
+use crate::support::ast::{assignment_op, in_class, kids, symbol_ref, Ast, DeclKind};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
+use std::collections::HashSet;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::ast::{Ast, DeclKind, assignment_op, in_class, kids, symbol_ref};
 
 /// Slang skips a body it rejects, so only a non-blocking assignment the
 /// model kept (its body compiles) is reported; the model holds no module code.

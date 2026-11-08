@@ -88,7 +88,8 @@ pub(crate) fn clocked_blocking_race(c: &Cst, s: &mut Sink) {
             let mut names: Vec<(&String, &u32)> = writes.iter().collect();
             names.sort_by_key(|(_, t)| **t);
             for (name, &tok) in names {
-                let reader = blocks.iter().enumerate().find(|(j, (_, e, _, r))| *j != i && e == edge && r.contains(name));
+                let reader =
+                    blocks.iter().enumerate().find(|(j, (_, e, _, r))| *j != i && e == edge && r.contains(name));
                 let Some((_, (rblk, _, _, _))) = reader else { continue };
                 if !seen.insert(name.clone()) {
                     continue;

@@ -2,14 +2,14 @@
 //! three or more separate scalar settings from uvm_config_db instead of one
 //! config object (Fowler 'data clumps', MG-4.2).
 
-use std::collections::BTreeSet;
-use dv_model::Design;
-use sv_syntax::NodeId;
 use crate::support::class_roles::{class_methods, role, role_name, user_classes, Ctx, Index, Role};
+use crate::support::routine_bodies::{calls_in, is_config_db_call, Calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::BTreeSet;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::routine_bodies::{Calls, calls_in, is_config_db_call};
 
 /// RUS-002's value types it leaves out: a class handle, a virtual
 /// interface or an unpacked array.

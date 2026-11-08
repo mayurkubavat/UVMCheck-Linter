@@ -1,10 +1,10 @@
 //! UVM-CFG-006 (PlusargsOutsideTest): Flags $test$plusargs, $value$plusargs and
 //! uvm_cmdline_processor reads in classes other than tests and config objects.
 
+use crate::support::class_index::{calls, Classes, Role};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_index::{Classes, Role, calls};
 
 pub(crate) fn plusargs_outside_test(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);

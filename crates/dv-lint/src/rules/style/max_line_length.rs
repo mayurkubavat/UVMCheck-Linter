@@ -2,9 +2,9 @@
 //! (option: max_columns) to preserve readability across split-view editors and
 //! terminal reviews.
 
+use crate::support::source_layout::{at, buffers, lines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::source_layout::{at, buffers, lines};
 
 pub(crate) fn max_line_length(c: &Cst, s: &mut Sink) {
     const MAX: usize = 120;

@@ -3,9 +3,9 @@
 //! objects, PMD CouplingBetweenObjects).
 
 use crate::support::class_index::*;
+use crate::support::class_metrics::each_class;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_metrics::each_class;
 
 pub(crate) fn high_coupling(c: &Cst, s: &mut Sink) {
     let limit = 10;

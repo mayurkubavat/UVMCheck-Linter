@@ -84,7 +84,14 @@ fn statements_nest() {
     let t = parse(src);
     assert!(t.errors.is_empty(), "{:?}", t.errors);
     let kinds: Vec<SyntaxKind> = t.preorder().into_iter().map(|n| t.kind(n)).collect();
-    for k in [SyntaxKind::CaseStmt, SyntaxKind::LoopStmt, SyntaxKind::IfStmt, SyntaxKind::DoWhileStmt, SyntaxKind::AssertStmt, SyntaxKind::StmtLabel] {
+    for k in [
+        SyntaxKind::CaseStmt,
+        SyntaxKind::LoopStmt,
+        SyntaxKind::IfStmt,
+        SyntaxKind::DoWhileStmt,
+        SyntaxKind::AssertStmt,
+        SyntaxKind::StmtLabel,
+    ] {
         assert!(kinds.contains(&k), "missing {k:?}");
     }
 }
@@ -178,7 +185,16 @@ endclass
     assert_eq!(n(SyntaxKind::EventTrigger), 1);
     assert_eq!(
         sv_syntax::canonical_exprs(&t),
-        ["(- W 1)", "(+ 1 1)", "(- n 1)", "(< i j)", "(post++ i)", "(post-- j)", "(= o T::type_id::create($sformatf(\"o%0d\",i),this))", "(= data[k] k)"]
+        [
+            "(- W 1)",
+            "(+ 1 1)",
+            "(- n 1)",
+            "(< i j)",
+            "(post++ i)",
+            "(post-- j)",
+            "(= o T::type_id::create($sformatf(\"o%0d\",i),this))",
+            "(= data[k] k)"
+        ]
     );
 }
 
@@ -403,10 +419,22 @@ endconfig : cfg
         ]
     );
     let kinds: Vec<SyntaxKind> = t.preorder().into_iter().map(|n| t.kind(n)).collect();
-    for k in [SyntaxKind::SpecifyBlock, SyntaxKind::PathDecl, SyntaxKind::TimingCheck, SyntaxKind::UdpDecl,
-              SyntaxKind::UdpTable, SyntaxKind::UdpInitial, SyntaxKind::ConfigDecl, SyntaxKind::Production,
-              SyntaxKind::RsWeight, SyntaxKind::RsRandJoin, SyntaxKind::RsCase, SyntaxKind::AttrSpec,
-              SyntaxKind::NetTypeDecl, SyntaxKind::CheckerDecl] {
+    for k in [
+        SyntaxKind::SpecifyBlock,
+        SyntaxKind::PathDecl,
+        SyntaxKind::TimingCheck,
+        SyntaxKind::UdpDecl,
+        SyntaxKind::UdpTable,
+        SyntaxKind::UdpInitial,
+        SyntaxKind::ConfigDecl,
+        SyntaxKind::Production,
+        SyntaxKind::RsWeight,
+        SyntaxKind::RsRandJoin,
+        SyntaxKind::RsCase,
+        SyntaxKind::AttrSpec,
+        SyntaxKind::NetTypeDecl,
+        SyntaxKind::CheckerDecl,
+    ] {
         assert!(kinds.contains(&k), "no {k:?}");
     }
 }

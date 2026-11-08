@@ -17,11 +17,7 @@ impl Json {
     pub fn get(&self, key: &str) -> &Json {
         static NULL: Json = Json::Null;
         match self {
-            Json::Obj(kv) => kv
-                .iter()
-                .find(|(k, _)| k == key)
-                .map(|(_, v)| v)
-                .unwrap_or(&NULL),
+            Json::Obj(kv) => kv.iter().find(|(k, _)| k == key).map(|(_, v)| v).unwrap_or(&NULL),
             _ => &NULL,
         }
     }
@@ -159,10 +155,7 @@ fn write_str(s: &str, out: &mut String) {
 }
 
 pub fn parse(s: &str) -> Result<Json, String> {
-    let mut p = Parser {
-        b: s.as_bytes(),
-        i: 0,
-    };
+    let mut p = Parser { b: s.as_bytes(), i: 0 };
     p.ws();
     let v = p.value()?;
     p.ws();
@@ -260,18 +253,12 @@ impl Parser<'_> {
             Some(b'n') => self.lit("null", Json::Null),
             Some(_) => {
                 let start = self.i;
-                while self.i < self.b.len()
-                    && matches!(
-                        self.b[self.i],
-                        b'-' | b'+' | b'.' | b'e' | b'E' | b'0'..=b'9'
-                    )
+                while self.i < self.b.len() && matches!(self.b[self.i], b'-' | b'+' | b'.' | b'e' | b'E' | b'0'..=b'9')
                 {
                     self.i += 1;
                 }
                 let t = std::str::from_utf8(&self.b[start..self.i]).unwrap_or("");
-                t.parse::<f64>()
-                    .map(Json::Num)
-                    .map_err(|_| format!("bad number at {}", start))
+                t.parse::<f64>().map(Json::Num).map_err(|_| format!("bad number at {}", start))
             }
         }
     }
@@ -279,8 +266,7 @@ impl Parser<'_> {
     fn hex4(&mut self) -> Result<u32, String> {
         let h = self.b.get(self.i..self.i + 4).ok_or("short \\u escape")?;
         self.i += 4;
-        u32::from_str_radix(std::str::from_utf8(h).map_err(|e| e.to_string())?, 16)
-            .map_err(|e| e.to_string())
+        u32::from_str_radix(std::str::from_utf8(h).map_err(|e| e.to_string())?, 16).map_err(|e| e.to_string())
     }
 
     fn string(&mut self) -> Result<String, String> {
@@ -305,14 +291,10 @@ impl Parser<'_> {
                         b't' => out.push(b'\t'),
                         b'u' => {
                             let mut cp = self.hex4()?;
-                            if (0xD800..0xDC00).contains(&cp)
-                                && self.b.get(self.i..self.i + 2) == Some(b"\\u")
-                            {
+                            if (0xD800..0xDC00).contains(&cp) && self.b.get(self.i..self.i + 2) == Some(b"\\u") {
                                 self.i += 2;
                                 let lo = self.hex4()?;
-                                cp = 0x10000
-                                    + ((cp - 0xD800) << 10)
-                                    + (lo.wrapping_sub(0xDC00) & 0x3FF);
+                                cp = 0x10000 + ((cp - 0xD800) << 10) + (lo.wrapping_sub(0xDC00) & 0x3FF);
                             }
                             let ch = char::from_u32(cp).unwrap_or('\u{FFFD}');
                             let mut buf = [0u8; 4];

@@ -2,12 +2,12 @@
 //! before drop_objection(), used to let traffic drain (xUnit 'sleepy test',
 //! Sonar S2925).
 
-use std::collections::HashSet;
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::ast::{call_site, kids, subtree, unparen, user_class_methods};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::ast::{call_site, kids, subtree, unparen, user_class_methods};
 
 /// `swe::exprText`: tokens joined, any trivia between two of them one space.
 fn norm_text(c: &Cst, n: NodeId) -> String {

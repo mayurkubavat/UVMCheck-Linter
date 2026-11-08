@@ -1,10 +1,10 @@
 //! SV-NAM-003 (InterfaceNamingConvention): Enforces that interface identifiers
 //! end with '_if' (e.g., 'axi_if') to standardize interface definitions.
 
+use crate::support::names::name_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::names::{name_tok};
 
 pub(crate) fn interface_naming(c: &Cst, s: &mut Sink) {
     for n in c.nodes(InterfaceDecl) {

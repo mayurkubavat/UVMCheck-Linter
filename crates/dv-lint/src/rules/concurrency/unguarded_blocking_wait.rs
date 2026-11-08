@@ -2,12 +2,12 @@
 //! drivers and sequences that are not raced against a timeout in fork ...
 //! join_any.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::procedural::{join_kind, name_sym, own_methods, routine_name, start, timing_kind, timing_of};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::procedural::{join_kind, name_sym, own_methods, routine_name, start, timing_kind, timing_of};
 
 /// `swe::classRole` reduced to the two roles SV-CON-015 needs.
 fn role_of(c: &Cst, cls: NodeId) -> &'static str {
@@ -18,10 +18,16 @@ fn role_of(c: &Cst, cls: NodeId) -> &'static str {
         return match n.as_str() {
             "uvm_driver" | "uvm_push_driver" => "driver",
             "uvm_sequence" | "uvm_sequence_base" | "uvm_reg_sequence" => "sequence",
-            "uvm_monitor" | "uvm_agent" | "uvm_scoreboard" | "uvm_subscriber" | "uvm_env" | "uvm_test" | "uvm_report_catcher"
-            | "uvm_sequence_item" | "uvm_transaction" | "uvm_component" | "uvm_root" | "uvm_object" | "uvm_void"
-            | "uvm_push_sequencer" | "uvm_mem" | "uvm_vreg" => "other",
-            x if x.starts_with("uvm_sequencer") || x.starts_with("uvm_reg") || x.starts_with("uvm_callback") || x.starts_with("uvm_tlm") => "other",
+            "uvm_monitor" | "uvm_agent" | "uvm_scoreboard" | "uvm_subscriber" | "uvm_env" | "uvm_test"
+            | "uvm_report_catcher" | "uvm_sequence_item" | "uvm_transaction" | "uvm_component" | "uvm_root"
+            | "uvm_object" | "uvm_void" | "uvm_push_sequencer" | "uvm_mem" | "uvm_vreg" => "other",
+            x if x.starts_with("uvm_sequencer")
+                || x.starts_with("uvm_reg")
+                || x.starts_with("uvm_callback")
+                || x.starts_with("uvm_tlm") =>
+            {
+                "other"
+            }
             _ => continue,
         };
     }
@@ -51,9 +57,10 @@ fn vif_type(c: &Cst, d: Decl) -> Option<String> {
 }
 
 fn is_clocking(c: &Cst, intf: &str, member: &str) -> bool {
-    c.nodes(InterfaceDecl).into_iter().filter(|&i| decl_name(c, i) == intf).any(|i| {
-        subtree(c, i).into_iter().any(|x| c.kind(x) == ClockingDecl && decl_name(c, x) == member)
-    })
+    c.nodes(InterfaceDecl)
+        .into_iter()
+        .filter(|&i| decl_name(c, i) == intf)
+        .any(|i| subtree(c, i).into_iter().any(|x| c.kind(x) == ClockingDecl && decl_name(c, x) == member))
 }
 
 fn is_exempt_signal(name: &str) -> bool {
@@ -107,12 +114,17 @@ pub(crate) fn unguarded_wait(c: &Cst, s: &mut Sink) {
                 continue;
             }
             for x in subtree(c, m) {
-                let guarded = ancestors(c, x).take_while(|&a| a != m).any(|a| c.kind(a) == ParBlock && join_kind(c, a) == "join_any");
+                let guarded = ancestors(c, x)
+                    .take_while(|&a| a != m)
+                    .any(|a| c.kind(a) == ParBlock && join_kind(c, a) == "join_any");
                 if guarded {
                     continue;
                 }
                 let (expr, how) = match c.kind(x) {
-                    WaitStmt if c.keyword(x).is_some_and(|k| c.text_of(k) == "wait") && !c.toks(x).any(|t| c.text_of(t) == "fork") => {
+                    WaitStmt
+                        if c.keyword(x).is_some_and(|k| c.text_of(k) == "wait")
+                            && !c.toks(x).any(|t| c.text_of(t) == "fork") =>
+                    {
                         (kids(c, x).into_iter().find(|&y| !matches!(c.kind(y), StmtLabel | Attribute)), "wait")
                     }
                     TimedStmt => {

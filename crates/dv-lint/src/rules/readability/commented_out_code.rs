@@ -1,11 +1,11 @@
 //! SV-RDB-003 (CommentedOutCode): Flags blocks of // comments that parse as
 //! SystemVerilog statements or declarations (Sonar S125).
 
-use std::collections::HashMap;
-use sv_syntax::Origin;
+use crate::support::trivia::{library_file, split_trivia, Triv};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::trivia::{Triv, library_file, split_trivia};
+use std::collections::HashMap;
+use sv_syntax::Origin;
 
 /// Each written token's trivia (split as slang does), with the token; and
 /// the trivia after each file's last token, with no token.
@@ -52,10 +52,7 @@ fn looks_like_code_line(l: &str) -> bool {
 }
 
 fn parses_cleanly(text: &str) -> bool {
-    let wrappers = [
-        ("module m__; initial begin\n", "\nend\nendmodule\n"),
-        ("class c__;\n", "\nendclass\n"),
-    ];
+    let wrappers = [("module m__; initial begin\n", "\nend\nendmodule\n"), ("class c__;\n", "\nendclass\n")];
     wrappers.iter().any(|(a, b)| {
         let tree = sv_syntax::parse_source(&format!("{a}{text}{b}"), "", Default::default());
         tree.errors.is_empty() && tree.pp_diagnostics.is_empty()

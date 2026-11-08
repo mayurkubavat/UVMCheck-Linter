@@ -1,16 +1,30 @@
 //! SV-ENC-001 (MutableObjectGetterLeak): Disallows getter functions (get_*())
 //! from returning direct references to mutable internal class object members.
 
-use std::collections::HashSet;
 use crate::support::class_items::{class_decls, declarators, own};
+use crate::support::data_items::{data_items, methods, routine_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
 use sv_syntax::SyntaxKind::*;
-use crate::support::data_items::{data_items, methods, routine_name};
 
 const PRIMITIVE: &[&str] = &[
-    "int", "integer", "bit", "logic", "reg", "byte", "shortint", "longint", "time", "real", "shortreal", "realtime",
-    "string", "void", "chandle", "event",
+    "int",
+    "integer",
+    "bit",
+    "logic",
+    "reg",
+    "byte",
+    "shortint",
+    "longint",
+    "time",
+    "real",
+    "shortreal",
+    "realtime",
+    "string",
+    "void",
+    "chandle",
+    "event",
 ];
 
 pub(crate) fn getter_leak(c: &Cst, s: &mut Sink) {

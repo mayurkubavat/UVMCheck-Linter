@@ -1,11 +1,11 @@
 //! SV-CNS-001 (DefineForConstant): Flags `define macros whose body is only a
 //! number or a string, used as constants.
 
-use dv_model::Design;
-use sv_lexer::Kind;
+use crate::support::defines_packages::{define_src, is_overridable_default, origin_loc, user_defines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::defines_packages::{define_src, is_overridable_default, origin_loc, user_defines};
+use dv_model::Design;
+use sv_lexer::Kind;
 
 pub(crate) fn define_for_constant(_: &Design, csts: &[Cst], out: &mut Sink) {
     for d in user_defines(csts) {

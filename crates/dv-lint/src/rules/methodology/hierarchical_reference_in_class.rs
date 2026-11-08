@@ -1,14 +1,14 @@
 //! UVM-CPL-004 (HierarchicalReferenceInClass): Flags class code that names a
 //! module hierarchy (tb_top.dut.sig, $root.tb.x).
 
-use std::collections::HashSet;
-use dv_model::Design;
-use crate::support::routine_bodies::bodies;
 use crate::support::class_roles::{Ctx, Index};
+use crate::support::free_routines::property_owner;
+use crate::support::routine_bodies::bodies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
 use sv_syntax::SyntaxKind::*;
-use crate::support::free_routines::{property_owner};
 
 pub(crate) fn hierarchical_reference_in_class(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);

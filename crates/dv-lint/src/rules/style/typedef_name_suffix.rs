@@ -1,11 +1,11 @@
 //! SV-STY-004 (TypedefNameSuffix): Enforces naming conventions for typedefs:
 //! enums must end with '_e', and structs/data types must end with '_t'.
 
-use std::collections::HashMap;
-use sv_syntax::NodeId;
 use crate::support::copies::copies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashMap;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 /// What a typedef names: an enum, a struct, or another type by name.

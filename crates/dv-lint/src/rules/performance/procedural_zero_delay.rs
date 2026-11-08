@@ -1,12 +1,12 @@
 //! SV-PRF-004 (ProceduralZeroDelay): Procedural delay #0 reschedules execution
 //! into the Inactive region.
 
-use sv_syntax::SyntaxKind;
+use crate::support::ast::{int_value, kids, source_text, unparen, Ast};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::ast::{Ast, int_value, kids, source_text, unparen};
 
 fn zero_delay(c: &Cst, a: &Ast, s: &mut Sink) {
     for n in c.nodes(TimedStmt) {

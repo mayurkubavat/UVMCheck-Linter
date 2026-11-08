@@ -2,9 +2,9 @@
 //! concatenation operators ({>> { ... }} / {<< { ... }}) without explicit slice
 //! size.
 
-use sv_syntax::Child;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::Child;
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn stream_slice(c: &Cst, s: &mut Sink) {

@@ -2,9 +2,9 @@
 //! base-class method that has a body, which silently switches the inherited
 //! behavior off (Fowler 'refused bequest', Liskov substitution).
 
+use crate::support::class_index::{count_statements, Classes};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_index::{Classes, count_statements};
 
 pub(crate) fn empty_override(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);

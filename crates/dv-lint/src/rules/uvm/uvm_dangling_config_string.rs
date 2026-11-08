@@ -2,12 +2,12 @@
 //! matching: detects glob strings in uvm_config_db::set() that match zero
 //! instantiated components in the verification hierarchy.
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use crate::support::uvm_classes::{args, call_name, calls_in, is_component, string_value};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{args, call_name, calls_in, is_component, string_value};
 
 /// `globMatch` of UvmModel: `*` and `?` wildcards.
 fn glob_match(p: &[u8], t: &[u8]) -> bool {
@@ -54,7 +54,9 @@ pub(crate) fn dangling_config_string(d: &Design, csts: &[Cst], s: &mut Sink) {
         return;
     }
     let matches = |pat: &str| {
-        pat.is_empty() || pat == "*" || paths.iter().any(|p| glob_match(pat.as_bytes(), p.as_bytes()) || p.contains(pat))
+        pat.is_empty()
+            || pat == "*"
+            || paths.iter().any(|p| glob_match(pat.as_bytes(), p.as_bytes()) || p.contains(pat))
     };
     for c in csts {
         for n in calls_in(c, c.tree.root) {

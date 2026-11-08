@@ -2,13 +2,17 @@
 //! suffix conventions for classes extending UVM base components (e.g. _seq,
 //! _item, _driver, _monitor, _scoreboard, _env).
 
+use crate::support::source_layout::classes;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::source_layout::{classes};
 
 const CLASS_SUFFIXES: [(&str, &[&str], &str); 8] = [
-    ("uvm_sequence_item", &["_item", "_tr", "_trans", "_pkt", "Item", "Transaction", "Packet", "Tr"], "'_item' or '_tr'"),
+    (
+        "uvm_sequence_item",
+        &["_item", "_tr", "_trans", "_pkt", "Item", "Transaction", "Packet", "Tr"],
+        "'_item' or '_tr'",
+    ),
     ("uvm_sequence", &["_seq", "_sequence", "_vseq", "Seq", "Sequence", "Vseq"], "'_seq'"),
     ("uvm_driver", &["_driver", "_drv", "Driver", "Drv"], "'_driver' or '_drv'"),
     ("uvm_monitor", &["_monitor", "_mon", "Monitor", "Mon"], "'_monitor' or '_mon'"),

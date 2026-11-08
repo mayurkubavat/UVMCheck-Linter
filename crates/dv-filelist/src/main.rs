@@ -55,7 +55,8 @@ fn to_json(fl: &FileList) -> String {
         })
         .collect();
     let strs = |items: &[Item<String>]| -> String {
-        let v: Vec<String> = items.iter().map(|i| format!("{{\"value\":\"{}\",{}}}", esc(&i.value), origin_json(i))).collect();
+        let v: Vec<String> =
+            items.iter().map(|i| format!("{{\"value\":\"{}\",{}}}", esc(&i.value), origin_json(i))).collect();
         format!("[{}]", v.join(","))
     };
     let diags: Vec<String> = fl

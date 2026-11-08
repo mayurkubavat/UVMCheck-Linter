@@ -1,13 +1,13 @@
 //! SV-PRF-002 (ArrayReductionWidthTruncation): Array reduction methods (.sum,
 //! .product) accumulate at element bit-width before extension to LHS.
 
-use sv_syntax::SyntaxKind::*;
-use crate::support::slang_ast::kids;
 use crate::expr_types::expr_types;
+use crate::support::config_db_calls::strip;
+use crate::support::slang_ast::kids;
 use crate::support::style_config::ast_visits;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::config_db_calls::{strip};
+use sv_syntax::SyntaxKind::*;
 
 /// `x = a.sum()` (or `.product()`) into a target wider than the elements:
 /// once per AST visit.
@@ -16,8 +16,9 @@ pub(crate) fn array_reduction_width(c: &Cst, out: &mut Sink) {
     let ix = c.index();
     for e in c.nodes(BinaryExpr) {
         let op = c.keyword(e).map_or("", |k| c.text_of(k));
-        let assign = matches!(op, "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" | "<<<=" | ">>>=")
-            || (op == "<=" && c.parent(e).is_some_and(|p| c.kind(p) == ExprStmt));
+        let assign =
+            matches!(op, "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" | "<<<=" | ">>>=")
+                || (op == "<=" && c.parent(e).is_some_and(|p| c.kind(p) == ExprStmt));
         if !assign {
             continue;
         }

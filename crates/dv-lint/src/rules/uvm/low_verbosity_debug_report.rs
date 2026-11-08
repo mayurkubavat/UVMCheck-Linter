@@ -1,12 +1,12 @@
 //! UVM-REP-005 (LowVerbosityDebugReport): Flags UVM debug or trace messages
 //! configured with low verbosity (UVM_LOW or UVM_NONE).
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use crate::support::uvm_classes::{args, call_name, calls_in, int_value, string_value, unparen};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{args, call_name, calls_in, int_value, string_value, unparen};
 
 pub(crate) fn low_verbosity_debug(_d: &Design, csts: &[Cst], s: &mut Sink) {
     for c in csts {
@@ -23,7 +23,11 @@ pub(crate) fn low_verbosity_debug(_d: &Design, csts: &[Cst], s: &mut Sink) {
             let idv = string_value(c, id).unwrap_or_default();
             let msg = a[1].and_then(|m| string_value(c, m)).unwrap_or_default();
             let (ui, um) = (idv.to_ascii_uppercase(), msg.to_ascii_uppercase());
-            let debug = ui.contains("DEBUG") || ui.contains("TRACE") || ui.contains("DUMP") || um.contains("DEBUG") || um.contains("TRACE");
+            let debug = ui.contains("DEBUG")
+                || ui.contains("TRACE")
+                || ui.contains("DUMP")
+                || um.contains("DEBUG")
+                || um.contains("TRACE");
             if !debug {
                 continue;
             }

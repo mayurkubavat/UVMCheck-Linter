@@ -3,15 +3,15 @@
 //! type-compatible across connect_phase connections.
 //! The item types are compared resolved, as slang compares types.
 
-use sv_syntax::SyntaxKind::*;
-use crate::support::slang_ast::kids;
 use crate::expr_types::expr_types;
+use crate::support::config_db_calls::strip_parens;
+use crate::support::slang_ast::kids;
+use crate::support::slang_ast::DeclKind;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::config_db_calls::{strip_parens};
-use crate::support::slang_ast::DeclKind;
 use sv_sema::oracle::TypeOracle;
 use sv_syntax::NodeId;
+use sv_syntax::SyntaxKind::*;
 
 /// The leftmost name of a chain (`a` of `a.b.c`).
 fn chain_root(c: &Cst, mut e: NodeId) -> NodeId {

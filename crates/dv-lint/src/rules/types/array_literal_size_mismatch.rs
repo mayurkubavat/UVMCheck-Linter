@@ -2,9 +2,9 @@
 //! patterns '{...} where the number of elements does not match the target fixed
 //! array dimension.
 
-use sv_syntax::SyntaxKind;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 
 /// slang's WrongNumberAssignmentPatterns diagnostic, once per pattern.

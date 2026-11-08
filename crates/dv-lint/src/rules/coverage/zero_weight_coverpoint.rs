@@ -1,12 +1,12 @@
 //! SV-COV-002 (ZeroWeightCoverpoint): Flags covergroups, coverpoints, or
 //! crosses configured with option.weight or type_option.weight set to 0.
 
-use crate::support::slang_ast::*;
 use crate::support::procedural::start;
+use crate::support::slang_ast::*;
+use crate::support::sva_cov::{option_parts, option_target};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{option_parts, option_target};
 
 pub(crate) fn zero_weight(c: &Cst, s: &mut Sink) {
     for o in c.nodes(CoverageOption) {

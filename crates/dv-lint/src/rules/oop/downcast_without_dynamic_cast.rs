@@ -1,14 +1,15 @@
 //! SV-OOP-011 (DowncastWithoutDynamicCast): Flags static casting syntax (e.g.
 
-use std::collections::HashSet;
-use dv_model::Design;
 use crate::support::class_items::{decl_name, own};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn downcast(d: &Design, csts: &[Cst], s: &mut Sink) {
-    let mut known: HashSet<String> = d.classes().iter().filter(|k| !k.is_parameterized).map(|k| k.name.clone()).collect();
+    let mut known: HashSet<String> =
+        d.classes().iter().filter(|k| !k.is_parameterized).map(|k| k.name.clone()).collect();
     const HINTS: &[&str] =
         &["uvm_", "_item", "_seq", "_driver", "_monitor", "_scoreboard", "_env", "_component", "_object"];
     for c in csts {

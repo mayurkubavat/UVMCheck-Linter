@@ -2,10 +2,10 @@
 //! deeper than the threshold (default 5; Checkstyle NestedIfDepth, clang-tidy
 //! readability-function-size NestingThreshold).
 
+use crate::support::routine_metrics::{each_routine, routine_metrics};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::routine_metrics::{each_routine, routine_metrics};
 
 pub(crate) fn deep_nesting(c: &Cst, s: &mut Sink) {
     let limit = 5;

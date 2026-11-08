@@ -2,12 +2,12 @@
 //! super call with the same arguments, such as a connect_phase that only calls
 //! super.connect_phase(phase) (Pylint useless-parent-delegation, Sonar S1185).
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::class_index::Classes;
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::class_index::Classes;
 
 /// The only statement of a body, looking through begin/end.
 fn sole_statement(c: &Cst, n: NodeId) -> Option<NodeId> {

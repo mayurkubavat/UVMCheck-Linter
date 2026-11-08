@@ -1,9 +1,9 @@
 //! SV-PRF-006 (StringKeyAssociativeArray): Detects associative arrays indexed
 //! by 'string'.
 
-use sv_syntax::{NodeId, SyntaxKind};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The first unpacked dimension is `[string]`. A typedef'd associative
@@ -19,7 +19,9 @@ pub(crate) fn string_key_assoc(c: &Cst, s: &mut Sink) {
     let decls = c.nodes(DataDecl).into_iter().chain(c.nodes(Port));
     for dd in decls {
         // Struct members are fields, not variables; module ports are nets.
-        if c.kind(dd) == DataDecl && std::iter::successors(c.parent(dd), |&a| c.parent(a)).any(|a| c.kind(a) == DataType) {
+        if c.kind(dd) == DataDecl
+            && std::iter::successors(c.parent(dd), |&a| c.parent(a)).any(|a| c.kind(a) == DataType)
+        {
             continue;
         }
         if c.kind(dd) == Port

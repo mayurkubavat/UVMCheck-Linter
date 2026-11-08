@@ -1,30 +1,21 @@
 //! UVM-SEQ-010 (SequenceItemCreateWithoutType): Flags sequence items created
 //! via direct new() inside sequence body().
 
-use dv_model::Design;
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::uvm_syntax::{
-    assignment, body_items,
-    name_node, stmt_expr, subtree,
-};
+use crate::support::uvm_classes::{sequence_bodies, Ix};
+use crate::support::uvm_syntax::{assignment, body_items, name_node, stmt_expr, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, sequence_bodies};
 
 /// slang's `NewClassExpression`: `new`, `new(...)`, `C::new(...)`.
 fn is_new_class(c: &Cst, e: NodeId) -> bool {
     match c.kind(e) {
         NewExpr => {
-            c.tok(e, "new").is_some()
-                && c.tok(e, "[").is_none()
-                && c.items(e).into_iter().all(|x| c.kind(x) == ArgList)
+            c.tok(e, "new").is_some() && c.tok(e, "[").is_none() && c.items(e).into_iter().all(|x| c.kind(x) == ArgList)
         }
-        CallExpr => c
-            .tree
-            .children(e)
-            .next()
-            .is_some_and(|l| c.kind(l) == ScopedExpr && c.last_text(l) == "new"),
+        CallExpr => c.tree.children(e).next().is_some_and(|l| c.kind(l) == ScopedExpr && c.last_text(l) == "new"),
         _ => false,
     }
 }

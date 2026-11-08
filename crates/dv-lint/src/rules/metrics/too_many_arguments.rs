@@ -1,10 +1,10 @@
 //! SV-MET-003 (TooManyArguments): Flags tasks and functions with more formal
 //! arguments than the threshold (default 7; Pylint R0913, Sonar S107).
 
+use crate::support::routine_metrics::each_routine;
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::routine_metrics::{each_routine};
 
 pub(crate) fn too_many_arguments(c: &Cst, s: &mut Sink) {
     let limit = 7;

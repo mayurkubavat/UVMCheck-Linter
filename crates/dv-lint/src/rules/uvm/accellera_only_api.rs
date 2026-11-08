@@ -3,12 +3,12 @@
 //! @uvm-accellera in the library source), such as uvm_component::print_config
 //! or uvm_port_base::debug_connected_to.
 
-use std::collections::HashSet;
-use dv_model::{Design, Loc};
+use crate::support::defines_packages::{api_pack, user_tok, Files};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use std::collections::HashSet;
 use sv_syntax::SyntaxKind::*;
-use crate::support::defines_packages::{Files, api_pack, user_tok};
 
 pub(crate) fn accellera_only_api(_: &Design, csts: &[Cst], out: &mut Sink) {
     let Some(pack) = api_pack(csts) else { return };
@@ -37,7 +37,9 @@ Another UVM implementation, or a later Accellera release, need not have it. Keep
             if !matches!(c.kind(decl), FunctionDecl | TaskDecl | MethodPrototype) {
                 continue;
             }
-            let Some(cls) = crate::support::slang_ast::ancestors(c, decl).find(|&a| c.kind(a) == ClassDecl) else { continue };
+            let Some(cls) = crate::support::slang_ast::ancestors(c, decl).find(|&a| c.kind(a) == ClassDecl) else {
+                continue;
+            };
             let cname = crate::support::slang_ast::decl_name(c, cls);
             let member = crate::support::slang_ast::last_name(c, decl);
             if !cname.starts_with("uvm_") || !pack.accellera_members.contains(&(cname.clone(), member.clone())) {

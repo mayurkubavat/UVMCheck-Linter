@@ -1,10 +1,10 @@
 //! SV-DEP-001 (ProgramBlockDeprecation): Disallow the obsolete SystemVerilog
 //! 'program' block.
 
-use sv_syntax::SyntaxKind;
+use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::syntax::{Cst};
 
 pub(crate) fn program_block(c: &Cst, s: &mut Sink) {
     for n in c.nodes(ProgramDecl) {

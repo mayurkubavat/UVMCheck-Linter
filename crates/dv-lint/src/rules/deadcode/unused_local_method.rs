@@ -1,11 +1,11 @@
 //! SV-DED-014 (UnusedLocalMethod): Flags a local task or function that no
 //! method of its class calls.
 
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use crate::support::handles::{body_refs_if_good, method_decl_in, routine_is_virtual};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::handles::{body_refs_if_good, method_decl_in, routine_is_virtual};
+use sv_syntax::NodeId;
+use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn unused_local_method(c: &Cst, out: &mut Sink) {
     use crate::support::slang_ast::{class_methods, decl_name, enclosing_class, has_kw, last_name, user_classes};
@@ -29,9 +29,8 @@ pub(crate) fn unused_local_method(c: &Cst, out: &mut Sink) {
                     return false;
                 }
                 body_calls(c, b).into_iter().any(|call| {
-                    crate::support::slang_ast::callee_decl(c, call).is_some_and(|d| {
-                        last_name(c, d) == name && enclosing_class(c, d).is_some_and(|k| k == cls)
-                    })
+                    crate::support::slang_ast::callee_decl(c, call)
+                        .is_some_and(|d| last_name(c, d) == name && enclosing_class(c, d).is_some_and(|k| k == cls))
                 })
             });
             if used {
@@ -57,7 +56,9 @@ fn body_calls(c: &Cst, body: NodeId) -> Vec<NodeId> {
     crate::support::slang_ast::subtree(c, body)
         .into_iter()
         .filter(|&x| c.kind(x) == CallExpr)
-        .filter(|&x| !crate::support::slang_ast::ancestors(c, x).take_while(|&a| a != body).any(|a| c.kind(a) == Declarator))
+        .filter(|&x| {
+            !crate::support::slang_ast::ancestors(c, x).take_while(|&a| a != body).any(|a| c.kind(a) == Declarator)
+        })
         .filter(|&x| !crate::support::procedural::is_system_call(c, x))
         .collect()
 }

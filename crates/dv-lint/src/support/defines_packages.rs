@@ -17,8 +17,6 @@ use crate::support::class_roles::{key, role, user_classes, Role};
 
 use crate::syntax::Cst;
 
-
-
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn base_name(p: &str) -> &str {
@@ -183,10 +181,36 @@ pub(crate) fn live(tree: &Tree, f: u32, off: u32) -> bool {
 
 /// Compiler directive names, which cannot be defined as macros.
 pub(crate) const DIRECTIVES: &[&str] = &[
-    "define", "undef", "undefineall", "ifdef", "ifndef", "elsif", "else", "endif", "include", "timescale", "default_nettype",
-    "resetall", "celldefine", "endcelldefine", "unconnected_drive", "nounconnected_drive", "line", "pragma",
-    "begin_keywords", "end_keywords", "__FILE__", "__LINE__", "default_decay_time", "default_trireg_strength",
-    "delay_mode_distributed", "delay_mode_path", "delay_mode_unit", "delay_mode_zero", "protect", "endprotect",
+    "define",
+    "undef",
+    "undefineall",
+    "ifdef",
+    "ifndef",
+    "elsif",
+    "else",
+    "endif",
+    "include",
+    "timescale",
+    "default_nettype",
+    "resetall",
+    "celldefine",
+    "endcelldefine",
+    "unconnected_drive",
+    "nounconnected_drive",
+    "line",
+    "pragma",
+    "begin_keywords",
+    "end_keywords",
+    "__FILE__",
+    "__LINE__",
+    "default_decay_time",
+    "default_trireg_strength",
+    "delay_mode_distributed",
+    "delay_mode_path",
+    "delay_mode_unit",
+    "delay_mode_zero",
+    "protect",
+    "endprotect",
 ];
 
 /// A token of a tree written in a user file (not made by a macro).
@@ -391,7 +415,9 @@ pub(crate) fn package_graph(d: &Design, csts: &[Cst]) -> PackageGraph {
             for k in c.tree.children(p) {
                 match c.kind(k) {
                     ClassDecl => {
-                        let Some((_, nt)) = c.tree.child(k, Name).and_then(|n| c.tree.token_bounds(n)) else { continue };
+                        let Some((_, nt)) = c.tree.child(k, Name).and_then(|n| c.tree.token_bounds(n)) else {
+                            continue;
+                        };
                         if let Some(cls) = classes.get(&key(c.loc(nt))) {
                             let l = layers.entry(name.clone()).or_insert(0);
                             *l = (*l).max(layer_of(role(d, cls)));

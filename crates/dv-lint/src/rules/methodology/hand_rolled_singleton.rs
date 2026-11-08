@@ -1,10 +1,10 @@
 //! UVM-PAT-002 (HandRolledSingleton): Flags a class that keeps a static
 //! variable of its own type, the usual hand-rolled singleton.
 
-use dv_model::{Class, Design};
 use crate::support::class_roles::{class_methods, user_classes, Ctx, Index};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Class, Design};
 use sv_syntax::SyntaxKind::*;
 
 fn singleton_finding(cls: &Class, var: &str, loc: dv_model::Loc, out: &mut Sink) {

@@ -2,8 +2,8 @@
 //! accessing p_sequencer violates the Law of Demeter by tightly coupling the
 //! sequence data tier to physical sequencer component internals.
 
-use dv_model::{Design, UvmKind};
 use crate::{find_property, Severity, Sink};
+use dv_model::{Design, UvmKind};
 
 pub(crate) fn uvm_p_sequencer_abuse(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

@@ -3,16 +3,13 @@
 //! path containing raise_objection() is strictly guaranteed to reach a matching
 //! drop_objection() without early returns or asymmetric conditional branching.
 
-use dv_model::Design;
-use sv_syntax::{Child, NodeId, SyntaxKind};
-use crate::support::uvm_syntax::{
-    body_items, callee,
-    name_node, routine_last_name, stmt_expr,
-};
+use crate::support::uvm_classes::{block_stmts, if_parts, is_component, is_sequence, Ix};
+use crate::support::uvm_syntax::{body_items, callee, name_node, routine_last_name, stmt_expr};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::{Child, NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, block_stmts, if_parts, is_component, is_sequence};
 
 /// A case statement's items: each statement, and whether it is the default.
 fn case_items(c: &Cst, n: NodeId) -> Vec<(NodeId, bool)> {
@@ -87,7 +84,8 @@ impl Flow<'_, '_> {
             SeqBlock | ParBlock | Body => self.list(&block_stmts(c, n), st),
             ExprStmt => {
                 let text = stmt_expr(c, n).map(|e| c.text(e)).unwrap_or_default();
-                let named = stmt_expr(c, n).map(|e| if c.kind(e) == CallExpr { callee(c, e) } else { "" }).unwrap_or("");
+                let named =
+                    stmt_expr(c, n).map(|e| if c.kind(e) == CallExpr { callee(c, e) } else { "" }).unwrap_or("");
                 if named == "raise_objection" || text.contains("raise_objection") {
                     if st == Obj::Held {
                         let msg = format!(
@@ -221,7 +219,9 @@ pub(crate) fn objection_control_flow(d: &Design, csts: &[Cst], s: &mut Sink) {
                 s.add("UVM-OBJ-003", "ObjectionControlFlowMismatch", sev, msg, c.loc(t));
             }
             if !ret && st == Obj::Held {
-                let Some(loc) = name_node(c, at.node).and_then(|x| c.tree.token_range(x).last().copied()).map(|t| c.loc(t)) else {
+                let Some(loc) =
+                    name_node(c, at.node).and_then(|x| c.tree.token_range(x).last().copied()).map(|t| c.loc(t))
+                else {
                     continue;
                 };
                 s.add(

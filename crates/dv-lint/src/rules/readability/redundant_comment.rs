@@ -3,17 +3,16 @@
 //! ...) is already a word of the statement's names, e.g. '// set cfg' above
 //! set_cfg().
 
+use crate::support::trivia::{ident_words, is_library_tok, split_trivia, Triv};
+use crate::syntax::Cst;
+use crate::{Severity, Sink};
 use std::collections::BTreeSet;
 use sv_lexer::Kind;
 use sv_syntax::Origin;
-use crate::syntax::Cst;
-use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::trivia::{Triv, ident_words, is_library_tok, split_trivia};
 
-const STOP: [&str; 16] = [
-    "the", "a", "an", "to", "of", "and", "for", "in", "on", "with", "this", "that", "is", "it", "from", "into",
-];
+const STOP: [&str; 16] =
+    ["the", "a", "an", "to", "of", "and", "for", "in", "on", "with", "this", "that", "is", "it", "from", "into"];
 
 pub(crate) fn redundant_comment(c: &Cst, s: &mut Sink) {
     let t = c.tree;
@@ -68,7 +67,9 @@ pub(crate) fn redundant_comment(c: &Cst, s: &mut Sink) {
             }
         }
         let covered = |w: &String| {
-            code.iter().any(|c| c == w || (c.len() >= 3 && w.len() >= 3 && (c.starts_with(w.as_str()) || w.starts_with(c.as_str()))))
+            code.iter().any(|c| {
+                c == w || (c.len() >= 3 && w.len() >= 3 && (c.starts_with(w.as_str()) || w.starts_with(c.as_str())))
+            })
         };
         if !words.iter().all(covered) {
             continue;

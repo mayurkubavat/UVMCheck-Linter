@@ -57,7 +57,8 @@ pub(crate) fn classes(c: &Cst) -> Vec<ClassConstraints> {
         if !user_tok(c, &fs, nt) {
             continue;
         }
-        let mut cc = ClassConstraints { name: c.tree.bare_text(nm), vars: HashMap::new(), atoms: Vec::new(), dists: Vec::new() };
+        let mut cc =
+            ClassConstraints { name: c.tree.bare_text(nm), vars: HashMap::new(), atoms: Vec::new(), dists: Vec::new() };
         for item in c.tree.children(k) {
             if c.kind(item) != DataDecl || !c.toks(item).any(|t| matches!(c.text_of(t), "rand" | "randc")) {
                 continue;

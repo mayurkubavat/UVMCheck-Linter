@@ -2,12 +2,12 @@
 //! a monitor where one branch counts clock cycles (repeat (N) @(...)) and then
 //! reports an error: a handshake timeout written as procedural code.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::class_index::{all_stmts, strongest_report, Classes, Level, Role};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::class_index::{Classes, Level, Role, all_stmts, strongest_report};
 
 pub(crate) fn procedural_timeout(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);

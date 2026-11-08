@@ -179,15 +179,18 @@ fn only_in(headers: &[std::path::PathBuf], files: &[String], found: &[dv_lint::F
         return found.to_vec();
     }
     let canon = |f: &str| std::path::Path::new(f).canonicalize().ok();
-    found
-        .iter()
-        .filter(|f| canon(f.position_in(files).0).is_some_and(|p| headers.contains(&p)))
-        .cloned()
-        .collect()
+    found.iter().filter(|f| canon(f.position_in(files).0).is_some_and(|p| headers.contains(&p))).cloned().collect()
 }
 
 /// Prints the findings (and with `--time` the stage times) and exits.
-fn report(design: &Design, time: bool, frames: bool, t: std::time::Instant, files: &[String], found: &[dv_lint::Finding]) -> ! {
+fn report(
+    design: &Design,
+    time: bool,
+    frames: bool,
+    t: std::time::Instant,
+    files: &[String],
+    found: &[dv_lint::Finding],
+) -> ! {
     let mut sources = dv_lint::frames::Sources::default();
     if time {
         let tm = design.timings();
@@ -202,16 +205,7 @@ fn report(design: &Design, time: bool, frames: bool, t: std::time::Instant, file
     }
     for f in found {
         let (file, line, column) = f.position_in(files);
-        println!(
-            "{}:{}:{}: [{}] {} ({}): {}",
-            file,
-            line,
-            column,
-            f.severity.as_str(),
-            f.rule,
-            f.name,
-            f.message
-        );
+        println!("{}:{}:{}: [{}] {} ({}): {}", file, line, column, f.severity.as_str(), f.rule, f.name, f.message);
         if frames {
             print!("{}", sources.frame(file, line, column));
         }

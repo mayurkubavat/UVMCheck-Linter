@@ -1,14 +1,14 @@
 //! SV-DUP-001 (DuplicateMethodBody): Detects identical or copy-pasted
 //! subroutine method bodies across different classes.
 
-use std::collections::HashMap;
-use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
 use crate::support::class_items::decl_name;
+use crate::support::data_items::{methods, routine_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use std::collections::HashMap;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::data_items::{methods, routine_name};
 
 /// A node's text exactly as its file holds it, from its first token to the
 /// end of its last; `None` when either end comes from a macro.

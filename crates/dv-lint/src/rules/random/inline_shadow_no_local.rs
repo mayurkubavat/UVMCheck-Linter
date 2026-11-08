@@ -1,10 +1,10 @@
 //! SV-RND-004 (InlineShadowNoLocal): Detects inline constraint variable
 //! shadowing inside 'randomize() with' missing 'local::'.
 
+use crate::support::class_items::{kids, op, subtree, trim, with_clause};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_items::{kids, op, subtree, trim, with_clause};
 
 pub(crate) fn inline_shadow_no_local(c: &Cst, s: &mut Sink) {
     for call in c.nodes(CallExpr) {

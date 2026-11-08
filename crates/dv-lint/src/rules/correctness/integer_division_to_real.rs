@@ -2,14 +2,14 @@
 //! used as a real value, which truncates before the conversion (Sonar S2184,
 //! SpotBugs ICAST_IDIV_CAST_TO_DOUBLE).
 
-use sv_syntax::NodeId;
 use crate::support::class_items::{kids, op, user_code};
-use crate::support::type_text::expr_text;
+use crate::support::real_types::{Ty, Types};
 use crate::support::sema_facts::ast_ok;
+use crate::support::type_text::expr_text;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::real_types::{Ty, Types};
 
 /// The division sits where slang converts it to real implicitly.
 fn converted_to_real(types: &Types, div: NodeId) -> bool {

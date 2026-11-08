@@ -6,11 +6,7 @@ use dv_model::{Class, Design};
 
 use sv_syntax::NodeId;
 
-
-
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 

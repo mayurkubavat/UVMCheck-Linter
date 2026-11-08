@@ -1,16 +1,13 @@
 //! UVM-STY-003 (ComponentNameMismatch): Disallows passing hardcoded string
 //! literals to super.new() in uvm_component constructors.
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
-use crate::support::uvm_syntax::{
-    arg_list,
-    name_node, ordered_expr, params, routine_last_name, subtree,
-};
+use crate::support::uvm_classes::{comp_decl, routines_in, Ix};
+use crate::support::uvm_syntax::{arg_list, name_node, ordered_expr, params, routine_last_name, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, comp_decl, routines_in};
 
 pub(crate) fn component_name_mismatch(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);
@@ -33,9 +30,7 @@ pub(crate) fn component_name_mismatch(d: &Design, csts: &[Cst], s: &mut Sink) {
             let mut list = None;
             for n in subtree(c, f) {
                 let found = match c.kind(n) {
-                    CallExpr => {
-                        c.tree.children(n).next().is_some_and(|l| c.text(l).contains("super.new"))
-                    }
+                    CallExpr => c.tree.children(n).next().is_some_and(|l| c.text(l).contains("super.new")),
                     NewExpr => false,
                     _ => false,
                 };

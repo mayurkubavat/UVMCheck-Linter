@@ -1,14 +1,14 @@
 //! SV-PKG-003 (UnusedPackageImport): Flags package imports that supply no name
 //! used in their scope.
 
-use std::collections::{HashMap, HashSet};
-use dv_model::Design;
-use sv_lexer::Kind;
-use sv_syntax::NodeId;
+use crate::support::defines_packages::{import_items, user_tok, Files};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::{HashMap, HashSet};
+use sv_lexer::Kind;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::defines_packages::{Files, import_items, user_tok};
 
 /// The names each package declares at its top (what a wildcard import of
 /// it can supply).
@@ -49,7 +49,13 @@ fn declared_names(c: &Cst) -> Vec<(u32, u32)> {
     out
 }
 
-fn looked_up(c: &Cst, lo: u32, hi: u32, packages: &HashMap<String, HashSet<String>>, skip: &[(u32, u32)]) -> HashSet<String> {
+fn looked_up(
+    c: &Cst,
+    lo: u32,
+    hi: u32,
+    packages: &HashMap<String, HashSet<String>>,
+    skip: &[(u32, u32)],
+) -> HashSet<String> {
     let t = c.tree;
     let mut declared = HashSet::new();
     let mut decl_toks = HashSet::new();
@@ -179,9 +185,9 @@ pub(crate) fn unused_package_import(_: &Design, csts: &[Cst], out: &mut Sink) {
                             if !import_items(o, i).iter().any(|&(p, _)| o.text_of(p) == pkg) {
                                 continue;
                             }
-                            match crate::support::slang_ast::ancestors(o, i)
-                                .find(|&a| matches!(o.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | PackageDecl | SourceFile))
-                            {
+                            match crate::support::slang_ast::ancestors(o, i).find(|&a| {
+                                matches!(o.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | PackageDecl | SourceFile)
+                            }) {
                                 Some(u) if o.kind(u) == SourceFile => {}
                                 Some(u) => skip.extend(o.tree.token_bounds(u)),
                                 None => {}
@@ -202,7 +208,7 @@ pub(crate) fn unused_package_import(_: &Design, csts: &[Cst], out: &mut Sink) {
                 }
                 let what = format!("{pkg}::{name}");
                 for _ in 0..copies {
-                out.add(
+                    out.add(
                     "SV-PKG-003",
                     "UnusedPackageImport",
                     Severity::Warning,

@@ -3,8 +3,8 @@
 //! with '_driver', uvm_monitor with '_monitor', uvm_agent with '_agent',
 //! uvm_env with '_env', and uvm_test with '_test'.
 
+use crate::{derives_from, Severity, Sink};
 use dv_model::Design;
-use crate::{Severity, Sink, derives_from};
 
 pub(crate) fn uvm_component_naming_convention(d: &Design, out: &mut Sink) {
     const CHECKS: [(&str, &str, &str); 5] = [

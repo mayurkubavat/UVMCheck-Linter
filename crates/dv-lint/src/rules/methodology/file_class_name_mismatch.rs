@@ -2,12 +2,12 @@
 //! more than one top-level class, or whose one class is not named after the
 //! file (my_drv.svh holding my_driver).
 
-use std::collections::{BTreeMap, HashSet};
-use dv_model::{Design, Loc};
+use crate::support::defines_packages::{base_name, Files};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use std::collections::{BTreeMap, HashSet};
 use sv_syntax::SyntaxKind::*;
-use crate::support::defines_packages::{Files, base_name};
 
 #[derive(Default)]
 struct ClassFile {
@@ -23,7 +23,8 @@ pub(crate) fn file_class_name_mismatch(_: &Design, csts: &[Cst], out: &mut Sink)
         // Only `include'd user files: the class files of a package.
         let file_of = |t: u32| -> Option<String> {
             let tok = &c.tree.tokens[t as usize];
-            (!tok.from_macro && !c.tree.mains.contains(&tok.origin.file) && fs.user(tok.origin.file)).then(|| fs.path(tok.origin.file))
+            (!tok.from_macro && !c.tree.mains.contains(&tok.origin.file) && fs.user(tok.origin.file))
+                .then(|| fs.path(tok.origin.file))
         };
         for n in c.nodes_of(&[ClassDecl, ModuleDecl, InterfaceDecl, ProgramDecl, PackageDecl]) {
             let Some(first) = c.first_tok(n) else { continue };

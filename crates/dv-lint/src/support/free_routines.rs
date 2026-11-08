@@ -1,15 +1,10 @@
 //! Free routines, assignment targets and the classes properties belong to.
 
-
 use dv_model::{Class, Design};
 
 use sv_syntax::NodeId;
 
-
-
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 
@@ -37,8 +32,9 @@ pub(crate) fn assignment_lhs(c: &Cst, n: NodeId) -> Option<NodeId> {
         return None;
     }
     let op = c.text_of(c.toks(n).next()?);
-    let assign = matches!(op, "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" | "<<<=" | ">>>=")
-        || (op == "<=" && c.parent(n).is_some_and(|p| c.kind(p) == ExprStmt));
+    let assign =
+        matches!(op, "=" | "+=" | "-=" | "*=" | "/=" | "%=" | "&=" | "|=" | "^=" | "<<=" | ">>=" | "<<<=" | ">>>=")
+            || (op == "<=" && c.parent(n).is_some_and(|p| c.kind(p) == ExprStmt));
     if !assign {
         return None;
     }
@@ -60,7 +56,5 @@ pub(crate) fn skip_selects(c: &Cst, mut n: NodeId) -> NodeId {
 
 /// The class (or a base) whose property `name` is, if any.
 pub(crate) fn property_owner<'d>(d: &'d Design, c: &'d Class, name: &str) -> Option<&'d Class> {
-    std::iter::once(c)
-        .chain(d.ancestors(c.id))
-        .find(|k| k.properties.iter().any(|p| p.name == name))
+    std::iter::once(c).chain(d.ancestors(c.id)).find(|k| k.properties.iter().any(|p| p.name == name))
 }

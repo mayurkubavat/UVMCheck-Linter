@@ -1,10 +1,10 @@
 //! SV-RND-012 (ZeroWeightDistribution): Detects constraint distribution blocks
 //! where all weights evaluate to zero.
 
+use crate::support::spans::child_nodes;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::spans::{child_nodes};
 
 pub(crate) fn zero_weight_dist(c: &Cst, s: &mut Sink) {
     for n in c.nodes(ExprOrDist) {

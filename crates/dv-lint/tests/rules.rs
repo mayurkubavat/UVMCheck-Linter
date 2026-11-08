@@ -31,18 +31,9 @@ fn oop_rules() {
     let src = "class a; int x; function void f(); endfunction endclass\n\
                class b extends a; int x; function void f(); endfunction function new(); endfunction endclass\n";
     let got = findings(src);
-    assert!(
-        got.contains(&("t.sv".into(), 2, 24, "SV-OOP-004")),
-        "{got:?}"
-    );
-    assert!(
-        got.contains(&("t.sv".into(), 2, 41, "SV-OOP-001")),
-        "{got:?}"
-    );
-    assert!(
-        got.contains(&("t.sv".into(), 2, 67, "SV-OOP-003")),
-        "{got:?}"
-    );
+    assert!(got.contains(&("t.sv".into(), 2, 24, "SV-OOP-004")), "{got:?}");
+    assert!(got.contains(&("t.sv".into(), 2, 41, "SV-OOP-001")), "{got:?}");
+    assert!(got.contains(&("t.sv".into(), 2, 67, "SV-OOP-003")), "{got:?}");
 }
 
 #[test]
@@ -55,14 +46,7 @@ fn component_rules() {
          endclass\n"
     );
     let got: Vec<_> = findings(&src).into_iter().map(|f| f.3).collect();
-    for id in [
-        "SV-OOP-007",
-        "SV-STY-001",
-        "UVM-PHS-002",
-        "UVM-PHS-009",
-        "UVM-OBJ-001",
-        "SV-NAM-001",
-    ] {
+    for id in ["SV-OOP-007", "SV-STY-001", "UVM-PHS-002", "UVM-PHS-009", "UVM-OBJ-001", "SV-NAM-001"] {
         assert!(got.contains(&id), "{id} missing in {got:?}");
     }
     // my_mon derives from uvm_monitor but lacks the _monitor suffix.
@@ -74,10 +58,7 @@ fn macro_code_is_reported_at_the_expansion() {
     let src = "`define DECL static int n;\nclass uvm_component; endclass\n\
                class c_env extends uvm_component;\n  `DECL\nendclass\n";
     let got = findings(src);
-    assert!(
-        got.contains(&("t.sv".into(), 4, 0, "SV-OOP-007")),
-        "{got:?}"
-    );
+    assert!(got.contains(&("t.sv".into(), 4, 0, "SV-OOP-007")), "{got:?}");
 }
 
 #[test]
@@ -147,8 +128,20 @@ fn syntax_rules_batch_two() {
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let got: Vec<_> = found.iter().map(|f| f.rule).collect();
     for want in [
-        "SV-NAM-002", "SV-NAM-003", "SV-DEP-006", "SV-BAN-001", "SV-COV-015", "SV-COV-009", "SV-COV-008",
-        "SV-RND-009", "SV-TYP-010", "SVA-LBL-001", "SV-CON-010", "SV-CON-004", "SV-RND-014", "UVM-PHS-007",
+        "SV-NAM-002",
+        "SV-NAM-003",
+        "SV-DEP-006",
+        "SV-BAN-001",
+        "SV-COV-015",
+        "SV-COV-009",
+        "SV-COV-008",
+        "SV-RND-009",
+        "SV-TYP-010",
+        "SVA-LBL-001",
+        "SV-CON-010",
+        "SV-CON-004",
+        "SV-RND-014",
+        "UVM-PHS-007",
     ] {
         assert!(got.contains(&want), "{want} not in {got:?}");
     }
@@ -248,7 +241,16 @@ fn syntax_rules_batch_five() {
     let d = sv_sema::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
-    for id in ["PORT-PRP-001", "UVM-CFG-003", "UVM-CFG-004", "UVM-TLM-002", "UVM-STR-005", "SV-LSP-001", "SV-OCP-001", "SV-STR-001"] {
+    for id in [
+        "PORT-PRP-001",
+        "UVM-CFG-003",
+        "UVM-CFG-004",
+        "UVM-TLM-002",
+        "UVM-STR-005",
+        "SV-LSP-001",
+        "SV-OCP-001",
+        "SV-STR-001",
+    ] {
         assert_eq!(count(id), 1, "{id}");
     }
 }
@@ -271,7 +273,16 @@ fn syntax_rules_batch_six() {
     let d = sv_sema::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
-    for id in ["SV-COV-006", "SV-COV-010", "SV-COV-012", "UVM-PHS-004", "SVA-VAC-001", "SVA-RST-001", "SV-PRF-012", "UVM-SEQ-012"] {
+    for id in [
+        "SV-COV-006",
+        "SV-COV-010",
+        "SV-COV-012",
+        "UVM-PHS-004",
+        "SVA-VAC-001",
+        "SVA-RST-001",
+        "SV-PRF-012",
+        "UVM-SEQ-012",
+    ] {
         assert!(count(id) >= 1, "{id}");
     }
 }
@@ -301,21 +312,49 @@ fn expected(json: &str) -> Vec<(String, u32)> {
 fn uvm_and_ral_rules_on_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let ids = [
-        "RAL-ACC-001", "RAL-ACC-002", "RAL-BLK-001", "RAL-COL-001", "RAL-MAP-001", "RAL-MAP-002",
-        "UVM-ALS-001", "UVM-DAG-001", "UVM-FAC-004", "UVM-FAC-005", "UVM-LOG-002", "UVM-OBJ-002",
-        "UVM-OBJ-003", "UVM-OBJ-004", "UVM-OBJ-005", "UVM-OBS-002", "UVM-PHS-005", "UVM-PHS-006",
-        "UVM-PHS-008", "UVM-PHS-010", "UVM-RAL-001", "UVM-REP-005", "UVM-SCB-001", "UVM-SCB-002",
-        "UVM-SEQ-005", "UVM-SEQ-006", "UVM-SEQ-008", "UVM-SEQ-009", "UVM-SEQ-010", "UVM-SEQ-011",
-        "UVM-SEQ-014", "UVM-SEQ-015", "UVM-STY-003", "UVM-TLM-004", "UVM-TLM-005", "UVM-TLM-006",
+        "RAL-ACC-001",
+        "RAL-ACC-002",
+        "RAL-BLK-001",
+        "RAL-COL-001",
+        "RAL-MAP-001",
+        "RAL-MAP-002",
+        "UVM-ALS-001",
+        "UVM-DAG-001",
+        "UVM-FAC-004",
+        "UVM-FAC-005",
+        "UVM-LOG-002",
+        "UVM-OBJ-002",
+        "UVM-OBJ-003",
+        "UVM-OBJ-004",
+        "UVM-OBJ-005",
+        "UVM-OBS-002",
+        "UVM-PHS-005",
+        "UVM-PHS-006",
+        "UVM-PHS-008",
+        "UVM-PHS-010",
+        "UVM-RAL-001",
+        "UVM-REP-005",
+        "UVM-SCB-001",
+        "UVM-SCB-002",
+        "UVM-SEQ-005",
+        "UVM-SEQ-006",
+        "UVM-SEQ-008",
+        "UVM-SEQ-009",
+        "UVM-SEQ-010",
+        "UVM-SEQ-011",
+        "UVM-SEQ-014",
+        "UVM-SEQ-015",
+        "UVM-STY-003",
+        "UVM-TLM-004",
+        "UVM-TLM-005",
+        "UVM-TLM-006",
     ];
     for id in ids {
         let area = if id == "UVM-RAL-001" { "oop" } else { "uvm" };
         let dir = root.join("testdata/rules").join(area).join(id);
         let json = std::fs::read_to_string(dir.join("expect.json")).unwrap();
-        let args = [
-            format!("+incdir+{}", root.join("testdata/common").display()),
-            dir.join("bad.sv").display().to_string(),
-        ];
+        let args =
+            [format!("+incdir+{}", root.join("testdata/common").display()), dir.join("bad.sv").display().to_string()];
         let (d, trees) = sv_sema::load_with_trees(&args).unwrap();
         let (files, found) = dv_lint::lint_all(&d, &trees, |r| r == id);
         let lines: Vec<u32> = found.iter().map(|f| f.position_in(&files).1).collect();
@@ -371,9 +410,25 @@ fn group_g_rules() {
     }
     let count = |id: &str| found.iter().filter(|r| **r == id).count();
     for id in [
-        "DPI-TYP-001", "SV-LOC-001", "SV-PRF-011", "SV-PRF-013", "SV-SYS-001", "SV-DED-005", "SV-DED-006",
-        "SV-DED-011", "SV-MOD-001", "SV-MAC-001", "SV-ERR-003", "UVM-TST-002", "PORT-PTH-001", "SEC-LOG-001",
-        "SV-PRF-005", "SV-PRF-004", "SV-PRF-003", "SV-PRF-009", "SV-PRF-008",
+        "DPI-TYP-001",
+        "SV-LOC-001",
+        "SV-PRF-011",
+        "SV-PRF-013",
+        "SV-SYS-001",
+        "SV-DED-005",
+        "SV-DED-006",
+        "SV-DED-011",
+        "SV-MOD-001",
+        "SV-MAC-001",
+        "SV-ERR-003",
+        "UVM-TST-002",
+        "PORT-PTH-001",
+        "SEC-LOG-001",
+        "SV-PRF-005",
+        "SV-PRF-004",
+        "SV-PRF-003",
+        "SV-PRF-009",
+        "SV-PRF-008",
     ] {
         assert!(count(id) >= 1, "{id}");
     }
@@ -465,8 +520,18 @@ fn group_e_random_and_correctness_rules() {
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
     for id in [
-        "SV-RND-019", "SV-RND-025", "SV-RND-026", "SV-RND-006", "SV-RND-017", "SV-RND-023", "SV-BUG-003", "SV-TST-001",
-        "SV-BUG-005", "SV-BUG-006", "SV-BUG-002", "SV-BUG-007",
+        "SV-RND-019",
+        "SV-RND-025",
+        "SV-RND-026",
+        "SV-RND-006",
+        "SV-RND-017",
+        "SV-RND-023",
+        "SV-BUG-003",
+        "SV-TST-001",
+        "SV-BUG-005",
+        "SV-BUG-006",
+        "SV-BUG-002",
+        "SV-BUG-007",
     ] {
         assert_eq!(count(id), 1, "{id}: {found:?}");
     }
@@ -524,7 +589,8 @@ fn identical_branches_and_mismatched_fields() {
     let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
     let d = sv_sema::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
-    let of = |id: &str| found.iter().filter(|f| f.rule == id).map(|f| (f.loc.line, f.message.clone())).collect::<Vec<_>>();
+    let of =
+        |id: &str| found.iter().filter(|f| f.rule == id).map(|f| (f.loc.line, f.message.clone())).collect::<Vec<_>>();
     let bug1 = of("SV-BUG-001");
     assert_eq!(bug1.len(), 1, "{found:?}");
     assert_eq!(bug1[0].0, 9);

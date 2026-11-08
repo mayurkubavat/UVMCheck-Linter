@@ -2,11 +2,11 @@
 //! bitwise OR ('|') instead of logical short-circuiting operators ('&&', '||')
 //! inside conditional statements.
 
-use sv_syntax::NodeId;
+use crate::support::for_loops::{kids, op_text, predicates};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::for_loops::{kids, op_text, predicates};
 
 const BOOLEAN_OPS: &[&str] = &["==", "!=", "===", "!==", "==?", "!=?", "<", "<=", ">", ">=", "&&", "||", "->", "<->"];
 

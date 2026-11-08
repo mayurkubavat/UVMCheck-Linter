@@ -2,8 +2,8 @@
 //! derived classes must match the parameter count and signature of the base
 //! virtual method.
 
+use crate::{find_method, Severity, Sink};
 use dv_model::Design;
-use crate::{Severity, Sink, find_method};
 
 pub(crate) fn virtual_method_signature_mismatch(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

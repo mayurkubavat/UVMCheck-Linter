@@ -2,8 +2,8 @@
 //! uvm_component classes begin with 'm_' prefix to distinguish local member
 //! state from arguments and parameters.
 
-use dv_model::Design;
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn class_member_prefix(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

@@ -2,13 +2,15 @@
 //! more branches of one fork, or in a join_none thread and in its parent,
 //! without a semaphore (SpotBugs IS2_INCONSISTENT_SYNC).
 
-use std::collections::{BTreeMap, HashSet};
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::procedural::{
+    add_n, calls_in, is_semaphore_get, items, join_kind, routine_name, start, written, Sym,
+};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::{BTreeMap, HashSet};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::procedural::{Sym, add_n, calls_in, is_semaphore_get, items, join_kind, routine_name, start, written};
 
 /// A fork's branches: its statements less declarations and empty ones.
 fn branches(c: &Cst, f: NodeId) -> Vec<NodeId> {

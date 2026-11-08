@@ -1,15 +1,13 @@
 //! UVM-PHS-010 (BuildPhaseCrossComponentAccess): Detects direct access to
 //! sibling components or cross-component handles during build_phase.
 
-use dv_model::Design;
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::uvm_syntax::{
-    routine_last_name, subtree,
-};
+use crate::support::uvm_classes::is_name_chain;
+use crate::support::uvm_syntax::{routine_last_name, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::uvm_classes::{is_name_chain};
 
 pub(crate) fn build_phase_cross_access(_d: &Design, csts: &[Cst], s: &mut Sink) {
     for c in csts {

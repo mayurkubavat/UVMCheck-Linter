@@ -2,14 +2,14 @@
 //! in three or more classes, a sign that behavior per kind belongs in a
 //! polymorphic item or policy class (Fowler 'repeated switches').
 
-use std::collections::{BTreeMap, HashMap, HashSet};
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::statements::*;
 use crate::support::class_index::*;
+use crate::support::class_metrics::{globals, Env};
+use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::{BTreeMap, HashMap, HashSet};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::class_metrics::{Env, globals};
 
 /// Enum typedef names.
 fn enum_types(c: &Cst) -> HashSet<String> {
@@ -62,11 +62,7 @@ pub(crate) fn repeated_enum_switch(c: &Cst, s: &mut Sink) {
         if v.len() < min {
             continue;
         }
-        let names = v
-            .iter()
-            .map(|(i, _)| classes.list[*i].name.as_str())
-            .collect::<Vec<_>>()
-            .join(", ");
+        let names = v.iter().map(|(i, _)| classes.list[*i].name.as_str()).collect::<Vec<_>>().join(", ");
         for (i, st) in v {
             s.add(
                 "SV-DSN-009",

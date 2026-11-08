@@ -2,12 +2,12 @@
 //! properties that are never constrained in any constraint block within the
 //! class.
 
-use std::collections::HashSet;
-use sv_syntax::NodeId;
+use crate::support::class_items::{class_decls, class_items, decl_name, declarators, own, qualifiers, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_items::{class_decls, class_items, decl_name, declarators, own, qualifiers, subtree};
 
 /// Whether a name chain (slang's ScopedName / IdentifierSelectName
 /// pieces) starts here: names, selects of names, members of names.
@@ -22,7 +22,23 @@ fn is_name_chain(c: &Cst, n: NodeId) -> bool {
 fn is_identifier(t: &str) -> bool {
     let mut ch = t.chars();
     ch.next().is_some_and(|f| f.is_ascii_alphabetic() || f == '_' || f == '\\')
-        && !matches!(t, "this" | "super" | "null" | "local" | "std" | "before" | "solve" | "foreach" | "inside" | "dist" | "soft" | "if" | "else" | "unique")
+        && !matches!(
+            t,
+            "this"
+                | "super"
+                | "null"
+                | "local"
+                | "std"
+                | "before"
+                | "solve"
+                | "foreach"
+                | "inside"
+                | "dist"
+                | "soft"
+                | "if"
+                | "else"
+                | "unique"
+        )
 }
 
 /// slang's `IdentifierNameSyntax` identifiers below a node.
@@ -36,9 +52,8 @@ fn identifier_names(c: &Cst, root: NodeId, out: &mut HashSet<String>) {
                     continue;
                 }
                 // `q[i]` is an IdentifierSelectName.
-                let selected = c
-                    .parent(n)
-                    .is_some_and(|p| c.kind(p) == SelectExpr && c.tree.children(p).next() == Some(n));
+                let selected =
+                    c.parent(n).is_some_and(|p| c.kind(p) == SelectExpr && c.tree.children(p).next() == Some(n));
                 if !selected {
                     out.insert(t.to_string());
                 }
@@ -46,11 +61,9 @@ fn identifier_names(c: &Cst, root: NodeId, out: &mut HashSet<String>) {
             MemberExpr | ScopedExpr => {
                 // The member of a name chain is an IdentifierName unless
                 // it is selected itself (`a.b[0]`).
-                let base_ok = c.kind(n) == ScopedExpr
-                    || c.tree.children(n).next().is_some_and(|b| is_name_chain(c, b));
-                let selected = c
-                    .parent(n)
-                    .is_some_and(|p| c.kind(p) == SelectExpr && c.tree.children(p).next() == Some(n));
+                let base_ok = c.kind(n) == ScopedExpr || c.tree.children(n).next().is_some_and(|b| is_name_chain(c, b));
+                let selected =
+                    c.parent(n).is_some_and(|p| c.kind(p) == SelectExpr && c.tree.children(p).next() == Some(n));
                 if base_ok && !selected {
                     if let Some(t) = c.toks(n).last() {
                         let x = c.text_of(t);

@@ -1,9 +1,9 @@
 //! RAL-COL-001 (RalAddressCollision): Detects duplicate/overlapping address
 //! offsets mapped in uvm_reg_block address maps.
 
+use crate::support::uvm_syntax::{name_loc, reg_block_builds, routine_text, strip_line_comments, trim_ws};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::uvm_syntax::{name_loc, reg_block_builds, routine_text, strip_line_comments, trim_ws};
 
 pub(crate) fn ral_address_collision(c: &Cst, s: &mut Sink) {
     for (cls, f) in reg_block_builds(c) {

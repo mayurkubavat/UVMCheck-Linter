@@ -2,8 +2,8 @@
 //! drop_objection() inside non-run function phases (e.g. build_phase,
 //! connect_phase).
 
-use dv_model::{Design, PhaseKind};
 use crate::{Severity, Sink};
+use dv_model::{Design, PhaseKind};
 
 pub(crate) fn objection_in_non_run_phase(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

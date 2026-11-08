@@ -188,12 +188,17 @@ impl CVal {
     /// slang's SVInt::writeTo for a value with unknown bits: decimal is
     /// one letter, other bases a digit (or x, z, X, Z) per group of bits.
     fn write_unknown(&self, radix: u32) -> String {
-        let mut out = format!("{}'{}{}", self.w, if self.s { "s" } else { "" }, match radix {
-            2 => 'b',
-            8 => 'o',
-            10 => 'd',
-            _ => 'h',
-        });
+        let mut out = format!(
+            "{}'{}{}",
+            self.w,
+            if self.s { "s" } else { "" },
+            match radix {
+                2 => 'b',
+                8 => 'o',
+                10 => 'd',
+                _ => 'h',
+            }
+        );
         let w = self.w.max(1);
         let all_u = self.u == Int::from(-1).trunc(w, false);
         let v = self.bits_v();
@@ -281,9 +286,8 @@ impl CVal {
     }
 }
 
-pub(crate) const INT_TYPES: [&str; 9] = [
-    "bit", "logic", "reg", "int", "integer", "byte", "shortint", "longint", "time",
-];
+pub(crate) const INT_TYPES: [&str; 9] =
+    ["bit", "logic", "reg", "int", "integer", "byte", "shortint", "longint", "time"];
 
 fn int_width(k: &str) -> (u32, bool) {
     match k {
@@ -326,22 +330,14 @@ impl<'t> Builder<'t> {
     // ---- constants ----------------------------------------------------------
 
     /// Width and signedness of an integral data type, if it is one.
-    pub(crate) fn int_shape(
-        &self,
-        dt: NodeRef,
-        scope: usize,
-        env: &Env,
-        depth: usize,
-    ) -> Option<(u32, bool)> {
+    pub(crate) fn int_shape(&self, dt: NodeRef, scope: usize, env: &Env, depth: usize) -> Option<(u32, bool)> {
         if depth > MAX_EVAL_DEPTH {
             return None;
         }
         let own = self.own_tokens(dt);
         let kw = own.iter().find(|t| INT_TYPES.contains(t)).copied();
         let implicit = kw.is_none()
-            && own
-                .iter()
-                .all(|t| matches!(*t, "signed" | "unsigned" | "parameter" | "localparam"))
+            && own.iter().all(|t| matches!(*t, "signed" | "unsigned" | "parameter" | "localparam"))
             && (!own.is_empty() || self.child(dt, Dim).is_some());
         if kw.is_none() && !implicit {
             let toks = self.toks_of(dt);
@@ -384,18 +380,9 @@ impl<'t> Builder<'t> {
                     if self.kind(m) != DataDecl {
                         continue;
                     }
-                    let (mw, _) =
-                        self.int_shape(self.child(m, DataType)?, scope, env, depth + 1)?;
-                    let n = self
-                        .children(m)
-                        .into_iter()
-                        .filter(|d| self.kind(*d) == Declarator)
-                        .count() as u32;
-                    w = if union {
-                        w.max(mw)
-                    } else {
-                        w.checked_add(mw.checked_mul(n)?)?
-                    };
+                    let (mw, _) = self.int_shape(self.child(m, DataType)?, scope, env, depth + 1)?;
+                    let n = self.children(m).into_iter().filter(|d| self.kind(*d) == Declarator).count() as u32;
+                    w = if union { w.max(mw) } else { w.checked_add(mw.checked_mul(n)?)? };
                 }
                 let mut w = w.max(1);
                 for d in self.children(dt) {
@@ -436,12 +423,8 @@ impl<'t> Builder<'t> {
 
     pub(crate) fn lookup_type(&self, dt: NodeRef, scope: usize) -> Option<Found> {
         let toks = self.toks_of(dt);
-        let path: Vec<&str> = toks
-            .iter()
-            .take_while(|t| **t != "#" && **t != "[")
-            .filter(|t| **t != "::")
-            .copied()
-            .collect();
+        let path: Vec<&str> =
+            toks.iter().take_while(|t| **t != "#" && **t != "[").filter(|t| **t != "::").copied().collect();
         match path.len() {
             0 => None,
             1 => self.lookup(path[0], scope, 0),
@@ -451,17 +434,12 @@ impl<'t> Builder<'t> {
 
     /// The bounds of a `[a:b]` or `[n]` dimension.
     pub(crate) fn dim_range(&self, d: NodeRef, scope: usize, env: &Env) -> Option<(i128, i128)> {
-        let exprs: Vec<NodeRef> = self
-            .children(d)
-            .into_iter()
-            .filter(|c| body_is_expr(self.kind(*c)))
-            .collect();
+        let exprs: Vec<NodeRef> = self.children(d).into_iter().filter(|c| body_is_expr(self.kind(*c))).collect();
         let own = self.own_tokens(d);
         match exprs.as_slice() {
-            [a, b] if own.contains(&":") => Some((
-                dim_bound(self.eval(*a, scope, env, 0)?)?,
-                dim_bound(self.eval(*b, scope, env, 0)?)?,
-            )),
+            [a, b] if own.contains(&":") => {
+                Some((dim_bound(self.eval(*a, scope, env, 0)?)?, dim_bound(self.eval(*b, scope, env, 0)?)?))
+            }
             [n] if !own.contains(&":") => Some((0, dim_bound(self.eval(*n, scope, env, 0)?)? - 1)),
             _ => None,
         }
@@ -469,7 +447,15 @@ impl<'t> Builder<'t> {
 
     /// A named constant seen from `scope`: a parameter or localparam, with
     /// type parameters' and value parameters' bindings from `env`.
-    fn const_value(&self, name: &str, s: usize, dt: Option<NodeRef>, val: Option<NodeRef>, env: &Env, depth: usize) -> Option<CVal> {
+    fn const_value(
+        &self,
+        name: &str,
+        s: usize,
+        dt: Option<NodeRef>,
+        val: Option<NodeRef>,
+        env: &Env,
+        depth: usize,
+    ) -> Option<CVal> {
         let v = match (env.get(name), self.scopes[s].kind) {
             (Some(b), ScopeKind::Class(_)) => self.eval(b.node, b.scope, &b.env, depth + 1)?,
             _ => match dt {
@@ -616,21 +602,13 @@ impl<'t> Builder<'t> {
     }
 
     /// Each enum member with its value.
-    pub(crate) fn enum_values(
-        &self,
-        dt: NodeRef,
-        scope: usize,
-        env: &Env,
-        depth: usize,
-    ) -> Vec<(String, CVal)> {
+    pub(crate) fn enum_values(&self, dt: NodeRef, scope: usize, env: &Env, depth: usize) -> Vec<(String, CVal)> {
         let mut out = Vec::new();
         if depth > MAX_EVAL_DEPTH {
             return out;
         }
-        let (w, s) = self
-            .child(dt, DataType)
-            .and_then(|b| self.int_shape(b, scope, env, depth + 1))
-            .unwrap_or((32, true));
+        let (w, s) =
+            self.child(dt, DataType).and_then(|b| self.int_shape(b, scope, env, depth + 1)).unwrap_or((32, true));
         let mut next = CVal::new(w, s, 0i128);
         for d in self.children(dt) {
             if self.kind(d) != Declarator {
@@ -649,26 +627,15 @@ impl<'t> Builder<'t> {
                 None => next,
             };
             // `C[2]` names C0 and C1.
-            match self
-                .child(d, Dim)
-                .and_then(|dim| self.dim_range(dim, scope, env))
-            {
+            match self.child(d, Dim).and_then(|dim| self.dim_range(dim, scope, env)) {
                 Some((a, b)) => {
                     let mut cur = v;
                     let n = (a - b).abs() + 1;
                     // `C[2]` names C0, C1; `C[3:5]` names C3, C4, C5.
                     let two = self.child(d, Dim).is_some_and(|dim| {
-                        self.children(dim)
-                            .into_iter()
-                            .filter(|c| body_is_expr(self.kind(*c)))
-                            .count()
-                            == 2
+                        self.children(dim).into_iter().filter(|c| body_is_expr(self.kind(*c))).count() == 2
                     });
-                    let (start, step) = if two {
-                        (a, if b >= a { 1 } else { -1 })
-                    } else {
-                        (0, 1)
-                    };
+                    let (start, step) = if two { (a, if b >= a { 1 } else { -1 }) } else { (0, 1) };
                     for k in 0..n {
                         let k = start + k * step;
                         let after = cur.bump(1);
@@ -765,9 +732,9 @@ impl<'t> Builder<'t> {
                 }
             }
             ConcatExpr => self.eval_concat(e, scope, env, depth + 1),
-            SelectExpr => self
-                .eval_select(e, scope, env, depth + 1)
-                .or_else(|| self.eval_packed_select(e, scope, env, depth + 1)),
+            SelectExpr => {
+                self.eval_select(e, scope, env, depth + 1).or_else(|| self.eval_packed_select(e, scope, env, depth + 1))
+            }
             MemberExpr => self.eval_packed_select(e, scope, env, depth + 1),
             PrefixExpr => {
                 let op = self.first_own_tok(e)?;
@@ -838,8 +805,7 @@ impl<'t> Builder<'t> {
                         let w = match self.kind(a) {
                             DataType => self.int_shape(a, scope, env, depth + 1)?.0,
                             // A type name (typedef, type parameter) or a value.
-                            NameExpr | ScopedExpr => match self.int_shape(a, scope, env, depth + 1)
-                            {
+                            NameExpr | ScopedExpr => match self.int_shape(a, scope, env, depth + 1) {
                                 Some((w, _)) => w,
                                 None => self.eval(a, scope, env, depth + 1)?.w,
                             },
@@ -866,14 +832,8 @@ impl<'t> Builder<'t> {
         env: &Env,
         canonical: bool,
     ) -> String {
-        let dims: Vec<NodeRef> = item
-            .map(|i| {
-                self.children(i)
-                    .into_iter()
-                    .filter(|c| self.kind(*c) == Dim)
-                    .collect()
-            })
-            .unwrap_or_default();
+        let dims: Vec<NodeRef> =
+            item.map(|i| self.children(i).into_iter().filter(|c| self.kind(*c) == Dim).collect()).unwrap_or_default();
         if dims.is_empty() {
             return match dt {
                 Some(d) => self.ts(d, scope, env, canonical, 0),
@@ -889,11 +849,7 @@ impl<'t> Builder<'t> {
             let Some((d, s)) = cur else { break };
             match self.lookup_type(d, s) {
                 Some(Found::Typedef(t, ts)) if self.child(t, Dim).is_some() => {
-                    let tdims: Vec<NodeRef> = self
-                        .children(t)
-                        .into_iter()
-                        .filter(|c| self.kind(*c) == Dim)
-                        .collect();
+                    let tdims: Vec<NodeRef> = self.children(t).into_iter().filter(|c| self.kind(*c) == Dim).collect();
                     let tenv = self.scope_env(ts, env);
                     text.push_str(&self.unpacked(&tdims, ts, &tenv));
                     cur = self.child(t, DataType).map(|i| (i, ts));
@@ -951,14 +907,7 @@ impl<'t> Builder<'t> {
     }
 
     /// A data type (or a name standing for one) as slang prints it.
-    pub(crate) fn ts(
-        &self,
-        dt: NodeRef,
-        scope: usize,
-        env: &Env,
-        canonical: bool,
-        depth: usize,
-    ) -> String {
+    pub(crate) fn ts(&self, dt: NodeRef, scope: usize, env: &Env, canonical: bool, depth: usize) -> String {
         if depth > 24 {
             return String::new();
         }
@@ -994,13 +943,8 @@ impl<'t> Builder<'t> {
                 return first.to_string();
             }
             "virtual" => {
-                let names: Vec<&str> = toks
-                    .iter()
-                    .skip(1)
-                    .filter(|t| **t != "interface")
-                    .take_while(|t| **t != "#")
-                    .copied()
-                    .collect();
+                let names: Vec<&str> =
+                    toks.iter().skip(1).filter(|t| **t != "interface").take_while(|t| **t != "#").copied().collect();
                 let name = names.first().copied().unwrap_or("");
                 let params = self.interface_params(name, dt, scope, env);
                 return format!("{name}{params}{}", names[1.min(names.len())..].concat());
@@ -1009,12 +953,8 @@ impl<'t> Builder<'t> {
             "struct" | "union" => return self.struct_string(dt, scope, env, None),
             _ => {}
         }
-        let path: Vec<&str> = toks
-            .iter()
-            .take_while(|t| **t != "#" && **t != "[")
-            .filter(|t| **t != "::")
-            .copied()
-            .collect();
+        let path: Vec<&str> =
+            toks.iter().take_while(|t| **t != "#" && **t != "[").filter(|t| **t != "::").copied().collect();
         // A type parameter bound by the specialization.
         if path.len() == 1 {
             if let Some(b) = env.get(first) {
@@ -1047,11 +987,7 @@ impl<'t> Builder<'t> {
                 }
                 let tenv = self.scope_env(s, env);
                 let inner = self.child(t, DataType);
-                let dims: Vec<NodeRef> = self
-                    .children(t)
-                    .into_iter()
-                    .filter(|c| self.kind(*c) == Dim)
-                    .collect();
+                let dims: Vec<NodeRef> = self.children(t).into_iter().filter(|c| self.kind(*c) == Dim).collect();
                 let alias = format!("{}{name}", self.scope_path(s));
                 let base = match inner {
                     Some(i) if dims.is_empty() => match self.own_tokens(i).first().copied() {
@@ -1085,19 +1021,13 @@ impl<'t> Builder<'t> {
             // it back as written.
             None if path.is_empty() => toks.concat(),
             None => {
-                let name = if path.len() == 2 && path[0] == "std" {
-                    path[1]
-                } else {
-                    path[0]
-                };
+                let name = if path.len() == 2 && path[0] == "std" { path[1] } else { path[0] };
                 match name {
                     "mailbox" => {
                         let arg = self
                             .child(dt, ParamList)
                             .and_then(|pl| self.child(pl, ArgList))
-                            .and_then(|al| {
-                                self.children(al).into_iter().find(|a| self.kind(*a) == Arg)
-                            })
+                            .and_then(|al| self.children(al).into_iter().find(|a| self.kind(*a) == Arg))
                             .and_then(|a| self.children(a).into_iter().next());
                         match arg {
                             Some(a) => {
@@ -1120,21 +1050,13 @@ impl<'t> Builder<'t> {
         let Some(&decl) = self.interfaces.get(name) else {
             return String::new();
         };
-        let Some(pl) = self
-            .child(decl, Header)
-            .and_then(|h| self.child(h, ParamList))
-        else {
+        let Some(pl) = self.child(decl, Header).and_then(|h| self.child(h, ParamList)) else {
             return String::new();
         };
         let args: Vec<NodeRef> = self
             .child(dt, ParamList)
             .and_then(|p| self.child(p, ArgList))
-            .map(|al| {
-                self.children(al)
-                    .into_iter()
-                    .filter(|a| self.kind(*a) == Arg)
-                    .collect()
-            })
+            .map(|al| self.children(al).into_iter().filter(|a| self.kind(*a) == Arg).collect())
             .unwrap_or_default();
         let mut out = Vec::new();
         let mut pos = 0;
@@ -1148,32 +1070,18 @@ impl<'t> Builder<'t> {
             let Some((pname, _)) = self.name_of(d) else {
                 continue;
             };
-            let default = self
-                .children(d)
-                .into_iter()
-                .find(|c| body_is_expr(self.kind(*c)));
+            let default = self.children(d).into_iter().find(|c| body_is_expr(self.kind(*c)));
             let actual = args
                 .iter()
                 .find(|a| self.own_tokens(**a).get(1) == Some(&pname.as_str()))
-                .or_else(|| {
-                    args.get(pos)
-                        .filter(|a| self.own_tokens(**a).first() != Some(&"."))
-                })
-                .and_then(|a| {
-                    self.children(*a)
-                        .into_iter()
-                        .find(|c| body_is_expr(self.kind(*c)))
-                });
+                .or_else(|| args.get(pos).filter(|a| self.own_tokens(**a).first() != Some(&".")))
+                .and_then(|a| self.children(*a).into_iter().find(|c| body_is_expr(self.kind(*c))));
             pos += 1;
             let v = match actual {
                 Some(a) => self.eval(a, scope, env, 0),
                 None => default.and_then(|e| self.eval(e, scope, &Env::default(), 0)),
             };
-            let v = match (
-                v,
-                self.child(p, DataType)
-                    .and_then(|t| self.int_shape(t, scope, env, 0)),
-            ) {
+            let v = match (v, self.child(p, DataType).and_then(|t| self.int_shape(t, scope, env, 0))) {
                 (Some(v), Some((w, s))) => Some(v.cast(w, s)),
                 (v, _) => v,
             };
@@ -1332,23 +1240,14 @@ impl<'t> Builder<'t> {
     }
 
     /// The value of a parameter, specparam or enum value, as slang prints it.
-    pub(crate) fn symbol_value(
-        &self,
-        y: &crate::scopes::Symbol,
-        scope: usize,
-        env: &Env,
-    ) -> Option<String> {
+    pub(crate) fn symbol_value(&self, y: &crate::scopes::Symbol, scope: usize, env: &Env) -> Option<String> {
         use crate::scopes::SymKind as K;
         let t = &self.trees[y.tree];
-        let r = |n: NodeId| NodeRef {
-            tree: y.tree,
-            node: n,
-        };
+        let r = |n: NodeId| NodeRef { tree: y.tree, node: n };
         if y.kind == K::EnumValue {
             let dt = y.dtype?;
             // An all-x value of a four-state enum prints as x.
-            let init = Some(y.node)
-                .and_then(|d| t.children(d).find(|&c| !matches!(t.kind(c), Name | Dim)));
+            let init = Some(y.node).and_then(|d| t.children(d).find(|&c| !matches!(t.kind(c), Name | Dim)));
             if let Some(i) = init {
                 let mut sub = vec![i];
                 let mut k = 0;
@@ -1371,16 +1270,9 @@ impl<'t> Builder<'t> {
                 }
             }
             let vals = self.enum_values(r(dt), scope, env, 0);
-            return vals
-                .iter()
-                .find(|(n, _)| *n == y.name)
-                .map(|(_, v)| v.show());
+            return vals.iter().find(|(n, _)| *n == y.name).map(|(_, v)| v.show());
         }
-        let d = if y.kind == K::Specparam {
-            Some(y.node)
-        } else {
-            y.item
-        };
+        let d = if y.kind == K::Specparam { Some(y.node) } else { y.item };
         let v = d.and_then(|d| t.children(d).find(|&c| !matches!(t.kind(c), Name | Dim)));
         let Some(v) = v else {
             return Some("<unset>".into());
@@ -1429,18 +1321,9 @@ impl<'t> Builder<'t> {
 
     /// A constant's value as slang prints it: `v` in a declaration of type
     /// `dtype` (`None`: implicit) in `scope`.
-    pub(crate) fn value_text(
-        &self,
-        dtype: Option<NodeRef>,
-        v: NodeRef,
-        scope: usize,
-        env: &Env,
-    ) -> Option<String> {
+    pub(crate) fn value_text(&self, dtype: Option<NodeRef>, v: NodeRef, scope: usize, env: &Env) -> Option<String> {
         let t = &self.trees[v.tree];
-        let r = |n: NodeId| NodeRef {
-            tree: v.tree,
-            node: n,
-        };
+        let r = |n: NodeId| NodeRef { tree: v.tree, node: n };
         let v = v.node;
         let toks = self.toks_of(r(v));
         let kw = dtype.and_then(|d| self.own_tokens(d).first().copied());
@@ -1531,13 +1414,7 @@ impl<'t> Builder<'t> {
     }
 
     /// `eval`, reading x and z digits as 0 only for a two-state target.
-    pub(crate) fn eval_xz(
-        &self,
-        v: NodeRef,
-        scope: usize,
-        env: &Env,
-        two_state: bool,
-    ) -> Option<CVal> {
+    pub(crate) fn eval_xz(&self, v: NodeRef, scope: usize, env: &Env, two_state: bool) -> Option<CVal> {
         let c = self.eval(v, scope, env, 0)?;
         Some(if two_state { c.two_state() } else { c })
     }
@@ -1595,10 +1472,7 @@ impl<'t> Builder<'t> {
             return None;
         }
         let mut out = Vec::new();
-        for e in self
-            .children(v)
-            .into_iter()
-            .filter(|c| body_is_expr(self.kind(*c)) || self.kind(*c) == AssignPattern)
+        for e in self.children(v).into_iter().filter(|c| body_is_expr(self.kind(*c)) || self.kind(*c) == AssignPattern)
         {
             // Elements of the declared element type (a packed struct too).
             if let Some(d) = dtype.filter(|d| self.packed_aggregate(*d, scope, env) || self.kind(e) == AssignPattern) {
@@ -1626,9 +1500,7 @@ impl<'t> Builder<'t> {
                 let n = lit.len().saturating_sub(2).max(1) * 8;
                 return format!("logic[{}:0]", n - 1);
             }
-            if lit.contains('.')
-                || (lit.contains(['e', 'E']) && !lit.contains('\'') && lit.parse::<f64>().is_ok())
-            {
+            if lit.contains('.') || (lit.contains(['e', 'E']) && !lit.contains('\'') && lit.parse::<f64>().is_ok()) {
                 return "real".into();
             }
         }
@@ -1646,19 +1518,13 @@ impl<'t> Builder<'t> {
     pub(crate) fn typedef_target(&self, t: NodeRef, s: usize, env: &Env) -> String {
         let name = self.name_of(t).map(|n| n.0).unwrap_or_default();
         let alias = format!("{}{name}", self.scope_path(s));
-        let dims: Vec<NodeRef> = self
-            .children(t)
-            .into_iter()
-            .filter(|c| self.kind(*c) == Dim)
-            .collect();
+        let dims: Vec<NodeRef> = self.children(t).into_iter().filter(|c| self.kind(*c) == Dim).collect();
         let Some(i) = self.child(t, DataType) else {
             return "logic".into();
         };
         let base = match self.own_tokens(i).first().copied() {
             Some("enum") if dims.is_empty() => self.enum_string(i, s, env, Some(&alias)),
-            Some("struct" | "union") if dims.is_empty() => {
-                self.struct_string(i, s, env, Some(&alias))
-            }
+            Some("struct" | "union") if dims.is_empty() => self.struct_string(i, s, env, Some(&alias)),
             _ => self.ts(i, s, env, false, 0),
         };
         if dims.is_empty() {
@@ -1683,10 +1549,7 @@ impl<'t> Builder<'t> {
 
     fn enum_string_of(&self, dt: NodeRef, scope: usize, env: &Env, alias: Option<&str>) -> String {
         let vals = self.enum_values(dt, scope, env, 0);
-        let body: Vec<String> = vals
-            .iter()
-            .map(|(n, v)| format!("{n}={}", v.show_dec()))
-            .collect();
+        let body: Vec<String> = vals.iter().map(|(n, v)| format!("{n}={}", v.show_dec())).collect();
         let name = match alias {
             Some(a) => a.to_string(),
             None => format!("{}e$1", self.scope_path(scope)),
@@ -1781,7 +1644,23 @@ fn string_value(lit: &str) -> Option<CVal> {
 fn is_context_op(op: &str) -> bool {
     matches!(
         op,
-        "+" | "-" | "*" | "/" | "%" | "&" | "|" | "^" | "~^" | "^~" | "==" | "!=" | "===" | "!==" | "<" | "<=" | ">" | ">="
+        "+" | "-"
+            | "*"
+            | "/"
+            | "%"
+            | "&"
+            | "|"
+            | "^"
+            | "~^"
+            | "^~"
+            | "=="
+            | "!="
+            | "==="
+            | "!=="
+            | "<"
+            | "<="
+            | ">"
+            | ">="
     )
 }
 

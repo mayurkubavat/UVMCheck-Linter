@@ -1,15 +1,13 @@
 //! UVM-PHS-005 (SuperBuildPhaseOrder): Enforces that super.build_phase(phase)
 //! is the very first procedural statement in build_phase.
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
-use crate::support::uvm_syntax::{
-    body_items, routine_last_name,
-};
+use crate::support::uvm_classes::{comp_decl, routines_in, Ix};
+use crate::support::uvm_syntax::{body_items, routine_last_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, comp_decl, routines_in};
 
 fn strip_comments_and_ws(input: &str) -> String {
     let b = input.as_bytes();

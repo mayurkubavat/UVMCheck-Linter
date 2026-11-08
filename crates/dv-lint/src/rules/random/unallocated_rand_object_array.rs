@@ -3,13 +3,13 @@
 //! not construct objects, so every element stays null and its rand members are
 //! never randomized.
 
-use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
 use crate::support::class_items::{declarators, is_parameterized, qualifiers};
+use crate::support::constraints::class_names;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::{HashMap, HashSet};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::constraints::{class_names};
 
 pub(crate) fn unallocated_rand_array(c: &Cst, s: &mut Sink) {
     let classes: HashMap<String, NodeId> = class_names(c);

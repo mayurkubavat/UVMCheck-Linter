@@ -3,15 +3,11 @@
 
 use std::collections::HashMap;
 
-
 use sv_lexer::Kind;
 
 use sv_syntax::NodeId;
 
-
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 
@@ -114,7 +110,11 @@ impl Classes {
                 let header = c.tree.child(n, Header);
                 let generic = header.and_then(|h| c.tree.child(h, ParamList)).is_some();
                 let base = header
-                    .and_then(|h| c.tree.children(h).find(|&e| c.kind(e) == Extends && c.first_tok(e).is_some_and(|t| c.text_of(t) == "extends")))
+                    .and_then(|h| {
+                        c.tree.children(h).find(|&e| {
+                            c.kind(e) == Extends && c.first_tok(e).is_some_and(|t| c.text_of(t) == "extends")
+                        })
+                    })
                     .and_then(|e| c.tree.child(e, DataType))
                     .map(|ty| {
                         let toks: Vec<&str> = c.tree.token_range(ty).iter().map(|&t| c.text_of(t)).collect();
@@ -188,11 +188,9 @@ impl Classes {
                     "uvm_sequence" | "uvm_sequence_base" | "uvm_reg_sequence" => Some(Role::Sequence),
                     "uvm_sequence_item" | "uvm_transaction" => Some(Role::Item),
                     _ if n == "uvm_component" || n.starts_with("uvm_tlm") || n == "uvm_root" => Some(Role::Component),
-                    "uvm_object" | "uvm_void" => Some(if name_says_config(&self.list[i].name) {
-                        Role::Config
-                    } else {
-                        Role::Object
-                    }),
+                    "uvm_object" | "uvm_void" => {
+                        Some(if name_says_config(&self.list[i].name) { Role::Config } else { Role::Object })
+                    }
                     _ => None,
                 };
                 if let Some(r) = r {
@@ -290,7 +288,8 @@ pub(crate) fn region_comments(c: &Cst, f: u32, from: u32, to: u32, nested: bool,
         if x.kind != Kind::Directive || tx(x) != "`include" {
             continue;
         }
-        let Some(name) = toks[i + 1..].iter().find(|y| !y.kind.is_trivia()).filter(|y| y.kind == Kind::StringLiteral) else {
+        let Some(name) = toks[i + 1..].iter().find(|y| !y.kind.is_trivia()).filter(|y| y.kind == Kind::StringLiteral)
+        else {
             continue;
         };
         let name = tx(name).trim_matches('"');
@@ -317,7 +316,10 @@ pub(crate) fn region_comments(c: &Cst, f: u32, from: u32, to: u32, nested: bool,
 /// tree whose path ends with the name.
 pub(crate) fn included_file(c: &Cst, f: u32, name: &str) -> Option<u32> {
     let want = std::path::Path::new(name);
-    (f as usize + 1..c.tree.files.len()).chain(0..f as usize).map(|i| i as u32).find(|&g| c.tree.files[g as usize].ends_with(want))
+    (f as usize + 1..c.tree.files.len())
+        .chain(0..f as usize)
+        .map(|i| i as u32)
+        .find(|&g| c.tree.files[g as usize].ends_with(want))
 }
 
 /// Class properties declared directly in the class: (name, name token).

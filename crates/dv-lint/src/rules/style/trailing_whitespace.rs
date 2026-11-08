@@ -1,9 +1,9 @@
 //! SV-STY-015 (TrailingWhitespace): Disallows trailing whitespace (spaces and
 //! tabs) at the end of lines in source files.
 
+use crate::support::source_layout::{at, buffers, lines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::source_layout::{at, buffers, lines};
 
 pub(crate) fn trailing_whitespace(c: &Cst, s: &mut Sink) {
     for (f, text) in buffers(c) {

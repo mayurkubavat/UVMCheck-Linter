@@ -1,13 +1,13 @@
 //! SV-CB-001 (ClockingBlockOutputReadSkew): Disallows reading output signals of
 //! a clocking block.
 
+use crate::support::procedural::start;
+use crate::support::slang_ast::kids;
+use crate::syntax::Cst;
+use crate::{Severity, Sink};
 use std::collections::HashSet;
 use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::syntax::Cst;
-use crate::{Severity, Sink};
-use crate::support::slang_ast::kids;
-use crate::support::procedural::start;
 
 /// The declarations of output-only clocking items anywhere in the compile,
 /// as written (`d`, `h = x.y`).

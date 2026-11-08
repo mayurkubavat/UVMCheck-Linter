@@ -4,17 +4,36 @@
 //! constraints and covergroups in `blocks`, assertions in `assertions`
 //! and the rarer items in `misc`.
 
-use crate::expr::{arg_list, expr, expr_bp, expr_with, param_values, value_range, ASSIGNABLE, STATEMENT};
 pub(crate) use crate::blocks::{constraint_block, timing_control};
+use crate::expr::{arg_list, expr, expr_bp, expr_with, param_values, value_range, ASSIGNABLE, STATEMENT};
 use crate::parser::Parser;
 use crate::SyntaxKind::{self, *};
 
 /// Keywords that close a scope. A statement or item never consumes one it
 /// does not own, which keeps one bad construct from swallowing the rest.
 pub(crate) const END_KEYWORDS: &[&str] = &[
-    "end", "join", "join_any", "join_none", "endcase", "endfunction", "endtask", "endclass", "endmodule",
-    "endinterface", "endprogram", "endpackage", "endchecker", "endgenerate", "endgroup", "endproperty",
-    "endsequence", "endclocking", "endspecify", "endconfig", "endprimitive", "endtable",
+    "end",
+    "join",
+    "join_any",
+    "join_none",
+    "endcase",
+    "endfunction",
+    "endtask",
+    "endclass",
+    "endmodule",
+    "endinterface",
+    "endprogram",
+    "endpackage",
+    "endchecker",
+    "endgenerate",
+    "endgroup",
+    "endproperty",
+    "endsequence",
+    "endclocking",
+    "endspecify",
+    "endconfig",
+    "endprimitive",
+    "endtable",
 ];
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -122,7 +141,17 @@ pub(crate) fn name_token(p: &mut Parser) {
 }
 
 const QUALIFIERS: &[&str] = &[
-    "extern", "pure", "virtual", "static", "protected", "local", "rand", "randc", "const", "automatic", "var",
+    "extern",
+    "pure",
+    "virtual",
+    "static",
+    "protected",
+    "local",
+    "rand",
+    "randc",
+    "const",
+    "automatic",
+    "var",
     "forkjoin",
 ];
 
@@ -704,8 +733,25 @@ fn constraint(p: &mut Parser, q: usize) -> SyntaxKind {
 
 /// Keywords that start a data type.
 pub(crate) const BUILTIN_TYPES: &[&str] = &[
-    "bit", "logic", "reg", "byte", "shortint", "int", "longint", "integer", "time", "real", "shortreal", "realtime",
-    "string", "chandle", "event", "void", "enum", "struct", "union",
+    "bit",
+    "logic",
+    "reg",
+    "byte",
+    "shortint",
+    "int",
+    "longint",
+    "integer",
+    "time",
+    "real",
+    "shortreal",
+    "realtime",
+    "string",
+    "chandle",
+    "event",
+    "void",
+    "enum",
+    "struct",
+    "union",
 ];
 
 pub(crate) fn is_net_type(s: &str) -> bool {
@@ -713,7 +759,18 @@ pub(crate) fn is_net_type(s: &str) -> bool {
 }
 
 const NET_TYPES: &[&str] = &[
-    "wire", "tri", "tri0", "tri1", "triand", "trior", "trireg", "wand", "wor", "supply0", "supply1", "uwire",
+    "wire",
+    "tri",
+    "tri0",
+    "tri1",
+    "triand",
+    "trior",
+    "trireg",
+    "wand",
+    "wor",
+    "supply0",
+    "supply1",
+    "uwire",
     "interconnect",
 ];
 
@@ -729,8 +786,19 @@ const STRENGTHS: &[&str] = &[
 ];
 
 const DECL_QUALIFIERS: &[&str] = &[
-    "const", "var", "static", "automatic", "rand", "randc", "local", "protected", "virtual", "input", "output",
-    "inout", "ref",
+    "const",
+    "var",
+    "static",
+    "automatic",
+    "rand",
+    "randc",
+    "local",
+    "protected",
+    "virtual",
+    "input",
+    "output",
+    "inout",
+    "ref",
 ];
 
 fn ident_at(p: &Parser, i: usize) -> bool {
@@ -1054,7 +1122,10 @@ pub(crate) fn type_with_dims(p: &Parser) -> bool {
             "]" => {
                 depth -= 1;
                 if depth == 0 && p.nth(k + 1) != "[" {
-                    return matches!(p.nth_kind(k + 1), Some(sv_lexer::Kind::Identifier | sv_lexer::Kind::EscapedIdentifier));
+                    return matches!(
+                        p.nth_kind(k + 1),
+                        Some(sv_lexer::Kind::Identifier | sv_lexer::Kind::EscapedIdentifier)
+                    );
                 }
             }
             "" => return false,
@@ -1132,7 +1203,6 @@ fn gate_instantiation(p: &mut Parser) {
     }
     p.expect(";");
 }
-
 
 /// `( expr )` around a condition.
 pub(crate) fn paren_expr(p: &mut Parser) {

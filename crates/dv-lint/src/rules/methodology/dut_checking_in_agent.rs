@@ -1,9 +1,9 @@
 //! UVM-ROL-003 (DutCheckingInAgent): Flags agents that hold a scoreboard,
 //! predictor or reference model.
 
-use dv_model::Design;
 use crate::support::class_roles::{is_library, property_class, role, user_classes, Role};
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 fn is_checker_class(d: &Design, c: &dv_model::Class) -> bool {
     if is_library(d, c) {
@@ -13,9 +13,7 @@ fn is_checker_class(d: &Design, c: &dv_model::Class) -> bool {
         return true;
     }
     let n = c.name.to_ascii_lowercase();
-    ["scoreboard", "predictor", "ref_model", "refmodel", "reference_model"]
-        .iter()
-        .any(|w| n.contains(w))
+    ["scoreboard", "predictor", "ref_model", "refmodel", "reference_model"].iter().any(|w| n.contains(w))
 }
 
 pub(crate) fn dut_checking_in_agent(d: &Design, out: &mut Sink) {

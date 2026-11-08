@@ -1,14 +1,14 @@
 //! SV-OOP-013 (AbstractClassInstantiation): Disallows direct instantiation of
 //! abstract (virtual) classes via 'new()'.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::class_fields::{class_property, declared_type};
 use crate::support::class_index::Classes;
 use crate::support::class_items::{kids, op};
 use crate::support::data_items::unparen;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::class_fields::{class_property, declared_type};
 
 /// The type a `new` constructs: the declared type of what it is assigned
 /// to (`x = new`, `T x = new`).
@@ -66,7 +66,10 @@ pub(crate) fn abstract_new(c: &Cst, s: &mut Sink) {
         let any_virtual = m.class_per_named_spec(c.index(), dt).into_iter().flatten().any(|(ti, cls)| {
             let t = &c.all[ti];
             let own = |w: &str| {
-                t.node(cls).children.iter().any(|k| matches!(*k, sv_syntax::Child::Token(x) if &*t.tokens[x as usize].text == w))
+                t.node(cls)
+                    .children
+                    .iter()
+                    .any(|k| matches!(*k, sv_syntax::Child::Token(x) if &*t.tokens[x as usize].text == w))
             };
             own("virtual") && own("class")
         });

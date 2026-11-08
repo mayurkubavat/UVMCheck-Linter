@@ -1,12 +1,12 @@
 //! SV-COR-011 (ModifyingLoopIndexInsideFor): Flags modifications to the loop
 //! control variable inside a 'for' loop body.
 
-use std::collections::HashSet;
-use sv_syntax::NodeId;
+use crate::support::for_loops::{for_parts, for_vars, is_ident_name, keyword_is, kids, op_text};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::for_loops::{for_parts, for_vars, is_ident_name, keyword_is, kids, op_text};
 
 pub(crate) fn loop_index_modified(c: &Cst, s: &mut Sink) {
     fn walk(c: &Cst, n: NodeId, vars: &HashSet<String>, s: &mut Sink) {

@@ -1,10 +1,10 @@
 //! PORT-PTH-001 (HardcodedHostPaths): Disallow hardcoded absolute filesystem
 //! paths (/home/..., C:\...) in file operations ($readmemh, $fopen).
 
+use crate::support::ast::{call_site, string_value, subtree, unparen, Ast};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use crate::support::ast::{Ast, call_site, string_value, subtree, unparen};
 
 fn hardcoded_paths(c: &Cst, a: &Ast, s: &mut Sink) {
     for n in subtree(c, c.tree.root) {

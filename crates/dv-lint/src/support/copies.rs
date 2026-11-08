@@ -9,8 +9,6 @@ use sv_syntax::NodeId;
 
 use crate::syntax::Cst;
 
-
-
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn decl_name(c: &Cst, n: NodeId) -> String {
@@ -65,7 +63,11 @@ pub(crate) fn module_instances(c: &Cst, name: &str) -> usize {
             total += here * outer;
         }
         seen.remove(name);
-        if any { total } else { 1 }
+        if any {
+            total
+        } else {
+            1
+        }
     }
     count(c, name, &mut HashSet::new())
 }
@@ -97,9 +99,9 @@ pub(crate) fn calls(c: &Cst) -> Vec<(NodeId, String, u32)> {
         out.push((n, c.last_text(callee).to_string(), first));
     }
     for n in c.nodes(NameExpr).into_iter().chain(c.nodes(ScopedExpr)).chain(c.nodes(MemberExpr)) {
-        let callee_of_call = c
-            .parent(n)
-            .is_some_and(|p| matches!(c.kind(p), CallExpr | ScopedExpr | MemberExpr) && c.tree.children(p).next() == Some(n));
+        let callee_of_call = c.parent(n).is_some_and(|p| {
+            matches!(c.kind(p), CallExpr | ScopedExpr | MemberExpr) && c.tree.children(p).next() == Some(n)
+        });
         if callee_of_call {
             continue;
         }
@@ -122,8 +124,5 @@ pub(crate) fn routine_names(c: &Cst) -> HashSet<String> {
 /// Calls of declared routines named `want`, with their call text.
 pub(crate) fn routine_calls(c: &Cst, want: &dyn Fn(&str) -> bool) -> Vec<(NodeId, String, u32)> {
     let declared = routine_names(c);
-    calls(c)
-        .into_iter()
-        .filter(|(_, name, _)| want(name) && declared.contains(name))
-        .collect()
+    calls(c).into_iter().filter(|(_, name, _)| want(name) && declared.contains(name)).collect()
 }

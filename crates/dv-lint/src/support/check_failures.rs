@@ -1,16 +1,10 @@
 //! Report severities and the failure branches of compare checks.
 
-
-
 use sv_syntax::NodeId;
 
 use crate::support::routine_bodies::{calls_in, if_parts, integer_literal, is_report_guard};
 
-
-
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 

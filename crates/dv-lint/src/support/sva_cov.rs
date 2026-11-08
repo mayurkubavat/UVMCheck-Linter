@@ -13,12 +13,19 @@ use crate::support::procedural::is_stmt;
 
 use crate::syntax::Cst;
 
-
 use crate::{Severity, Sink};
 
 use sv_syntax::SyntaxKind::*;
 
-pub(crate) fn add_n(s: &mut Sink, n: usize, rule: &'static str, name: &'static str, sev: Severity, msg: String, loc: Loc) {
+pub(crate) fn add_n(
+    s: &mut Sink,
+    n: usize,
+    rule: &'static str,
+    name: &'static str,
+    sev: Severity,
+    msg: String,
+    loc: Loc,
+) {
     for _ in 0..n {
         s.add(rule, name, sev, msg.clone(), loc);
     }
@@ -75,7 +82,10 @@ pub(crate) fn option_target(c: &Cst, o: NodeId) -> String {
 
 /// An immediate assertion's keyword: `assert`, `assume` or `cover`.
 pub(crate) fn assert_kw<'a>(c: &'a Cst, a: NodeId) -> &'a str {
-    c.toks(a).map(|t| c.text_of(t)).find(|t| matches!(*t, "assert" | "assume" | "cover" | "restrict" | "expect")).unwrap_or("")
+    c.toks(a)
+        .map(|t| c.text_of(t))
+        .find(|t| matches!(*t, "assert" | "assume" | "cover" | "restrict" | "expect"))
+        .unwrap_or("")
 }
 
 /// An assertion's pass and fail actions (slang's ifTrue and ifFalse).

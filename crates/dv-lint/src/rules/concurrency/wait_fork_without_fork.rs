@@ -1,12 +1,12 @@
 //! SV-CON-009 (WaitForkWithoutFork): Flags 'wait fork;' statements in tasks or
 //! routines that contain no 'fork' blocks.
 
-use sv_syntax::SyntaxKind;
+use crate::support::procedural::{routine_name, start};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::procedural::{routine_name, start};
 
 pub(crate) fn wait_fork_without_fork(c: &Cst, s: &mut Sink) {
     for k in [FunctionDecl, TaskDecl] {

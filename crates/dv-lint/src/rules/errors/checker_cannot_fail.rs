@@ -3,13 +3,13 @@
 //! comparator, in the class, its bases or the helpers it calls (Sonar S2699,
 //! tests without assertions).
 
-use std::collections::{HashMap, HashSet};
-use dv_model::{Class, Design};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
 use crate::support::class_roles::{role, Index, Role};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Class, Design};
+use std::collections::{HashMap, HashSet};
+use sv_syntax::NodeId;
+use sv_syntax::SyntaxKind::*;
 
 fn looks_like_checker(d: &Design, cls: &Class) -> bool {
     let r = role(d, cls);
@@ -21,7 +21,11 @@ fn looks_like_checker(d: &Design, cls: &Class) -> bool {
         return false;
     }
     let n = cls.name.to_lowercase();
-    n.contains("scoreboard") || n.contains("checker") || n.ends_with("_scb") || n.contains("_scb_") || n.ends_with("_sb")
+    n.contains("scoreboard")
+        || n.contains("checker")
+        || n.ends_with("_scb")
+        || n.contains("_scb_")
+        || n.ends_with("_sb")
 }
 
 /// A routine written in the library (uvm_pkg, a uvm_* class, the stub).

@@ -4,8 +4,6 @@ use sv_syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
 
-
-
 use sv_syntax::SyntaxKind::*;
 
 /// The name token of a declaration's `Name` child.

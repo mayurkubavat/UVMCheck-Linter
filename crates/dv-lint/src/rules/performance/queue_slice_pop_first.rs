@@ -1,12 +1,12 @@
 //! SV-PRF-008 (QueueSlicePopFirst): Disallow queue slicing ('q = q[1:$]') to
 //! drop head elements.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::ast::{assignment_op, kids, source_text, symbol_ref, type_head, typedef_named, unparen, Ast, Decl};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::ast::{Ast, Decl, assignment_op, kids, source_text, symbol_ref, type_head, typedef_named, unparen};
 
 pub(crate) fn ast_queue_slice(d: &Design, csts: &[Cst], s: &mut Sink) {
     for c in csts {
@@ -25,9 +25,7 @@ fn is_queue(c: &Cst, d: &Decl) -> bool {
     }
     let Some(dt) = d.dtype else { return false };
     let Some(name) = type_head(c, dt) else { return false };
-    typedef_named(c, name)
-        .and_then(first_dim)
-        .is_some_and(|dim| dim == "[$]" || dim.starts_with("[$:"))
+    typedef_named(c, name).and_then(first_dim).is_some_and(|dim| dim == "[$]" || dim.starts_with("[$:"))
 }
 
 fn queue_slice(c: &Cst, a: &Ast, s: &mut Sink) {

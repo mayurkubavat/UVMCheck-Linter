@@ -1,0 +1,5 @@
+# cargo fmt settings for the Rust workspace (stable options only; checked by
+# tools/gates/rust_gate.sh). 120 columns and "Max" heuristics match how the
+# code was written: short calls, struct literals and chains stay on one line.
+max_width = 120
+use_small_heuristics = "Max"

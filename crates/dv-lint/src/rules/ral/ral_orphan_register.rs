@@ -1,9 +1,9 @@
 //! RAL-MAP-001 (RalOrphanRegister): Detects instantiated uvm_reg instances
 //! inside uvm_reg_block that are never mapped via default_map.add_reg().
 
+use crate::support::uvm_syntax::{name_loc, reg_block_builds, routine_text, strip_line_comments, trim_ws};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::uvm_syntax::{name_loc, reg_block_builds, routine_text, strip_line_comments, trim_ws};
 
 pub(crate) fn ral_orphan_register(c: &Cst, s: &mut Sink) {
     for (cls, f) in reg_block_builds(c) {

@@ -1,12 +1,9 @@
 //! Class declarations, their items, qualifiers and constraints, for the
 //! randomization rules.
 
-
 use sv_syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 
@@ -59,10 +56,7 @@ pub(crate) fn class_decls(c: &Cst) -> Vec<NodeId> {
 
 /// The class's direct items (properties, methods, constraints).
 pub(crate) fn class_items(c: &Cst, cls: NodeId) -> Vec<NodeId> {
-    c.tree
-        .children(cls)
-        .filter(|&x| !matches!(c.kind(x), Name | Header | EndLabel | Attribute))
-        .collect()
+    c.tree.children(cls).filter(|&x| !matches!(c.kind(x), Name | Header | EndLabel | Attribute)).collect()
 }
 
 /// A data declaration's qualifier tokens (before its type).

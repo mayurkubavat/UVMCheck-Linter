@@ -1,12 +1,12 @@
 //! SV-SML-002 (MagicDelayInSequence): Disallow hardcoded physical delays
 //! (#delay) inside uvm_sequence.
 
-use sv_syntax::SyntaxKind;
+use crate::support::class_index::Classes;
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::class_index::{Classes};
 
 pub(crate) fn magic_delay_in_sequence(c: &Cst, s: &mut Sink) {
     let units = Units::new(c);
@@ -55,11 +55,7 @@ fn literal_is_zero(t: &str) -> bool {
         return t.chars().all(|ch| ch == '0');
     }
     if let Some(p) = t.find('\'') {
-        let digits: String = t[p + 1..]
-            .chars()
-            .skip_while(|ch| matches!(ch, 's' | 'S'))
-            .skip(1)
-            .collect();
+        let digits: String = t[p + 1..].chars().skip_while(|ch| matches!(ch, 's' | 'S')).skip(1).collect();
         return !digits.is_empty() && digits.chars().all(|ch| ch == '0');
     }
     false

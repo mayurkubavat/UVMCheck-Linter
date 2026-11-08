@@ -1,7 +1,7 @@
 //! SV-DEP-003 (LegacyAlwaysBlock): Disallow untyped 'always' blocks.
 
+use crate::syntax::{procedural_blocks, Cst};
 use crate::{Severity, Sink};
-use crate::syntax::{Cst, procedural_blocks};
 
 pub(crate) fn legacy_always(c: &Cst, s: &mut Sink) {
     for (_, kw) in procedural_blocks(c) {

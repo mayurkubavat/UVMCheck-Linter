@@ -17,13 +17,25 @@ use crate::SyntaxKind::*;
 
 /// Binary sequence and property operators.
 const SEQ_BINARY: &[&str] = &[
-    "and", "or", "intersect", "throughout", "within", "iff", "until", "s_until", "until_with", "s_until_with",
-    "implies", "|->", "|=>", "#-#", "#=#",
+    "and",
+    "or",
+    "intersect",
+    "throughout",
+    "within",
+    "iff",
+    "until",
+    "s_until",
+    "until_with",
+    "s_until_with",
+    "implies",
+    "|->",
+    "|=>",
+    "#-#",
+    "#=#",
 ];
 
 /// Unary property operators, some with an optional `[range]`.
-const PROP_UNARY: &[&str] =
-    &["not", "nexttime", "s_nexttime", "always", "s_always", "eventually", "s_eventually"];
+const PROP_UNARY: &[&str] = &["not", "nexttime", "s_nexttime", "always", "s_always", "eventually", "s_eventually"];
 
 const ACCEPT_ON: &[&str] = &["accept_on", "reject_on", "sync_accept_on", "sync_reject_on"];
 
@@ -186,7 +198,10 @@ pub(crate) fn arg_is_sequence(p: &Parser) -> bool {
                 if depth == 0
                     && t == "("
                     && !matches!(p.text_at(i.wrapping_sub(1)), "'" | "#")
-                    && !matches!(p.kind_at(i.wrapping_sub(1)), Some(sv_lexer::Kind::Identifier | sv_lexer::Kind::SystemIdentifier))
+                    && !matches!(
+                        p.kind_at(i.wrapping_sub(1)),
+                        Some(sv_lexer::Kind::Identifier | sv_lexer::Kind::SystemIdentifier)
+                    )
                     && paren_sequence_at(p, i, 0)
                 {
                     return true;
@@ -194,7 +209,10 @@ pub(crate) fn arg_is_sequence(p: &Parser) -> bool {
                 depth += 1;
             }
             "[" => {
-                if depth == 0 && (matches!(p.text_at(i + 1), "*" | "->" | "=") || p.text_at(i + 1) == "+" && p.text_at(i + 2) == "]") {
+                if depth == 0
+                    && (matches!(p.text_at(i + 1), "*" | "->" | "=")
+                        || p.text_at(i + 1) == "+" && p.text_at(i + 2) == "]")
+                {
                     return true;
                 }
                 depth += 1;

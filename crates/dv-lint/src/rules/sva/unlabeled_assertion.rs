@@ -1,9 +1,9 @@
 //! SVA-LBL-001 (UnlabeledAssertion): Immediate and concurrent assertions must
 //! declare an explicit label prefix (e.g. 'check_lbl: assert ...').
 
-use sv_syntax::NodeId;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn unlabeled_assertion(c: &Cst, s: &mut Sink) {

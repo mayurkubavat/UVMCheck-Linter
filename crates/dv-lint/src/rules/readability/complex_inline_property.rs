@@ -2,16 +2,29 @@
 //! statements whose inline property uses more than max_temporal_ops (default 3)
 //! temporal operators (##, |->, |=>, [*], throughout, within, until, ...).
 
+use crate::support::trivia::is_library_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::trivia::{is_library_tok};
 
 pub(crate) fn complex_inline_property(c: &Cst, s: &mut Sink) {
     const LIMIT: usize = 3;
     const TEMPORAL: [&str; 15] = [
-        "##", "|->", "|=>", "throughout", "within", "intersect", "until", "s_until", "until_with", "s_until_with",
-        "implies", "#-#", "#=#", "nexttime", "s_nexttime",
+        "##",
+        "|->",
+        "|=>",
+        "throughout",
+        "within",
+        "intersect",
+        "until",
+        "s_until",
+        "until_with",
+        "s_until_with",
+        "implies",
+        "#-#",
+        "#=#",
+        "nexttime",
+        "s_nexttime",
     ];
     for n in c.nodes(ConcurrentAssert) {
         let Some(first) = c.first_tok(n) else { continue };

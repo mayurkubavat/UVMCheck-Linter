@@ -1,9 +1,9 @@
 //! UVM-ROL-006 (VirtualInterfaceInChecker): Flags virtual interface handles in
 //! scoreboards and subscribers.
 
-use dv_model::Design;
 use crate::support::class_roles::{role, role_name, user_classes, Role};
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn virtual_interface_in_checker(d: &Design, out: &mut Sink) {
     for cls in user_classes(d) {

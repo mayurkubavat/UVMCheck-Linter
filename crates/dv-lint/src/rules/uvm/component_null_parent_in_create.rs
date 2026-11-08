@@ -2,11 +2,11 @@
 //! create calls passing 'null' as the parent handle, creating orphaned
 //! hierarchy nodes.
 
-use sv_syntax::NodeId;
+use crate::support::calls::{args, callee};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::calls::{args, callee};
 
 /// An ordered (not named) argument's expression.
 fn ordered(c: &Cst, a: Option<NodeId>) -> Option<NodeId> {

@@ -1,15 +1,15 @@
 //! SV-BUG-006 (RealEquality): Flags == and != on real or shortreal operands,
 //! except against an exact zero (Sonar S1244, clang-tidy float equality).
 
-use sv_syntax::NodeId;
 use crate::support::class_items::{kids, op, user_code};
-use crate::support::type_text::expr_text;
 use crate::support::data_items::unparen;
+use crate::support::real_types::{Ty, Types};
 use crate::support::sema_facts::ast_ok;
+use crate::support::type_text::expr_text;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::real_types::{Ty, Types};
 
 fn is_zero_literal(c: &Cst, e: NodeId) -> bool {
     let e = unparen(c, e);

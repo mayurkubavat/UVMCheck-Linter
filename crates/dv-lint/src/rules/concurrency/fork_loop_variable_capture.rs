@@ -2,12 +2,12 @@
 //! directly inside 'fork ... join_none' or 'join_any' blocks without an
 //! automatic local variable copy.
 
-use std::collections::HashSet;
-use sv_syntax::NodeId;
+use crate::support::for_loops::{for_parts, for_vars, is_ident_name, keyword_is, kids, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::for_loops::{for_parts, for_vars, is_ident_name, keyword_is, kids, subtree};
 
 /// The names slang reads as `IdentifierName`s under `n`, in order, with
 /// the names `DataDeclaration`s declared before each: plain names, member

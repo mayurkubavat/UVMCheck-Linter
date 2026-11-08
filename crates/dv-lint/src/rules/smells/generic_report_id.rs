@@ -1,11 +1,11 @@
 //! SV-SML-003 (GenericReportId): Disallow generic single-word report IDs
 //! ('ERR', 'INFO', 'DEBUG') in UVM reporting macros.
 
-use sv_syntax::SyntaxKind;
+use crate::support::statements::{call_args, call_name, report, start, string_literal, Units};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::statements::{Units, call_args, call_name, report, start, string_literal};
 
 pub(crate) fn generic_report_id(c: &Cst, s: &mut Sink) {
     let units = Units::new(c);

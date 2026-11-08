@@ -2,9 +2,9 @@
 //! inside a clocked loop (always_ff, always @(posedge/negedge), or a loop that
 //! waits on a clock edge).
 
-use sv_syntax::{NodeId, SyntaxKind};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A clock edge that gates `n`: a posedge/negedge event outside any fork.

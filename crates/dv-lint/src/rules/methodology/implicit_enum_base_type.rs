@@ -1,11 +1,11 @@
 //! SV-CNS-006 (ImplicitEnumBaseType): Flags enums in packages, classes and
 //! interfaces declared without a base type.
 
-use dv_model::Design;
+use crate::support::defines_packages::{container_of, user_types, Container, Files};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
 use sv_syntax::SyntaxKind::*;
-use crate::support::defines_packages::{Container, Files, container_of, user_types};
 
 pub(crate) fn implicit_enum_base_type(_: &Design, csts: &[Cst], out: &mut Sink) {
     for c in csts {

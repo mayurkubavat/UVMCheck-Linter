@@ -2,8 +2,8 @@
 //! class property shadows a base class property, or a method argument / local
 //! variable shadows a class member property.
 
+use crate::{ancestors, find_property, Severity, Sink};
 use dv_model::Design;
-use crate::{Severity, Sink, ancestors, find_property};
 
 pub(crate) fn variable_shadowing(d: &Design, out: &mut Sink) {
     for cls in d.classes() {
@@ -27,8 +27,7 @@ pub(crate) fn variable_shadowing(d: &Design, out: &mut Sink) {
                     ),
                     p.loc,
                 );
-                f.related
-                    .push((shadow.loc, format!("shadowed property in '{}'", base.name)));
+                f.related.push((shadow.loc, format!("shadowed property in '{}'", base.name)));
                 break;
             }
         }

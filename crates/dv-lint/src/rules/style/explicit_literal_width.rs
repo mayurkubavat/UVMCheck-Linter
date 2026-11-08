@@ -1,11 +1,11 @@
 //! SV-STY-010 (ExplicitLiteralWidth): Disallow unsized integer and numeric
 //! literals without explicit bit-width declarations.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::literals::{ast_times, compact, integer_literal};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::literals::{ast_times, compact, integer_literal};
 
 /// A plain decimal's value is above one.
 fn above_one(digits: &str) -> bool {
@@ -28,7 +28,11 @@ pub(crate) fn explicit_literal_width(c: &Cst, s: &mut Sink) {
         let mut text = compact(c, outer);
         // `#(50)`: slang keeps the parentheses as an expression.
         if c.parent(outer).is_some_and(|p| {
-            c.kind(p) == TimingControl && c.tok(p, "#").is_some() && c.tok(p, "(").is_some() && c.tok(p, ":").is_none() && c.tok(p, ",").is_none()
+            c.kind(p) == TimingControl
+                && c.tok(p, "#").is_some()
+                && c.tok(p, "(").is_some()
+                && c.tok(p, ":").is_none()
+                && c.tok(p, ",").is_none()
         }) {
             text = format!("({text})");
         }

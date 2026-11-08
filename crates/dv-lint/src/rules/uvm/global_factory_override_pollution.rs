@@ -3,9 +3,9 @@
 //! factory.set_type_override_by_name, T::type_id::set_type_override) outside
 //! uvm_test classes.
 
-use dv_model::Design;
+use crate::support::uvm_classes::{class_role, user_classes, Role};
 use crate::{Severity, Sink};
-use crate::support::uvm_classes::{Role, class_role, user_classes};
+use dv_model::Design;
 
 fn role_name(r: Role) -> &'static str {
     match r {

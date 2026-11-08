@@ -4,9 +4,9 @@
 //! layer rules).
 
 use crate::support::class_index::*;
+use crate::support::class_metrics::each_class;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_metrics::each_class;
 
 fn layer_of(r: Role) -> Option<usize> {
     match r {
@@ -20,10 +20,7 @@ fn layer_of(r: Role) -> Option<usize> {
 }
 
 fn layer_name(l: usize) -> &'static str {
-    ["sequence item", "sequence", "agent", "env", "test"]
-        .get(l)
-        .copied()
-        .unwrap_or("?")
+    ["sequence item", "sequence", "agent", "env", "test"].get(l).copied().unwrap_or("?")
 }
 
 pub(crate) fn layer_dependency(c: &Cst, s: &mut Sink) {

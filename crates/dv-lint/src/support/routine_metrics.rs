@@ -9,8 +9,6 @@ use crate::support::class_index::*;
 
 use crate::syntax::Cst;
 
-
-
 use SyntaxKind::*;
 
 /// A routine with a body that rules lint.
@@ -55,11 +53,7 @@ pub(crate) fn user_routines(c: &Cst, classes: &Classes) -> Vec<Routine> {
         let Some(parent) = c.parent(d) else { continue };
         let (owner, times) = match c.kind(parent) {
             PackageDecl => {
-                let p = c
-                    .tree
-                    .child(parent, Name)
-                    .map(|x| c.tree.bare_text(x))
-                    .unwrap_or_default();
+                let p = c.tree.child(parent, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();
                 if p == "uvm_pkg" {
                     continue;
                 }
@@ -67,11 +61,7 @@ pub(crate) fn user_routines(c: &Cst, classes: &Classes) -> Vec<Routine> {
             }
             SourceFile => (String::new(), 1),
             ModuleDecl | InterfaceDecl | ProgramDecl => {
-                let p = c
-                    .tree
-                    .child(parent, Name)
-                    .map(|x| c.tree.bare_text(x))
-                    .unwrap_or_default();
+                let p = c.tree.child(parent, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();
                 (p, units.direct_times(c, parent))
             }
             _ => continue,
@@ -102,9 +92,7 @@ pub(crate) fn user_routines(c: &Cst, classes: &Classes) -> Vec<Routine> {
 }
 
 pub(crate) fn has_scope(c: &Cst, d: NodeId) -> bool {
-    c.tree
-        .child(d, Name)
-        .is_some_and(|n| c.toks(n).any(|t| c.text_of(t) == "::"))
+    c.tree.child(d, Name).is_some_and(|n| c.toks(n).any(|t| c.text_of(t) == "::"))
 }
 
 #[derive(Default)]
@@ -118,10 +106,7 @@ pub(crate) struct Metrics {
 }
 
 pub(crate) fn logical_ops(c: &Cst, e: NodeId) -> i64 {
-    subtree(c, e)
-        .into_iter()
-        .filter(|&x| c.kind(x) == BinaryExpr && matches!(op(c, x), "&&" | "||"))
-        .count() as i64
+    subtree(c, e).into_iter().filter(|&x| c.kind(x) == BinaryExpr && matches!(op(c, x), "&&" | "||")).count() as i64
 }
 
 pub(crate) fn logical_sequences(c: &Cst, e: NodeId, parent: Option<&str>) -> i64 {
@@ -139,12 +124,7 @@ pub(crate) fn logical_sequences(c: &Cst, e: NodeId, parent: Option<&str>) -> i64
                 logical_sequences(c, l, None) + logical_sequences(c, r, None)
             }
         }
-        PrefixExpr => c
-            .tree
-            .children(e)
-            .next()
-            .map(|x| logical_sequences(c, x, None))
-            .unwrap_or(0),
+        PrefixExpr => c.tree.children(e).next().map(|x| logical_sequences(c, x, None)).unwrap_or(0),
         _ => 0,
     }
 }
@@ -305,13 +285,7 @@ impl Walker<'_, '_> {
 }
 
 pub(crate) fn routine_metrics(c: &Cst, body: Option<NodeId>) -> Metrics {
-    let mut w = Walker {
-        c,
-        m: Metrics {
-            cyclomatic: 1,
-            ..Default::default()
-        },
-    };
+    let mut w = Walker { c, m: Metrics { cyclomatic: 1, ..Default::default() } };
     if let Some(b) = body {
         for x in list(c, b) {
             w.walk(x, 0);

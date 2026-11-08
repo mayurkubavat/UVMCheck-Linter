@@ -1,11 +1,11 @@
 //! SV-DED-008 (UnusedGenerateBlock): Flags conditional statements or generate
 //! blocks with constant false conditions ('0') and no 'else' clause.
 
-use sv_syntax::SyntaxKind;
+use crate::support::statements::{if_parts, start};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::statements::{if_parts, start};
 
 pub(crate) fn false_condition(c: &Cst, s: &mut Sink) {
     for n in c.nodes(IfStmt) {

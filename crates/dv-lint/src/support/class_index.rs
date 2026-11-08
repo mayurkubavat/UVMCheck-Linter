@@ -10,8 +10,6 @@ use crate::support::statements::*;
 
 use crate::syntax::Cst;
 
-
-
 use SyntaxKind::*;
 
 pub(crate) struct Prop {
@@ -170,10 +168,7 @@ pub(crate) fn ports(c: &Cst, decl: NodeId) -> Vec<Port> {
     let mut ty: Option<NodeId> = None;
     for p in c.tree.children(list).filter(|&p| c.kind(p) == Port) {
         let toks: Vec<&str> = c.toks(p).map(|t| c.text_of(t)).collect();
-        let new_dir = toks
-            .iter()
-            .find(|t| matches!(**t, "input" | "output" | "inout" | "ref"))
-            .copied();
+        let new_dir = toks.iter().find(|t| matches!(**t, "input" | "output" | "inout" | "ref")).copied();
         let pty = c.tree.child(p, DataType);
         if let Some(d) = new_dir {
             dir = match d {
@@ -188,12 +183,7 @@ pub(crate) fn ports(c: &Cst, decl: NodeId) -> Vec<Port> {
         }
         let is_const = toks.contains(&"const");
         for (name, _) in decl_names(c, p) {
-            out.push(Port {
-                name,
-                ty,
-                dir,
-                is_const,
-            });
+            out.push(Port { name, ty, dir, is_const });
         }
     }
     out
@@ -255,11 +245,7 @@ impl Classes {
             let name = c.text_of(tok).to_string();
             let header = c.tree.child(n, Header);
             let base = header
-                .and_then(|h| {
-                    c.tree
-                        .children(h)
-                        .find(|&e| c.kind(e) == Extends && has_tok(c, e, "extends"))
-                })
+                .and_then(|h| c.tree.children(h).find(|&e| c.kind(e) == Extends && has_tok(c, e, "extends")))
                 .and_then(|e| c.tree.child(e, DataType))
                 .and_then(|ty| type_name(c, ty));
             let generic = header.is_some_and(|h| c.tree.child(h, ParamList).is_some());
@@ -334,17 +320,7 @@ impl Classes {
                     _ => {}
                 }
             }
-            list.push(Class {
-                node: n,
-                name,
-                tok,
-                base,
-                generic,
-                library,
-                props,
-                methods,
-                pure,
-            });
+            list.push(Class { node: n, name, tok, base, generic, library, props, methods, pure });
         }
         let mut by_name: HashMap<String, Vec<usize>> = HashMap::new();
         let mut by_node = HashMap::new();
@@ -352,12 +328,7 @@ impl Classes {
             by_name.entry(k.name.clone()).or_default().push(i);
             by_node.insert(k.node.0, i);
         }
-        Classes {
-            list,
-            by_name,
-            typedefs,
-            by_node,
-        }
+        Classes { list, by_name, typedefs, by_node }
     }
 
     /// The class a type name stands for, through typedefs.
@@ -459,10 +430,7 @@ impl Classes {
     }
 
     pub fn uvm_base_name(&self, i: usize) -> Option<String> {
-        self.chain(i)
-            .into_iter()
-            .map(|(n, _)| n)
-            .find(|n| n.starts_with("uvm_"))
+        self.chain(i).into_iter().map(|(n, _)| n).find(|n| n.starts_with("uvm_"))
     }
 
     /// `swe::derivesFrom(cls, base)`.
@@ -609,18 +577,11 @@ pub(crate) fn calls(c: &Cst, n: NodeId) -> Vec<NodeId> {
 }
 
 pub(crate) fn strongest_report(c: &Cst, n: NodeId) -> Level {
-    calls(c, n)
-        .into_iter()
-        .map(|x| report_level(c, x))
-        .max()
-        .unwrap_or(Level::None)
+    calls(c, n).into_iter().map(|x| report_level(c, x)).max().unwrap_or(Level::None)
 }
 
 pub(crate) fn is_report_query(n: &str) -> bool {
-    matches!(
-        n,
-        "uvm_report_enabled" | "get_report_verbosity_level" | "get_report_action" | "uvm_get_report_object"
-    )
+    matches!(n, "uvm_report_enabled" | "get_report_verbosity_level" | "get_report_action" | "uvm_get_report_object")
 }
 
 /// `swe::isReportGuard`: an if whose condition only asks whether to report.
@@ -831,7 +792,12 @@ pub(crate) fn root_name<'a>(c: &'a Cst, e: NodeId) -> Option<&'a str> {
 /// `swe::writtenSymbols` by name (roots of assigned, incremented and
 /// mutated expressions). Output arguments of user routines are not
 /// resolved here.
-pub(crate) fn written_names(c: &Cst, env: &crate::support::class_metrics::Env, body: NodeId, container: bool) -> Vec<String> {
+pub(crate) fn written_names(
+    c: &Cst,
+    env: &crate::support::class_metrics::Env,
+    body: NodeId,
+    container: bool,
+) -> Vec<String> {
     let mut out = Vec::new();
     let root = |e: NodeId, out: &mut Vec<String>| out.extend(root_name(c, e).map(str::to_string));
     for x in subtree(c, body) {
@@ -860,10 +826,7 @@ pub(crate) fn written_names(c: &Cst, env: &crate::support::class_metrics::Env, b
                 let args: Vec<Option<NodeId>> = call_args(c, x);
                 match c.kind(callee) {
                     NameExpr if name.starts_with('$') => {
-                        if matches!(
-                            name,
-                            "$cast" | "$sscanf" | "$fscanf" | "$fgets" | "$fread" | "$value$plusargs"
-                        ) {
+                        if matches!(name, "$cast" | "$sscanf" | "$fscanf" | "$fgets" | "$fread" | "$value$plusargs") {
                             for a in args.iter().flatten() {
                                 root(*a, &mut out);
                             }
@@ -888,9 +851,8 @@ pub(crate) fn written_names(c: &Cst, env: &crate::support::class_metrics::Env, b
                             }
                         } else if c.kind(callee) == MemberExpr {
                             let recv = c.tree.children(callee).next();
-                            let on_class = recv
-                                .and_then(|r| env.expr_type(r))
-                                .is_some_and(|t| !t.array && t.class.is_some());
+                            let on_class =
+                                recv.and_then(|r| env.expr_type(r)).is_some_and(|t| !t.array && t.class.is_some());
                             let container_op = container
                                 && !on_class
                                 && matches!(

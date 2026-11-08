@@ -2,19 +2,21 @@
 //! where condition variables are never modified or assigned inside the loop
 //! body.
 
-use std::collections::HashSet;
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::procedural::{assign_lhs, is_incdec, loop_kw};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::procedural::{assign_lhs, is_incdec, loop_kw};
 
 /// The identifiers slang keeps as `IdentifierName` under a node: names and
 /// members, but not a name that a select follows (`a` of `a[i]`, which is
 /// an `IdentifierSelectName`), in source order.
 pub(crate) fn identifier_names(c: &Cst, n: NodeId) -> Vec<String> {
-    let ident = |s: &str| s.starts_with(|ch: char| ch.is_ascii_alphabetic() || ch == '_') && !matches!(s, "this" | "super" | "null");
+    let ident = |s: &str| {
+        s.starts_with(|ch: char| ch.is_ascii_alphabetic() || ch == '_') && !matches!(s, "this" | "super" | "null")
+    };
     let mut res: Vec<(u32, String)> = Vec::new();
     for x in subtree(c, n) {
         let selected = c.parent(x).is_some_and(|p| c.kind(p) == SelectExpr && kids(c, p).first() == Some(&x));
@@ -46,7 +48,11 @@ pub(crate) fn wait_in_loop(c: &Cst, s: &mut Sink) {
         let waits: Vec<NodeId> = all
             .iter()
             .copied()
-            .filter(|&x| c.kind(x) == WaitStmt && c.keyword(x).is_some_and(|k| c.text_of(k) == "wait") && !c.toks(x).any(|t| c.text_of(t) == "fork"))
+            .filter(|&x| {
+                c.kind(x) == WaitStmt
+                    && c.keyword(x).is_some_and(|k| c.text_of(k) == "wait")
+                    && !c.toks(x).any(|t| c.text_of(t) == "fork")
+            })
             .collect();
         if waits.is_empty() {
             continue;
@@ -60,7 +66,9 @@ pub(crate) fn wait_in_loop(c: &Cst, s: &mut Sink) {
             }
         }
         for w in waits {
-            let Some(cond) = kids(c, w).into_iter().find(|&x| !matches!(c.kind(x), StmtLabel | Attribute)) else { continue };
+            let Some(cond) = kids(c, w).into_iter().find(|&x| !matches!(c.kind(x), StmtLabel | Attribute)) else {
+                continue;
+            };
             let ids = identifier_names(c, cond);
             if ids.is_empty() || ids.iter().any(|i| modified.contains(i)) {
                 continue;

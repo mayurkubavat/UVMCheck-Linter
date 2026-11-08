@@ -49,14 +49,25 @@ impl<'t> Cst<'t> {
                 parent[c.0 as usize] = n.0;
             }
         }
-        Cst { tree, ix, pre, parent, locator: RefCell::new(locator), prior_files: Default::default(), all: std::slice::from_ref(tree), by_kind: Default::default() }
+        Cst {
+            tree,
+            ix,
+            pre,
+            parent,
+            locator: RefCell::new(locator),
+            prior_files: Default::default(),
+            all: std::slice::from_ref(tree),
+            by_kind: Default::default(),
+        }
     }
 
     /// How many specializations slang elaborates of the generic class
     /// declared at `class` in this tree (None for a class that is not
     /// generic).
     pub fn spec_count(&self, class: NodeId) -> Option<usize> {
-        crate::shared::get("spec_counts", self.compile_key(), || sv_sema::spec_counts(self.all)).get(&(self.index(), class)).copied()
+        crate::shared::get("spec_counts", self.compile_key(), || sv_sema::spec_counts(self.all))
+            .get(&(self.index(), class))
+            .copied()
     }
 
     /// Identifies this tree within its compile, for per-tree caches whose
@@ -79,7 +90,11 @@ impl<'t> Cst<'t> {
 
     /// This tree's index in [`Self::all`].
     pub fn index(&self) -> usize {
-        if self.all.len() == 1 { 0 } else { self.ix }
+        if self.all.len() == 1 {
+            0
+        } else {
+            self.ix
+        }
     }
 
     /// Gives back the locator, with any files this tree added.
@@ -147,10 +162,7 @@ impl<'t> Cst<'t> {
     /// Child nodes, skipping labels and attributes (slang keeps those
     /// outside a block's items and a statement's kind).
     pub fn items(&self, n: NodeId) -> Vec<NodeId> {
-        self.tree
-            .children(n)
-            .filter(|&c| !matches!(self.kind(c), EndLabel | StmtLabel | Attribute))
-            .collect()
+        self.tree.children(n).filter(|&c| !matches!(self.kind(c), EndLabel | StmtLabel | Attribute)).collect()
     }
 
     /// Tokens that are direct children of `n`.
@@ -242,30 +254,40 @@ pub type SyntaxFn = fn(&Cst, &mut Sink);
 
 /// slang's `CaseStatementSyntax`: case, casex, casez (randcase is another kind).
 pub(crate) fn case_statements(c: &Cst) -> Vec<(NodeId, u32)> {
-    c.nodes(CaseStmt).into_iter().filter_map(|n| {
-        let kw = c.toks(n).find(|&t| matches!(c.text_of(t), "case" | "casex" | "casez"))?;
-        Some((n, kw))
-    }).collect()
+    c.nodes(CaseStmt)
+        .into_iter()
+        .filter_map(|n| {
+            let kw = c.toks(n).find(|&t| matches!(c.text_of(t), "case" | "casex" | "casez"))?;
+            Some((n, kw))
+        })
+        .collect()
 }
 
-pub(crate) const PROCEDURAL_KEYWORDS: [&str; 6] = ["initial", "final", "always", "always_comb", "always_ff", "always_latch"];
+pub(crate) const PROCEDURAL_KEYWORDS: [&str; 6] =
+    ["initial", "final", "always", "always_comb", "always_ff", "always_latch"];
 
 /// slang's `ProceduralBlockSyntax` and its keyword.
 pub(crate) fn procedural_blocks(c: &Cst) -> Vec<(NodeId, u32)> {
-    c.nodes(ProceduralBlock).into_iter().filter_map(|n| {
-        let kw = c.toks(n).find(|&t| PROCEDURAL_KEYWORDS.contains(&c.text_of(t)))?;
-        Some((n, kw))
-    }).collect()
+    c.nodes(ProceduralBlock)
+        .into_iter()
+        .filter_map(|n| {
+            let kw = c.toks(n).find(|&t| PROCEDURAL_KEYWORDS.contains(&c.text_of(t)))?;
+            Some((n, kw))
+        })
+        .collect()
 }
 
 /// slang's `AssignmentExpression` (plain `=`): its operator, left and right.
 pub(crate) fn assignments(c: &Cst) -> Vec<(u32, NodeId, NodeId)> {
-    c.nodes(BinaryExpr).into_iter().filter_map(|n| {
-        let op = c.toks(n).next()?;
-        if c.text_of(op) != "=" {
-            return None;
-        }
-        let mut sides = c.tree.children(n);
-        Some((op, sides.next()?, sides.next()?))
-    }).collect()
+    c.nodes(BinaryExpr)
+        .into_iter()
+        .filter_map(|n| {
+            let op = c.toks(n).next()?;
+            if c.text_of(op) != "=" {
+                return None;
+            }
+            let mut sides = c.tree.children(n);
+            Some((op, sides.next()?, sides.next()?))
+        })
+        .collect()
 }

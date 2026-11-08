@@ -7,12 +7,9 @@ use sv_syntax::SyntaxKind::*;
 
 use crate::support::slang_ast::kids;
 
-
 use crate::support::style_config::ast_visits;
 
 use crate::syntax::Cst;
-
-
 
 /// In a generate construct's header (a loop's bounds, an `if` or `case`
 /// condition): elaboration evaluates it, the AST walk does not reach it.
@@ -20,8 +17,8 @@ pub(crate) fn in_generate_header(c: &Cst, e: NodeId) -> bool {
     for a in crate::support::slang_ast::ancestors(c, e) {
         match c.kind(a) {
             LoopGenerate | IfGenerate | CaseGenerate => return true,
-            GenerateBlock | ElseClause | ModuleDecl | InterfaceDecl | ProgramDecl | ClassDecl | FunctionDecl | TaskDecl
-            | ProceduralBlock | ContinuousAssign | DataDecl | Instantiation => return false,
+            GenerateBlock | ElseClause | ModuleDecl | InterfaceDecl | ProgramDecl | ClassDecl | FunctionDecl
+            | TaskDecl | ProceduralBlock | ContinuousAssign | DataDecl | Instantiation => return false,
             _ => {}
         }
     }
@@ -63,7 +60,9 @@ pub(crate) fn user_visits(c: &Cst, n: NodeId) -> usize {
     if crate::support::slang_ast::is_library(c, n) {
         return 0;
     }
-    if crate::support::slang_ast::ancestors(c, n).any(|a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl)) {
+    if crate::support::slang_ast::ancestors(c, n)
+        .any(|a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl))
+    {
         if let Some(m) = crate::support::slang_ast::elab_copies(c, n) {
             return m;
         }
@@ -130,7 +129,9 @@ pub(crate) fn field_arg(c: &Cst, a: NodeId) -> String {
 pub(crate) fn config_db_calls(csts: &[Cst]) -> Vec<CfgCall> {
     let mut out = Vec::new();
     // How slang prints the formal's type `T`.
-    let in_pkg = csts.iter().any(|c| c.nodes(PackageDecl).into_iter().any(|p| crate::support::slang_ast::decl_name(c, p) == "uvm_pkg"));
+    let in_pkg = csts
+        .iter()
+        .any(|c| c.nodes(PackageDecl).into_iter().any(|p| crate::support::slang_ast::decl_name(c, p) == "uvm_pkg"));
     let formal = if in_pkg { "uvm_pkg::uvm_config_db::T" } else { "uvm_config_db::T" };
     for c in csts {
         let cfg = crate::expr_types::cfgdb_types(c);

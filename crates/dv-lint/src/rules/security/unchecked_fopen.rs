@@ -1,11 +1,11 @@
 //! SV-SYS-001 (UncheckedFopen): Flags unchecked $fopen return descriptors and
 //! discarded $fopen calls.
 
-use sv_syntax::SyntaxKind;
+use crate::support::ast::{kids, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::ast::{kids, subtree};
 
 pub(crate) fn unchecked_fopen(c: &Cst, s: &mut Sink) {
     for n in c.nodes(CallExpr) {

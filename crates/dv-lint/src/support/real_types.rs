@@ -12,11 +12,7 @@ use crate::support::type_text::base_name;
 
 use crate::support::constraints::class_names;
 
-
-
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 
@@ -27,14 +23,56 @@ pub(crate) enum Ty {
 }
 
 pub(crate) const REAL_SYS: &[&str] = &[
-    "$realtime", "$itor", "$bitstoreal", "$shortrealtobits", "$bitstoshortreal", "$sqrt", "$ln", "$log10", "$exp",
-    "$pow", "$floor", "$ceil", "$sin", "$cos", "$tan", "$asin", "$acos", "$atan", "$atan2", "$hypot", "$sinh",
-    "$cosh", "$tanh", "$asinh", "$acosh", "$atanh", "$dist_normal_real",
+    "$realtime",
+    "$itor",
+    "$bitstoreal",
+    "$shortrealtobits",
+    "$bitstoshortreal",
+    "$sqrt",
+    "$ln",
+    "$log10",
+    "$exp",
+    "$pow",
+    "$floor",
+    "$ceil",
+    "$sin",
+    "$cos",
+    "$tan",
+    "$asin",
+    "$acos",
+    "$atan",
+    "$atan2",
+    "$hypot",
+    "$sinh",
+    "$cosh",
+    "$tanh",
+    "$asinh",
+    "$acosh",
+    "$atanh",
+    "$dist_normal_real",
 ];
 
 pub(crate) const INT_SYS: &[&str] = &[
-    "$time", "$stime", "$rtoi", "$realtobits", "$clog2", "$bits", "$size", "$urandom", "$random", "$urandom_range",
-    "$countones", "$onehot", "$onehot0", "$isunknown", "$high", "$low", "$left", "$right", "$increment", "$dimensions",
+    "$time",
+    "$stime",
+    "$rtoi",
+    "$realtobits",
+    "$clog2",
+    "$bits",
+    "$size",
+    "$urandom",
+    "$random",
+    "$urandom_range",
+    "$countones",
+    "$onehot",
+    "$onehot0",
+    "$isunknown",
+    "$high",
+    "$low",
+    "$left",
+    "$right",
+    "$increment",
+    "$dimensions",
 ];
 
 pub(crate) struct Types<'a> {
@@ -330,7 +368,9 @@ impl Types<'_> {
         let mut cur = Some(cls);
         let mut guard = 0;
         while let Some(k) = cur {
-            if crate::support::class_items::decl_name(c, k).is_some_and(|(n, _)| n.starts_with("uvm_")) || !user_code(c, k) {
+            if crate::support::class_items::decl_name(c, k).is_some_and(|(n, _)| n.starts_with("uvm_"))
+                || !user_code(c, k)
+            {
                 return None;
             }
             for m in class_items(c, k) {

@@ -1,13 +1,13 @@
 //! SVA-ACT-001 (AssertWithoutElse): Immediate and concurrent assertions must
 //! include an 'else' action block (e.g. 'else `uvm_error(...)').
 
-use sv_syntax::NodeId;
-use crate::support::slang_ast::*;
 use crate::support::procedural::start;
+use crate::support::slang_ast::*;
+use crate::support::sva_cov::{add_n, assert_kw, ast_asserts};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{add_n, assert_kw, ast_asserts};
 
 fn has_else(c: &Cst, a: NodeId) -> bool {
     c.tree.child(a, ElseClause).is_some()

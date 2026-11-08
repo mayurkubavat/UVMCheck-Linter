@@ -1,11 +1,11 @@
 //! UVM-SEQ-012 (SequenceStartOnNullSequencer): Flags sequence start(null) calls
 //! that start sequences without an attached sequencer handle.
 
-use sv_syntax::Child;
+use crate::support::cross_labels::last_line;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::Child;
 use sv_syntax::SyntaxKind::*;
-use crate::support::cross_labels::last_line;
 
 pub(crate) fn start_on_null(c: &Cst, s: &mut Sink) {
     for call in c.nodes(CallExpr) {

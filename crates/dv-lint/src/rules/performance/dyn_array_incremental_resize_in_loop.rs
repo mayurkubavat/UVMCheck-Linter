@@ -2,12 +2,12 @@
 //! incrementally inside loops with new[arr.size()+1](arr) causes O(N^2) memory
 //! reallocation bottlenecks.
 
-use sv_syntax::SyntaxKind;
+use crate::support::ast::Ast;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::ast::{Ast};
 
 fn resize_in_loop(c: &Cst, a: &Ast, s: &mut Sink) {
     for n in c.nodes(NewExpr) {

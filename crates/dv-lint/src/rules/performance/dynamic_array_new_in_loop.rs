@@ -2,11 +2,11 @@
 //! (new[...]) inside simulation loops to prevent heap contention and memory
 //! churn.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::ast::{kids, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::ast::{kids, subtree};
 
 /// The loops whose body slang's loop visitors search: for, foreach,
 /// while, repeat, forever (LoopStmt) and do-while; with the body.

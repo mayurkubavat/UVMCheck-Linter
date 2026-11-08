@@ -1,16 +1,16 @@
 //! SV-DUP-004 (RepeatedStringLiteral): Flags a string literal, such as a report
 //! ID or a file name, written four or more times in the code.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use dv_model::{Design, Loc};
-use sv_lexer::Kind;
-use sv_syntax::NodeId;
-use crate::support::routine_owner::{bad_body, free_routine_names, routine_class};
 use crate::support::class_roles::user_classes;
+use crate::support::routine_owner::{bad_body, free_routine_names, routine_class};
+use crate::support::written_tokens::{in_define, Generated};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use sv_lexer::Kind;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::written_tokens::{Generated, in_define};
 
 fn args_of(c: &Cst, n: NodeId) -> Vec<NodeId> {
     let Some(al) = c.tree.child(n, ArgList) else { return Vec::new() };
@@ -32,7 +32,9 @@ fn name_argument(c: &Cst, n: NodeId) -> Option<NodeId> {
     let inner = c.tree.children(callee).next()?;
     match method {
         "create" if c.kind(inner) == ScopedExpr && c.last_text(inner) == "type_id" => args.first().copied(),
-        "set" | "get" if c.kind(inner) == NameExpr && c.keyword(inner).is_some_and(|t| c.text_of(t) == "uvm_config_db") => {
+        "set" | "get"
+            if c.kind(inner) == NameExpr && c.keyword(inner).is_some_and(|t| c.text_of(t) == "uvm_config_db") =>
+        {
             args.get(2).copied()
         }
         _ => None,
@@ -130,7 +132,8 @@ pub(crate) fn repeated_string_literal(d: &Design, csts: &[Cst], out: &mut Sink) 
                     continue;
                 }
                 let w = if tok.from_macro { tok.written } else { tok.origin };
-                let path = c.tree.files.get(w.file as usize).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
+                let path =
+                    c.tree.files.get(w.file as usize).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default();
                 let base = path.rsplit(['/', '\\']).next().unwrap_or(&path);
                 if base.starts_with("uvm_") || !seen.insert((path.clone(), w.offset)) {
                     continue;

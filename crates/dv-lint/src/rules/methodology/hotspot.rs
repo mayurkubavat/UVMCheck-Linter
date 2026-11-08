@@ -2,11 +2,11 @@
 //! complex (summed cyclomatic complexity of their routines) and often changed
 //! in git, the top five by complexity times commits.
 
+use crate::support::history::{base_name, file_of, log_for, HISTORY, MAX_COMMITS};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::BTreeMap;
 use std::sync::atomic::Ordering;
-use crate::support::history::{HISTORY, MAX_COMMITS, base_name, file_of, log_for};
 
 /// SV-EVO-001: the five files with the largest complexity times churn.
 pub(crate) fn hotspot(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {

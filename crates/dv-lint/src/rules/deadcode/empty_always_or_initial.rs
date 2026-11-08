@@ -1,10 +1,10 @@
 //! SV-DED-009 (EmptyAlwaysOrInitial): Disallows initial, always, always_comb,
 //! always_ff, always_latch, or final procedural blocks with empty bodies.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::syntax::{procedural_blocks, Cst};
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::syntax::{Cst, procedural_blocks};
 
 fn effectively_empty(c: &Cst, stmt: Option<NodeId>) -> bool {
     let Some(n) = stmt else { return true };

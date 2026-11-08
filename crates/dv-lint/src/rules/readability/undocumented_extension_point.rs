@@ -3,13 +3,13 @@
 //! subclasses, classes named *base*, and callbacks (Checkstyle
 //! MissingJavadocMethod, Pylint C0116).
 
-use std::collections::{HashMap, HashSet};
-use dv_model::Design;
-use sv_syntax::NodeId;
+use crate::support::class_docs::{decl_name, name_tok, own_comments, Classes, Role};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::{HashMap, HashSet};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_docs::{Classes, Role, decl_name, name_tok, own_comments};
 
 fn is_uvm_standard_name(n: &str) -> bool {
     n == "new"
@@ -17,7 +17,16 @@ fn is_uvm_standard_name(n: &str) -> bool {
         || n.starts_with("do_")
         || matches!(
             n,
-            "convert2string" | "get_type_name" | "create" | "body" | "pre_body" | "post_body" | "pre_start" | "post_start" | "write" | "catch"
+            "convert2string"
+                | "get_type_name"
+                | "create"
+                | "body"
+                | "pre_body"
+                | "post_body"
+                | "pre_start"
+                | "post_start"
+                | "write"
+                | "catch"
         )
 }
 

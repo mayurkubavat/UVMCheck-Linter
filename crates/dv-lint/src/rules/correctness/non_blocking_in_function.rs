@@ -1,11 +1,11 @@
 //! SV-LANG-005 (NonBlockingInFunction): Prohibits non-blocking assignments
 //! ('<=') inside functions.
 
-use sv_syntax::SyntaxKind;
+use crate::support::literals::compact;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::literals::{compact};
 
 pub(crate) fn nonblocking_in_function(c: &Cst, s: &mut Sink) {
     for f in c.nodes(FunctionDecl) {

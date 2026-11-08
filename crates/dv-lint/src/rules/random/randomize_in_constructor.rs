@@ -1,8 +1,8 @@
 //! SV-RND-018 (RandomizeInConstructor): Disallows calling randomize() inside
 //! class constructors (new()).
 
-use dv_model::Design;
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn randomize_in_constructor(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

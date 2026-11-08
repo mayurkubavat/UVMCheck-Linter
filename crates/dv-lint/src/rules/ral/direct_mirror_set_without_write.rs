@@ -2,13 +2,13 @@
 //! that update only software mirrors without issuing physical DUT write
 //! transactions.
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use crate::support::uvm_classes::{receiver, unparen};
 use crate::support::uvm_syntax::callee;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{receiver, unparen};
 
 pub(crate) fn direct_mirror_set(_d: &Design, csts: &[Cst], s: &mut Sink) {
     for c in csts {
@@ -25,7 +25,11 @@ pub(crate) fn direct_mirror_set(_d: &Design, csts: &[Cst], s: &mut Sink) {
                 SelectExpr => "reg".to_string(),
                 _ => c.trimmed(recv),
             };
-            if !(target.contains("reg") || target.contains("field") || target.contains("model") || target.contains("ral")) {
+            if !(target.contains("reg")
+                || target.contains("field")
+                || target.contains("model")
+                || target.contains("ral"))
+            {
                 continue;
             }
             let Some(t) = c.first_tok(n) else { continue };

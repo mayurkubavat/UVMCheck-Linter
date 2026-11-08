@@ -2,9 +2,9 @@
 //! uvm_reg_predictor components have their .map property assigned in
 //! connect_phase.
 
-use dv_model::Design;
+use crate::support::connect_phase::connect_phase_assignments;
 use crate::{Severity, Sink};
-use crate::support::connect_phase::{connect_phase_assignments};
+use dv_model::Design;
 
 pub(crate) fn ral_predictor_adapter_wiring(d: &Design, out: &mut Sink) {
     let mut predictors = Vec::new();

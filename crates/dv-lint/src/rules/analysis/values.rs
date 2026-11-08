@@ -14,7 +14,11 @@ impl Set {
         Set(Vec::new())
     }
     pub fn range(lo: i128, hi: i128) -> Set {
-        if lo > hi { Set::empty() } else { Set(vec![(lo, hi)]) }
+        if lo > hi {
+            Set::empty()
+        } else {
+            Set(vec![(lo, hi)])
+        }
     }
     pub fn point(v: i128) -> Set {
         Set::range(v, v)
@@ -156,10 +160,7 @@ pub(crate) fn type_range(c: &Cst, dt: NodeId) -> Option<(Set, u32)> {
     if w == 0 || w > 64 {
         return None;
     }
-    let set = if signed {
-        Set::range(-(1i128 << (w - 1)), (1i128 << (w - 1)) - 1)
-    } else {
-        Set::range(0, (1i128 << w) - 1)
-    };
+    let set =
+        if signed { Set::range(-(1i128 << (w - 1)), (1i128 << (w - 1)) - 1) } else { Set::range(0, (1i128 << w) - 1) };
     Some((set, w))
 }

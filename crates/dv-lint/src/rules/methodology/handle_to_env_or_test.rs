@@ -1,9 +1,9 @@
 //! UVM-CPL-002 (HandleToEnvOrTest): Flags sequences, items, agents, config
 //! objects and helpers that store a handle to a user env or test class.
 
-use dv_model::Design;
 use crate::support::class_roles::{is_library, property_class, role, role_name, user_classes, Role};
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn handle_to_env_or_test(d: &Design, out: &mut Sink) {
     for cls in user_classes(d) {

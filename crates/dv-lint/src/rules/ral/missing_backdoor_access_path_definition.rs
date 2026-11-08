@@ -1,10 +1,10 @@
 //! RAL-ACC-002 (MissingBackdoorAccessPathDefinition): Flags RAL backdoor path
 //! configuration routines called with an empty string or null path.
 
+use crate::support::uvm_syntax::{callee, first_ordered};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::uvm_syntax::{callee, first_ordered};
 
 pub(crate) fn backdoor_path(c: &Cst, s: &mut Sink) {
     for n in c.nodes(CallExpr) {

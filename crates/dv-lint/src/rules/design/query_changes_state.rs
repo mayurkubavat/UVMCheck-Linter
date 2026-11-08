@@ -2,9 +2,9 @@
 //! that write class properties (command-query separation). get_next_* is
 //! allowed.
 
+use crate::support::class_index::{local_or_port, property_owner, written_names, Classes};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_index::{Classes, local_or_port, property_owner, written_names};
 
 pub(crate) fn query_changes_state(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);

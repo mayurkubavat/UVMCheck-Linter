@@ -1,10 +1,10 @@
 //! SV-RCE-001 (ZeroDelayEventTrigger): Flags blocking event triggers ('->
 //! event') which cause zero-delay simulation race conditions.
 
-use sv_syntax::SyntaxKind;
+use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::syntax::{Cst};
 
 pub(crate) fn zero_delay_event_trigger(c: &Cst, s: &mut Sink) {
     for n in c.nodes(EventTrigger) {

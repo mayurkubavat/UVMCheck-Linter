@@ -3,14 +3,14 @@
 //! has items of another size. ':=' applies the weight to each value, which is
 //! rarely what the author meant; ':/' shares it.
 
-use std::collections::HashMap;
-use sv_syntax::NodeId;
 use crate::support::class_items::{expression_constraint, kids, subtree};
+use crate::support::constraints::{const_int, constraint_blocks, param_values, user_model_classes};
 use crate::support::data_items::unparen;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashMap;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::constraints::{const_int, constraint_blocks, param_values, user_model_classes};
 
 /// Number of values `[lo:hi]` covers.
 fn range_width(c: &Cst, value: NodeId, params: &HashMap<String, NodeId>) -> Option<i64> {

@@ -21,7 +21,9 @@ fn signature(c: &Cst, n: NodeId) -> String {
     let mut dir = "input".to_string();
     if let Some(pl) = c.tree.child(n, PortList) {
         for p in c.tree.children(pl).filter(|&p| c.kind(p) == Port) {
-            if let Some(d) = c.toks(p).map(|t| c.text_of(t)).find(|t| matches!(*t, "input" | "output" | "inout" | "ref")) {
+            if let Some(d) =
+                c.toks(p).map(|t| c.text_of(t)).find(|t| matches!(*t, "input" | "output" | "inout" | "ref"))
+            {
                 dir = d.to_string();
             }
             let ty = c.tree.child(p, DataType).map(|t| c.trimmed(t)).unwrap_or_else(|| "logic".into());
@@ -57,7 +59,12 @@ pub(crate) fn conflicting_dpi_prototypes(_: &Design, csts: &[Cst], out: &mut Sin
             let Some(at) = c.tree.child(n, Name).and_then(|x| c.first_tok(x)) else { continue };
             let sig = signature(c, n);
             let loc = c.loc(at);
-            let file = c.tree.files.get(c.tree.tokens[at as usize].origin.file as usize).map(|p| p.display().to_string()).unwrap_or_default();
+            let file = c
+                .tree
+                .files
+                .get(c.tree.tokens[at as usize].origin.file as usize)
+                .map(|p| p.display().to_string())
+                .unwrap_or_default();
             let v = by_name.entry(name).or_default();
             if !v.iter().any(|(s, _, _)| *s == sig) {
                 v.push((sig, loc, format!("{}:{}", file, loc.line)));

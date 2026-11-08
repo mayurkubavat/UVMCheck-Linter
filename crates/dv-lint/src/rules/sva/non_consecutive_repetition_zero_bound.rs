@@ -1,10 +1,10 @@
 //! SV-SVA-004 (NonConsecutiveRepetitionZeroBound): Non-consecutive repetition
 //! operators ([= ...] and [-> ...]) must specify a minimum bound >= 1.
 
+use crate::support::spans::span;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::spans::{span};
 
 pub(crate) fn zero_repetition(c: &Cst, s: &mut Sink) {
     for n in c.nodes(Repetition) {

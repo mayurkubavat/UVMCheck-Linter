@@ -2,13 +2,15 @@
 //! fork..join_none inside loops without copying the loop variable to an
 //! automatic local variable causes all threads to see the final loop index.
 
-use std::collections::HashSet;
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use crate::support::procedural::{
+    add_n, assign_lhs, if_parts, is_stmt, items, join_kind, loop_body, loop_kw, name_sym, timing_of, Sym,
+};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::{Child, NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::procedural::{Sym, add_n, assign_lhs, if_parts, is_stmt, items, join_kind, loop_body, loop_kw, name_sym, timing_of};
 
 pub(crate) fn fork_loop_variable(c: &Cst, s: &mut Sink) {
     for l in c.nodes(LoopStmt) {
@@ -99,8 +101,14 @@ fn stmt_exprs(c: &Cst, st: NodeId) -> Vec<NodeId> {
         ExprStmt => kids(c, st).into_iter().filter(|&x| !matches!(c.kind(x), StmtLabel | Attribute)).collect(),
         IfStmt => if_parts(c, st).0.into_iter().collect(),
         ReturnStmt | EventTrigger | DisableStmt => kids(c, st),
-        LoopStmt | DoWhileStmt => kids(c, st).into_iter().filter(|&x| !is_stmt(c.kind(x)) && !matches!(c.kind(x), StmtLabel | Attribute)).collect(),
-        WaitStmt | CaseStmt => kids(c, st).into_iter().filter(|&x| !is_stmt(c.kind(x)) && !matches!(c.kind(x), StmtLabel | Attribute)).collect(),
+        LoopStmt | DoWhileStmt => kids(c, st)
+            .into_iter()
+            .filter(|&x| !is_stmt(c.kind(x)) && !matches!(c.kind(x), StmtLabel | Attribute))
+            .collect(),
+        WaitStmt | CaseStmt => kids(c, st)
+            .into_iter()
+            .filter(|&x| !is_stmt(c.kind(x)) && !matches!(c.kind(x), StmtLabel | Attribute))
+            .collect(),
         TimedStmt => timing_of(c, st).into_iter().collect(),
         _ => Vec::new(),
     }

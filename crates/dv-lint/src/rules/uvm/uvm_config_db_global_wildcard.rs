@@ -3,11 +3,11 @@
 //! global regex matching across every component in the testbench, severely
 //! degrading simulation startup.
 
-use sv_syntax::NodeId;
+use crate::support::calls::{args, callee};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::calls::{args, callee};
 
 pub(crate) fn config_db_wildcard(c: &Cst, s: &mut Sink) {
     for call in c.nodes(CallExpr) {

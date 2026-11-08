@@ -1,10 +1,10 @@
 //! UVM-REP-009 (InfoAtNoneVerbosity): Flags `uvm_info messages at UVM_NONE
 //! verbosity, which cannot be filtered with +UVM_VERBOSITY.
 
-use sv_syntax::SyntaxKind;
 use crate::support::literals::ast_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn info_at_none(c: &Cst, s: &mut Sink) {

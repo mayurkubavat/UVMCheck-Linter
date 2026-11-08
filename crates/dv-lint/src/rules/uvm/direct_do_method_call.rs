@@ -1,10 +1,10 @@
 //! UVM-BAN-003 (DirectDoMethodCall): Flags direct calls to do_copy, do_compare,
 //! do_print, do_pack, do_unpack and do_record.
 
-use std::collections::HashMap;
-use dv_model::{Class, Design};
+use crate::support::uvm_kinds::is_object;
 use crate::{Severity, Sink};
-use crate::support::uvm_kinds::{is_object};
+use dv_model::{Class, Design};
+use std::collections::HashMap;
 
 pub(crate) fn direct_do_method_call(d: &Design, out: &mut Sink) {
     const PUBLIC: [(&str, &str); 6] = [

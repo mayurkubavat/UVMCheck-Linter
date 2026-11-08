@@ -2,13 +2,13 @@
 //! with a literal count instead of a count from their config object
 //! (open/closed principle, MG-4.2).
 
-use dv_model::Design;
-use sv_syntax::{Child, NodeId};
 use crate::support::class_roles::{is_component_role, role, Ctx, Index, Role};
+use crate::support::routine_bodies::{bodies, creations, integer_literal, Calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
 use sv_syntax::SyntaxKind::*;
-use crate::support::routine_bodies::{Calls, bodies, creations, integer_literal};
+use sv_syntax::{Child, NodeId};
 
 /// A loop: its keyword, the slots between its parentheses (split at `;`)
 /// and its body.
@@ -68,7 +68,9 @@ pub(crate) fn hardcoded_topology(d: &Design, csts: &[Cst], out: &mut Sink) {
                 _ => None,
             };
             let (Some(bound), Some(lbody)) = (bound, lbody) else { continue };
-            if let Some(cr) = creations(&ctx, &calls, c, lbody).into_iter().find(|cr| is_component_role(role(d, cr.class))) {
+            if let Some(cr) =
+                creations(&ctx, &calls, c, lbody).into_iter().find(|cr| is_component_role(role(d, cr.class)))
+            {
                 out.add(
                     "UVM-RUS-003",
                     "HardcodedTopology",

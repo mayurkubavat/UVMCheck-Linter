@@ -3,15 +3,13 @@
 //! seq_item_pull_port and monitor analysis_port) are bound in connect_phase
 //! across the verification environment hierarchy.
 
-use dv_model::{Design, Loc};
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::uvm_syntax::{
-    callee, decl_name,
-};
+use crate::support::uvm_classes::{is_component, Ix};
+use crate::support::uvm_syntax::{callee, decl_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, is_component};
 
 /// `swe::normalizedText`: tokens with any trivia between them as one space.
 fn normalized(c: &Cst, n: NodeId) -> String {

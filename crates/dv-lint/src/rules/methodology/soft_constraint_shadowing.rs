@@ -3,15 +3,15 @@
 //! soft constraint on a variable that a base class or another constraint block
 //! of the same class already constrains softly.
 
-use std::collections::{HashMap, HashSet};
-use dv_model::{ClassId, Design};
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::is_with_wrapper;
 use crate::support::class_roles::{user_classes, Ctx, Index};
+use crate::support::routine_bodies::is_with_wrapper;
+use crate::support::routine_owner::{bad_body, free_routine_names, in_library, routine_class};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{ClassId, Design};
+use std::collections::{HashMap, HashSet};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::routine_owner::{bad_body, free_routine_names, in_library, routine_class};
 
 /// The expressions of `soft` constraints under a constraint block or item,
 /// through lists, implications, conditionals and foreach.
@@ -93,9 +93,7 @@ fn constraint_blocks<'a, 't>(ix: &Index<'a, 't>, c: &'a Cst<'t>, decl: NodeId) -
             ConstraintPrototype => {
                 let full = format!("{cname}::{name}");
                 let body = ix.csts.iter().find_map(|k| {
-                    k.first_named(ConstraintDecl, &full)
-                        .and_then(|n| k.tree.child(n, ConstraintBlock))
-                        .map(|b| (k, b))
+                    k.first_named(ConstraintDecl, &full).and_then(|n| k.tree.child(n, ConstraintBlock)).map(|b| (k, b))
                 });
                 if let Some((k, b)) = body {
                     out.push((name, k, b));
@@ -191,7 +189,9 @@ is hidden from the reader. Keep one soft default and override it with a hard con
             if c.callee_name(inner) != "randomize" {
                 continue;
             }
-            let Some(blk) = c.tree.child(n, WithClause).and_then(|w| c.tree.child(w, ConstraintBlock)) else { continue };
+            let Some(blk) = c.tree.child(n, WithClause).and_then(|w| c.tree.child(w, ConstraintBlock)) else {
+                continue;
+            };
             if in_library(d, c, n) || in_bad_body(d, c, n, &free) {
                 continue;
             }

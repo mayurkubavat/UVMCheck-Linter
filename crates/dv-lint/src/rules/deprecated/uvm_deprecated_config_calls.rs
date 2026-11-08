@@ -1,9 +1,9 @@
 //! UVM-DEP-001 (UvmDeprecatedConfigCalls): Disallow deprecated legacy
 //! set_config_* and get_config_* methods (IEEE 1800.2 Annex H).
 
+use crate::support::copies::{copies, routine_calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::copies::{copies, routine_calls};
 
 const CONFIG_CALLS: [&str; 6] = [
     "set_config_int",

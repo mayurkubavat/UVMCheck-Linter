@@ -2,10 +2,10 @@
 //! bins must not specify unbounded repetitions (e.g., [*1:$], [->1:$]).
 
 use crate::support::slang_ast::*;
+use crate::support::sva_cov::bins_name;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{bins_name};
 
 pub(crate) fn unbounded_transition(c: &Cst, s: &mut Sink) {
     for it in c.nodes(TransItem) {
@@ -16,7 +16,11 @@ pub(crate) fn unbounded_transition(c: &Cst, s: &mut Sink) {
         if !text.contains('$') {
             continue;
         }
-        let bin = ancestors(c, it).find(|&a| c.kind(a) == Bins).and_then(|b| bins_name(c, b)).map(|x| x.0).unwrap_or_else(|| "unnamed_bin".into());
+        let bin = ancestors(c, it)
+            .find(|&a| c.kind(a) == Bins)
+            .and_then(|b| bins_name(c, b))
+            .map(|x| x.0)
+            .unwrap_or_else(|| "unnamed_bin".into());
         s.add(
             "SV-COV-005",
             "UnboundedTransitionBins",

@@ -2,9 +2,9 @@
 //! in standard macro include guards (`ifndef / `define / `endif) to prevent
 //! circular definitions and compiler redefinition errors.
 
+use crate::support::source_layout::at;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::source_layout::{at};
 
 /// slang's full path of a file: absolute, with `.` and `..` resolved.
 fn full_path(p: &std::path::Path) -> String {

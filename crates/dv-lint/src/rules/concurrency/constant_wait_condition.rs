@@ -3,9 +3,9 @@
 //! deadlocks the simulation thread permanently, while 'wait(1);' executes
 //! instantaneously.
 
-use sv_syntax::NodeId;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 /// slang's IntegerVectorExpression (`4'b1`, `'hF`) or IntegerLiteralExpression (`7`).
@@ -19,7 +19,11 @@ fn integer_literal(c: &Cst, n: NodeId) -> bool {
         b.is_some_and(|r| r.starts_with(['b', 'B', 'o', 'O', 'd', 'D', 'h', 'H']))
     };
     match toks.as_slice() {
-        [t] => t.chars().next().is_some_and(|ch| ch.is_ascii_digit()) && t.chars().all(|ch| ch.is_ascii_digit() || ch == '_') || based(t),
+        [t] => {
+            t.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+                && t.chars().all(|ch| ch.is_ascii_digit() || ch == '_')
+                || based(t)
+        }
         _ => toks.iter().any(|t| based(t)),
     }
 }

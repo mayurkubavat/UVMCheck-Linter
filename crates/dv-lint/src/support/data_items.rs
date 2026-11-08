@@ -1,15 +1,10 @@
 //! Methods, data items and literals of classes, for the OOP rules.
 
-
-
 use sv_syntax::{Child, NodeId};
 
 use crate::support::class_items::class_items;
 
-
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 
@@ -24,10 +19,7 @@ pub(crate) fn routine_name(c: &Cst, f: NodeId) -> String {
 
 /// Data declarations among the class's items.
 pub(crate) fn data_items(c: &Cst, cls: NodeId) -> Vec<NodeId> {
-    class_items(c, cls)
-        .into_iter()
-        .filter(|&x| c.kind(x) == DataDecl && c.tree.child(x, DataType).is_some())
-        .collect()
+    class_items(c, cls).into_iter().filter(|&x| c.kind(x) == DataDecl && c.tree.child(x, DataType).is_some()).collect()
 }
 
 /// The files given to the compiler (not included ones): the tree's first.
@@ -48,7 +40,10 @@ pub(crate) fn is_number_literal(c: &Cst, n: NodeId) -> bool {
     }
     if f == '\'' {
         // `'h1F` is an integer; `'0`, `'1`, `'x`, `'z` are unbased unsized.
-        return t.len() > 2 || t.chars().nth(1).is_some_and(|x| matches!(x, 'h' | 'H' | 'd' | 'D' | 'b' | 'B' | 'o' | 'O' | 's' | 'S'));
+        return t.len() > 2
+            || t.chars()
+                .nth(1)
+                .is_some_and(|x| matches!(x, 'h' | 'H' | 'd' | 'D' | 'b' | 'B' | 'o' | 'O' | 's' | 'S'));
     }
     if !f.is_ascii_digit() {
         return false;

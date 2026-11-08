@@ -2,8 +2,8 @@
 //! have a corresponding phase.drop_objection() within the same execution
 //! context to prevent simulation hangs or fatal errors.
 
-use dv_model::{Design, UvmKind};
 use crate::{Severity, Sink};
+use dv_model::{Design, UvmKind};
 
 pub(crate) fn uvm_unpaired_objection(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

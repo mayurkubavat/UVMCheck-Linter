@@ -2,10 +2,10 @@
 //! than the threshold (default 5; Pylint R0916, Checkstyle
 //! BooleanExpressionComplexity).
 
+use crate::support::routine_metrics::{each_routine, routine_metrics};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::routine_metrics::{each_routine, routine_metrics};
 
 pub(crate) fn complex_condition(c: &Cst, s: &mut Sink) {
     let limit = 5;

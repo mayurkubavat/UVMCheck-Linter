@@ -2,13 +2,13 @@
 //! names containing a vowel-less word of four or more letters (trnsfr, chnnl,
 //! rgstr) that is not a common DV short form (clk, cfg, ctrl, jtag, ...).
 
-use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
+use crate::support::class_docs::{class_methods, name_tok, properties, Classes};
 use crate::support::trivia::ident_words;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_docs::{Classes, class_methods, name_tok, properties};
 
 fn is_unclear_abbreviation(word: &str) -> bool {
     const LEXICON: &[&str] = &[

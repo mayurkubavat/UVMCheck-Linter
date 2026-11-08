@@ -1,12 +1,12 @@
 //! SV-CON-006 (EventTriggerInAlwaysComb): Disallows event triggers ('->' or
 //! '->>') inside always_comb blocks (IEEE 1800 § 9.2.2.2).
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::procedural::{add_n, start};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::procedural::{add_n, start};
 
 fn proc_kind<'a>(c: &'a Cst, p: NodeId) -> &'a str {
     c.keyword(p).map_or("", |k| c.text_of(k))

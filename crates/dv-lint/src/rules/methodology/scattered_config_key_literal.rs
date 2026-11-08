@@ -1,13 +1,13 @@
 //! UVM-CFG-008 (ScatteredConfigKeyLiteral): Flags a uvm_config_db field name
 //! typed as a string literal in two or more files.
 
-use std::collections::{BTreeMap, BTreeSet, HashSet};
-use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::{bodies, calls_in, is_config_db_call, Calls};
 use crate::support::class_roles::{key, Index, Typedefs};
+use crate::support::routine_bodies::{bodies, calls_in, is_config_db_call, Calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use std::collections::{BTreeMap, BTreeSet, HashSet};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 /// `uvm_config_db#(T)::<method>(...)` written outside a class, where the
@@ -85,7 +85,9 @@ pub(crate) fn scattered_config_key_literal(d: &Design, csts: &[Cst], out: &mut S
     }
     for c in csts {
         for call in outside_class_calls(c) {
-            if syntactic_config_db_call(c, &ix.typedefs, call, "set") || syntactic_config_db_call(c, &ix.typedefs, call, "get") {
+            if syntactic_config_db_call(c, &ix.typedefs, call, "set")
+                || syntactic_config_db_call(c, &ix.typedefs, call, "get")
+            {
                 add(c, call, &mut keys);
             }
         }

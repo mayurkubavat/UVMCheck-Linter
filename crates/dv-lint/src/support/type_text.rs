@@ -4,12 +4,7 @@ use std::collections::HashMap;
 
 use sv_syntax::NodeId;
 
-
-
-
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 

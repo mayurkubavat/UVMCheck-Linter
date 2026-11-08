@@ -10,9 +10,8 @@ fn main() {
         None => PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build-model"),
     };
     let dir = dir.canonicalize().unwrap_or(dir);
-    let found = ["libuvmcheck_model.so", "libuvmcheck_model.dylib", "uvmcheck_model.dll"]
-        .iter()
-        .any(|f| dir.join(f).exists());
+    let found =
+        ["libuvmcheck_model.so", "libuvmcheck_model.dylib", "uvmcheck_model.dll"].iter().any(|f| dir.join(f).exists());
     if !found {
         panic!(
             "libuvmcheck_model not found in {}; build it first (cmake --preset model && cmake --build build-model --target uvmcheck_model) \

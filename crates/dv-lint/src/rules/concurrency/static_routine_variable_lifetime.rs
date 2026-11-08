@@ -1,12 +1,12 @@
 //! SV-THR-002 (StaticRoutineVariableLifetime): Non-class tasks and functions
 //! default to static lifetime in SystemVerilog.
 
-use sv_syntax::SyntaxKind;
+use crate::support::procedural::{add_n, routine_name};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::procedural::{add_n, routine_name};
 
 pub(crate) fn static_routine_variable(c: &Cst, s: &mut Sink) {
     for k in [FunctionDecl, TaskDecl] {
@@ -18,7 +18,8 @@ pub(crate) fn static_routine_variable(c: &Cst, s: &mut Sink) {
                 continue;
             }
             // The routine's default lifetime is its unit's.
-            let unit = ancestors(c, r).find(|&a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | PackageDecl | CheckerDecl));
+            let unit = ancestors(c, r)
+                .find(|&a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | PackageDecl | CheckerDecl));
             if unit.is_some_and(|u| has_kw(c, u, "automatic")) {
                 continue;
             }
@@ -30,7 +31,10 @@ pub(crate) fn static_routine_variable(c: &Cst, s: &mut Sink) {
                     continue;
                 }
                 let toks = tok_texts(c, d);
-                if toks.iter().any(|t| matches!(*t, "automatic" | "const" | "typedef" | "input" | "output" | "inout" | "ref")) {
+                if toks
+                    .iter()
+                    .any(|t| matches!(*t, "automatic" | "const" | "typedef" | "input" | "output" | "inout" | "ref"))
+                {
                     continue;
                 }
                 if c.tree.child(d, DataType).is_some_and(|t| tok_texts(c, t).first() == Some(&"const")) {

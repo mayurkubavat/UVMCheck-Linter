@@ -1,9 +1,9 @@
 //! SV-STY-005 (MandatoryMatchingEndLabel): Enforces explicit and matching end
 //! labels on functions, tasks, and classes (e.g., endfunction : name).
 
+use crate::support::source_layout::{classes, end_and_label, end_loc, routine_name, routines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::source_layout::{classes, end_and_label, end_loc, routine_name, routines};
 
 pub(crate) fn missing_end_label(c: &Cst, s: &mut Sink) {
     for (n, _) in routines(c) {

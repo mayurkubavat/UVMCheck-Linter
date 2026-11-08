@@ -3,7 +3,6 @@
 
 use crate::syntax::Cst;
 
-
 use std::collections::HashMap;
 
 use std::path::{Path, PathBuf};
@@ -11,7 +10,6 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use std::sync::{Arc, Mutex, OnceLock};
-
 
 pub(crate) static HISTORY: AtomicBool = AtomicBool::new(false);
 
@@ -108,10 +106,7 @@ pub(crate) fn log_for(path: &str, max: usize) -> Option<Arc<Log>> {
             r
         }
     }?;
-    c.logs
-        .entry((root.clone(), max))
-        .or_insert_with(|| read_log(&root, max).map(Arc::new))
-        .clone()
+    c.logs.entry((root.clone(), max)).or_insert_with(|| read_log(&root, max).map(Arc::new)).clone()
 }
 
 pub(crate) const MAX_COMMITS: usize = 1000;

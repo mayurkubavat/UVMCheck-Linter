@@ -40,7 +40,6 @@ pub(crate) struct Info {
     memo: std::sync::Mutex<std::collections::HashMap<NodeId, bool>>,
 }
 
-
 /// What the whole compile says: sv-sema's diagnostics by tree (the
 /// nodes), and the names every other tree declares at its top.
 struct Whole {
@@ -49,7 +48,6 @@ struct Whole {
     /// Each interface's modport names.
     modports: std::collections::HashMap<String, HashSet<String>>,
 }
-
 
 fn whole(c: &Cst) -> Rc<Whole> {
     crate::shared::get("whole", c.compile_key(), || build_whole(c))
@@ -265,7 +263,9 @@ fn build_info(c: &Cst) -> Info {
                     c.tree.child(cls, Header).and_then(|h| c.tree.child(h, ParamList)).is_some_and(|pl| {
                         c.tree.children(pl).any(|pd| {
                             c.tree.child(pd, Name).is_some_and(|nm| c.tree.bare_text(nm) == ty)
-                                && c.tree.child(pd, DataType).is_some_and(|d| tainted_classes.contains(&c.tree.bare_text(d)))
+                                && c.tree
+                                    .child(pd, DataType)
+                                    .is_some_and(|d| tainted_classes.contains(&c.tree.bare_text(d)))
                         })
                     })
                 })
@@ -340,9 +340,27 @@ fn is_stmt(k: SyntaxKind) -> bool {
 }
 
 const BUILTINS: &[&str] = &[
-    "this", "super", "null", "std", "local", "process", "semaphore", "mailbox", "weak_reference",
-    "option", "type_option", "item", "index", "randomize", "new", "CrossQueueType", "srandom", "get_randstate",
-    "set_randstate", "rand_mode", "constraint_mode",
+    "this",
+    "super",
+    "null",
+    "std",
+    "local",
+    "process",
+    "semaphore",
+    "mailbox",
+    "weak_reference",
+    "option",
+    "type_option",
+    "item",
+    "index",
+    "randomize",
+    "new",
+    "CrossQueueType",
+    "srandom",
+    "get_randstate",
+    "set_randstate",
+    "rand_mode",
+    "constraint_mode",
 ];
 
 fn is_builtin(t: &str) -> bool {
@@ -484,9 +502,10 @@ fn ctor_formals(c: &Cst, class: &str) -> Option<usize> {
     if classes.next().is_some() {
         return None;
     }
-    let f = c.tree.children(k).find(|&f| {
-        c.kind(f) == FunctionDecl && c.tree.child(f, Name).is_some_and(|n| c.tree.bare_text(n) == "new")
-    })?;
+    let f = c
+        .tree
+        .children(k)
+        .find(|&f| c.kind(f) == FunctionDecl && c.tree.child(f, Name).is_some_and(|n| c.tree.bare_text(n) == "new"))?;
     let pl = c.tree.child(f, PortList)?;
     Some(c.tree.children(pl).filter(|&p| c.kind(p) == Port).count())
 }
@@ -497,9 +516,12 @@ fn tainted_classes(c: &Cst, declared: &HashSet<String>) -> HashSet<String> {
     let mut base: Vec<(String, String)> = Vec::new();
     for cls in c.nodes(ClassDecl) {
         let Some(nm) = c.tree.child(cls, Name) else { continue };
-        let ext = c.tree.child(cls, Header).into_iter().flat_map(|h| c.tree.children(h)).find(|&e| {
-            c.kind(e) == Extends && c.first_tok(e).is_some_and(|t| c.text_of(t) == "extends")
-        });
+        let ext = c
+            .tree
+            .child(cls, Header)
+            .into_iter()
+            .flat_map(|h| c.tree.children(h))
+            .find(|&e| c.kind(e) == Extends && c.first_tok(e).is_some_and(|t| c.text_of(t) == "extends"));
         let Some(dt) = ext.and_then(|e| c.tree.child(e, DataType)) else { continue };
         let Some(first) = c.first_tok(dt) else { continue };
         base.push((c.tree.bare_text(nm), c.text_of(first).to_string()));

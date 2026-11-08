@@ -1,14 +1,14 @@
 //! SV-CNS-003 (IfdefInReusableClass): Flags `ifdef, `ifndef and `elsif inside
 //! class bodies, apart from simulator and UVM version shims.
 
-use std::collections::HashSet;
-use dv_model::Design;
-use sv_lexer::Kind;
-use sv_syntax::Tree;
+use crate::support::defines_packages::{origin_loc, user_tok, Files, Lexed};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
+use sv_lexer::Kind;
 use sv_syntax::SyntaxKind::*;
-use crate::support::defines_packages::{Files, Lexed, origin_loc, user_tok};
+use sv_syntax::Tree;
 
 /// A conditional directive (token `i` of file `f`) was seen by the
 /// preprocessor. A skipped range runs from the first branch not taken, so a
@@ -35,8 +35,23 @@ fn live_conditional(tree: &Tree, lx: &Lexed, f: u32, i: usize) -> bool {
 }
 
 const SHIM_PREFIXES: &[&str] = &[
-    "UVM_", "VCS", "QUESTA", "MODEL_TECH", "MTI", "XCELIUM", "INCA", "NCSIM", "CADENCE", "RIVIERA", "ALDEC",
-    "VERILATOR", "SYNTHESIS", "SYNOPSYS", "IUS", "DSIM", "IVERILOG",
+    "UVM_",
+    "VCS",
+    "QUESTA",
+    "MODEL_TECH",
+    "MTI",
+    "XCELIUM",
+    "INCA",
+    "NCSIM",
+    "CADENCE",
+    "RIVIERA",
+    "ALDEC",
+    "VERILATOR",
+    "SYNTHESIS",
+    "SYNOPSYS",
+    "IUS",
+    "DSIM",
+    "IVERILOG",
 ];
 
 pub(crate) fn ifdef_in_reusable_class(_: &Design, csts: &[Cst], out: &mut Sink) {
@@ -66,7 +81,10 @@ pub(crate) fn ifdef_in_reusable_class(_: &Design, csts: &[Cst], out: &mut Sink) 
                 if at < from || at >= to {
                     continue;
                 }
-                if k != Kind::Directive || !matches!(lx.text(i), "`ifdef" | "`ifndef" | "`elsif") || !live_conditional(c.tree, lx, f, i) {
+                if k != Kind::Directive
+                    || !matches!(lx.text(i), "`ifdef" | "`ifndef" | "`elsif")
+                    || !live_conditional(c.tree, lx, f, i)
+                {
                     continue;
                 }
                 if !seen.insert((f, at)) {

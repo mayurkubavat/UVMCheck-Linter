@@ -5,12 +5,12 @@
 //! UVM 1.1d/1.2 the ones UVM_NO_DEPRECATED removes (`uvm_sequence_utils,
 //! `uvm_update_sequence_lib and the other sequence-library macros).
 
-use std::collections::HashSet;
-use dv_model::Design;
-use sv_lexer::Kind;
+use crate::support::defines_packages::{api_pack, live, origin_loc, Files};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::defines_packages::{Files, api_pack, live, origin_loc};
+use dv_model::Design;
+use std::collections::HashSet;
+use sv_lexer::Kind;
 
 pub(crate) fn deprecated_uvm_macro(_: &Design, csts: &[Cst], out: &mut Sink) {
     let Some(pack) = api_pack(csts) else { return };

@@ -1,11 +1,11 @@
 //! UVM-ROL-004 (TestBuildsLeafComponents): Flags tests that create drivers,
 //! monitors, sequencers, agents, scoreboards or subscribers directly.
 
-use dv_model::Design;
 use crate::support::class_roles::{role, role_name, user_classes, Index, Role};
+use crate::support::routine_bodies::class_creations;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::routine_bodies::{class_creations};
+use dv_model::Design;
 
 pub(crate) fn test_builds_leaf_components(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);
@@ -15,7 +15,10 @@ pub(crate) fn test_builds_leaf_components(d: &Design, csts: &[Cst], out: &mut Si
         }
         for cr in class_creations(d, &ix, cls) {
             let r = role(d, cr.class);
-            if !matches!(r, Role::Driver | Role::Monitor | Role::Sequencer | Role::Agent | Role::Scoreboard | Role::Subscriber) {
+            if !matches!(
+                r,
+                Role::Driver | Role::Monitor | Role::Sequencer | Role::Agent | Role::Scoreboard | Role::Subscriber
+            ) {
                 continue;
             }
             out.add(

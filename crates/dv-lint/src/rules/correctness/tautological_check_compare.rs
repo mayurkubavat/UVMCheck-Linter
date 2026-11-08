@@ -2,11 +2,11 @@
 //! between identical expressions (e.g. 'act_pkt.data == act_pkt.data').
 
 use crate::support::class_items::{kids, op, trim};
+use crate::support::data_items::{is_number_literal, strip_conv, unparen};
 use crate::support::sema_facts::{ast_ok, visits};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::data_items::{is_number_literal, strip_conv, unparen};
 
 pub(crate) fn tautological_compare(c: &Cst, s: &mut Sink) {
     for n in c.nodes(BinaryExpr) {

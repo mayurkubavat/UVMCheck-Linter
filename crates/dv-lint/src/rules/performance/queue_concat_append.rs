@@ -1,11 +1,11 @@
 //! SV-PRF-007 (QueueConcatAppend): Disallow queue concatenation ('q = {q, x}'
 //! or 'q = {x, q}').
 
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use crate::support::style_config::ast_visits;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::style_config::{ast_visits};
+use sv_syntax::NodeId;
+use sv_syntax::SyntaxKind::*;
 
 /// The declarator has a queue dimension (`[$]`, `[$:N]`), or its type is a
 /// typedef of a queue.
@@ -22,15 +22,17 @@ fn is_queue(c: &Cst, d: &crate::support::slang_ast::Decl) -> bool {
     // The typedef's own name (the last of `pkg::cls::name_t`).
     let Some(name) = d
         .dtype
-        .and_then(|ty| c.toks(ty).take_while(|&t| !matches!(c.text_of(t), "[" | "#")).filter(|&t| c.text_of(t) != "::").last())
+        .and_then(|ty| {
+            c.toks(ty).take_while(|&t| !matches!(c.text_of(t), "[" | "#")).filter(|&t| c.text_of(t) != "::").last()
+        })
         .map(|t| c.text_of(t).to_string())
     else {
         return false;
     };
     c.all.iter().any(|t| {
-        (0..t.nodes.len()).map(|i| NodeId(i as u32)).any(|n| {
-            t.kind(n) == TypedefDecl && t.child(n, Name).is_some_and(|nm| t.bare_text(nm) == name) && q(t, n)
-        })
+        (0..t.nodes.len())
+            .map(|i| NodeId(i as u32))
+            .any(|n| t.kind(n) == TypedefDecl && t.child(n, Name).is_some_and(|nm| t.bare_text(nm) == name) && q(t, n))
     })
 }
 

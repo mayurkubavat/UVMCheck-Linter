@@ -2,14 +2,14 @@
 //! type casts where the source and destination already have identical static
 //! types.
 
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
-use crate::support::slang_ast::kids;
 use crate::expr_types::{expr_types, ETy};
+use crate::support::config_db_calls::{in_generate_header, strip_parens};
+use crate::support::slang_ast::kids;
 use crate::support::style_config::ast_visits;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::config_db_calls::{in_generate_header, strip_parens};
+use sv_syntax::NodeId;
+use sv_syntax::SyntaxKind::*;
 
 /// `$cast(a, b)` on matching types, or a cast to the operand's own type:
 /// once per AST visit.

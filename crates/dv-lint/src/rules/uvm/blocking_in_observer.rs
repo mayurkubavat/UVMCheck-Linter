@@ -2,16 +2,13 @@
 //! (uvm_subscriber::write and the `write<SFX>` methods behind
 //! `uvm_analysis_imp<SFX>`) must be functions that finish in zero time.
 
-use dv_model::Design;
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::uvm_syntax::{
-    body_items,
-    name_node, routine_last_name, subtree,
-};
+use crate::support::uvm_classes::{class_role, is_join_none, user_classes, Ix, Role};
+use crate::support::uvm_syntax::{body_items, name_node, routine_last_name, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, Role, class_role, is_join_none, user_classes};
 
 pub(crate) fn blocking_in_observer(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);
@@ -38,7 +35,9 @@ pub(crate) fn blocking_in_observer(d: &Design, csts: &[Cst], s: &mut Sink) {
             }
             let wh = format!("'{name}' of class '{}'", cls.name);
             if c.kind(at.node) == TaskDecl {
-                let Some(loc) = name_node(c, at.node).and_then(|x| c.tree.token_range(x).last().copied()).map(|t| c.loc(t)) else {
+                let Some(loc) =
+                    name_node(c, at.node).and_then(|x| c.tree.token_range(x).last().copied()).map(|t| c.loc(t))
+                else {
                     continue;
                 };
                 s.add(

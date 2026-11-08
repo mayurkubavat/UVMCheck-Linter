@@ -2,13 +2,13 @@
 //! uvm_info/warning without checking uvm_report_enabled formats strings even
 //! when messages are discarded by verbosity.
 
-use std::collections::HashMap;
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::ast::{call_site, int_value, source_text, unparen, Ast, CallSite};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
+use std::collections::HashMap;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::ast::{Ast, CallSite, call_site, int_value, source_text, unparen};
 
 fn unshielded_format(c: &Cst, a: &Ast, s: &mut Sink) {
     fn walk(c: &Cst, a: &Ast, t: &Formals, n: NodeId, guard: usize, s: &mut Sink) {
@@ -38,9 +38,8 @@ fn unshielded_format(c: &Cst, a: &Ast, s: &mut Sink) {
     }
     fn check(c: &Cst, table: &Formals, call: &CallSite, s: &mut Sink) -> bool {
         let n = &call.name;
-        let info_or_warning = ["uvm_report_info", "uvm_info", "uvm_report_warning", "uvm_warning"]
-            .iter()
-            .any(|w| n.contains(w));
+        let info_or_warning =
+            ["uvm_report_info", "uvm_info", "uvm_report_warning", "uvm_warning"].iter().any(|w| n.contains(w));
         if !info_or_warning {
             return false;
         }
@@ -60,7 +59,9 @@ fn unshielded_format(c: &Cst, a: &Ast, s: &mut Sink) {
         let high = verb.is_some_and(|v| {
             let v = unparen(c, v);
             let toks = c.tree.token_range(v);
-            c.kind(v) == Literal && toks.len() == 1 && c.text_of(toks[0]).bytes().all(|b| b.is_ascii_digit() || b == b'_')
+            c.kind(v) == Literal
+                && toks.len() == 1
+                && c.text_of(toks[0]).bytes().all(|b| b.is_ascii_digit() || b == b'_')
                 && int_value(c, v).is_some_and(|x| x > 200)
         });
         if !high {

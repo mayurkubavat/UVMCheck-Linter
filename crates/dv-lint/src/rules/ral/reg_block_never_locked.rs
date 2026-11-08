@@ -1,14 +1,14 @@
 //! RAL-BLK-001 (RegBlockNeverLocked): Flags a top-level register block (held by
 //! an env or test, not by another block) on which lock_model() is never called.
 
-use std::collections::HashSet;
-use dv_model::{ClassId, Design};
-use sv_syntax::SyntaxKind;
+use crate::support::uvm_classes::{derived, receiver, At, Ix};
 use crate::support::uvm_syntax::callee;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{ClassId, Design};
+use std::collections::HashSet;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{At, Ix, derived, receiver};
 
 pub(crate) fn reg_block_never_locked(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);

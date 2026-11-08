@@ -8,11 +8,8 @@ fn repo() -> PathBuf {
 
 fn load(example: &str) -> Design {
     let r = repo();
-    Design::load([
-        format!("+incdir+{}", r.join("testdata/common").display()),
-        r.join(example).display().to_string(),
-    ])
-    .expect("design loads")
+    Design::load([format!("+incdir+{}", r.join("testdata/common").display()), r.join(example).display().to_string()])
+        .expect("design loads")
 }
 
 #[test]
@@ -32,7 +29,8 @@ fn reads_a_component_with_a_static_member() {
 #[test]
 fn reads_sequence_methods() {
     let d = load("testdata/rules/oop/UVM-SEQ-002/bad.sv");
-    let seqs: Vec<_> = d.classes().iter().filter(|c| c.uvm == UvmKind::Sequence && !c.name.starts_with("uvm_")).collect();
+    let seqs: Vec<_> =
+        d.classes().iter().filter(|c| c.uvm == UvmKind::Sequence && !c.name.starts_with("uvm_")).collect();
     assert!(!seqs.is_empty());
     assert!(seqs.iter().any(|c| c.methods.iter().any(|m| m.name == "pre_body" || m.name == "post_body")));
     assert!(d.classes().iter().flat_map(|c| &c.methods).any(|m| m.phase == PhaseKind::Function));

@@ -9,13 +9,7 @@ use sv_lexer::Kind;
 
 use sv_syntax::{NodeId, Origin};
 
-
-
-
 use crate::syntax::Cst;
-
-
-
 
 /// A token as written: its text, and whether it is an identifier.
 pub(crate) type NormToken = (String, bool);

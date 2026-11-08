@@ -11,12 +11,9 @@ use crate::support::routine_bodies::{bodies, case_parts, if_parts};
 
 use crate::support::free_routines::free_routines;
 
-
 use crate::support::class_roles::{class_of_type_in, is_library, Ctx, Index, Typedefs};
 
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 
@@ -128,7 +125,14 @@ pub(crate) fn referenced(d: &Design, ix: &Index, r: &Routine, e: NodeId) -> Opti
                 });
             }
             let (k, p) = find_prop(d, r.cls?, &name)?;
-            Some(SymInfo { sym: Sym::Prop(k.id, name.clone()), name, ty: p.ty.clone(), formal: false, library: is_library(d, k), loc: p.loc })
+            Some(SymInfo {
+                sym: Sym::Prop(k.id, name.clone()),
+                name,
+                ty: p.ty.clone(),
+                formal: false,
+                library: is_library(d, k),
+                loc: p.loc,
+            })
         }
         MemberExpr => {
             let obj = c.tree.children(e).next()?;
@@ -136,7 +140,11 @@ pub(crate) fn referenced(d: &Design, ix: &Index, r: &Routine, e: NodeId) -> Opti
             let o = c.strip(obj);
             let oc = if c.kind(o) == NameExpr && matches!(c.tree.bare_text(o).as_str(), "this" | "super") {
                 let k = r.cls?;
-                if c.tree.bare_text(o) == "super" { k.base.map(|b| d.class(b))? } else { k }
+                if c.tree.bare_text(o) == "super" {
+                    k.base.map(|b| d.class(b))?
+                } else {
+                    k
+                }
             } else if let Some(cls) = r.cls {
                 let ctx = Ctx { d, cls, m: r.m, td: Some(&ix.typedefs) };
                 ctx.class_of(c, o)?
@@ -244,9 +252,15 @@ pub(crate) fn dispatches(d: &Design, ix: &Index, r: &Routine, args_only: bool, t
             CaseStmt => {
                 let parts = case_parts(c, n);
                 let Some(e) = parts.expr else { continue };
-                let Some(s) = referenced(d, ix, r, e).filter(|s| is_string_type(&ix.typedefs, &s.ty) && wanted(s)) else { continue };
-                let mut lits: BTreeSet<String> =
-                    parts.items.iter().flat_map(|(labels, ..)| labels.iter().filter_map(|&l| c.string_value(l))).collect();
+                let Some(s) = referenced(d, ix, r, e).filter(|s| is_string_type(&ix.typedefs, &s.ty) && wanted(s))
+                else {
+                    continue;
+                };
+                let mut lits: BTreeSet<String> = parts
+                    .items
+                    .iter()
+                    .flat_map(|(labels, ..)| labels.iter().filter_map(|&l| c.string_value(l)))
+                    .collect();
                 lits.remove("");
                 if lits.len() >= threshold {
                     out.push(Dispatch { sym: s, lits, loc: c.loc_of(n) });
@@ -299,8 +313,8 @@ pub(crate) fn literal_list(lits: &BTreeSet<String>) -> String {
 /// enum to use.
 pub(crate) fn all_uvm_access_policies(lits: &BTreeSet<String>) -> bool {
     const POLICIES: &[&str] = &[
-        "RO", "RW", "RC", "RS", "WRC", "WRS", "WC", "WS", "WSRC", "WCRS", "W1C", "W1S", "W1T", "W0C", "W0S", "W0T", "W1SRC",
-        "W1CRS", "W0SRC", "W0CRS", "WO", "WOC", "WOS", "W1", "WO1", "NOACCESS",
+        "RO", "RW", "RC", "RS", "WRC", "WRS", "WC", "WS", "WSRC", "WCRS", "W1C", "W1S", "W1T", "W0C", "W0S", "W0T",
+        "W1SRC", "W1CRS", "W0SRC", "W0CRS", "WO", "WOC", "WOS", "W1", "WO1", "NOACCESS",
     ];
     lits.iter().all(|l| POLICIES.contains(&l.as_str()))
 }

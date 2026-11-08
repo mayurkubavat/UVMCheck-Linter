@@ -3,13 +3,13 @@
 //! least three classes and 80% of the classes in the larger package (classes
 //! with almost no code are not counted).
 
-use std::collections::{BTreeMap, HashMap};
-use dv_model::{Class, Design, Loc};
 use crate::support::class_roles::{class_methods, role, role_name, user_classes, Index};
+use crate::support::written_tokens::{tok_where, token_key, written_tokens, Generated};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Class, Design, Loc};
+use std::collections::{BTreeMap, HashMap};
 use sv_syntax::SyntaxKind::*;
-use crate::support::written_tokens::{Generated, tok_where, token_key, written_tokens};
 
 /// A class's shape: its role, property count and method bodies with
 /// renaming; and how many tokens its methods have.

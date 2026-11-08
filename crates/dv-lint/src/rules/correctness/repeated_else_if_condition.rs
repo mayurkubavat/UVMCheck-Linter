@@ -2,14 +2,14 @@
 //! earlier condition of the same if/else-if chain, which makes the later branch
 //! dead (Sonar S1862).
 
-use sv_syntax::NodeId;
 use crate::support::class_items::user_code;
 use crate::support::data_items::unparen;
 use crate::support::sema_facts::ast_ok;
+use crate::support::type_text::expr_text;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::type_text::{expr_text};
 
 /// The condition of an if statement when it is one plain expression.
 fn if_condition(c: &Cst, n: NodeId) -> Option<NodeId> {

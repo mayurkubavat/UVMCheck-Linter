@@ -1,12 +1,12 @@
 //! SV-IPC-001 (TryPutIgnoredReturn): Non-blocking IPC routines (try_put,
 //! try_get, try_peek) return a boolean status.
 
-use sv_syntax::SyntaxKind;
+use crate::support::procedural::{add_n, start, stmt_call};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::procedural::{add_n, start, stmt_call};
 
 pub(crate) fn try_put_ignored(c: &Cst, s: &mut Sink) {
     for st in c.nodes(ExprStmt) {

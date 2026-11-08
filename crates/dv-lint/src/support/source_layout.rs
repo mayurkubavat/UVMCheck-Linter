@@ -9,7 +9,6 @@ use sv_syntax::{NodeId, Origin};
 
 use crate::syntax::Cst;
 
-
 use crate::{Severity, Sink};
 
 use sv_syntax::SyntaxKind::*;
@@ -90,9 +89,9 @@ pub(crate) fn banned_macros(c: &Cst, s: &mut Sink, field: bool) {
         let trimmed = line.trim_start_matches([' ', '\t']);
         if !trimmed.is_empty() && !trimmed.starts_with("//") && !trimmed.starts_with("/*") {
             if field {
-                let hit = line
-                    .find("`uvm_field_")
-                    .or_else(|| line.find("`uvm_object_utils_begin").or_else(|| line.find("`uvm_component_utils_begin")));
+                let hit = line.find("`uvm_field_").or_else(|| {
+                    line.find("`uvm_object_utils_begin").or_else(|| line.find("`uvm_component_utils_begin"))
+                });
                 if let Some(h) = hit {
                     s.add(
                         "UVM-BAN-001",
@@ -107,9 +106,7 @@ pub(crate) fn banned_macros(c: &Cst, s: &mut Sink, field: bool) {
                 }
             } else if let Some(h) = line.find("`uvm_do") {
                 let rest = &line[h + 7..];
-                if rest.is_empty()
-                    || ["(", " ", "_with", "_on", "_pri"].iter().any(|p| rest.starts_with(p))
-                {
+                if rest.is_empty() || ["(", " ", "_with", "_on", "_pri"].iter().any(|p| rest.starts_with(p)) {
                     s.add(
                         "UVM-BAN-002",
                         "UvmBannedUvmDoMacros",
@@ -256,7 +253,8 @@ pub(crate) fn build_trivia_comments(c: &Cst) -> Vec<(u32, u32, u32, Loc)> {
         let file_uses = uses.get(&f).map_or(&[][..], Vec::as_slice);
         let directive = last_directive(triv, tok.trivia_start);
         for (a, e, in_define) in comments(triv, tok.trivia_start) {
-            if in_define || a < directive || skipped(f, a) || file_uses.iter().any(|&m| m > a && m < tok.origin.offset) {
+            if in_define || a < directive || skipped(f, a) || file_uses.iter().any(|&m| m > a && m < tok.origin.offset)
+            {
                 continue;
             }
             out.push((f, a, e, c.loc(i as u32)));
@@ -415,13 +413,8 @@ impl<'c, 't> Buffers<'c, 't> {
         }
         let w = tok.written;
         let mut defs = self.defines.borrow_mut();
-        let ranges = defs
-            .entry(w.file)
-            .or_insert_with(|| define_ranges(&self.c.tree.sources[w.file as usize]));
-        let body = ranges
-            .iter()
-            .find(|&&(a, e)| a <= w.offset && w.offset < e)
-            .map_or(u32::MAX, |&(a, _)| a);
+        let ranges = defs.entry(w.file).or_insert_with(|| define_ranges(&self.c.tree.sources[w.file as usize]));
+        let body = ranges.iter().find(|&&(a, e)| a <= w.offset && w.offset < e).map_or(u32::MAX, |&(a, _)| a);
         (true, tok.origin.file, tok.origin.offset, w.file, body)
     }
 

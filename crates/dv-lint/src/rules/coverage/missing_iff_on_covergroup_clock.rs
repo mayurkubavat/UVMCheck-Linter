@@ -1,10 +1,10 @@
 //! SV-COV-015 (MissingIffOnCovergroupClock): Covergroups sampled by a clocking
 //! event should specify an 'iff' reset guard condition.
 
+use crate::support::names::name_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::names::{name_tok};
 
 pub(crate) fn missing_iff(c: &Cst, s: &mut Sink) {
     for n in c.nodes(CovergroupDecl) {

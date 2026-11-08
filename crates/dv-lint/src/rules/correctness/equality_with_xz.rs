@@ -1,13 +1,13 @@
 //! SV-LANG-001 (EqualityWithXz): Detects equality ('==', '!=') checks against
 //! 4-state unknown literals ('x, 'z).
 
-use sv_syntax::{NodeId, SyntaxKind, TokenKind};
 use crate::support::class_fields::declared_type;
 use crate::support::class_index::Classes;
+use crate::support::literals::{ast_times, integer_literal, unparen};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind, TokenKind};
 use SyntaxKind::*;
-use crate::support::literals::{ast_times, integer_literal, unparen};
 
 fn has_unknown(digits: &str) -> bool {
     digits.chars().any(|ch| matches!(ch, 'x' | 'X' | 'z' | 'Z' | '?'))

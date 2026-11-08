@@ -1,12 +1,14 @@
 //! SV-DSN-013 (FatalStubOverride): Flags an override of a user base-class
 //! method whose whole body is an error or fatal report ("not supported here").
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::class_index::{
+    is_report_guard, is_report_scaffolding, nested_stmts, report_level, strongest_report, Classes, Level,
+};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::class_index::{Classes, Level, is_report_guard, is_report_scaffolding, nested_stmts, report_level, strongest_report};
 
 pub(crate) fn fatal_stub_override(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);

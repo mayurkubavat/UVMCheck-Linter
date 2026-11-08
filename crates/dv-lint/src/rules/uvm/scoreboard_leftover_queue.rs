@@ -2,13 +2,11 @@
 //! queues must be checked for drain completeness in check_phase or
 //! report_phase.
 
-use dv_model::Design;
-use crate::support::uvm_syntax::{
-    routine_last_name, routine_text,
-};
+use crate::support::uvm_classes::{is_scoreboard, Ix};
+use crate::support::uvm_syntax::{routine_last_name, routine_text};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::uvm_classes::{Ix, is_scoreboard};
+use dv_model::Design;
 
 /// The outermost unpacked dimension of a type string (`int$[$]`).
 fn outer_dim(ty: &str) -> Option<&str> {

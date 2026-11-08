@@ -1,18 +1,12 @@
 //! Where each config_db field name is set and got.
 
-
 use dv_model::{Design, Loc};
 
-
 use crate::support::routine_bodies::{bodies, calls_in, is_config_db_call, Calls};
-
 
 use crate::support::class_roles::Index;
 
 use crate::syntax::Cst;
-
-
-
 
 /// Field names with where each is used.
 pub(crate) type FieldUses = Vec<(String, Loc)>;

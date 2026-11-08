@@ -1,13 +1,13 @@
 //! UVM-ROL-001 (DriverGeneratesStimulus): Flags drivers that randomize sequence
 //! items or start sequences.
 
-use dv_model::Design;
-use sv_syntax::NodeId;
 use crate::support::class_roles::{role, role_name, Ctx, Index, Role};
+use crate::support::routine_bodies::{bodies, calls_in};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::routine_bodies::{bodies, calls_in};
 
 /// The object a call works on: `obj` of `obj.f()`, the first argument of
 /// `std::randomize(obj)`.
@@ -15,7 +15,9 @@ fn receiver_of(c: &Cst, call: NodeId) -> Option<NodeId> {
     let callee = c.tree.children(call).next()?;
     match c.kind(callee) {
         MemberExpr => c.tree.children(callee).next(),
-        ScopedExpr if c.tree.bare_text(callee) == "std::randomize" => c.arg_expr(c.call_args(call).first().copied().flatten()),
+        ScopedExpr if c.tree.bare_text(callee) == "std::randomize" => {
+            c.arg_expr(c.call_args(call).first().copied().flatten())
+        }
         _ => None,
     }
 }

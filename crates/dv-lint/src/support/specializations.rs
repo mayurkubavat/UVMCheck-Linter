@@ -83,10 +83,7 @@ impl Engine<'_, '_> {
 
     fn name_of(&self, g: usize) -> String {
         let c = self.c;
-        c.tree
-            .child(self.generics[g].node, Name)
-            .map(|x| c.tree.bare_text(x))
-            .unwrap_or_default()
+        c.tree.child(self.generics[g].node, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default()
     }
 
     /// `name #(args)` as a DataType or name expression.
@@ -109,10 +106,7 @@ impl Engine<'_, '_> {
                     let named = c.toks(a).any(|t| c.text_of(t) == ".");
                     let name = named
                         .then(|| {
-                            c.toks(a)
-                                .map(|t| c.text_of(t))
-                                .find(|x| !matches!(*x, "." | "(" | ")"))
-                                .map(str::to_string)
+                            c.toks(a).map(|t| c.text_of(t)).find(|x| !matches!(*x, "." | "(" | ")")).map(str::to_string)
                         })
                         .flatten();
                     args.push((name, c.tree.children(a).next()));
@@ -197,9 +191,8 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
             .map(|(n, _)| n.as_str())
             .collect();
         let toks = c.tree.token_range(n);
-        let default_invalid = toks
-            .windows(2)
-            .any(|w| builtin_default.contains(&c.text_of(w[0])) && c.text_of(w[1]) == "::");
+        let default_invalid =
+            toks.windows(2).any(|w| builtin_default.contains(&c.text_of(w[0])) && c.text_of(w[1]) == "::");
         let mut locals = HashMap::default();
         for t in c.tree.children(n).filter(|&x| c.kind(x) == TypedefDecl) {
             if let (Some(nm), Some(ty)) = (c.tree.child(t, Name), c.tree.child(t, DataType)) {
@@ -207,12 +200,7 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
             }
         }
         by_name.entry(name).or_insert(generics.len());
-        generics.push(Generic {
-            node: n,
-            params,
-            default_invalid,
-            locals,
-        });
+        generics.push(Generic { node: n, params, default_invalid, locals });
     }
     if generics.is_empty() {
         return HashMap::default();
@@ -227,12 +215,7 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
             typedefs.insert(c.tree.bare_text(nm), ty);
         }
     }
-    let engine = Engine {
-        c,
-        generics,
-        by_name,
-        typedefs,
-    };
+    let engine = Engine { c, generics, by_name, typedefs };
     let class_of: HashMap<u32, usize> = engine.generics.iter().enumerate().map(|(i, g)| (g.node.0, i)).collect();
     // Out-of-block bodies of generic classes.
     let mut out_of_block: HashMap<u32, usize> = HashMap::default();
@@ -269,11 +252,7 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
         if c.kind(n) == NameExpr && c.tree.child(n, ParamList).is_none() {
             continue;
         }
-        refs.push(Ref {
-            generic: g,
-            args,
-            context: context(n),
-        });
+        refs.push(Ref { generic: g, args, context: context(n) });
     }
     let mut specs: Vec<BTreeSet<Vec<String>>> = vec![BTreeSet::new(); engine.generics.len()];
     let mut queue: Vec<(usize, Vec<String>)> = Vec::new();
@@ -303,22 +282,13 @@ pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
         if steps > 20_000 {
             break;
         }
-        let subst: HashMap<String, String> = engine.generics[g]
-            .params
-            .iter()
-            .map(|(n, _)| n.clone())
-            .zip(t.iter().cloned())
-            .collect();
+        let subst: HashMap<String, String> =
+            engine.generics[g].params.iter().map(|(n, _)| n.clone()).zip(t.iter().cloned()).collect();
         for r in refs.iter().filter(|r| r.context == Some(g)) {
             if let Some(nt) = engine.tuple(r.generic, &r.args, &subst, Some(g), 0) {
                 add(r.generic, nt, &mut specs, &mut queue);
             }
         }
     }
-    engine
-        .generics
-        .iter()
-        .zip(specs)
-        .map(|(g, s)| (g.node.0, s.len()))
-        .collect()
+    engine.generics.iter().zip(specs).map(|(g, s)| (g.node.0, s.len())).collect()
 }

@@ -2,12 +2,12 @@
 //! components and objects must use `uvm_component_param_utils or
 //! `uvm_object_param_utils instead of non-parameterized utils macros.
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use crate::support::uvm_classes::{At, Ix};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{At, Ix};
 
 pub(crate) fn param_class_factory(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);

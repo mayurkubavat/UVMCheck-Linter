@@ -104,19 +104,10 @@ impl Walk {
 }
 
 /// Methods every class has; calls to them are built-in methods of the class.
-const CLASS_BUILTINS: &[&str] = &[
-    "pre_randomize",
-    "post_randomize",
-    "get_randstate",
-    "set_randstate",
-    "srandom",
-    "rand_mode",
-    "constraint_mode",
-];
+const CLASS_BUILTINS: &[&str] =
+    &["pre_randomize", "post_randomize", "get_randstate", "set_randstate", "srandom", "rand_mode", "constraint_mode"];
 
-const ASSIGN_OPS: &[&str] = &[
-    "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "<<<=", ">>>=",
-];
+const ASSIGN_OPS: &[&str] = &["=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "<<<=", ">>>="];
 
 fn is_expr(k: SyntaxKind) -> bool {
     matches!(
@@ -147,14 +138,7 @@ fn is_expr(k: SyntaxKind) -> bool {
 impl<'t> Builder<'t> {
     /// Calls, assignments and timing of a method body (`body` holds the
     /// ports and the Body node) of class `c` seen with `env`.
-    pub(crate) fn body_facts(
-        &mut self,
-        decl: NodeRef,
-        body: NodeRef,
-        c: usize,
-        env: &Env,
-        name: &str,
-    ) -> BodyFacts {
+    pub(crate) fn body_facts(&mut self, decl: NodeRef, body: NodeRef, c: usize, env: &Env, name: &str) -> BodyFacts {
         let Some(b) = self.child(body, Body) else {
             return BodyFacts::default();
         };
@@ -198,10 +182,7 @@ impl<'t> Builder<'t> {
     /// Marks the body as one slang rejects.
     fn poison(&self, w: &mut Walk, why: &str) {
         if !w.facts.bad && std::env::var_os("SV_SEMA_BAD").is_some() {
-            eprintln!(
-                "bad body {}::{}: {why}",
-                self.classes[w.class].name, w.own_name
-            );
+            eprintln!("bad body {}::{}: {why}", self.classes[w.class].name, w.own_name);
         }
         w.facts.bad = true;
     }
@@ -214,9 +195,7 @@ impl<'t> Builder<'t> {
             ConstraintBlock | WithClause | DataType => return false,
             _ => {}
         }
-        self.children(n)
-            .into_iter()
-            .any(|c| self.has_error_name(w, c))
+        self.children(n).into_iter().any(|c| self.has_error_name(w, c))
     }
 
     /// Whether a constructor call is one slang rejects (the `new` itself
@@ -225,33 +204,18 @@ impl<'t> Builder<'t> {
         let Some(al) = args else {
             return false;
         };
-        let actuals: Vec<NodeRef> = self
-            .children(al)
-            .into_iter()
-            .filter(|a| self.kind(*a) == Arg)
-            .collect();
-        let named = actuals
-            .iter()
-            .any(|a| self.own_tokens(*a).first() == Some(&"."));
-        (!named && !c.builtin && actuals.len() > c.formals.len())
-            || actuals.iter().any(|a| self.has_error_name(w, *a))
+        let actuals: Vec<NodeRef> = self.children(al).into_iter().filter(|a| self.kind(*a) == Arg).collect();
+        let named = actuals.iter().any(|a| self.own_tokens(*a).first() == Some(&"."));
+        (!named && !c.builtin && actuals.len() > c.formals.len()) || actuals.iter().any(|a| self.has_error_name(w, *a))
     }
 
     fn is_virtual_class(&self, c: usize) -> bool {
         let node = self.classes[c].node;
-        self.tokens(node)
-            .iter()
-            .map(|&t| self.text(node.tree, t))
-            .take_while(|t| *t != "class")
-            .any(|t| t == "virtual")
+        self.tokens(node).iter().map(|&t| self.text(node.tree, t)).take_while(|t| *t != "class").any(|t| t == "virtual")
     }
 
     fn is_assign_op(&self, n: NodeRef) -> bool {
-        self.kind(n) == BinaryExpr
-            && self
-                .own_tokens(n)
-                .first()
-                .is_some_and(|t| ASSIGN_OPS.contains(t))
+        self.kind(n) == BinaryExpr && self.own_tokens(n).first().is_some_and(|t| ASSIGN_OPS.contains(t))
     }
 
     fn port_types(&self, body: NodeRef, scope: usize, env: &Env) -> Vec<(String, Ty)> {
@@ -265,9 +229,7 @@ impl<'t> Builder<'t> {
                 continue;
             }
             let own = self.own_tokens(p);
-            let dir = own
-                .iter()
-                .any(|t| matches!(*t, "input" | "output" | "inout" | "ref"));
+            let dir = own.iter().any(|t| matches!(*t, "input" | "output" | "inout" | "ref"));
             match (dir, self.child(p, DataType)) {
                 (_, Some(d)) => ty = Some(d),
                 (true, None) => ty = None,
@@ -304,19 +266,9 @@ impl<'t> Builder<'t> {
             }
             let default = self.child(p, Declarator).and_then(|d| {
                 let has_eq = self.own_tokens(d).contains(&"=");
-                has_eq
-                    .then(|| {
-                        self.children(d)
-                            .into_iter()
-                            .find(|c| !matches!(self.kind(*c), Name | Dim))
-                    })
-                    .flatten()
+                has_eq.then(|| self.children(d).into_iter().find(|c| !matches!(self.kind(*c), Name | Dim))).flatten()
             });
-            let name = self
-                .child(p, Declarator)
-                .and_then(|d| self.name_of(d))
-                .map(|n| n.0)
-                .unwrap_or_default();
+            let name = self.child(p, Declarator).and_then(|d| self.name_of(d)).map(|n| n.0).unwrap_or_default();
             out.push((dir, default, name));
         }
         out
@@ -324,13 +276,7 @@ impl<'t> Builder<'t> {
 
     /// The type a declaration gives a name: its data type and the unpacked
     /// dimensions after the name.
-    pub(crate) fn decl_ty(
-        &self,
-        dt: Option<NodeRef>,
-        item: Option<NodeRef>,
-        scope: usize,
-        env: &Env,
-    ) -> Ty {
+    pub(crate) fn decl_ty(&self, dt: Option<NodeRef>, item: Option<NodeRef>, scope: usize, env: &Env) -> Ty {
         let mut ty = match dt {
             Some(d) if self.struct_of(d, scope, 0).is_some() => {
                 let (sn, ss) = self.struct_of(d, scope, 0).unwrap();
@@ -339,10 +285,7 @@ impl<'t> Builder<'t> {
             Some(d) if self.array_typedef(d, scope).is_some() => {
                 let (td, s, dim) = self.array_typedef(d, scope).unwrap();
                 let elem = self.decl_ty(self.child(td, DataType), None, s, &Env::default());
-                Ty::Array {
-                    elem: Box::new(elem),
-                    index: self.assoc_index(dim, s).map(Box::new),
-                }
+                Ty::Array { elem: Box::new(elem), index: self.assoc_index(dim, s).map(Box::new) }
             }
             Some(d) => {
                 let info = self.resolve_env(d, scope, env, 0);
@@ -359,26 +302,16 @@ impl<'t> Builder<'t> {
                 if matches!(info.shape, TypeShape::Other | TypeShape::UnpackedStruct) {
                     t
                 } else {
-                    Ty::Array {
-                        elem: Box::new(t),
-                        index: None,
-                    }
+                    Ty::Array { elem: Box::new(t), index: None }
                 }
             }
             None => Ty::Other,
         };
         if let Some(item) = item {
-            let dims: Vec<NodeRef> = self
-                .children(item)
-                .into_iter()
-                .filter(|c| self.kind(*c) == Dim)
-                .collect();
+            let dims: Vec<NodeRef> = self.children(item).into_iter().filter(|c| self.kind(*c) == Dim).collect();
             for d in dims.iter().rev() {
                 let index = self.assoc_index(*d, scope);
-                ty = Ty::Array {
-                    elem: Box::new(ty),
-                    index: index.map(Box::new),
-                };
+                ty = Ty::Array { elem: Box::new(ty), index: index.map(Box::new) };
             }
         }
         ty
@@ -425,11 +358,7 @@ impl<'t> Builder<'t> {
 
     /// The typedef a type name (`t` or `p::c::t`) stands for.
     fn typedef_named(&self, d: NodeRef, scope: usize) -> Option<(NodeRef, usize)> {
-        let toks: Vec<&str> = self
-            .tokens(d)
-            .iter()
-            .map(|&t| self.text(d.tree, t))
-            .collect();
+        let toks: Vec<&str> = self.tokens(d).iter().map(|&t| self.text(d.tree, t)).collect();
         let found = match toks.as_slice() {
             [one] => self.lookup(one, scope, 0),
             _ if toks.len() % 2 == 1 && toks.iter().skip(1).step_by(2).all(|t| *t == "::") => {
@@ -454,15 +383,8 @@ impl<'t> Builder<'t> {
                         continue;
                     }
                     for item in self.children(d) {
-                        if self.kind(item) == Declarator
-                            && self.name_of(item).is_some_and(|n| n.0 == name)
-                        {
-                            let t = self.decl_ty(
-                                self.child(d, DataType),
-                                Some(item),
-                                *ss,
-                                &Env::default(),
-                            );
+                        if self.kind(item) == Declarator && self.name_of(item).is_some_and(|n| n.0 == name) {
+                            let t = self.decl_ty(self.child(d, DataType), Some(item), *ss, &Env::default());
                             return Some(Val::Var(t, RootKind::Other));
                         }
                     }
@@ -476,10 +398,7 @@ impl<'t> Builder<'t> {
     /// A type name standing for a typedef with an unpacked dimension.
     fn array_typedef(&self, d: NodeRef, scope: usize) -> Option<(NodeRef, usize, NodeRef)> {
         let (td, s) = self.typedef_named(d, scope)?;
-        let dim = self
-            .children(td)
-            .into_iter()
-            .find(|c| self.kind(*c) == Dim)?;
+        let dim = self.children(td).into_iter().find(|c| self.kind(*c) == Dim)?;
         Some((td, s, dim))
     }
 
@@ -493,10 +412,7 @@ impl<'t> Builder<'t> {
         if t == "string" {
             return Some(Ty::Str);
         }
-        if let Some(k) = ["process", "semaphore", "mailbox"]
-            .into_iter()
-            .find(|k| *k == t)
-        {
+        if let Some(k) = ["process", "semaphore", "mailbox"].into_iter().find(|k| *k == t) {
             if self.lookup(t, scope, 0).is_none() {
                 return Some(Ty::Std(k));
             }
@@ -519,7 +435,14 @@ impl<'t> Builder<'t> {
     /// The class (and its type arguments) of the value a name or member
     /// chain names: `x`, `this.x`, `a.b.c`, seen from `scope`. `local` is
     /// the declared type of a local variable the chain starts from.
-    pub(crate) fn expr_class(&self, n: NodeRef, scope: usize, env: &Env, local: Option<NodeRef>, depth: usize) -> Option<(usize, Env)> {
+    pub(crate) fn expr_class(
+        &self,
+        n: NodeRef,
+        scope: usize,
+        env: &Env,
+        local: Option<NodeRef>,
+        depth: usize,
+    ) -> Option<(usize, Env)> {
         if depth > 16 {
             return None;
         }
@@ -607,11 +530,7 @@ impl<'t> Builder<'t> {
             }
         }
         if CLASS_BUILTINS.contains(&name) {
-            let ret = if name == "get_randstate" {
-                Ty::Str
-            } else {
-                Ty::Other
-            };
+            let ret = if name == "get_randstate" { Ty::Str } else { Ty::Other };
             return Some(Val::Sub(Callee {
                 system: false,
                 scope: self.classes[c].name.clone(),
@@ -634,11 +553,7 @@ impl<'t> Builder<'t> {
             }
             Member::Var { decl, item } => {
                 let ty = self.decl_ty(self.child(decl, DataType), Some(item), scope, env);
-                let kind = if class.is_some() {
-                    RootKind::Property
-                } else {
-                    RootKind::Local
-                };
+                let kind = if class.is_some() { RootKind::Property } else { RootKind::Local };
                 Val::Var(ty, kind)
             }
             Member::Sub { decl } => {
@@ -672,11 +587,7 @@ impl<'t> Builder<'t> {
                     formals: self.formals(
                         class
                             .filter(|_| self.kind(decl) == MethodPrototype)
-                            .and_then(|c| {
-                                self.bodies
-                                    .get(&(self.classes[c].name.clone(), name.clone()))
-                                    .copied()
-                            })
+                            .and_then(|c| self.bodies.get(&(self.classes[c].name.clone(), name.clone())).copied())
                             .unwrap_or(decl),
                     ),
                     receiver_is_arg: false,
@@ -698,11 +609,8 @@ impl<'t> Builder<'t> {
         while let Some(s) = cur {
             match self.scopes[s].kind {
                 ScopeKind::Class(c) => {
-                    let env = if c == w.class {
-                        w.env.clone()
-                    } else {
-                        self.rep_env.get(&c).cloned().unwrap_or_default()
-                    };
+                    let env =
+                        if c == w.class { w.env.clone() } else { self.rep_env.get(&c).cloned().unwrap_or_default() };
                     if let Some(v) = self.class_member(c, &env, name) {
                         return Some(v);
                     }
@@ -823,8 +731,7 @@ impl<'t> Builder<'t> {
                     }
                 }
             }
-            ConstraintBlock | WithClause | CovergroupDecl | ConcurrentAssert | TypedefDecl
-            | ForwardTypedef => {}
+            ConstraintBlock | WithClause | CovergroupDecl | ConcurrentAssert | TypedefDecl | ForwardTypedef => {}
             _ if is_expr(k) => self.expr(w, n, None),
             _ => {
                 for c in self.children(n) {
@@ -868,11 +775,7 @@ impl<'t> Builder<'t> {
                 _ => {}
             }
         }
-        let path: Vec<&str> = toks[2..open]
-            .iter()
-            .copied()
-            .filter(|t| *t != ".")
-            .collect();
+        let path: Vec<&str> = toks[2..open].iter().copied().filter(|t| *t != ".").collect();
         let mut ty = Ty::Unknown;
         for (k, seg) in path.iter().enumerate() {
             ty = if k == 0 {
@@ -902,10 +805,7 @@ impl<'t> Builder<'t> {
             };
             ty = next;
             if let Some(v) = v {
-                w.frames
-                    .last_mut()
-                    .unwrap()
-                    .insert(v.to_string(), (vt, RootKind::Other));
+                w.frames.last_mut().unwrap().insert(v.to_string(), (vt, RootKind::Other));
             }
         }
     }
@@ -981,9 +881,7 @@ impl<'t> Builder<'t> {
             return false;
         }
         let toks = self.tokens(callee);
-        toks.len() == 3
-            && self.text(callee.tree, toks[0]) == "super"
-            && self.text(callee.tree, toks[2]) == "new"
+        toks.len() == 3 && self.text(callee.tree, toks[0]) == "super" && self.text(callee.tree, toks[2]) == "new"
     }
 
     // ---- expressions ------------------------------------------------------
@@ -1036,9 +934,7 @@ impl<'t> Builder<'t> {
                         let left = self.children(n)[0];
                         let callee = match self.ty_of(w, left) {
                             Ty::Std(k) => Some(self.std_method(k, &name)),
-                            t @ (Ty::Array { .. } | Ty::Str | Ty::Enum | Ty::Event)
-                                if is_value_method(&name) =>
-                            {
+                            t @ (Ty::Array { .. } | Ty::Str | Ty::Enum | Ty::Event) if is_value_method(&name) => {
                                 Some(self.value_method(&t, &name))
                             }
                             _ => None,
@@ -1061,10 +957,7 @@ impl<'t> Builder<'t> {
             CastExpr => {
                 // The type before the tick is not an expression. Inside
                 // `T'(...)` (not `void'`) slang's call syntax is the parens.
-                let void = self
-                    .children(n)
-                    .first()
-                    .is_some_and(|t| self.own_tokens(*t) == ["void"]);
+                let void = self.children(n).first().is_some_and(|t| self.own_tokens(*t) == ["void"]);
                 for c in self.children(n).into_iter().skip(1) {
                     if self.kind(c) == CallExpr {
                         self.call(w, c, !void);
@@ -1115,11 +1008,7 @@ impl<'t> Builder<'t> {
     }
 
     fn assignment(&mut self, w: &mut Walk, n: NodeRef, non_blocking: bool) {
-        let kids: Vec<NodeRef> = self
-            .children(n)
-            .into_iter()
-            .filter(|c| is_expr(self.kind(*c)))
-            .collect();
+        let kids: Vec<NodeRef> = self.children(n).into_iter().filter(|c| is_expr(self.kind(*c))).collect();
         let (Some(&lhs), rhs) = (kids.first(), kids.get(1).copied()) else {
             return;
         };
@@ -1148,14 +1037,8 @@ impl<'t> Builder<'t> {
     fn written_arg(&mut self, w: &mut Walk, e: NodeRef) {
         let (root_kind, root_name) = self.root_of(w, e);
         let loc = self.first_loc(e);
-        let a = Assignment {
-            lhs: self.src_text(e),
-            rhs: String::new(),
-            is_non_blocking: false,
-            root_kind,
-            root_name,
-            loc,
-        };
+        let a =
+            Assignment { lhs: self.src_text(e), rhs: String::new(), is_non_blocking: false, root_kind, root_name, loc };
         w.facts.assignments.push(a);
     }
 
@@ -1198,9 +1081,9 @@ impl<'t> Builder<'t> {
                 let t = self.text(n.tree, toks[0]);
                 match t {
                     "this" => Some(Val::Var(Ty::Class(w.class, w.env.clone()), RootKind::Local)),
-                    "super" => self
-                        .base_env(w.class, &w.env, 0)
-                        .map(|(b, e)| Val::Var(Ty::Class(b, e), RootKind::Other)),
+                    "super" => {
+                        self.base_env(w.class, &w.env, 0).map(|(b, e)| Val::Var(Ty::Class(b, e), RootKind::Other))
+                    }
                     _ => self.lookup_val(w, t),
                 }
             }
@@ -1255,10 +1138,7 @@ impl<'t> Builder<'t> {
                 let Some(l) = self.children(n).into_iter().next() else {
                     return Ty::Unknown;
                 };
-                let range = self
-                    .own_tokens(n)
-                    .iter()
-                    .any(|t| matches!(*t, ":" | "+:" | "-:"));
+                let range = self.own_tokens(n).iter().any(|t| matches!(*t, ":" | "+:" | "-:"));
                 match self.ty_of(w, l) {
                     a @ Ty::Array { .. } if range => a,
                     Ty::Array { elem, .. } => *elem,
@@ -1272,14 +1152,11 @@ impl<'t> Builder<'t> {
                 if self.kind(callee) == CallExpr {
                     return self.ty_of(w, callee);
                 }
-                self.resolve_callee(w, callee)
-                    .map_or(Ty::Unknown, |(c, _)| c.ret)
+                self.resolve_callee(w, callee).map_or(Ty::Unknown, |(c, _)| c.ret)
             }
-            ParenExpr => self
-                .children(n)
-                .into_iter()
-                .find(|c| is_expr(self.kind(*c)))
-                .map_or(Ty::Unknown, |c| self.ty_of(w, c)),
+            ParenExpr => {
+                self.children(n).into_iter().find(|c| is_expr(self.kind(*c))).map_or(Ty::Unknown, |c| self.ty_of(w, c))
+            }
             CastExpr => {
                 let Some(t) = self.children(n).into_iter().next() else {
                     return Ty::Unknown;
@@ -1293,11 +1170,7 @@ impl<'t> Builder<'t> {
                 }
             }
             CondExpr => {
-                let kids: Vec<NodeRef> = self
-                    .children(n)
-                    .into_iter()
-                    .filter(|c| is_expr(self.kind(*c)))
-                    .collect();
+                let kids: Vec<NodeRef> = self.children(n).into_iter().filter(|c| is_expr(self.kind(*c))).collect();
                 match kids.get(1).map(|&k| self.ty_of(w, k)) {
                     Some(t @ Ty::Class(..)) => t,
                     _ => kids.get(2).map_or(Ty::Unknown, |&k| self.ty_of(w, k)),
@@ -1310,8 +1183,9 @@ impl<'t> Builder<'t> {
 
     fn system_callee(&self, name: &str) -> Callee {
         let written = match name {
-            "$cast" | "$sformat" | "$swrite" | "$swriteb" | "$swriteh" | "$swriteo" | "$fgets"
-            | "$fread" => Written::At(0),
+            "$cast" | "$sformat" | "$swrite" | "$swriteb" | "$swriteh" | "$swriteo" | "$fgets" | "$fread" => {
+                Written::At(0)
+            }
             "$value$plusargs" => Written::At(1),
             "$sscanf" | "$fscanf" => Written::From(2),
             _ => Written::None,
@@ -1397,10 +1271,7 @@ impl<'t> Builder<'t> {
                 }
                 if name == w.own_name {
                     // A recursive call, not the return variable.
-                    let mut ww = Walk {
-                        frames: Vec::new(),
-                        ..w.shallow()
-                    };
+                    let mut ww = Walk { frames: Vec::new(), ..w.shallow() };
                     ww.frames.clear();
                     return match self.lookup_val(&ww, name) {
                         Some(Val::Sub(c)) => Some((c, None)),
@@ -1504,21 +1375,15 @@ impl<'t> Builder<'t> {
             self.super_new_call(w, n, args);
             return;
         }
-        let name = self
-            .own_tokens(callee)
-            .last()
-            .copied()
-            .unwrap_or("")
-            .to_string();
+        let name = self.own_tokens(callee).last().copied().unwrap_or("").to_string();
         let resolved = self.resolve_callee(w, callee);
         let (c, recv) = match resolved {
             Some(x) => x,
             None => {
                 // Unknown: slang has no call for a name it cannot bind, but
                 // a value method on a receiver of unknown type is kept.
-                let recv = (self.kind(callee) == MemberExpr)
-                    .then(|| self.children(callee).into_iter().next())
-                    .flatten();
+                let recv =
+                    (self.kind(callee) == MemberExpr).then(|| self.children(callee).into_iter().next()).flatten();
                 // `c.constraint_mode(0)` on a constraint is a value method too.
                 let vm = recv.is_some() && (is_value_method(&name) || name == "constraint_mode");
                 if !vm {
@@ -1565,11 +1430,7 @@ impl<'t> Builder<'t> {
     /// `q.find(x) with (x.f())`: the expression, with the iterator bound to
     /// an element of the array (`item` unless named).
     fn with_clause(&mut self, w: &mut Walk, call: NodeRef, wc: NodeRef) {
-        let Some(e) = self
-            .children(wc)
-            .into_iter()
-            .find(|c| is_expr(self.kind(*c)))
-        else {
+        let Some(e) = self.children(wc).into_iter().find(|c| is_expr(self.kind(*c))) else {
             return;
         };
         let callee = self.children(call)[0];
@@ -1605,10 +1466,9 @@ impl<'t> Builder<'t> {
                     let written = match c.written {
                         Written::At(i) => i == k,
                         Written::From(i) => k >= i,
-                        Written::None => c
-                            .formals
-                            .get(k)
-                            .is_some_and(|f| matches!(f.0, Direction::Out | Direction::InOut)),
+                        Written::None => {
+                            c.formals.get(k).is_some_and(|f| matches!(f.0, Direction::Out | Direction::InOut))
+                        }
                     };
                     if written {
                         self.written_arg(w, e);
@@ -1616,8 +1476,7 @@ impl<'t> Builder<'t> {
                     self.expr(w, e, None);
                 }
                 None => {
-                    let (Some(d), Some((class, env, scope))) =
-                        (c.formals.get(k).and_then(|f| f.1), c.ctx.as_ref())
+                    let (Some(d), Some((class, env, scope))) = (c.formals.get(k).and_then(|f| f.1), c.ctx.as_ref())
                     else {
                         continue;
                     };
@@ -1650,10 +1509,7 @@ impl<'t> Builder<'t> {
             if self.kind(a) != Arg {
                 continue;
             }
-            let e = self
-                .children(a)
-                .into_iter()
-                .find(|e| is_expr(self.kind(*e)) || self.kind(*e) == DataType);
+            let e = self.children(a).into_iter().find(|e| is_expr(self.kind(*e)) || self.kind(*e) == DataType);
             let own = self.own_tokens(a);
             if own.first() == Some(&".") {
                 let name = own.get(1).copied().unwrap_or("");
@@ -1737,12 +1593,10 @@ impl<'t> Builder<'t> {
                     self.poison(w, "new of a virtual class");
                 }
                 match self.classes[c].members.get("new").copied() {
-                    Some(m @ Member::Sub { .. }) => {
-                        match self.member_val(m, Some(c), self.classes[c].scope, &e) {
-                            Val::Sub(callee) => Some(callee),
-                            _ => None,
-                        }
-                    }
+                    Some(m @ Member::Sub { .. }) => match self.member_val(m, Some(c), self.classes[c].scope, &e) {
+                        Val::Sub(callee) => Some(callee),
+                        _ => None,
+                    },
                     _ => None,
                 }
             }
@@ -1794,21 +1648,10 @@ impl<'t> Builder<'t> {
         let loc = self.first_loc(n);
         // In parentheses, slang's syntax for the call is the parenthesized
         // expression: no receiver, and it does not start with `super`.
-        let receiver = if parens {
-            String::new()
-        } else {
-            self.receiver_text(callee)
-        };
-        let recv_node = (self.kind(callee) == MemberExpr)
-            .then(|| self.children(callee).into_iter().next())
-            .flatten();
-        let (null, arg_loc) =
-            self.first_arg(args, c, if c.receiver_is_arg { recv_node } else { None });
-        let via_super = !parens
-            && self
-                .tokens(n)
-                .first()
-                .is_some_and(|&t| self.text(n.tree, t) == "super");
+        let receiver = if parens { String::new() } else { self.receiver_text(callee) };
+        let recv_node = (self.kind(callee) == MemberExpr).then(|| self.children(callee).into_iter().next()).flatten();
+        let (null, arg_loc) = self.first_arg(args, c, if c.receiver_is_arg { recv_node } else { None });
+        let via_super = !parens && self.tokens(n).first().is_some_and(|&t| self.text(n.tree, t) == "super");
         w.facts.calls.push(Call {
             name,
             is_system: c.system,
@@ -1825,12 +1668,7 @@ impl<'t> Builder<'t> {
 
     /// Whether the first argument is `null`, and where it is: the
     /// receiver of a value method, the first actual or the default.
-    fn first_arg(
-        &mut self,
-        args: Option<NodeRef>,
-        c: &Callee,
-        recv: Option<NodeRef>,
-    ) -> (bool, Loc) {
+    fn first_arg(&mut self, args: Option<NodeRef>, c: &Callee, recv: Option<NodeRef>) -> (bool, Loc) {
         let first = if let Some(r) = recv {
             Some(r)
         } else {
@@ -1841,11 +1679,7 @@ impl<'t> Builder<'t> {
             Some(mut e) => {
                 // slang places a parenthesized expression at its inside.
                 while self.kind(e) == ParenExpr {
-                    match self
-                        .children(e)
-                        .into_iter()
-                        .find(|c| is_expr(self.kind(*c)))
-                    {
+                    match self.children(e).into_iter().find(|c| is_expr(self.kind(*c))) {
                         Some(x) => e = x,
                         None => break,
                     }
@@ -1888,11 +1722,7 @@ impl<'t> Builder<'t> {
     fn is_name(&self, n: NodeRef) -> bool {
         match self.kind(n) {
             NameExpr | ScopedExpr => true,
-            MemberExpr | SelectExpr => self
-                .children(n)
-                .into_iter()
-                .next()
-                .is_some_and(|l| self.is_name(l)),
+            MemberExpr | SelectExpr => self.children(n).into_iter().next().is_some_and(|l| self.is_name(l)),
             _ => false,
         }
     }
@@ -1910,10 +1740,7 @@ impl<'t> Builder<'t> {
             return String::new();
         }
         let src = &t.sources[ta.origin.file as usize];
-        let (lo, hi) = (
-            ta.origin.offset as usize,
-            tb.origin.offset as usize + tb.text.len(),
-        );
+        let (lo, hi) = (ta.origin.offset as usize, tb.origin.offset as usize + tb.text.len());
         if lo > hi || hi > src.len() {
             return String::new();
         }
@@ -2041,8 +1868,8 @@ fn printed_trivia(raw: &str) -> String {
                         region_start = Some(out.len());
                     }
                 }
-                "define" | "undef" | "timescale" | "default_nettype" | "line" | "pragma"
-                | "include" | "begin_keywords" | "unconnected_drive" => {
+                "define" | "undef" | "timescale" | "default_nettype" | "line" | "pragma" | "include"
+                | "begin_keywords" | "unconnected_drive" => {
                     // To the end of the line, with continuations.
                     while j < b.len() && b[j] != b'\n' {
                         if b[j] == b'\\' && j + 1 < b.len() && b[j + 1] == b'\n' {

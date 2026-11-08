@@ -2,12 +2,12 @@
 //! type does not explicitly handle all declared enum variants while using a
 //! default: arm.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::literal_values::{decl_of_expr, literal_value};
 use crate::support::literals::ast_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::literal_values::{decl_of_expr, literal_value};
 
 /// The enum a declaration's type is, through typedefs: its name as slang
 /// prints the canonical type, and its members with their values.
@@ -35,8 +35,12 @@ fn enum_of(c: &Cst, dt: NodeId) -> Option<(String, Vec<(String, Option<i64>)>)> 
         // The typedef in scope: in a unit around the use (innermost first),
         // else in a package or at the top of the file.
         let scope_of = |n: NodeId| {
-            std::iter::successors(c.parent(n), |&a| c.parent(a))
-                .find(|&a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | ClassDecl | PackageDecl | FunctionDecl | TaskDecl))
+            std::iter::successors(c.parent(n), |&a| c.parent(a)).find(|&a| {
+                matches!(
+                    c.kind(a),
+                    ModuleDecl | InterfaceDecl | ProgramDecl | ClassDecl | PackageDecl | FunctionDecl | TaskDecl
+                )
+            })
         };
         let around: Vec<NodeId> = std::iter::successors(c.parent(dt), |&a| c.parent(a)).collect();
         let td = c
@@ -102,7 +106,8 @@ pub(crate) fn non_exhaustive_enum_case(c: &Cst, s: &mut Sink) {
         }
         let names: Vec<&str> = members.iter().map(|(m, _)| m.as_str()).collect();
         let Some(order) = crate::support::slang_ast::std_unordered_order(&names) else { continue };
-        let missing: Vec<String> = order.into_iter().filter(|m| !handled.contains(m)).map(|m| format!("'{m}'")).collect();
+        let missing: Vec<String> =
+            order.into_iter().filter(|m| !handled.contains(m)).map(|m| format!("'{m}'")).collect();
         if missing.is_empty() {
             continue;
         }

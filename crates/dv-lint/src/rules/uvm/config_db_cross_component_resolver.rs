@@ -2,9 +2,9 @@
 //! semantic resolution on uvm_config_db calls across the testbench hierarchy
 //! DAG to detect configuration type mismatches between set() and get() calls.
 
+use crate::support::config_db_calls::config_db_calls;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::config_db_calls::{config_db_calls};
 
 pub(crate) fn config_db_cross_component(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {
     let calls = config_db_calls(csts);

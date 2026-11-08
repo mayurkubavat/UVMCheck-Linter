@@ -2,8 +2,8 @@
 //! uvm_config_db inside a uvm_component breaks hierarchical scoping and
 //! prevents targeted configuration overrides.
 
-use dv_model::Design;
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn uvm_config_db_null_context(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

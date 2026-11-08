@@ -2,12 +2,12 @@
 //! fields that implement neither field macros nor do_copy(), do_compare() and
 //! convert2string()/do_print().
 
-use std::collections::HashSet;
-use dv_model::Design;
-use sv_syntax::NodeId;
 use crate::support::class_roles::{class_methods, is_library, role, user_classes, Index};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
+use sv_syntax::NodeId;
 
 /// The class's text as written, from `class` to `endclass`.
 fn class_text<'t>(c: &Cst<'t>, n: NodeId) -> &'t str {

@@ -2,12 +2,12 @@
 //! loop without an intervening time-advancing delay (@ or #) causes a
 //! zero-delay infinite delta loop that hangs the simulator at 100% CPU.
 
-use sv_syntax::SyntaxKind;
+use crate::support::procedural::{add_n, is_wait_loop, loop_body, start};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::procedural::{add_n, is_wait_loop, loop_body, start};
 
 pub(crate) fn triggered_wait_loop(c: &Cst, s: &mut Sink) {
     for l in subtree(c, c.tree.root) {
@@ -20,7 +20,10 @@ pub(crate) fn triggered_wait_loop(c: &Cst, s: &mut Sink) {
         for x in subtree(c, body) {
             match c.kind(x) {
                 TimedStmt => advance = true,
-                WaitStmt if c.keyword(x).is_some_and(|k| c.text_of(k) == "wait") && !c.toks(x).any(|t| c.text_of(t) == "fork") => {
+                WaitStmt
+                    if c.keyword(x).is_some_and(|k| c.text_of(k) == "wait")
+                        && !c.toks(x).any(|t| c.text_of(t) == "fork") =>
+                {
                     let cond = kids(c, x).into_iter().find(|&y| !matches!(c.kind(y), StmtLabel | Attribute));
                     if cond.is_some_and(|cd| slang_text(c, cd).contains(".triggered")) {
                         wait_loc = start(c, x);

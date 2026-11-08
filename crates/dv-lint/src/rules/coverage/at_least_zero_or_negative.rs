@@ -1,12 +1,12 @@
 //! SV-COV-011 (AtLeastZeroOrNegative): Flags option.at_least or
 //! type_option.at_least set to 0 or negative values in covergroups/coverpoints.
 
-use crate::support::slang_ast::*;
 use crate::support::procedural::start;
+use crate::support::slang_ast::*;
+use crate::support::sva_cov::{option_parts, option_target};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{option_parts, option_target};
 
 pub(crate) fn at_least_zero(c: &Cst, s: &mut Sink) {
     for o in c.nodes(CoverageOption) {

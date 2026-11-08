@@ -2,9 +2,9 @@
 //! be undef'd with `undef before the end of the file unless registered as
 //! public API macros.
 
-use std::collections::HashSet;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
 
 pub(crate) fn header_macro_leak(c: &Cst, s: &mut Sink) {
     // A file of directives only has just the end-of-file token, which slang
@@ -31,7 +31,8 @@ pub(crate) fn header_macro_leak(c: &Cst, s: &mut Sink) {
             continue;
         }
         let Some((start, name)) = name_at(pos + 7, b" \t\r\n(") else { continue };
-        let guard = name.ends_with("_SVH") || name.ends_with("_H") || name.ends_with("_INC") || name.ends_with("_GUARD");
+        let guard =
+            name.ends_with("_SVH") || name.ends_with("_H") || name.ends_with("_INC") || name.ends_with("_GUARD");
         let public = name.starts_with("uvm_") || name.starts_with("UVM_");
         if !guard && !public && !name.is_empty() {
             defined.push((name, start));

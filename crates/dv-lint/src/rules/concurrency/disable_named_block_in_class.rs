@@ -1,13 +1,13 @@
 //! SV-CON-014 (DisableNamedBlockInClass): Flags `disable <block>` and
 //! `disable <task>` inside class methods.
 
-use std::collections::HashSet;
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::procedural::{own_methods, start};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::procedural::{own_methods, start};
 
 fn named_blocks(c: &Cst, r: NodeId) -> HashSet<String> {
     let mut out = HashSet::new();
@@ -38,9 +38,10 @@ pub(crate) fn disable_in_class(c: &Cst, s: &mut Sink) {
                 if toks.get(1) == Some(&"fork") {
                     continue;
                 }
-                let target = kids(c, x).first().map(|&n| c.tree.bare_text(n)).unwrap_or_else(|| {
-                    toks.iter().skip(1).filter(|t| **t != ";").copied().collect::<String>()
-                });
+                let target = kids(c, x)
+                    .first()
+                    .map(|&n| c.tree.bare_text(n))
+                    .unwrap_or_else(|| toks.iter().skip(1).filter(|t| **t != ";").copied().collect::<String>());
                 let last = target.rsplit('.').next().unwrap_or("").to_string();
                 let is_block = blocks.contains(&last);
                 let is_task = !is_block && {
@@ -50,7 +51,10 @@ pub(crate) fn disable_in_class(c: &Cst, s: &mut Sink) {
                             (c.kind(m2) == TaskDecl || (c.kind(m2) == MethodPrototype && has_kw(c, m2, "task")))
                                 && last_name(c, m2) == last
                         })
-                    }) || c.nodes(TaskDecl).into_iter().any(|t| decl_name(c, t) == last && enclosing_class(c, t).is_none())
+                    }) || c
+                        .nodes(TaskDecl)
+                        .into_iter()
+                        .any(|t| decl_name(c, t) == last && enclosing_class(c, t).is_none())
                 };
                 if !is_block && !is_task {
                     continue;

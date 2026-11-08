@@ -41,11 +41,7 @@ impl LineIndex {
         let Some(&start) = self.starts.get(line as usize) else {
             return text.len() as u32;
         };
-        let end = self
-            .starts
-            .get(line as usize + 1)
-            .map(|&e| e as usize)
-            .unwrap_or(text.len());
+        let end = self.starts.get(line as usize + 1).map(|&e| e as usize).unwrap_or(text.len());
         let mut units = 0u32;
         for (i, c) in text[start as usize..end].char_indices() {
             if units >= col || c == '\n' {

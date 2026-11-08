@@ -2,9 +2,9 @@
 //! uvm_config_db#(T)::get must match the type parameter used in the
 //! corresponding set call for the same field name.
 
+use crate::support::config_db_calls::{config_db_calls, CfgCall};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::config_db_calls::{CfgCall, config_db_calls};
 
 pub(crate) fn config_db_type_mismatch(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {
     let calls = config_db_calls(csts);

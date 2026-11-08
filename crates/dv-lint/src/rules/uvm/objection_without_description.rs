@@ -2,15 +2,13 @@
 //! raise_objection()/drop_objection() on a phase or objection with no
 //! description or an empty one.
 
-use dv_model::{ClassId, Design};
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::uvm_syntax::{
-    arg_list, decl_name, ordered_expr, params,
-};
+use crate::support::uvm_classes::{call_name, calls_in, receiver, string_value, At, Ix};
+use crate::support::uvm_syntax::{arg_list, decl_name, ordered_expr, params};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{ClassId, Design};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::uvm_classes::{At, Ix, call_name, calls_in, receiver, string_value};
 
 /// Name of the nearest uvm_* ancestor.
 fn uvm_base_name(d: &Design, id: ClassId) -> &str {
@@ -33,7 +31,8 @@ pub(crate) fn objection_without_description(d: &Design, csts: &[Cst], s: &mut Si
             let Some(k) = ix.expr_class(c, &cx, recv, 0) else { continue };
             let kc = d.class(k);
             let base = uvm_base_name(d, k);
-            if !(kc.name == "uvm_phase" || kc.name == "uvm_objection" || base == "uvm_phase" || base == "uvm_objection") {
+            if !(kc.name == "uvm_phase" || kc.name == "uvm_objection" || base == "uvm_phase" || base == "uvm_objection")
+            {
                 continue;
             }
             // The second argument is the description; an empty literal counts as none.

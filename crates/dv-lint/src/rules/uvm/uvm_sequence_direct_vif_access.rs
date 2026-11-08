@@ -1,8 +1,8 @@
 //! UVM-SEQ-001 (UvmSequenceDirectVifAccess): Sequences and sequence items must
 //! not directly declare or drive virtual interface signals.
 
-use dv_model::{Design, UvmKind};
 use crate::{Severity, Sink};
+use dv_model::{Design, UvmKind};
 
 pub(crate) fn uvm_sequence_direct_vif_access(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

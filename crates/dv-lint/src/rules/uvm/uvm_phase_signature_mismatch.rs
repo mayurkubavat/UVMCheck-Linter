@@ -2,8 +2,8 @@
 //! declare correct signatures (function void vs task, and a single argument of
 //! type uvm_phase).
 
-use dv_model::Design;
 use crate::{derives_from, is_function_phase, is_task_phase, Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn uvm_phase_signature_mismatch(d: &Design, out: &mut Sink) {
     const ID: &str = "UVM-PHS-003";

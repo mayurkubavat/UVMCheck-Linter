@@ -2,10 +2,10 @@
 //! compared to itself (e.g. a == a), which tautologically evaluates to constant
 //! true or false.
 
-use sv_syntax::SyntaxKind;
+use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::syntax::{Cst};
 
 /// slang's binary operator kinds the rule checks; `<=` directly under an
 /// expression statement is a nonblocking assignment there instead.

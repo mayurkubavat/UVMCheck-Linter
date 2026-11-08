@@ -1,9 +1,9 @@
 //! SV-RND-017 (RandcStateExhaustion): Flags 'randc' cyclic variables declared
 //! with bit-width <= 2 bits (1 or 2 bits).
 
+use crate::support::constraints::randc_vars;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::constraints::{randc_vars};
 
 pub(crate) fn randc_narrow(c: &Cst, s: &mut Sink) {
     for (tok, name, w) in randc_vars(c) {

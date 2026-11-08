@@ -1,9 +1,9 @@
 //! UVM-ROL-002 (CoverageOutsideObservers): Flags covergroups declared in
 //! drivers and sequences.
 
-use dv_model::Design;
 use crate::support::class_roles::{role, role_name, user_classes, Role};
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn coverage_outside_observers(d: &Design, out: &mut Sink) {
     for cls in user_classes(d) {

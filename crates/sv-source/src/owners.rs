@@ -115,7 +115,8 @@ impl IncludeIndex {
             walk(r, &mut files, &mut seen, 0);
         }
         let mut idx = IncludeIndex { includers: HashMap::new(), files: files.clone() };
-        let by_suffix: Vec<(String, PathBuf)> = files.iter().map(|f| (f.to_string_lossy().replace('\\', "/"), f.clone())).collect();
+        let by_suffix: Vec<(String, PathBuf)> =
+            files.iter().map(|f| (f.to_string_lossy().replace('\\', "/"), f.clone())).collect();
         for f in &files {
             let Ok(bytes) = std::fs::read(f) else { continue };
             let text = String::from_utf8_lossy(&bytes);
@@ -157,7 +158,8 @@ impl IncludeIndex {
         let start = canon(header);
         let mut out = Vec::new();
         // (file, chain from the header, package seen on the way)
-        let mut queue: VecDeque<(PathBuf, Vec<PathBuf>, Option<String>)> = VecDeque::from([(start.clone(), Vec::new(), None)]);
+        let mut queue: VecDeque<(PathBuf, Vec<PathBuf>, Option<String>)> =
+            VecDeque::from([(start.clone(), Vec::new(), None)]);
         let mut seen = HashSet::from([start.clone()]);
         while let Some((f, chain, pkg)) = queue.pop_front() {
             let up = self.includers.get(&f).map_or(&[][..], Vec::as_slice);

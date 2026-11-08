@@ -1,11 +1,11 @@
 //! SV-STY-012 (SpaceKeywordParen): Requires a single space between control
 //! keywords (if, for, foreach, while, case) and opening parenthesis.
 
-use sv_syntax::NodeId;
+use crate::support::source_layout::Buffers;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::source_layout::{Buffers};
 
 pub(crate) fn space_keyword_paren(c: &Cst, s: &mut Sink) {
     let b = Buffers::new(c);
@@ -14,7 +14,8 @@ pub(crate) fn space_keyword_paren(c: &Cst, s: &mut Sink) {
             return;
         }
         let (k, o) = (&c.tree.tokens[kw as usize], &c.tree.tokens[open as usize]);
-        let (ko, oo) = if k.from_macro { (k.written.offset, o.written.offset) } else { (k.origin.offset, o.origin.offset) };
+        let (ko, oo) =
+            if k.from_macro { (k.written.offset, o.written.offset) } else { (k.origin.offset, o.origin.offset) };
         if ko + k.text.len() as u32 == oo {
             let kw_text = c.text_of(kw);
             s.add(

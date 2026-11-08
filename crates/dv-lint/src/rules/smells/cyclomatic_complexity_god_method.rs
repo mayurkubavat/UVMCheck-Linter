@@ -1,12 +1,12 @@
 //! SV-SML-004 (CyclomaticComplexityGodMethod): Detects subroutines with high
 //! McCabe Cyclomatic Complexity ($M > 15$).
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::routine_metrics::visited;
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::routine_metrics::{visited};
 
 fn cyclomatic_simple(c: &Cst, body: NodeId) -> i64 {
     let mut n = 1;

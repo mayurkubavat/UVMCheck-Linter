@@ -1,8 +1,8 @@
 //! UVM-STY-002 (ConstraintNameSuffix): Enforces a naming standard requiring all
 //! constraint blocks to end with '_c' suffix.
 
-use dv_model::Design;
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn constraint_name_suffix(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

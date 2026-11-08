@@ -2,11 +2,11 @@
 //! constraints must be pure and must not have side effects or void return
 //! types.
 
-use sv_syntax::NodeId;
+use crate::support::class_items::{kids, with_clause};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_items::{kids, with_clause};
 
 fn non_pure_walk(c: &Cst, n: NodeId, inside: &mut bool, s: &mut Sink) {
     let k = c.kind(n);

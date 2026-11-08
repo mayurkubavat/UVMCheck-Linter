@@ -1,9 +1,9 @@
 //! UVM-DEP-002 (UvmDeprecatedReportServer): Disallow direct singleton calls to
 //! uvm_report_server::get_server() (IEEE 1800.2 Annex H).
 
+use crate::support::copies::{copies, routine_calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::copies::{copies, routine_calls};
 
 pub(crate) fn deprecated_report_server(c: &Cst, s: &mut Sink) {
     for (n, _, first) in routine_calls(c, &|x| x == "get_server") {

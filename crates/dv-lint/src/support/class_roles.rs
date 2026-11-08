@@ -140,10 +140,7 @@ pub(crate) fn role(d: &Design, c: &Class) -> Role {
 
 /// `swe::uvmBaseName`: the nearest uvm_* ancestor's name.
 pub(crate) fn uvm_base_name<'d>(d: &'d Design, c: &Class) -> &'d str {
-    d.ancestors(c.id)
-        .find(|a| a.name.starts_with("uvm_"))
-        .map(|a| a.name.as_str())
-        .unwrap_or("")
+    d.ancestors(c.id).find(|a| a.name.starts_with("uvm_")).map(|a| a.name.as_str()).unwrap_or("")
 }
 
 /// `swe::isLibrarySymbol`: in uvm_pkg or a uvm_* class, or written in the
@@ -177,7 +174,12 @@ pub(crate) fn class_of_type<'d>(d: &'d Design, ty: &str, near: Option<&Class>) -
 pub(crate) type Typedefs = HashMap<String, String>;
 
 /// [`class_of_type`], also through typedefs.
-pub(crate) fn class_of_type_in<'d>(d: &'d Design, td: Option<&Typedefs>, ty: &str, near: Option<&Class>) -> Option<&'d Class> {
+pub(crate) fn class_of_type_in<'d>(
+    d: &'d Design,
+    td: Option<&Typedefs>,
+    ty: &str,
+    near: Option<&Class>,
+) -> Option<&'d Class> {
     let mut ty = ty.to_string();
     for _ in 0..8 {
         let base = ty.split('$').next().unwrap_or("");

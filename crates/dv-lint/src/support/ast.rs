@@ -12,7 +12,6 @@ use sv_syntax::{NodeId, SyntaxKind};
 
 use crate::syntax::Cst;
 
-
 use crate::Sink;
 
 use dv_model::Design;
@@ -33,10 +32,7 @@ pub(crate) fn last_tok(c: &Cst, n: NodeId) -> Option<u32> {
 }
 
 pub(crate) fn is_ident(c: &Cst, tok: u32) -> bool {
-    matches!(
-        c.tree.tokens[tok as usize].kind,
-        sv_lexer::Kind::Identifier | sv_lexer::Kind::EscapedIdentifier
-    )
+    matches!(c.tree.tokens[tok as usize].kind, sv_lexer::Kind::Identifier | sv_lexer::Kind::EscapedIdentifier)
 }
 
 /// Whether slang parses `n` as a name (`a`, `a.b`, `p::c`, `a[i].b`)
@@ -44,9 +40,9 @@ pub(crate) fn is_ident(c: &Cst, tok: u32) -> bool {
 /// name (`IdentifierSelectName`), not an `ElementSelectExpression`.
 pub(crate) fn is_name(c: &Cst, n: NodeId) -> bool {
     match c.kind(n) {
-        NameExpr => c.first_tok(n).is_some_and(|t| {
-            is_ident(c, t) || matches!(c.text_of(t), "this" | "super" | "$unit" | "$root" | "local")
-        }),
+        NameExpr => c
+            .first_tok(n)
+            .is_some_and(|t| is_ident(c, t) || matches!(c.text_of(t), "this" | "super" | "$unit" | "$root" | "local")),
         ScopedExpr => true,
         MemberExpr | SelectExpr => kids(c, n).first().is_some_and(|&b| is_name(c, b)),
         _ => false,
@@ -90,9 +86,8 @@ pub(crate) fn usage(c: &Cst, n: NodeId, unwritten: bool, u: &mut Usage) {
         }
         NameExpr => {
             if let Some(t) = c.first_tok(n) {
-                let base_of_select = c
-                    .parent(n)
-                    .is_some_and(|p| c.kind(p) == SelectExpr && kids(c, p).first() == Some(&n));
+                let base_of_select =
+                    c.parent(n).is_some_and(|p| c.kind(p) == SelectExpr && kids(c, p).first() == Some(&n));
                 if is_ident(c, t) && !base_of_select {
                     u.read.insert(c.text_of(t).to_string());
                 }
@@ -101,9 +96,7 @@ pub(crate) fn usage(c: &Cst, n: NodeId, unwritten: bool, u: &mut Usage) {
         MemberExpr | ScopedExpr => {
             // The name after `.` or `::` is an IdentifierName when the whole
             // is a name and no select or parameter list follows it.
-            let base_of_select = c
-                .parent(n)
-                .is_some_and(|p| c.kind(p) == SelectExpr && kids(c, p).first() == Some(&n));
+            let base_of_select = c.parent(n).is_some_and(|p| c.kind(p) == SelectExpr && kids(c, p).first() == Some(&n));
             let whole_name = c.kind(n) == ScopedExpr || k.first().is_some_and(|&b| is_name(c, b));
             if whole_name && !base_of_select && c.tree.child(n, ParamList).is_none() {
                 if let Some(t) = last_tok(c, n).filter(|&t| is_ident(c, t)) {
@@ -208,7 +201,9 @@ pub(crate) fn call_site(c: &Cst, n: NodeId) -> Option<CallSite> {
                 return None;
             }
             let p = c.parent(n);
-            if p.is_some_and(|p| matches!(c.kind(p), CallExpr | MemberExpr | ScopedExpr) && kids(c, p).first() == Some(&n)) {
+            if p.is_some_and(|p| {
+                matches!(c.kind(p), CallExpr | MemberExpr | ScopedExpr) && kids(c, p).first() == Some(&n)
+            }) {
                 return None;
             }
             Some(CallSite { node: n, name: c.text_of(t).to_string(), args: Vec::new() })
@@ -431,9 +426,9 @@ pub(crate) struct Decl {
 }
 
 pub(crate) fn declarators_named(c: &Cst, decl: NodeId, name: &str) -> Option<NodeId> {
-    kids(c, decl).into_iter().find(|&d| {
-        c.kind(d) == Declarator && c.tree.child(d, Name).is_some_and(|x| c.tree.bare_text(x) == name)
-    })
+    kids(c, decl)
+        .into_iter()
+        .find(|&d| c.kind(d) == Declarator && c.tree.child(d, Name).is_some_and(|x| c.tree.bare_text(x) == name))
 }
 
 pub(crate) fn find_in_items(c: &Cst, scope: NodeId, name: &str, kind: DeclKind) -> Option<Decl> {
@@ -631,11 +626,10 @@ pub(crate) fn symbol_ref(c: &Cst, n: NodeId) -> Option<(Decl, String)> {
             if is_class_type(c, &bd) {
                 // A member of a class handle: the property itself.
                 let dt = bd.dtype?;
-                let k = class_named(c, type_head(c, dt)?)
-                    .or_else(|| {
-                        let t = typedef_named(c, type_head(c, dt)?)?;
-                        class_named(c, type_head(c, c.tree.child(t, DataType)?)?)
-                    })?;
+                let k = class_named(c, type_head(c, dt)?).or_else(|| {
+                    let t = typedef_named(c, type_head(c, dt)?)?;
+                    class_named(c, type_head(c, c.tree.child(t, DataType)?)?)
+                })?;
                 return class_property(c, k, &mname).map(|d| (d, mname));
             }
             None

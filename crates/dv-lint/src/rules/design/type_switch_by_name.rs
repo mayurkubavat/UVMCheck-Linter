@@ -2,11 +2,13 @@
 //! with string literals instead of virtual dispatch (Sonar 'instanceof chains',
 //! open/closed principle).
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::statements::{
+    call_name, case_parts, op, report, start, stmt, string_literal, strip_parens, St, Units,
+};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::statements::{St, Units, call_name, case_parts, op, report, start, stmt, string_literal, strip_parens};
 
 pub(crate) fn type_switch_by_name(c: &Cst, s: &mut Sink) {
     let units = Units::new(c);
@@ -44,14 +46,6 @@ pub(crate) fn type_switch_by_name(c: &Cst, s: &mut Sink) {
         if classes.in_library(c, n) {
             continue;
         }
-        report(
-            s,
-            units.unit_times(c, n),
-            "SV-DSN-001",
-            "TypeSwitchByName",
-            Severity::Warning,
-            msg.into(),
-            start(c, n),
-        );
+        report(s, units.unit_times(c, n), "SV-DSN-001", "TypeSwitchByName", Severity::Warning, msg.into(), start(c, n));
     }
 }

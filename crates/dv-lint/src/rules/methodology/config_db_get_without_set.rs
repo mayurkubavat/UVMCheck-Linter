@@ -2,11 +2,11 @@
 //! field name has no set in this compilation, when the compilation contains
 //! both sets and gets.
 
-use std::collections::HashSet;
-use dv_model::Design;
+use crate::support::field_uses::field_uses;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::field_uses::{field_uses};
+use dv_model::Design;
+use std::collections::HashSet;
 
 pub(crate) fn config_db_get_without_set(d: &Design, csts: &[Cst], out: &mut Sink) {
     let (sets, gets) = field_uses(d, csts);

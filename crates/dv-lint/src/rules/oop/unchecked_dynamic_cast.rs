@@ -2,10 +2,10 @@
 //! be checked (e.g., in an if statement or assert) to prevent silent
 //! null-pointer dereferences on cast failures.
 
-use sv_syntax::SyntaxKind;
 use crate::support::literals::ast_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn unchecked_dynamic_cast(c: &Cst, s: &mut Sink) {

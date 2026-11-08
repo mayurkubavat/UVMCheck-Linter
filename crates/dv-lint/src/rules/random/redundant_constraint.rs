@@ -1,11 +1,11 @@
 //! SV-RND-011 (RedundantConstraint): Detects duplicate or redundant constraint
 //! expressions within the same class scope.
 
-use std::collections::HashSet;
+use crate::support::class_items::{class_decls, decl_name, expression_constraint, subtree, trim};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_items::{class_decls, decl_name, expression_constraint, subtree, trim};
 
 fn strip_comments_and_ws(input: &str) -> String {
     let b = input.as_bytes();

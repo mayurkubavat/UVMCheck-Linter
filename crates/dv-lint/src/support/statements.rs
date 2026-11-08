@@ -14,7 +14,6 @@ use sv_syntax::{Child, NodeId, SyntaxKind};
 
 use crate::syntax::Cst;
 
-
 use crate::{Severity, Sink};
 
 use SyntaxKind::*;
@@ -121,16 +120,9 @@ pub(crate) fn exprs(c: &Cst, n: NodeId) -> Vec<NodeId> {
 /// An if statement: condition, then-branch, else-branch.
 pub(crate) fn if_parts(c: &Cst, n: NodeId) -> (Option<NodeId>, Option<NodeId>, Option<NodeId>) {
     let items = c.items(n);
-    let cond = items
-        .iter()
-        .copied()
-        .find(|&x| stmt(c, x).is_none() && c.kind(x) != ElseClause);
+    let cond = items.iter().copied().find(|&x| stmt(c, x).is_none() && c.kind(x) != ElseClause);
     let then = items.iter().copied().find(|&x| is_stmt(c, x));
-    let els = items
-        .iter()
-        .copied()
-        .find(|&x| c.kind(x) == ElseClause)
-        .and_then(|e| sub_stmts(c, e).into_iter().next());
+    let els = items.iter().copied().find(|&x| c.kind(x) == ElseClause).and_then(|e| sub_stmts(c, e).into_iter().next());
     (cond, then, els)
 }
 
@@ -142,11 +134,7 @@ pub(crate) struct CaseParts {
 }
 
 pub(crate) fn case_parts(c: &Cst, n: NodeId) -> CaseParts {
-    let mut out = CaseParts {
-        sel: None,
-        items: Vec::new(),
-        default: None,
-    };
+    let mut out = CaseParts { sel: None, items: Vec::new(), default: None };
     let randcase = c.toks(n).any(|t| c.text_of(t) == "randcase");
     let mut after_paren = randcase;
     let mut labels = Vec::new();
@@ -191,11 +179,7 @@ pub(crate) struct ForParts {
 }
 
 pub(crate) fn for_parts(c: &Cst, n: NodeId) -> ForParts {
-    let mut out = ForParts {
-        init: Vec::new(),
-        stop: None,
-        body: None,
-    };
+    let mut out = ForParts { init: Vec::new(), stop: None, body: None };
     let mut semis = 0;
     let mut closed = false;
     for k in c.kids(n) {
@@ -239,9 +223,8 @@ pub(crate) fn op<'t>(c: &Cst<'t>, n: NodeId) -> &'t str {
     c.toks(n).next().map(|t| c.text_of(t)).unwrap_or("")
 }
 
-pub(crate) const ASSIGN_OPS: &[&str] = &[
-    "=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "<<<=", ">>>=",
-];
+pub(crate) const ASSIGN_OPS: &[&str] =
+    &["=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "<<<=", ">>>="];
 
 /// An assignment as an expression statement: `x = e;`, `x += e;`, `x <= e;`.
 pub(crate) fn assignment<'t>(c: &Cst<'t>, s: NodeId) -> Option<(NodeId, NodeId, &'t str)> {
@@ -319,21 +302,13 @@ pub(crate) fn call_args(c: &Cst, call: NodeId) -> Vec<Option<NodeId>> {
     let Some(list) = c.tree.child(call, ArgList) else {
         return Vec::new();
     };
-    c.tree
-        .children(list)
-        .filter(|&a| c.kind(a) == Arg)
-        .map(|a| c.tree.children(a).next())
-        .collect()
+    c.tree.children(list).filter(|&a| c.kind(a) == Arg).map(|a| c.tree.children(a).next()).collect()
 }
 
 /// File name a token was written in.
 pub(crate) fn file_of(c: &Cst, tok: u32) -> String {
     let w = c.tree.tokens[tok as usize].written;
-    c.tree
-        .files
-        .get(w.file as usize)
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_default()
+    c.tree.files.get(w.file as usize).map(|p| p.to_string_lossy().into_owned()).unwrap_or_default()
 }
 
 /// How many times slang elaborates each module, interface or program body.
@@ -357,12 +332,7 @@ impl Units {
             .filter(|n| specs.contains_key(&n.0))
             .filter_map(|n| c.tree.child(n, Name).map(|x| (c.tree.bare_text(x), n.0)))
             .collect();
-        Units {
-            times: Self::count(c, false),
-            direct: Self::count(c, true),
-            specs,
-            generic_names,
-        }
+        Units { times: Self::count(c, false), direct: Self::count(c, true), specs, generic_names }
     }
 
     pub(crate) fn count(c: &Cst, direct_only: bool) -> HashMap<u32, usize> {
@@ -547,19 +517,14 @@ pub(crate) fn report(
 
 /// Statement lists slang builds: block and routine bodies.
 pub(crate) fn statement_lists(c: &Cst) -> Vec<NodeId> {
-    c.nodes(SeqBlock)
-        .into_iter()
-        .chain(c.nodes(ParBlock))
-        .chain(c.nodes(Body))
-        .collect()
+    c.nodes(SeqBlock).into_iter().chain(c.nodes(ParBlock)).chain(c.nodes(Body)).collect()
 }
 
 /// `n` is in a subroutine or procedural block whose statements hold a
 /// syntax error: slang binds the body as invalid and its AST walk
 /// (VisitFlags::AllGood) skips all of it.
 pub(crate) fn in_bad_body(c: &Cst, n: NodeId) -> bool {
-    let Some(d) = ancestors_or_self(c, n)
-        .find(|&x| matches!(c.kind(x), FunctionDecl | TaskDecl | ProceduralBlock))
+    let Some(d) = ancestors_or_self(c, n).find(|&x| matches!(c.kind(x), FunctionDecl | TaskDecl | ProceduralBlock))
     else {
         return false;
     };

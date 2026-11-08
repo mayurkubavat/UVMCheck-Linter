@@ -2,9 +2,9 @@
 //! sub-sequencer handles declared within a virtual sequencer are fully wired
 //! and assigned in connect_phase across the verification environment.
 
-use dv_model::Design;
+use crate::support::connect_phase::connect_phase_assignments;
 use crate::{derives_from, Severity, Sink};
-use crate::support::connect_phase::{connect_phase_assignments};
+use dv_model::Design;
 
 pub(crate) fn virtual_sequencer_wiring_checker(d: &Design, out: &mut Sink) {
     let mut fields = Vec::new();
@@ -19,9 +19,7 @@ pub(crate) fn virtual_sequencer_wiring_checker(d: &Design, out: &mut Sink) {
             continue;
         }
         for p in &cls.properties {
-            let sub = p.ty.contains("sequencer")
-                || p.name.contains("_seqr")
-                || p.name.contains("sequencer");
+            let sub = p.ty.contains("sequencer") || p.name.contains("_seqr") || p.name.contains("sequencer");
             if sub && !derives_from(d, p.type_class, "uvm_phase") {
                 fields.push((cls, p));
             }

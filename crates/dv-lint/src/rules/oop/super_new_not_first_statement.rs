@@ -1,8 +1,8 @@
 //! SV-OOP-014 (SuperNewNotFirstStatement): Derived class constructors calling
 //! super.new(...) must invoke it as the very first procedural statement.
 
+use crate::{find_method, Severity, Sink};
 use dv_model::Design;
-use crate::{Severity, Sink, find_method};
 
 pub(crate) fn super_new_not_first_statement(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

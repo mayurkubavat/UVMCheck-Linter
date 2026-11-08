@@ -1,11 +1,11 @@
 //! SV-RND-024 (RandomizeInsideAssert): Flags randomize() used as the condition
 //! of an immediate assert or assume.
 
-use sv_syntax::NodeId;
+use crate::support::class_items::{call_name, kids, op, strip_casts, user_code};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_items::{call_name, kids, op, strip_casts, user_code};
 
 fn calls_randomize(c: &Cst, e: NodeId) -> bool {
     let e = strip_casts(c, e);

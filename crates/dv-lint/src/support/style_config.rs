@@ -5,11 +5,7 @@ use sv_syntax::NodeId;
 
 use sv_syntax::SyntaxKind::*;
 
-
 use crate::syntax::Cst;
-
-
-
 
 /// The ids SV-STY-100 reports under.
 pub(crate) const STYLE_SUBS: &[(&str, &str)] = &[

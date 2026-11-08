@@ -1,12 +1,12 @@
 //! SV-PKG-002 (WildcardImportOutsidePackage): Flags 'import pkg::*' at file
 //! ($unit) scope, and inside files that are `include'd into a package.
 
-use std::collections::HashSet;
-use dv_model::Design;
+use crate::support::defines_packages::{import_items, user_tok, Files};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
 use sv_syntax::SyntaxKind::*;
-use crate::support::defines_packages::{Files, import_items, user_tok};
 
 pub(crate) fn wildcard_import_outside_package(_: &Design, csts: &[Cst], out: &mut Sink) {
     let mut seen = HashSet::new();

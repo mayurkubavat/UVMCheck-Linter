@@ -1,10 +1,10 @@
 //! SV-CON-005 (SemaphoreZeroKey): Flags semaphore method calls (sem.get(0),
 //! sem.put(0), sem.try_get(0)) passing non-positive key counts (<= 0).
 
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{Child, NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::syntax::{Cst};
 
 /// The first argument of an argument list when it is ordered (not named or
 /// left empty): its expression.

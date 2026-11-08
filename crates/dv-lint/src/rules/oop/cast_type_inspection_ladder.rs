@@ -1,10 +1,10 @@
 //! SV-OCP-001 (CastTypeInspectionLadder): Disallows cascading $cast ladders (3+
 //! branches) inspecting object types.
 
+use crate::support::calls::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::calls::{kids};
 
 pub(crate) fn cast_ladder(c: &Cst, s: &mut Sink) {
     for n in c.nodes(IfStmt) {

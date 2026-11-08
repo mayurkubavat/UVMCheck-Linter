@@ -1,15 +1,13 @@
 //! UVM-SEQ-011 (UncheckedPSequencerCast): Flags unchecked $cast(p_sequencer,
 //! m_sequencer) calls in sequences that do not verify the return status.
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
-use crate::support::uvm_syntax::{
-    callee, stmt_expr,
-};
+use crate::support::uvm_classes::args;
+use crate::support::uvm_syntax::{callee, stmt_expr};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{args};
 
 pub(crate) fn unchecked_p_sequencer_cast(_d: &Design, csts: &[Cst], s: &mut Sink) {
     for c in csts {

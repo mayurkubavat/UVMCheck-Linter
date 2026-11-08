@@ -1,10 +1,10 @@
 //! SV-COV-001 (UnreferencedCovergroup): Detects covergroups declared in classes
 //! or modules that are never instantiated with 'new()' or never sampled.
 
-use std::collections::HashSet;
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn unreferenced_covergroup(c: &Cst, s: &mut Sink) {
@@ -44,7 +44,11 @@ pub(crate) fn unreferenced_covergroup(c: &Cst, s: &mut Sink) {
                 (ty, Some(text))
             }
             Declarator => {
-                let ty = c.parent(p).and_then(|d| c.tree.child(d, DataType)).and_then(|t| c.first_tok(t)).map(|t| c.text_of(t).to_string());
+                let ty = c
+                    .parent(p)
+                    .and_then(|d| c.tree.child(d, DataType))
+                    .and_then(|t| c.first_tok(t))
+                    .map(|t| c.text_of(t).to_string());
                 (ty.filter(|t| covergroups.contains(t)), None)
             }
             _ => (None, None),

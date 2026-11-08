@@ -4,8 +4,6 @@ use sv_syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
 
-
-
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn kids(c: &Cst, n: NodeId) -> Vec<NodeId> {
@@ -44,7 +42,8 @@ pub(crate) fn statement_calls(c: &Cst) -> Vec<NodeId> {
             CallExpr => Some(e),
             CastExpr => {
                 let k = kids(c, e);
-                let signed = k.first().is_some_and(|&t| matches!(c.tree.bare_text(t).as_str(), "signed" | "unsigned" | "void"));
+                let signed =
+                    k.first().is_some_and(|&t| matches!(c.tree.bare_text(t).as_str(), "signed" | "unsigned" | "void"));
                 k.last().copied().filter(|&x| !signed && k.len() == 2 && c.kind(x) == CallExpr)
             }
             _ => None,

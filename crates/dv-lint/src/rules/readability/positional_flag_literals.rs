@@ -2,12 +2,12 @@
 //! literals positionally to 1-bit arguments; use named argument binding
 //! (clang-tidy bugprone-argument-comment, Clean Code flag arguments).
 
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use crate::support::config_db_calls::{bool_literal, user_visits};
 use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::config_db_calls::{bool_literal, user_visits};
+use sv_syntax::NodeId;
+use sv_syntax::SyntaxKind::*;
 
 /// The `min_flags` default.
 const MIN_FLAGS: usize = 2;

@@ -408,7 +408,9 @@ impl Ctx<'_> {
             DataType if first_tok(t, n) == Some("enum") => self.enum_decl(t, n, &mut err),
             ExprStmt => self.assignment(ix, t, n, parent, &mut err),
             BinaryExpr | PrefixExpr | PostfixExpr | CallExpr => self.lvalues(ix, t, n, parent, &mut err),
-            Dim | ElabTask | IfGenerate | CaseGenerate | LoopGenerate => self.constant_context(ix, t, n, parent, &mut err),
+            Dim | ElabTask | IfGenerate | CaseGenerate | LoopGenerate => {
+                self.constant_context(ix, t, n, parent, &mut err)
+            }
             ConcatExpr if matches!(toks(t, n).get(1).copied(), Some("<<" | ">>")) => {
                 self.stream_into(ix, t, n, parent, &mut err)
             }
@@ -577,9 +579,7 @@ impl Ctx<'_> {
                 t.children(n).collect()
             }
             ElabTask => t.children(n).collect(),
-            IfGenerate | CaseGenerate => {
-                t.children(n).filter(|&c| t.kind(c) != GenerateBlock).take(1).collect()
-            }
+            IfGenerate | CaseGenerate => t.children(n).filter(|&c| t.kind(c) != GenerateBlock).take(1).collect(),
             // The header only; the body may be a single item.
             LoopGenerate => t
                 .children(n)
@@ -590,7 +590,8 @@ impl Ctx<'_> {
                 let port = pk == Some(Port)
                     && p.and_then(|p| up(parent, p)).and_then(|l| up(parent, l)).is_some_and(|h| {
                         t.kind(h) == Header
-                            && up(parent, h).is_some_and(|d| matches!(t.kind(d), ModuleDecl | InterfaceDecl | ProgramDecl))
+                            && up(parent, h)
+                                .is_some_and(|d| matches!(t.kind(d), ModuleDecl | InterfaceDecl | ProgramDecl))
                     });
                 let member = pk == Some(DataDecl)
                     && p.and_then(|p| up(parent, p)).is_some_and(|d| {
@@ -625,10 +626,16 @@ impl Ctx<'_> {
                     if genvars.contains(&name) {
                         continue;
                     }
-                    if self.name_decl(ix, t, e, parent).is_some_and(|d| {
-                        matches!(d.kind, SymKind::Variable | SymKind::Net | SymKind::Port)
-                    }) {
-                        err(e, format!("reference to non-constant variable '{name}' is not allowed in a constant expression"));
+                    if self
+                        .name_decl(ix, t, e, parent)
+                        .is_some_and(|d| matches!(d.kind, SymKind::Variable | SymKind::Net | SymKind::Port))
+                    {
+                        err(
+                            e,
+                            format!(
+                                "reference to non-constant variable '{name}' is not allowed in a constant expression"
+                            ),
+                        );
                     }
                 }
                 // `x.m`: a member or a method; not checked.
@@ -670,8 +677,8 @@ impl Ctx<'_> {
         let mut cur = up(parent, n);
         while let Some(a) = cur {
             match t.kind(a) {
-                DataDecl | ParamDecl | TypedefDecl | Port | ModuleDecl | InterfaceDecl
-                | ProgramDecl | PackageDecl | ClassDecl => return false,
+                DataDecl | ParamDecl | TypedefDecl | Port | ModuleDecl | InterfaceDecl | ProgramDecl | PackageDecl
+                | ClassDecl => return false,
                 k if format!("{k:?}").ends_with("Expr") => return true,
                 _ => {}
             }
@@ -701,9 +708,9 @@ impl Ctx<'_> {
             Literal | CondExpr | CallExpr => true,
             BinaryExpr => !ASSIGN_OPS.contains(&op),
             PrefixExpr => !matches!(op, "++" | "--"),
-            NameExpr => self.name_decl(ix, t, e, parent).is_some_and(|d| {
-                matches!(d.kind, SymKind::Parameter | SymKind::EnumValue | SymKind::Specparam)
-            }),
+            NameExpr => self
+                .name_decl(ix, t, e, parent)
+                .is_some_and(|d| matches!(d.kind, SymKind::Parameter | SymKind::EnumValue | SymKind::Specparam)),
             _ => false,
         }
     }

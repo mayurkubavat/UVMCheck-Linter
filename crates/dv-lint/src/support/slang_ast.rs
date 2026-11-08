@@ -11,8 +11,8 @@
 //! - [`std_unordered_order`]: the iteration order of a libstdc++
 //!   `std::unordered_set<std::string>`, which some messages list names in.
 
-use sv_sema::fx::{FxMap as HashMap, FxSet as HashSet};
 use std::sync::{Arc, Mutex};
+use sv_sema::fx::{FxMap as HashMap, FxSet as HashSet};
 
 use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
@@ -48,9 +48,10 @@ pub(crate) fn std_hash(b: &[u8]) -> u64 {
 /// inserting `items` in turn (duplicates dropped); `None` past the sizes
 /// modelled here.
 pub(crate) fn std_unordered_order<S: AsRef<str>>(items: &[S]) -> Option<Vec<String>> {
-    const PRIMES: &[usize] = &[29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 103, 109, 113, 127,
-        137, 139, 149, 157, 167, 179, 193, 199, 211, 227, 241, 257, 277, 293, 313, 337, 359, 383, 409, 439, 467,
-        503, 541];
+    const PRIMES: &[usize] = &[
+        29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 103, 109, 113, 127, 137, 139, 149, 157, 167,
+        179, 193, 199, 211, 227, 241, 257, 277, 293, 313, 337, 359, 383, 409, 439, 467, 503, 541,
+    ];
     const FAST: [usize; 14] = [2, 2, 2, 3, 5, 5, 7, 7, 11, 11, 11, 11, 13, 13];
     #[derive(Clone, Copy)]
     enum Before {
@@ -195,7 +196,9 @@ pub(crate) fn last_name(c: &Cst, decl: NodeId) -> String {
 /// A class's own routines (functions, tasks, prototypes) by last name, in
 /// item order: what [`callee_decl`] scans along the class chain.
 fn class_routines(c: &Cst, cls: NodeId) -> Arc<Vec<(String, NodeId)>> {
-    let all = crate::shared::get("class_routines", c.tree_key(), || Mutex::new(HashMap::<NodeId, Arc<Vec<(String, NodeId)>>>::default()));
+    let all = crate::shared::get("class_routines", c.tree_key(), || {
+        Mutex::new(HashMap::<NodeId, Arc<Vec<(String, NodeId)>>>::default())
+    });
     if let Some(v) = all.lock().unwrap_or_else(|e| e.into_inner()).get(&cls) {
         return v.clone();
     }
@@ -355,7 +358,6 @@ struct TreeInfo {
     specs: HashMap<u32, usize>,
 }
 
-
 fn info(c: &Cst) -> std::sync::Arc<TreeInfo> {
     crate::shared::get("tree_info", c.tree_key(), || build_info(c))
 }
@@ -462,7 +464,12 @@ fn class_params(c: &Cst, cls: NodeId) -> Option<Vec<(String, String)>> {
         } else {
             for d in c.tree.children(p).filter(|&d| c.kind(d) == Declarator) {
                 let name = c.tree.child(d, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();
-                let def = kids(c, d).into_iter().filter(|&k| c.kind(k) != Name).last().map(|x| c.tree.bare_text(x)).unwrap_or_default();
+                let def = kids(c, d)
+                    .into_iter()
+                    .filter(|&k| c.kind(k) != Name)
+                    .last()
+                    .map(|x| c.tree.bare_text(x))
+                    .unwrap_or_default();
                 out.push((name, def));
             }
         }
@@ -477,11 +484,8 @@ fn spec_key(c: &Cst, cls: NodeId, list: Option<NodeId>) -> Option<Vec<String>> {
     let params = class_params(c, cls)?;
     let mut vals: Vec<String> = params.iter().map(|p| p.1.clone()).collect();
     if let Some(pl) = list {
-        let outer: Vec<(String, String)> = ancestors(c, pl)
-            .filter(|&a| c.kind(a) == ClassDecl)
-            .filter_map(|a| class_params(c, a))
-            .flatten()
-            .collect();
+        let outer: Vec<(String, String)> =
+            ancestors(c, pl).filter(|&a| c.kind(a) == ClassDecl).filter_map(|a| class_params(c, a)).flatten().collect();
         let subst = |t: &str| -> String {
             match outer.iter().find(|o| o.0 == t) {
                 Some(o) => o.1.clone(),
@@ -497,7 +501,9 @@ fn spec_key(c: &Cst, cls: NodeId, list: Option<NodeId>) -> Option<Vec<String>> {
             });
             let val = val.unwrap_or_default();
             let ix = match named {
-                Some(n) if c.toks(a).next().is_some_and(|t| c.text_of(t) == ".") => params.iter().position(|p| p.0 == n)?,
+                Some(n) if c.toks(a).next().is_some_and(|t| c.text_of(t) == ".") => {
+                    params.iter().position(|p| p.0 == n)?
+                }
                 _ => i,
             };
             if ix < vals.len() {
@@ -572,14 +578,18 @@ struct Hier {
     last: HashMap<String, usize>,
 }
 
-
 fn hier(c: &Cst) -> std::sync::Arc<Hier> {
     crate::shared::get("hier", c.compile_key(), || build_hier(c))
 }
 
 fn build_hier(c: &Cst) -> Hier {
     let e = crate::shared::elaboration(c);
-    let mut h = Hier { instances: HashMap::default(), def_of: HashMap::default(), copies: e.copies.clone(), last: HashMap::default() };
+    let mut h = Hier {
+        instances: HashMap::default(),
+        def_of: HashMap::default(),
+        copies: e.copies.clone(),
+        last: HashMap::default(),
+    };
     for (ix, line) in e.hierarchy.iter().enumerate() {
         let mut it = line.splitn(3, ' ');
         let (Some(parent), Some("instance"), Some(rest)) = (it.next(), it.next(), it.next()) else { continue };
@@ -796,7 +806,14 @@ pub(crate) fn model_classes(c: &Cst) -> Vec<NodeId> {
     c.nodes(ClassDecl)
         .into_iter()
         .filter(|&n| class_params(c, n).is_none())
-        .filter(|&n| !ancestors(c, n).any(|a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl | ParamList | FunctionDecl | TaskDecl)))
+        .filter(|&n| {
+            !ancestors(c, n).any(|a| {
+                matches!(
+                    c.kind(a),
+                    ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl | ParamList | FunctionDecl | TaskDecl
+                )
+            })
+        })
         .collect()
 }
 
@@ -810,7 +827,11 @@ pub(crate) fn user_classes(c: &Cst) -> Vec<NodeId> {
     }
     c.nodes(ClassDecl)
         .into_iter()
-        .filter(|&n| !ancestors(c, n).any(|a| matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl | FunctionDecl | TaskDecl)))
+        .filter(|&n| {
+            !ancestors(c, n).any(|a| {
+                matches!(c.kind(a), ModuleDecl | InterfaceDecl | ProgramDecl | CheckerDecl | FunctionDecl | TaskDecl)
+            })
+        })
         .filter(|&n| class_params(c, n).is_none() || enclosing_class_decl(c, n).is_none())
         .filter(|&n| !is_library(c, n))
         .collect()
@@ -883,7 +904,9 @@ fn build_user_routines(c: &Cst) -> Vec<(NodeId, usize)> {
             let p = c.parent(r).map(|p| c.kind(p));
             let n = match p {
                 Some(SourceFile | PackageDecl) => 1,
-                Some(ModuleDecl | InterfaceDecl | ProgramDecl) => direct_instances(c, &decl_name(c, c.parent(r).unwrap_or(r))),
+                Some(ModuleDecl | InterfaceDecl | ProgramDecl) => {
+                    direct_instances(c, &decl_name(c, c.parent(r).unwrap_or(r)))
+                }
                 _ => continue,
             };
             seen.insert(r);
@@ -935,7 +958,8 @@ fn in_items(c: &Cst, scope: NodeId, name: &str, kind: DeclKind) -> Option<Decl> 
 type ItemIndex = HashMap<String, (bool, Option<NodeId>, NodeId)>;
 
 fn item_index(c: &Cst, scope: NodeId) -> Arc<ItemIndex> {
-    let all = crate::shared::get("item_index", c.tree_key(), || Mutex::new(HashMap::<NodeId, Arc<ItemIndex>>::default()));
+    let all =
+        crate::shared::get("item_index", c.tree_key(), || Mutex::new(HashMap::<NodeId, Arc<ItemIndex>>::default()));
     if let Some(v) = all.lock().unwrap_or_else(|e| e.into_inner()).get(&scope) {
         return v.clone();
     }

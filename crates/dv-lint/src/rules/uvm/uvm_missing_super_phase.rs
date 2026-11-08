@@ -2,9 +2,9 @@
 //! build_phase, connect_phase) in uvm_component must call
 //! `super.<phase_name>(phase)` to ensure proper base-class configuration.
 
-use dv_model::Design;
+use crate::support::uvm_kinds::is_component;
 use crate::{is_function_phase, is_task_phase, Severity, Sink};
-use crate::support::uvm_kinds::{is_component};
+use dv_model::Design;
 
 pub(crate) fn uvm_missing_super_phase(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

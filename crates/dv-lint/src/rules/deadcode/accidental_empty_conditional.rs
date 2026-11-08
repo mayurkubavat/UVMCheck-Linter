@@ -1,11 +1,11 @@
 //! SV-DED-003 (AccidentalEmptyConditional): Detects accidental semicolons
 //! immediately following if() or while() headers.
 
-use sv_syntax::SyntaxKind;
+use crate::support::statements::{body_of, if_parts, in_bad_body, report, start, stmt, St, Units};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::statements::{St, Units, body_of, if_parts, in_bad_body, report, start, stmt};
 
 pub(crate) fn empty_conditional(c: &Cst, s: &mut Sink) {
     let units = Units::new(c);

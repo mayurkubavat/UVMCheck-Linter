@@ -2,17 +2,17 @@
 //! field-wise methods, flags a field of this object paired with a differently
 //! named field of the other object when the matching field exists.
 
-use std::collections::HashMap;
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::slang_ast::{class_methods, decl_name, user_classes};
 use crate::support::class_index::Classes;
 use crate::support::class_items::{declarators, kids, op};
-use crate::support::type_text::expr_text;
 use crate::support::data_items::{strip_conv, unparen};
-use crate::support::statements::in_bad_body;
 use crate::support::sema_facts::ast_ok;
+use crate::support::slang_ast::{class_methods, decl_name, user_classes};
+use crate::support::statements::in_bad_body;
+use crate::support::type_text::expr_text;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashMap;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 fn fieldwise(name: &str) -> bool {
@@ -211,12 +211,7 @@ pub(crate) fn mismatched_field(c: &Cst, s: &mut Sink) {
                     locals.insert(v.to_string(), ty);
                 }
             }
-            let p = Pairing {
-                c,
-                classes: &classes,
-                cls: ci,
-                locals,
-            };
+            let p = Pairing { c, classes: &classes, cls: ci, locals };
             let Some(body) = c.tree.child(m, Body) else { continue };
             for e in crate::support::statements::subtree(c, body) {
                 match c.kind(e) {

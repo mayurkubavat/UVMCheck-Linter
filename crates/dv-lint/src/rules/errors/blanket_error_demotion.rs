@@ -3,12 +3,12 @@
 //! overrides/actions that disable UVM_ERROR or UVM_FATAL for every ID (Pylint
 //! W0718 broad-exception-caught).
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind::*;
-use crate::support::routine_bodies::{bodies, calls_in};
 use crate::support::class_roles::{role, Index, Role};
+use crate::support::routine_bodies::{bodies, calls_in};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind::*;
 
 fn is_error_severity(a: &str) -> bool {
     a.contains("UVM_ERROR") || a.contains("UVM_FATAL")

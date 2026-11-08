@@ -1,10 +1,10 @@
 //! SV-STY-009 (ExternMethodThreshold): Enforces 'extern' declaration for class
 //! methods exceeding N lines of code (default: 5 lines).
 
+use crate::support::source_layout::{routine_name, routines, Buffers};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::source_layout::{Buffers, routine_name, routines};
 
 pub(crate) fn extern_method_threshold(c: &Cst, s: &mut Sink) {
     const THRESHOLD: u32 = 5;

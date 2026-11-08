@@ -2,12 +2,12 @@
 //! variable whose name is negative (disable_*, no_*, not_*, skip_*, inhibit_*,
 //! ...).
 
-use sv_syntax::SyntaxKind::*;
-use crate::support::slang_ast::kids;
 use crate::expr_types::expr_types;
+use crate::support::config_db_calls::{strip, user_visits, with_parens};
+use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::config_db_calls::{strip, user_visits, with_parens};
+use sv_syntax::SyntaxKind::*;
 
 /// The words of a name: split at `_`, digits and lower-to-upper case steps,
 /// lowercased.
@@ -33,7 +33,8 @@ fn ident_words(name: &str) -> Vec<String> {
 }
 
 fn negative_name(name: &str) -> bool {
-    const NEG: &[&str] = &["disable", "disabled", "dis", "no", "not", "inhibit", "skip", "ignore", "without", "non", "suppress"];
+    const NEG: &[&str] =
+        &["disable", "disabled", "dis", "no", "not", "inhibit", "skip", "ignore", "without", "non", "suppress"];
     ident_words(name).iter().any(|w| NEG.contains(&w.as_str()))
 }
 
@@ -43,10 +44,15 @@ fn user_variable(c: &Cst, d: &crate::support::slang_ast::Decl) -> bool {
     match d.kind {
         Property | Local => true,
         Static => {
-            const NETS: &[&str] = &["wire", "tri", "wand", "wor", "triand", "trior", "tri0", "tri1", "supply0", "supply1", "uwire", "trireg"];
+            const NETS: &[&str] = &[
+                "wire", "tri", "wand", "wor", "triand", "trior", "tri0", "tri1", "supply0", "supply1", "uwire",
+                "trireg",
+            ];
             // The declaration holding the declarator.
             let Some(holder) = c.parent(d.node) else { return false };
-            if c.toks(holder).any(|t| NETS.contains(&c.text_of(t))) || d.dtype.is_some_and(|t| c.toks(t).any(|t| NETS.contains(&c.text_of(t)))) {
+            if c.toks(holder).any(|t| NETS.contains(&c.text_of(t)))
+                || d.dtype.is_some_and(|t| c.toks(t).any(|t| NETS.contains(&c.text_of(t))))
+            {
                 return false;
             }
             // A port without a data type is a net.
@@ -56,7 +62,10 @@ fn user_variable(c: &Cst, d: &crate::support::slang_ast::Decl) -> bool {
                 if toks.iter().any(|t| matches!(*t, "input" | "inout")) && !toks.contains(&"var") {
                     return false;
                 }
-                return d.dtype.and_then(|t| c.first_tok(t)).is_some_and(|f| !matches!(c.text_of(f), "signed" | "unsigned" | "["));
+                return d
+                    .dtype
+                    .and_then(|t| c.first_tok(t))
+                    .is_some_and(|f| !matches!(c.text_of(f), "signed" | "unsigned" | "["));
             }
             true
         }

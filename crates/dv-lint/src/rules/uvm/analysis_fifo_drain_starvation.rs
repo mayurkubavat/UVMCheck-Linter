@@ -4,14 +4,14 @@
 //! phases, causing unbounded simulation heap memory growth and fatal bad_alloc
 //! crashes.
 
-use std::collections::HashSet;
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use crate::support::uvm_classes::{call_name, calls_in, is_component, Ix};
 use crate::support::uvm_syntax::routine_last_name;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, call_name, calls_in, is_component};
 
 pub(crate) fn fifo_drain_starvation(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);

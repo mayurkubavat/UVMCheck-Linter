@@ -359,7 +359,15 @@ impl Preprocessor {
         self.out.timescales.push((0, self.time_unit));
         while let Some(t) = self.next() {
             let written = t.written.unwrap_or(t.origin);
-            self.out.tokens.push(PpToken { kind: t.kind, text: t.text, origin: t.origin, from_macro: t.from_macro, written, space_before: t.space_before, from_arg: t.from_arg });
+            self.out.tokens.push(PpToken {
+                kind: t.kind,
+                text: t.text,
+                origin: t.origin,
+                from_macro: t.from_macro,
+                written,
+                space_before: t.space_before,
+                from_arg: t.from_arg,
+            });
         }
         if !self.conds.is_empty() {
             self.diag(Origin { file: id, offset: src.len() as u32 }, "missing `endif".into());
@@ -516,13 +524,17 @@ impl Preprocessor {
                 }
                 "__LINE__" => {
                     let line = self.line_of(t.origin);
-                    return Some(T { kind: Kind::IntegerLiteral, text: Arc::from(line.to_string()), from_macro: true, ..t });
+                    return Some(T {
+                        kind: Kind::IntegerLiteral,
+                        text: Arc::from(line.to_string()),
+                        from_macro: true,
+                        ..t
+                    });
                 }
                 "begin_keywords" => {
                     let spec = self.line_next();
-                    let v = spec.as_ref().and_then(|s| {
-                        sv_lexer::KeywordVersion::from_specifier(s.text.trim_matches('"'))
-                    });
+                    let v =
+                        spec.as_ref().and_then(|s| sv_lexer::KeywordVersion::from_specifier(s.text.trim_matches('"')));
                     match v {
                         Some(v) => self.keyword_versions.push(v),
                         None => self.diag(t.origin, "unknown `begin_keywords version".into()),
@@ -583,8 +595,14 @@ impl Preprocessor {
     /// Slang does.
     fn directive_args(&mut self, d: &T, name: &str) {
         match name {
-            "resetall" | "celldefine" | "endcelldefine" | "nounconnected_drive" | "delay_mode_distributed"
-            | "delay_mode_path" | "delay_mode_unit" | "delay_mode_zero" => {}
+            "resetall"
+            | "celldefine"
+            | "endcelldefine"
+            | "nounconnected_drive"
+            | "delay_mode_distributed"
+            | "delay_mode_path"
+            | "delay_mode_unit"
+            | "delay_mode_zero" => {}
             "default_nettype" | "default_decay_time" | "default_trireg_strength" => {
                 if self.line_next().is_none() {
                     self.diag(d.origin, format!("`{name} needs a value"));
@@ -952,7 +970,8 @@ impl Preprocessor {
             .into_iter()
             .map(|a| if a.iter().any(|t| t.kind == Kind::Directive) { self.expand_list(a, name) } else { a })
             .collect();
-        let names: Vec<&str> = m.params.as_ref().map(|p| p.iter().map(|(n, _)| n.as_str()).collect()).unwrap_or_default();
+        let names: Vec<&str> =
+            m.params.as_ref().map(|p| p.iter().map(|(n, _)| n.as_str()).collect()).unwrap_or_default();
         let mut toks = self.substitute(use_tok, &m.body, &names, &args);
         // The expansion's first token takes the use's spacing when the use is
         // itself inside an expansion, none at the top level.
@@ -1034,7 +1053,14 @@ impl Preprocessor {
 
     fn substitute(&self, use_tok: &T, body: &[T], names: &[&str], args: &[Vec<T>]) -> Vec<T> {
         let origin = use_tok.origin;
-        let mark = |t: &T, space: bool| T { origin, from_macro: true, space_before: space, newline_before: false, from_arg: false, ..t.clone() };
+        let mark = |t: &T, space: bool| T {
+            origin,
+            from_macro: true,
+            space_before: space,
+            newline_before: false,
+            from_arg: false,
+            ..t.clone()
+        };
         let param = |s: &str| names.iter().position(|n| *n == s);
         let mut out: Vec<T> = Vec::new();
         let mut i = 0;
@@ -1142,7 +1168,8 @@ impl Preprocessor {
                     }
                     let mut re = lex_to_t(&glued, origin.file, true, Some(origin));
                     // Placed where the left half was written, as slang does.
-                    let written = left.as_ref().and_then(|l| l.written).or_else(|| next.first().and_then(|n| n.written));
+                    let written =
+                        left.as_ref().and_then(|l| l.written).or_else(|| next.first().and_then(|n| n.written));
                     for (n, r) in re.iter_mut().enumerate() {
                         r.written = written;
                         if n == 0 {
@@ -1155,7 +1182,9 @@ impl Preprocessor {
                     i += 2;
                     continue;
                 }
-                Kind::MacroEscapedQuote => out.push(T { kind: Kind::Punct, text: Arc::from("\""), ..mark(t, t.space_before) }),
+                Kind::MacroEscapedQuote => {
+                    out.push(T { kind: Kind::Punct, text: Arc::from("\""), ..mark(t, t.space_before) })
+                }
                 _ => match param(&t.text) {
                     Some(k) if t.kind == Kind::Identifier || t.kind == Kind::Keyword => {
                         if args[k].is_empty() {
@@ -1202,9 +1231,10 @@ mod tests {
 
     #[test]
     fn object_and_function_macros() {
-        assert_eq!(pp("`define A 1\n`define F(x, y=2) (x+y)\na=`A; b=`F(3); c=`F(4,5);"), [
-            "a", "=", "1", ";", "b", "=", "(", "3", "+", "2", ")", ";", "c", "=", "(", "4", "+", "5", ")", ";"
-        ]);
+        assert_eq!(
+            pp("`define A 1\n`define F(x, y=2) (x+y)\na=`A; b=`F(3); c=`F(4,5);"),
+            ["a", "=", "1", ";", "b", "=", "(", "3", "+", "2", ")", ";", "c", "=", "(", "4", "+", "5", ")", ";"]
+        );
     }
 
     #[test]
@@ -1237,7 +1267,10 @@ mod tests {
 
     #[test]
     fn multi_line_define_and_undef() {
-        assert_eq!(pp("`define M(a) \\\n  begin \\\n    a; \\\n  end\n`M(x)\n`undef M\n`ifdef M y `endif"), ["begin", "x", ";", "end"]);
+        assert_eq!(
+            pp("`define M(a) \\\n  begin \\\n    a; \\\n  end\n`M(x)\n`undef M\n`ifdef M y `endif"),
+            ["begin", "x", ";", "end"]
+        );
     }
 }
 

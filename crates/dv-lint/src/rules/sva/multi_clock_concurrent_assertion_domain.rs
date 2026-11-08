@@ -2,10 +2,10 @@
 //! assertions mixing multiple asynchronous clock domains without formal CDC
 //! qualification.
 
-use std::collections::BTreeSet;
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::BTreeSet;
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn multi_clock(c: &Cst, s: &mut Sink) {

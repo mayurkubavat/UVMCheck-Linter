@@ -20,11 +20,31 @@ mod values;
 
 pub(crate) fn rules() -> Vec<Rule> {
     vec![
-        Rule { id: "SV-RND-030", name: "ContradictoryConstraints", check: Check::Mixed(contradictory_constraints::contradictory_constraints) },
-        Rule { id: "SV-RND-031", name: "SoftConstraintNeverHolds", check: Check::Mixed(soft_constraint_never_holds::soft_never_holds) },
+        Rule {
+            id: "SV-RND-030",
+            name: "ContradictoryConstraints",
+            check: Check::Mixed(contradictory_constraints::contradictory_constraints),
+        },
+        Rule {
+            id: "SV-RND-031",
+            name: "SoftConstraintNeverHolds",
+            check: Check::Mixed(soft_constraint_never_holds::soft_never_holds),
+        },
         Rule { id: "SV-RND-032", name: "DeadDistItem", check: Check::Mixed(dead_dist_item::dead_dist_item) },
-        Rule { id: "SV-COV-018", name: "CrossBinCountTooLarge", check: Check::Syntax(cross_bin_count::cross_bin_count) },
-        Rule { id: "SV-RCE-002", name: "ClockedBlockingRace", check: Check::Syntax(clocked_blocking_race::clocked_blocking_race) },
-        Rule { id: "DPI-PRT-001", name: "ConflictingDpiPrototypes", check: Check::Mixed(conflicting_dpi_prototypes::conflicting_dpi_prototypes) },
+        Rule {
+            id: "SV-COV-018",
+            name: "CrossBinCountTooLarge",
+            check: Check::Syntax(cross_bin_count::cross_bin_count),
+        },
+        Rule {
+            id: "SV-RCE-002",
+            name: "ClockedBlockingRace",
+            check: Check::Syntax(clocked_blocking_race::clocked_blocking_race),
+        },
+        Rule {
+            id: "DPI-PRT-001",
+            name: "ConflictingDpiPrototypes",
+            check: Check::Mixed(conflicting_dpi_prototypes::conflicting_dpi_prototypes),
+        },
     ]
 }

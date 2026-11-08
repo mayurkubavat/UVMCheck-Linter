@@ -1,11 +1,11 @@
 //! SV-LANG-004 (PartSelectReversed): Detects reversed or inverted part-select
 //! slicing on vectors (e.g. vec[0:7] on logic [7:0] vec).
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::literal_values::int_value;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::literal_values::{int_value};
 
 /// slang's RangeSelectReversed diagnostic (the select itself does not
 /// bind), once per select, at its left bound.

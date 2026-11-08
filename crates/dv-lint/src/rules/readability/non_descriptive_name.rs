@@ -2,15 +2,16 @@
 //! routines longer than min_lines (default 10), named tmp, temp, val, obj, foo,
 //! d, t and the like (with or without a number; locals also data and value).
 
-use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
+use crate::support::class_docs::{class_methods, properties, Classes};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_docs::{Classes, class_methods, properties};
 
 fn is_generic_name(name: &str, local: bool) -> bool {
-    const STEMS: [&str; 13] = ["tmp", "temp", "val", "obj", "foo", "bar", "baz", "var", "thing", "stuff", "dummy", "d", "t"];
+    const STEMS: [&str; 13] =
+        ["tmp", "temp", "val", "obj", "foo", "bar", "baz", "var", "thing", "stuff", "dummy", "d", "t"];
     let mut n = name.to_ascii_lowercase();
     while n.len() > 1 && n.ends_with(|ch: char| ch.is_ascii_digit()) {
         n.pop();
@@ -37,7 +38,9 @@ fn locals(c: &Cst, routine: NodeId) -> Vec<(String, u32)> {
     let mut stack = vec![body];
     while let Some(n) = stack.pop() {
         if c.kind(n) == DataDecl {
-            let in_for_init = c.parent(n).is_some_and(|p| c.kind(p) == LoopStmt && c.keyword(p).is_some_and(|k| c.text_of(k) == "for"));
+            let in_for_init = c
+                .parent(n)
+                .is_some_and(|p| c.kind(p) == LoopStmt && c.keyword(p).is_some_and(|k| c.text_of(k) == "for"));
             if !in_for_init {
                 for dd in c.tree.children(n).filter(|&x| c.kind(x) == Declarator) {
                     let Some(nm) = c.tree.child(dd, Name) else { continue };

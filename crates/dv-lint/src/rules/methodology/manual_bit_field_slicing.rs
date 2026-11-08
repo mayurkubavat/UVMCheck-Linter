@@ -1,14 +1,14 @@
 //! SV-CNS-005 (ManualBitFieldSlicing): Flags a vector that is cut into three or
 //! more different fixed part-selects (hdr[7:0], hdr[15:8], hdr[31:16]).
 
-use std::collections::{BTreeSet, HashMap};
-use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
 use crate::support::class_roles::{Index, Typedefs};
+use crate::support::string_codes::{referenced, typedef_base, user_routines, Sym, SymInfo};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use std::collections::{BTreeSet, HashMap};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::string_codes::{Sym, SymInfo, referenced, typedef_base, user_routines};
 
 /// An integral type that is not a struct or packed union.
 fn is_integral_type(td: &Typedefs, ty: &str) -> bool {
@@ -17,7 +17,9 @@ fn is_integral_type(td: &Typedefs, ty: &str) -> bool {
         return false;
     }
     const BASES: &[&str] = &["bit", "logic", "reg", "byte", "shortint", "int", "longint", "integer", "time", "enum"];
-    BASES.iter().any(|b| t.strip_prefix(b).is_some_and(|rest| !rest.starts_with(|ch: char| ch.is_ascii_alphanumeric() || ch == '_')))
+    BASES.iter().any(|b| {
+        t.strip_prefix(b).is_some_and(|rest| !rest.starts_with(|ch: char| ch.is_ascii_alphanumeric() || ch == '_'))
+    })
 }
 
 pub(crate) fn manual_bit_field_slicing(d: &Design, csts: &[Cst], out: &mut Sink) {

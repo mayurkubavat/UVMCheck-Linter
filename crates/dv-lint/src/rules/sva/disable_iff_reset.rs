@@ -2,9 +2,9 @@
 //! declarations must include a 'disable iff (!rst_n)' clause to gate checking
 //! during power-on reset and warm resets, avoiding false-failure storms.
 
-use sv_syntax::NodeId;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 fn has_disable(c: &Cst, n: NodeId) -> bool {

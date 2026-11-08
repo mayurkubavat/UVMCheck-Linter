@@ -2,11 +2,11 @@
 //! value-returning routines ($sformatf, $realtime, len, toupper, sum) used as
 //! standalone statements where the result is discarded.
 
-use sv_syntax::SyntaxKind;
+use crate::support::statements::exprs;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::statements::{exprs};
 
 pub(crate) fn unused_pure_result(c: &Cst, s: &mut Sink) {
     for st in c.nodes(ExprStmt) {

@@ -2,10 +2,10 @@
 //! calls without a matching 'phase.drop_objection()' in the same task or
 //! method.
 
+use crate::support::uvm_syntax::{body_items, callee, routine_last_name, routines, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::uvm_syntax::{body_items, callee, routine_last_name, routines, subtree};
 
 pub(crate) fn phase_objection_mismatch(c: &Cst, s: &mut Sink) {
     for f in routines(c) {

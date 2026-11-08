@@ -1,10 +1,10 @@
 //! SVA-CYC-001 (SvaUnboundedDelay): Disallow unbounded cycle delays (##[1:$])
 //! in SVA sequences.
 
+use crate::support::spans::span;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::spans::{span};
 
 pub(crate) fn unbounded_delay(c: &Cst, s: &mut Sink) {
     for n in c.nodes(TimingControl) {

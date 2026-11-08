@@ -2,14 +2,14 @@
 //! three or more component handles (env.agt.drv.vif), outside connect_phase
 //! wiring (PMD LawOfDemeter, Fowler 'message chains').
 
-use std::collections::HashSet;
-use sv_syntax::SyntaxKind;
-use crate::support::statements::*;
 use crate::support::class_index::*;
+use crate::support::class_metrics::{globals, is_method_ref, Env, Ty};
+use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::class_metrics::{Env, Ty, globals, is_method_ref};
 
 pub(crate) fn hierarchy_reach_through(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);
@@ -23,8 +23,7 @@ pub(crate) fn hierarchy_reach_through(c: &Cst, s: &mut Sink) {
             let Some(body) = m.body else { continue };
             let env = Env::new(c, &classes, Some(i), Some(m.decl), &g);
             let is_component = |t: &Option<Ty>| {
-                t.as_ref()
-                    .is_some_and(|t| !t.array && t.class.is_some_and(|k| classes.role(k).is_component()))
+                t.as_ref().is_some_and(|t| !t.array && t.class.is_some_and(|k| classes.role(k).is_component()))
             };
             let mut inner: HashSet<u32> = HashSet::new();
             for top in subtree(c, body) {

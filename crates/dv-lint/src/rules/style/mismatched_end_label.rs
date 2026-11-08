@@ -1,9 +1,9 @@
 //! SV-STY-006 (MismatchedEndLabel): Flags mismatched end labels on functions,
 //! tasks, and classes (e.g., function void foo(); ... endfunction : bar).
 
+use crate::support::source_layout::{classes, end_and_label, routine_name, routines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::source_layout::{classes, end_and_label, routine_name, routines};
 
 pub(crate) fn mismatched_end_label(c: &Cst, s: &mut Sink) {
     for (n, _) in routines(c) {

@@ -1,10 +1,10 @@
 //! SV-RND-001 (UncheckedRandomize): The return value of randomize() must be
 //! checked.
 
+use crate::support::class_items::{call_name, strip_casts};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_items::{call_name, strip_casts};
 
 pub(crate) fn unchecked_randomize(c: &Cst, s: &mut Sink) {
     for st in c.nodes(ExprStmt) {

@@ -13,8 +13,6 @@ use crate::support::routine_metrics::routine_metrics;
 
 use crate::syntax::Cst;
 
-
-
 use SyntaxKind::*;
 
 /// A resolved type: its name (through typedefs), the class it is, and
@@ -49,10 +47,7 @@ pub(crate) fn globals(c: &Cst) -> HashMap<String, (Option<NodeId>, bool)> {
     let mut out = HashMap::new();
     for d in c.nodes(DataDecl) {
         let Some(p) = c.parent(d) else { continue };
-        if !matches!(
-            c.kind(p),
-            SourceFile | PackageDecl | ModuleDecl | InterfaceDecl | ProgramDecl
-        ) {
+        if !matches!(c.kind(p), SourceFile | PackageDecl | ModuleDecl | InterfaceDecl | ProgramDecl) {
             continue;
         }
         let ty = c.tree.child(d, DataType);
@@ -96,24 +91,14 @@ impl<'a, 'c> Env<'a, 'c> {
                 }
             }
         }
-        Env {
-            c,
-            classes,
-            class,
-            locals,
-            globals,
-        }
+        Env { c, classes, class, locals, globals }
     }
 
     pub fn ty_of(&self, ty: Option<NodeId>, array: bool) -> Option<Ty> {
         let ty = ty?;
         let name = type_name(self.c, ty)?;
         let class = self.classes.find(&name);
-        Some(Ty {
-            name: self.classes.resolve_name(&name),
-            class,
-            array,
-        })
+        Some(Ty { name: self.classes.resolve_name(&name), class, array })
     }
 
     /// The type of a name and where it was declared.
@@ -174,19 +159,11 @@ impl<'a, 'c> Env<'a, 'c> {
                 let t = c.toks(e).next().map(|t| c.text_of(t))?;
                 if t == "this" {
                     let i = self.class?;
-                    return Some(Ty {
-                        name: self.classes.list[i].name.clone(),
-                        class: Some(i),
-                        array: false,
-                    });
+                    return Some(Ty { name: self.classes.list[i].name.clone(), class: Some(i), array: false });
                 }
                 if t == "super" {
                     let b = self.classes.base(self.class?)?;
-                    return Some(Ty {
-                        name: self.classes.list[b].name.clone(),
-                        class: Some(b),
-                        array: false,
-                    });
+                    return Some(Ty { name: self.classes.list[b].name.clone(), class: Some(b), array: false });
                 }
                 self.lookup(ident(c, e)?).map(|(t, _)| t)
             }
@@ -215,11 +192,7 @@ impl<'a, 'c> Env<'a, 'c> {
                 let t = c.tree.children(e).next()?;
                 let name = c.tree.bare_text(t);
                 let class = self.classes.find(&name);
-                class.map(|k| Ty {
-                    name: self.classes.list[k].name.clone(),
-                    class: Some(k),
-                    array: false,
-                })
+                class.map(|k| Ty { name: self.classes.list[k].name.clone(), class: Some(k), array: false })
             }
             _ => None,
         }
@@ -293,11 +266,7 @@ pub(crate) fn prev_sibling_decl(c: &Cst, d: NodeId) -> Option<NodeId> {
     let p = c.parent(d)?;
     let kids: Vec<NodeId> = c.tree.children(p).collect();
     let i = kids.iter().position(|&x| x == d)?;
-    kids[..i]
-        .iter()
-        .rev()
-        .copied()
-        .find(|&x| c.kind(x) == DataDecl && c.tree.child(x, DataType).is_some())
+    kids[..i].iter().rev().copied().find(|&x| c.kind(x) == DataDecl && c.tree.child(x, DataType).is_some())
 }
 
 /// `a.m` as the callee of a call is a method reference, not a member access.
@@ -366,9 +335,7 @@ impl Usage<'_, '_, '_> {
             match c.kind(x) {
                 NameExpr => {
                     // Callees are calls, not values.
-                    if c.parent(x)
-                        .is_some_and(|p| c.kind(p) == CallExpr && c.tree.children(p).next() == Some(x))
-                    {
+                    if c.parent(x).is_some_and(|p| c.kind(p) == CallExpr && c.tree.children(p).next() == Some(x)) {
                         continue;
                     }
                     let Some(name) = ident(c, x) else { continue };
@@ -409,11 +376,7 @@ impl Usage<'_, '_, '_> {
                         }
                     }
                     let t = match self.env.factory_create(x) {
-                        Some(k) => Some(Ty {
-                            name: classes.list[k].name.clone(),
-                            class: Some(k),
-                            array: false,
-                        }),
+                        Some(k) => Some(Ty { name: classes.list[k].name.clone(), class: Some(k), array: false }),
                         None => self.env.expr_type(x),
                     };
                     self.note(t);

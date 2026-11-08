@@ -3,11 +3,11 @@
 //! without a deterministic drop path, leaving orphan objections that hang
 //! simulation phases.
 
-use dv_model::Design;
+use crate::support::uvm_classes::{block_stmts, call_name, calls_in, is_join_none, is_sequence, Ix};
 use crate::support::uvm_syntax::subtree;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::uvm_classes::{Ix, block_stmts, call_name, calls_in, is_join_none, is_sequence};
+use dv_model::Design;
 
 pub(crate) fn orphan_objection(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);

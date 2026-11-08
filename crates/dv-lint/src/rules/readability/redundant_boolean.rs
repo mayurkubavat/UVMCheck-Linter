@@ -2,21 +2,24 @@
 //! and 'if (c) return 1; else return 0;' (Sonar S1125, clang-tidy
 //! readability-simplify-boolean-expr).
 
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
-use crate::support::slang_ast::kids;
 use crate::expr_types::expr_types;
+use crate::support::config_db_calls::{bool_literal, in_generate_header, strip, user_visits, with_parens};
+use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::config_db_calls::{bool_literal, in_generate_header, strip, user_visits, with_parens};
+use sv_syntax::NodeId;
+use sv_syntax::SyntaxKind::*;
 
 /// A statement under `begin ... end` blocks of one statement.
 fn unwrap_stmt(c: &Cst, mut s: NodeId) -> NodeId {
     while c.kind(s) == SeqBlock {
         let items = c.items(s);
-        let stmts: Vec<NodeId> = items.iter().copied().filter(|&x| crate::support::statements::stmt(c, x).is_some()).collect();
+        let stmts: Vec<NodeId> =
+            items.iter().copied().filter(|&x| crate::support::statements::stmt(c, x).is_some()).collect();
         match stmts.as_slice() {
-            [one] if crate::support::statements::stmt(c, *one) != Some(crate::support::statements::St::Decl) => s = *one,
+            [one] if crate::support::statements::stmt(c, *one) != Some(crate::support::statements::St::Decl) => {
+                s = *one
+            }
             _ => break,
         }
     }

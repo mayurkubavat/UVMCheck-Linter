@@ -12,12 +12,11 @@ use dv_model::{Class, ClassId, Design, Loc};
 use sv_syntax::{NodeId, SyntaxKind};
 
 use crate::support::uvm_syntax::{
-    arg_list, callee, class_routines, decl_name, enclosing_class,
-    name_node, ordered_expr, params, routine_last_name, subtree, trim_ws,
+    arg_list, callee, class_routines, decl_name, enclosing_class, name_node, ordered_expr, params, routine_last_name,
+    subtree, trim_ws,
 };
 
 use crate::syntax::Cst;
-
 
 use crate::{Severity, Sink};
 
@@ -273,7 +272,8 @@ pub(crate) fn calls_in(c: &Cst, n: NodeId) -> Vec<NodeId> {
         .filter(|&x| match c.kind(x) {
             CallExpr => true,
             NameExpr => {
-                c.parent(x).is_some_and(|p| c.kind(p) == ExprStmt) && c.first_tok(x).is_some_and(|t| c.text_of(t).starts_with('$'))
+                c.parent(x).is_some_and(|p| c.kind(p) == ExprStmt)
+                    && c.first_tok(x).is_some_and(|t| c.text_of(t).starts_with('$'))
             }
             _ => false,
         })
@@ -578,7 +578,15 @@ pub(crate) fn int_value(text: &str) -> Option<u128> {
     t.parse().ok()
 }
 
-pub(crate) fn unused(d: &Design, csts: &[Cst], s: &mut Sink, role: Role, id: &'static str, name: &'static str, noun: &str) {
+pub(crate) fn unused(
+    d: &Design,
+    csts: &[Cst],
+    s: &mut Sink,
+    role: Role,
+    id: &'static str,
+    name: &'static str,
+    noun: &str,
+) {
     let ix = Ix::new(d, csts);
     let users = user_classes(d);
     if !users.iter().any(|c| class_role(d, c.id) == Role::Test) {

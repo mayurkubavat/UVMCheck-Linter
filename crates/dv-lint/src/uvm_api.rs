@@ -176,7 +176,8 @@ impl Reader<'_> {
                 Some(Json::Null)
             }
             _ => {
-                while self.i < self.s.len() && matches!(self.s[self.i], b'-' | b'+' | b'.' | b'e' | b'E' | b'0'..=b'9') {
+                while self.i < self.s.len() && matches!(self.s[self.i], b'-' | b'+' | b'.' | b'e' | b'E' | b'0'..=b'9')
+                {
                     self.i += 1;
                 }
                 Some(Json::Num)
@@ -236,7 +237,9 @@ fn packs() -> &'static [ApiPack] {
     static PACKS: OnceLock<Vec<ApiPack>> = OnceLock::new();
     PACKS.get_or_init(|| {
         let mut v: Vec<ApiPack> = match std::env::var("UVMCHECK_UVM_API_PACK") {
-            Ok(path) if !path.is_empty() => std::fs::read_to_string(&path).ok().and_then(|t| parse(&t)).into_iter().collect(),
+            Ok(path) if !path.is_empty() => {
+                std::fs::read_to_string(&path).ok().and_then(|t| parse(&t)).into_iter().collect()
+            }
             _ => EMBEDDED.iter().filter_map(|t| parse(t)).collect(),
         };
         v.sort_by_key(|p| version_key(&p.version));
@@ -281,4 +284,3 @@ pub(crate) fn for_version(version: Option<&str>) -> Option<&'static ApiPack> {
     }
     all.iter().rev().find(|p| line_of(&p.version) == line_of(&v)).or(all.last())
 }
-

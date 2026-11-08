@@ -1,11 +1,11 @@
 //! UVM-RUS-004 (AbsoluteConfigDbPath): Flags uvm_config_db calls in classes
 //! whose path starts at uvm_test_top.
 
-use dv_model::Design;
 use crate::support::class_roles::{role, role_name, Index, Role};
+use crate::support::routine_bodies::{bodies, calls_in, is_config_db_call, Calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::routine_bodies::{Calls, bodies, calls_in, is_config_db_call};
+use dv_model::Design;
 
 pub(crate) fn absolute_config_db_path(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);

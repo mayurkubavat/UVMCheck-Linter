@@ -23,10 +23,9 @@ pub struct Sources {
 
 impl Sources {
     fn line(&mut self, file: &str, line: u32) -> Option<&str> {
-        let lines = self
-            .files
-            .entry(file.to_string())
-            .or_insert_with(|| std::fs::read(file).ok().map(|b| String::from_utf8_lossy(&b).lines().map(str::to_string).collect()));
+        let lines = self.files.entry(file.to_string()).or_insert_with(|| {
+            std::fs::read(file).ok().map(|b| String::from_utf8_lossy(&b).lines().map(str::to_string).collect())
+        });
         lines.as_ref()?.get((line as usize).checked_sub(1)?).map(String::as_str)
     }
 

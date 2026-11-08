@@ -2,8 +2,8 @@
 //! build_phase, connect_phase) must not consume simulation time using delays
 //! (#), event controls (@), or wait statements.
 
-use dv_model::{Design, PhaseKind};
 use crate::{Severity, Sink};
+use dv_model::{Design, PhaseKind};
 
 pub(crate) fn uvm_time_in_function_phase(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

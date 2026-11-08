@@ -2,14 +2,24 @@
 //! $display/$write/$strobe calls inside UVM classes (components, objects,
 //! sequences).
 
-use dv_model::Design;
+use crate::support::uvm_classes::{call_name, calls_in, derived, is_component, is_sequence, Ix};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::uvm_classes::{Ix, call_name, calls_in, derived, is_component, is_sequence};
+use dv_model::Design;
 
 const DISPLAYS: [&str; 12] = [
-    "$display", "$displayh", "$displayb", "$displayo", "$write", "$writeh", "$writeb", "$writeo", "$strobe", "$strobeh",
-    "$strobeb", "$strobeo",
+    "$display",
+    "$displayh",
+    "$displayb",
+    "$displayo",
+    "$write",
+    "$writeh",
+    "$writeb",
+    "$writeo",
+    "$strobe",
+    "$strobeh",
+    "$strobeb",
+    "$strobeo",
 ];
 
 pub(crate) fn display_in_uvm(d: &Design, csts: &[Cst], s: &mut Sink) {

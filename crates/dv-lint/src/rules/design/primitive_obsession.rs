@@ -2,13 +2,13 @@
 //! item or config that a constraint limits to a list of 3 to 16 single constant
 //! values ('x inside {0, 1, 2}').
 
-use std::collections::HashSet;
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::class_index::{referenced_name, Classes, Role};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::class_index::{Classes, Role, referenced_name};
 
 pub(crate) fn primitive_obsession(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);
@@ -83,10 +83,7 @@ fn multi_bit_integral(c: &Cst, ty: NodeId) -> bool {
     };
     match first {
         "int" | "integer" | "shortint" | "longint" | "byte" => true,
-        "bit" | "logic" | "reg" => c
-            .tree
-            .children(ty)
-            .any(|d| c.kind(d) == Dim && dim_wider_than_one(c, d)),
+        "bit" | "logic" | "reg" => c.tree.children(ty).any(|d| c.kind(d) == Dim && dim_wider_than_one(c, d)),
         _ => false,
     }
 }

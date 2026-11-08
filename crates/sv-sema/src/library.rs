@@ -52,9 +52,7 @@ pub fn instantiated(tree: &Tree) -> BTreeSet<String> {
 pub fn find_in_dirs(name: &str, dirs: &[PathBuf], exts: &[String]) -> Option<PathBuf> {
     let none = [String::new()];
     let exts = if exts.is_empty() { &none[..] } else { exts };
-    dirs.iter()
-        .flat_map(|d| exts.iter().map(move |e| d.join(format!("{name}{e}"))))
-        .find(|p| p.is_file())
+    dirs.iter().flat_map(|d| exts.iter().map(move |e| d.join(format!("{name}{e}")))).find(|p| p.is_file())
 }
 
 /// Parses the library files the sources need and appends them to `trees`,

@@ -1,9 +1,9 @@
 //! UVM-ROL-005 (MonitorDependsOnActivePath): Flags monitors that hold a handle
 //! to a driver, sequencer or sequence item port.
 
-use dv_model::Design;
 use crate::support::class_roles::{property_class, role, user_classes, Role};
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn monitor_depends_on_active_path(d: &Design, out: &mut Sink) {
     for cls in user_classes(d) {

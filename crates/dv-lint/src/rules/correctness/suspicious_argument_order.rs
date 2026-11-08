@@ -3,16 +3,16 @@
 //! write(len, addr) for write(addr, len) (clang-tidy
 //! readability-suspicious-call-argument, Sonar S2234).
 
-use std::collections::HashMap;
-use sv_syntax::NodeId;
 use crate::support::class_items::{declarators, user_code};
-use crate::support::type_text::expr_text;
 use crate::support::data_items::unparen;
+use crate::support::real_types::Types;
 use crate::support::sema_facts::ast_ok;
+use crate::support::type_text::expr_text;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashMap;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::real_types::{Types};
 
 /// The formal arguments of a routine, in order: name and declared type
 /// text (carried over from the previous port when left out).

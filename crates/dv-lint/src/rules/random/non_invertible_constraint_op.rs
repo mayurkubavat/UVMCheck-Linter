@@ -1,10 +1,10 @@
 //! SV-RND-008 (NonInvertibleConstraintOp): Disallow non-invertible operators
 //! (%, /, **) inside constraint blocks.
 
+use crate::support::class_items::{class_items, decl_name, model_classes, op, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::class_items::{class_items, decl_name, model_classes, op, subtree};
 
 pub(crate) fn non_invertible_op(c: &Cst, s: &mut Sink) {
     for (cls, _) in model_classes(c) {

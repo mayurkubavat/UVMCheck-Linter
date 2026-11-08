@@ -2,14 +2,14 @@
 //! least 50 tokens) that appear in more than one place, also when variables and
 //! literals were renamed consistently.
 
-use std::collections::{HashMap, HashSet};
-use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
 use crate::support::routine_bodies::is_stmt;
+use crate::support::written_tokens::{in_define, tok_where, token_key, written_tokens, Generated, NormToken};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Design, Loc};
+use std::collections::{HashMap, HashSet};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::written_tokens::{Generated, NormToken, in_define, tok_where, token_key, written_tokens};
 
 /// `file:line` of where a node starts (where its macro was used), as the
 /// C++ `where()` prints it.

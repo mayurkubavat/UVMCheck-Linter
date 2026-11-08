@@ -2,11 +2,13 @@
 //! same variable where the initial value is immediately overwritten without
 //! being read.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::statements::{
+    ancestors_or_self, assignment, has_error, ident, list, report, start, statement_lists, subtree, Units,
+};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::statements::{Units, ancestors_or_self, assignment, has_error, ident, list, report, start, statement_lists, subtree};
 
 pub(crate) fn dead_store(c: &Cst, s: &mut Sink) {
     let units = Units::new(c);
@@ -84,10 +86,7 @@ fn bad_bodies(c: &Cst, lists: &[NodeId]) -> std::collections::HashSet<u32> {
             }
             let mut root = st;
             while let Some(p) = c.parent(root) {
-                if matches!(
-                    c.kind(p),
-                    ProceduralBlock | FunctionDecl | TaskDecl | ClassDecl | ModuleDecl
-                ) {
+                if matches!(c.kind(p), ProceduralBlock | FunctionDecl | TaskDecl | ClassDecl | ModuleDecl) {
                     break;
                 }
                 root = p;
@@ -106,13 +105,8 @@ fn enum_typed(c: &Cst, n: NodeId, name: &str) -> bool {
             return true;
         }
         c.nodes(TypedefDecl).into_iter().any(|td| {
-            c.tree
-                .child(td, Name)
-                .is_some_and(|nm| c.tree.bare_text(nm) == c.text_of(t))
-                && c.tree
-                    .child(td, DataType)
-                    .and_then(|d| c.first_tok(d))
-                    .is_some_and(|f| c.text_of(f) == "enum")
+            c.tree.child(td, Name).is_some_and(|nm| c.tree.bare_text(nm) == c.text_of(t))
+                && c.tree.child(td, DataType).and_then(|d| c.first_tok(d)).is_some_and(|f| c.text_of(f) == "enum")
         })
     };
     let mut x = Some(n);
@@ -139,6 +133,5 @@ fn reads_name(c: &Cst, x: NodeId, name: &str) -> bool {
         return false;
     }
     // The callee of `name(...)` is a call, not a value.
-    !c.parent(x)
-        .is_some_and(|p| c.kind(p) == CallExpr && c.tree.children(p).next() == Some(x))
+    !c.parent(x).is_some_and(|p| c.kind(p) == CallExpr && c.tree.children(p).next() == Some(x))
 }

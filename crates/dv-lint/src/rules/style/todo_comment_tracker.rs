@@ -1,10 +1,10 @@
 //! SV-STY-003 (TodoCommentTracker): Tracks unresolved TODO, FIXME, ICEBOX,
 //! HACK, and XXX comment markers across the codebase.
 
-use sv_sema::fx::FxMap as HashMap;
-use sv_syntax::Origin;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_sema::fx::FxMap as HashMap;
+use sv_syntax::Origin;
 
 /// The comments in `text` (which starts at byte `base` of its file), as
 /// byte ranges, with whether each is inside a `define. Strings are skipped.
@@ -99,7 +99,9 @@ pub(crate) fn todo_comments(c: &Cst, s: &mut Sink) {
                 continue;
             }
             let w = tok.written;
-            let map = lexed.entry(w.file).or_insert_with(|| crate::support::source_layout::comments_before(&t.sources[w.file as usize]));
+            let map = lexed
+                .entry(w.file)
+                .or_insert_with(|| crate::support::source_layout::comments_before(&t.sources[w.file as usize]));
             for &(a, e) in map.get(&w.offset).map_or(&[][..], Vec::as_slice) {
                 report(s, w.file, a, e, c.loc(i as u32));
             }

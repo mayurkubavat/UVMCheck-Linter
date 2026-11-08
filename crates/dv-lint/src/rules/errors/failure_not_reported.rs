@@ -2,11 +2,11 @@
 //! uvm_config_db::get(), try_* and compare() status checks whose failure branch
 //! is empty or only reports below error severity (Sonar S108/S1166).
 
+use crate::support::class_index::{is_report_guard, is_report_scaffolding, report_level, Level};
+use crate::syntax::Cst;
+use crate::{Severity, Sink};
 use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::syntax::Cst;
-use crate::support::class_index::{is_report_guard, is_report_scaffolding, report_level, Level};
-use crate::{Severity, Sink};
 
 #[derive(Clone, Copy, PartialEq)]
 enum Status {
@@ -77,7 +77,9 @@ fn only_weak_reports(c: &Cst, st: NodeId, strongest: &mut Level) -> bool {
             if is_report_scaffolding(c, st) {
                 return true;
             }
-            let Some(e) = c.tree.children(st).next().map(|e| crate::support::statements::strip_parens(c, e)) else { return false };
+            let Some(e) = c.tree.children(st).next().map(|e| crate::support::statements::strip_parens(c, e)) else {
+                return false;
+            };
             if c.kind(e) != CallExpr {
                 return false;
             }

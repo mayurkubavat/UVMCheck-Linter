@@ -34,9 +34,7 @@ pub(crate) fn create_string_mismatch(c: &Cst, s: &mut Sink) {
             continue;
         }
         let val = &raw[1..raw.len() - 1];
-        let ok = val == var
-            || var.strip_prefix("m_") == Some(val)
-            || val.strip_prefix("m_") == Some(var.as_str());
+        let ok = val == var || var.strip_prefix("m_") == Some(val) || val.strip_prefix("m_") == Some(var.as_str());
         if ok {
             continue;
         }

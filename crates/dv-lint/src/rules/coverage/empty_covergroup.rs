@@ -1,10 +1,10 @@
 //! SV-COV-007 (EmptyCovergroup): Flags covergroups declared with zero
 //! coverpoints and zero crosses.
 
+use crate::support::names::name_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::names::{name_tok};
 
 pub(crate) fn empty_covergroup(c: &Cst, s: &mut Sink) {
     for n in c.nodes(CovergroupDecl) {

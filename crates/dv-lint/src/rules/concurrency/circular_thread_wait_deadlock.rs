@@ -3,13 +3,13 @@
 //! fork..join blocks, which cause guaranteed or probabilistic simulation
 //! deadlocks.
 
-use dv_model::Loc;
-use sv_syntax::SyntaxKind;
+use crate::support::procedural::{add_n, calls_in, items, start};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Loc;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::procedural::{add_n, calls_in, items, start};
 
 pub(crate) fn circular_wait(c: &Cst, s: &mut Sink) {
     for f in c.nodes(ParBlock) {

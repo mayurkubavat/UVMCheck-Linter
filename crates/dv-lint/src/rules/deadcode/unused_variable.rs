@@ -1,13 +1,13 @@
 //! SV-DED-001 (UnusedVariable): Local variables declared in tasks or functions
 //! should be referenced.
 
+use crate::support::handles::body_refs_if_good;
+use crate::support::slang_ast::kids;
+use crate::syntax::Cst;
+use crate::{Severity, Sink};
 use std::collections::HashSet;
 use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::syntax::Cst;
-use crate::{Severity, Sink};
-use crate::support::slang_ast::kids;
-use crate::support::handles::{body_refs_if_good};
 
 /// The classes slang's model lists: non-generic classes of `$unit`,
 /// packages and other such classes (not of modules, not generic).

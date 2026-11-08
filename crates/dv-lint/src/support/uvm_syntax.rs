@@ -5,8 +5,6 @@ use sv_syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
 
-
-
 use sv_syntax::SyntaxKind::*;
 
 /// `n` and everything under it, in source order.

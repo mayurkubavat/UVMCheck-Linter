@@ -1,12 +1,12 @@
 //! SV-FOR-001 (ForkInsideFunction): Disallows spawning concurrent threads with
 //! 'fork ... join/join_any/join_none' inside functions.
 
-use sv_syntax::SyntaxKind;
+use crate::support::procedural::{join_kind, routine_name};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::procedural::{join_kind, routine_name};
 
 pub(crate) fn fork_in_function(c: &Cst, s: &mut Sink) {
     for f in c.nodes(FunctionDecl) {

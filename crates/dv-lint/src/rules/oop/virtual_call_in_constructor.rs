@@ -1,8 +1,8 @@
 //! SV-OOP-005 (VirtualCallInConstructor): Never call virtual methods inside
 //! constructors.
 
-use dv_model::Design;
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn virtual_call_in_constructor(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

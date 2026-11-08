@@ -1,12 +1,12 @@
 //! SV-SVA-003 (MixedClockEdgesInProperty): Flags SVA properties or assertions
 //! that mix both 'posedge' and 'negedge' clocking events.
 
-use sv_syntax::NodeId;
 use crate::support::slang_ast::*;
+use crate::support::sva_cov::assert_kw;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{assert_kw};
 
 fn edges(c: &Cst, n: NodeId) -> (bool, bool, Option<u32>) {
     let (mut pos, mut neg, mut first) = (false, false, None);

@@ -2,10 +2,10 @@
 //! in coverpoints that mask uncovered stimulus and give a false sense of
 //! coverage closure.
 
+use crate::support::names::name_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::names::{name_tok};
 
 pub(crate) fn default_bin(c: &Cst, s: &mut Sink) {
     for n in c.nodes(Bins) {

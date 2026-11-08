@@ -1,10 +1,10 @@
 //! SV-MET-007 (LongTask): Flags tasks longer than the line budget (default 40
 //! source lines, option max_lines).
 
+use crate::support::routine_metrics::{each_routine, Routine};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::routine_metrics::{Routine, each_routine};
 
 /// `metrics::routineLineSpan`: lines from the routine's name to the end of
 /// its last statement.
@@ -40,11 +40,7 @@ pub(crate) fn long_task(c: &Cst, s: &mut Sink) {
         if lines <= limit {
             return;
         }
-        let place = if r.owner.is_empty() {
-            r.name.clone()
-        } else {
-            format!("{}::{}", r.owner, r.name)
-        };
+        let place = if r.owner.is_empty() { r.name.clone() } else { format!("{}::{}", r.owner, r.name) };
         report(
             s,
             r.times,

@@ -2,18 +2,16 @@
 //! without a comment of at least min_words (default 10) words of prose right
 //! above the class.
 
-use dv_model::Design;
+use crate::support::class_docs::{name_tok, own_comments, Classes, Role};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_docs::{Classes, Role, name_tok, own_comments};
+use dv_model::Design;
 
 /// A class's or method's first token is from a macro or a uvm_* file.
 fn library_tok(c: &Cst, t: u32) -> bool {
     let tok = &c.tree.tokens[t as usize];
     tok.from_macro
-        || c.tree.files[tok.origin.file as usize]
-            .file_name()
-            .is_some_and(|n| n.to_string_lossy().starts_with("uvm_"))
+        || c.tree.files[tok.origin.file as usize].file_name().is_some_and(|n| n.to_string_lossy().starts_with("uvm_"))
 }
 
 fn prose_words(comments: &[(u32, String)]) -> usize {

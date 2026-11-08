@@ -3,12 +3,12 @@
 //! loops of any task. config_db is build-time wiring; used at run time it
 //! becomes a slow global mailbox (common coupling, MG-2.3).
 
-use dv_model::Design;
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::{bodies, calls_in, is_config_db_call, Calls};
 use crate::support::class_roles::{is_component_role, role, Index};
+use crate::support::routine_bodies::{bodies, calls_in, is_config_db_call, Calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 fn is_run_time_phase(m: &str) -> bool {

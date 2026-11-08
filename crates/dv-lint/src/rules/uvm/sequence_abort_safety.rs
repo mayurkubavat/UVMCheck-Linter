@@ -2,10 +2,13 @@
 //! sequences that can bypass finish_item() via early return or break
 //! statements.
 
+use crate::support::uvm_syntax::{
+    class_routines, decl_name, extends_clause, name_loc, name_node, routine_first_name, routine_text,
+    strip_line_comments,
+};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::uvm_syntax::{class_routines, decl_name, extends_clause, name_loc, name_node, routine_first_name, routine_text, strip_line_comments};
 
 pub(crate) fn sequence_abort_safety(c: &Cst, s: &mut Sink) {
     for cls in c.nodes(ClassDecl) {

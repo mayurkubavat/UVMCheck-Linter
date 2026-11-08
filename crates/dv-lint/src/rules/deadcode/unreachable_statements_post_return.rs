@@ -2,9 +2,9 @@
 //! appearing after an unconditional control-flow termination (return, break,
 //! continue).
 
+use crate::support::statements::{list, report, start, statement_lists, stmt, St, Units};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::statements::{St, Units, list, report, start, statement_lists, stmt};
 
 pub(crate) fn unreachable_after_exit(c: &Cst, s: &mut Sink) {
     let units = Units::new(c);

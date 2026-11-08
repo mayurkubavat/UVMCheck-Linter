@@ -48,11 +48,16 @@ uvm_sequence::start) before upgrading UVM.",
             if !matches!(c.kind(decl), FunctionDecl | TaskDecl | MethodPrototype) {
                 continue;
             }
-            let Some(cls) = crate::support::slang_ast::ancestors(c, decl).find(|&a| c.kind(a) == ClassDecl) else { continue };
+            let Some(cls) = crate::support::slang_ast::ancestors(c, decl).find(|&a| c.kind(a) == ClassDecl) else {
+                continue;
+            };
             let cname = crate::support::slang_ast::decl_name(c, cls);
             let member = crate::support::slang_ast::last_name(c, decl);
             // `super.new` of a deprecated class: the class finding says it.
-            if member == "new" || !cname.starts_with("uvm_") || !pack.deprecated_members.contains(&(cname.clone(), member.clone())) {
+            if member == "new"
+                || !cname.starts_with("uvm_")
+                || !pack.deprecated_members.contains(&(cname.clone(), member.clone()))
+            {
                 continue;
             }
             let o = c.tree.tokens[t as usize].origin;

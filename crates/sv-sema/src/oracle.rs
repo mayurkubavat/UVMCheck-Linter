@@ -57,7 +57,16 @@ impl<'t> TypeOracle<'t> {
         b.collect_names();
         b.collect();
         let regions = (0..trees.len()).map(|t| b.scope_map(t)).collect();
-        TypeOracle { b, regions, decls: Default::default(), values: Default::default(), consts: Default::default(), members: Default::default(), spec: Default::default(), enum_types: Default::default() }
+        TypeOracle {
+            b,
+            regions,
+            decls: Default::default(),
+            values: Default::default(),
+            consts: Default::default(),
+            members: Default::default(),
+            spec: Default::default(),
+            enum_types: Default::default(),
+        }
     }
 
     fn scope_of(&self, tree: usize, n: sv_syntax::NodeId) -> usize {
@@ -104,12 +113,7 @@ impl<'t> TypeOracle<'t> {
 
     /// A declaration's type: its data type (`None` for an implicit one)
     /// and the declarator (for unpacked dimensions).
-    pub fn decl_type(
-        &self,
-        tree: usize,
-        dt: Option<sv_syntax::NodeId>,
-        item: Option<sv_syntax::NodeId>,
-    ) -> TypeInfo {
+    pub fn decl_type(&self, tree: usize, dt: Option<sv_syntax::NodeId>, item: Option<sv_syntax::NodeId>) -> TypeInfo {
         if let Some(t) = self.decls.borrow().get(&(tree, dt, item)) {
             return t.clone();
         }
@@ -215,7 +219,9 @@ impl<'t> TypeOracle<'t> {
             return Some(self.decl_type(item.tree, b.child(*decl, DataType).map(|d| d.node), Some(item.node)));
         }
         if let Some(&(dt, v)) = sc.consts.get(name) {
-            let typed = dt.is_some_and(|d| !b.toks_of(d).iter().all(|t| matches!(*t, "signed" | "unsigned")) || b.child(d, Dim).is_some());
+            let typed = dt.is_some_and(|d| {
+                !b.toks_of(d).iter().all(|t| matches!(*t, "signed" | "unsigned")) || b.child(d, Dim).is_some()
+            });
             return match (typed, dt, v) {
                 (true, Some(d), _) => Some(self.decl_type(d.tree, Some(d.node), None)),
                 (_, _, Some(v)) => Some(self.value_type(v.tree, v.node)),
@@ -247,10 +253,12 @@ impl<'t> TypeOracle<'t> {
         for _ in 0..16 {
             let scope = self.scope_of(dt.tree, dt.node);
             match b.lookup_type(dt, scope) {
-                Some(Found::Typedef(td, _)) if b.children(td).into_iter().all(|c| b.kind(c) != Dim) => match b.child(td, DataType) {
-                    Some(i) => dt = i,
-                    None => break,
-                },
+                Some(Found::Typedef(td, _)) if b.children(td).into_iter().all(|c| b.kind(c) != Dim) => {
+                    match b.child(td, DataType) {
+                        Some(i) => dt = i,
+                        None => break,
+                    }
+                }
                 Some(Found::Param(..)) => {
                     let name = b.toks_of(dt).concat();
                     match self.env_of(scope).get(&name) {
@@ -327,7 +335,12 @@ impl<'t> TypeOracle<'t> {
     /// specialization (`C#(T)`), these do not depend on which code made the
     /// specialization first. `local` is the declared type of a local
     /// variable the chain starts from.
-    pub fn class_args(&self, tree: usize, e: sv_syntax::NodeId, local: Option<(usize, sv_syntax::NodeId)>) -> Option<(String, Vec<Option<String>>)> {
+    pub fn class_args(
+        &self,
+        tree: usize,
+        e: sv_syntax::NodeId,
+        local: Option<(usize, sv_syntax::NodeId)>,
+    ) -> Option<(String, Vec<Option<String>>)> {
         let scope = self.scope_of(tree, e);
         let env = self.env_of(scope);
         let local = local.map(|(t, n)| NodeRef { tree: t, node: n });
@@ -350,7 +363,11 @@ impl<'t> TypeOracle<'t> {
                         DataDecl | Port => {
                             for d in b.children(k) {
                                 if b.kind(d) == Declarator && b.name_of(d).is_some_and(|x| x.0 == name) {
-                                    return Some(self.decl_type(d.tree, b.child(k, DataType).map(|x| x.node), Some(d.node)));
+                                    return Some(self.decl_type(
+                                        d.tree,
+                                        b.child(k, DataType).map(|x| x.node),
+                                        Some(d.node),
+                                    ));
                                 }
                             }
                         }
@@ -379,7 +396,9 @@ impl<'t> TypeOracle<'t> {
             }
             let scope = self.scope_of(dt.tree, dt.node);
             match b.lookup_type(dt, scope) {
-                Some(Found::Typedef(t, _)) if b.children(t).into_iter().all(|c| b.kind(c) != Dim) => dt = b.child(t, DataType)?,
+                Some(Found::Typedef(t, _)) if b.children(t).into_iter().all(|c| b.kind(c) != Dim) => {
+                    dt = b.child(t, DataType)?
+                }
                 _ => return None,
             }
         }
@@ -438,18 +457,19 @@ impl<'t> TypeOracle<'t> {
         match own.first().copied() {
             Some("enum") => return b.child(dt, DataType).is_some_and(|i| self.four_state(i, scope, env, depth + 1)),
             Some("struct" | "union") => {
-                return b.children(dt).into_iter().filter(|m| b.kind(*m) == DataDecl).any(|m| {
-                    b.child(m, DataType).is_some_and(|i| self.four_state(i, scope, env, depth + 1))
-                })
+                return b
+                    .children(dt)
+                    .into_iter()
+                    .filter(|m| b.kind(*m) == DataDecl)
+                    .any(|m| b.child(m, DataType).is_some_and(|i| self.four_state(i, scope, env, depth + 1)))
             }
             _ => {}
         }
         let toks = b.toks_of(dt);
         // Implicit (`[7:0] x`, `signed x`): no type name before the dimensions.
-        let named = toks
-            .iter()
-            .take_while(|t| **t != "[")
-            .any(|t| t.starts_with(|c: char| c.is_alphabetic() || c == '_' || c == '\\') && !matches!(*t, "signed" | "unsigned"));
+        let named = toks.iter().take_while(|t| **t != "[").any(|t| {
+            t.starts_with(|c: char| c.is_alphabetic() || c == '_' || c == '\\') && !matches!(*t, "signed" | "unsigned")
+        });
         if !named {
             return true;
         }

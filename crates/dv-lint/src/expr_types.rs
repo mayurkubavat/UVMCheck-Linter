@@ -6,8 +6,8 @@
 //! `Type::toString()`. Gated against slang by tools/gates/expr_gate.py
 //! (tools/oracles/exprdump.cpp is the reference).
 
-use sv_sema::fx::FxMap as HashMap;
 use std::sync::Arc;
+use sv_sema::fx::FxMap as HashMap;
 
 use sv_sema::oracle::{TypeInfo, TypeOracle};
 use sv_syntax::NodeId;
@@ -31,7 +31,12 @@ pub(crate) fn vector(w: u32, s: bool, four: bool) -> ETy {
 fn ranged(w: u32, s: bool, four: bool) -> ETy {
     let base = if four { "logic" } else { "bit" };
     let sign = if s { " signed" } else { "" };
-    ETy { text: format!("{base}{sign}[{}:0]", w.max(1) - 1), integral: Some((w.max(1), s, four)), src: None, aggregate: false }
+    ETy {
+        text: format!("{base}{sign}[{}:0]", w.max(1) - 1),
+        integral: Some((w.max(1), s, four)),
+        src: None,
+        aggregate: false,
+    }
 }
 
 /// A simple bit vector type slang treats as matching another of the same
@@ -364,7 +369,10 @@ impl<'a, 't> Typer<'a, 't> {
                 // A type parameter is not a value.
                 return None;
             }
-            if d.dtype.is_none() || c.tree.child(d.dtype?, Dim).is_none() && c.toks(d.dtype?).all(|t| matches!(c.text_of(t), "signed" | "unsigned")) {
+            if d.dtype.is_none()
+                || c.tree.child(d.dtype?, Dim).is_none()
+                    && c.toks(d.dtype?).all(|t| matches!(c.text_of(t), "signed" | "unsigned"))
+            {
                 // Untyped: the value's type.
                 let v = kids(c, d.node).into_iter().find(|&k| !matches!(c.kind(k), Name | Dim))?;
                 if d.dtype.is_none() {
@@ -471,7 +479,12 @@ impl<'a, 't> Typer<'a, 't> {
                     };
                     if let Some((a, b)) = lo_hi {
                         let kw = if f { "logic" } else { "bit" };
-                        return Some(ETy { text: format!("{kw}[{a}:{b}]"), integral: Some((w, false, f)), src: None, aggregate: false });
+                        return Some(ETy {
+                            text: format!("{kw}[{a}:{b}]"),
+                            integral: Some((w, false, f)),
+                            src: None,
+                            aggregate: false,
+                        });
                     }
                 }
                 Some(vector(w.checked_mul(ew)?, false, f))
@@ -516,7 +529,12 @@ impl<'a, 't> Typer<'a, 't> {
         let dim: Vec<i128> = text[open + 1..close].split(':').filter_map(|x| x.parse().ok()).collect();
         let n = if dim.len() == 2 { (dim[0] - dim[1]).unsigned_abs() as u32 + 1 } else { return None };
         let _ = (e, s);
-        Some(ETy { text: format!("{head}{rest}"), integral: Some((bw / n.max(1), false, f)), src: None, aggregate: false })
+        Some(ETy {
+            text: format!("{head}{rest}"),
+            integral: Some((bw / n.max(1), false, f)),
+            src: None,
+            aggregate: false,
+        })
     }
 
     fn cast_type(&mut self, e: NodeId) -> Option<ETy> {
@@ -557,7 +575,15 @@ impl<'a, 't> Typer<'a, 't> {
                     let s = name == "$signed";
                     Some(vector(w, s, f))
                 }
-                "$clog2" | "$bits" | "$size" | "$high" | "$low" | "$left" | "$right" | "$increment" | "$dimensions"
+                "$clog2"
+                | "$bits"
+                | "$size"
+                | "$high"
+                | "$low"
+                | "$left"
+                | "$right"
+                | "$increment"
+                | "$dimensions"
                 | "$unpacked_dimensions" => Some(vector(32, true, true).named("integer")),
                 "$countones" | "$test$plusargs" | "$value$plusargs" => Some(vector(32, true, false).named("int")),
                 "$random" => Some(vector(32, true, false).named("int")),
@@ -582,10 +608,14 @@ impl<'a, 't> Typer<'a, 't> {
                         _ => Some(ETy::other("void")),
                     };
                 }
-                if t.text.contains("$[") && matches!(name.as_str(), "size" | "num" | "exists" | "first" | "last" | "next" | "prev") {
+                if t.text.contains("$[")
+                    && matches!(name.as_str(), "size" | "num" | "exists" | "first" | "last" | "next" | "prev")
+                {
                     return int();
                 }
-                if t.aggregate && t.text.contains("enum") || (t.aggregate && t.integral.is_some() && !t.text.contains("struct")) {
+                if t.aggregate && t.text.contains("enum")
+                    || (t.aggregate && t.integral.is_some() && !t.text.contains("struct"))
+                {
                     match name.as_str() {
                         "num" => return int(),
                         "name" => return Some(ETy::other("string")),
@@ -645,7 +675,8 @@ impl<'a, 't> Typer<'a, 't> {
         }
         crate::support::slang_ast::class_chain(c, cls).into_iter().find_map(|k| {
             kids(c, k).into_iter().find(|&m| {
-                matches!(c.kind(m), FunctionDecl | TaskDecl | MethodPrototype) && crate::support::slang_ast::last_name(c, m) == name
+                matches!(c.kind(m), FunctionDecl | TaskDecl | MethodPrototype)
+                    && crate::support::slang_ast::last_name(c, m) == name
             })
         })
     }
@@ -790,7 +821,13 @@ fn null_compare_fails(c: &Cst, ty: &mut Typer, n: NodeId) -> bool {
                         let ks = kids(c, e);
                         if let [l, r] = ks[..] {
                             let null = |x: NodeId| c.kind(x) == Literal && c.tree.bare_text(x) == "null";
-                            let other = if null(r) { Some(l) } else if null(l) { Some(r) } else { None };
+                            let other = if null(r) {
+                                Some(l)
+                            } else if null(l) {
+                                Some(r)
+                            } else {
+                                None
+                            };
                             if other.and_then(|o| ty.self_type(o)).is_some_and(|t| t.integral.is_some()) {
                                 return true;
                             }
@@ -829,7 +866,6 @@ type Facts = (
 /// `T`: one entry, or (flagged true) one per specialization of the generic
 /// class around.
 pub(crate) type CfgDbTypes = HashMap<(usize, NodeId), (bool, Vec<(ETy, String, bool)>)>;
-
 
 /// Per specialization of the generic class around them: the type and its
 /// matching form of each cast and `$cast` argument there.
@@ -992,7 +1028,9 @@ fn build_facts(c: &Cst) -> Facts {
         // Formals: a port without a type takes the previous one's.
         for n in 0..t.nodes.len() {
             let pl = NodeId(n as u32);
-            if tc.kind(pl) != PortList || !tc.parent(pl).is_some_and(|f| matches!(tc.kind(f), FunctionDecl | TaskDecl | MethodPrototype)) {
+            if tc.kind(pl) != PortList
+                || !tc.parent(pl).is_some_and(|f| matches!(tc.kind(f), FunctionDecl | TaskDecl | MethodPrototype))
+            {
                 continue;
             }
             let mut dt: Option<NodeId> = None;
@@ -1104,8 +1142,20 @@ fn build_facts(c: &Cst) -> Facts {
 pub(crate) fn is_expr(k: sv_syntax::SyntaxKind) -> bool {
     matches!(
         k,
-        BinaryExpr | PrefixExpr | PostfixExpr | CondExpr | InsideExpr | ParenExpr | Literal | NameExpr | ScopedExpr | MemberExpr | SelectExpr
-            | CallExpr | ConcatExpr | CastExpr
+        BinaryExpr
+            | PrefixExpr
+            | PostfixExpr
+            | CondExpr
+            | InsideExpr
+            | ParenExpr
+            | Literal
+            | NameExpr
+            | ScopedExpr
+            | MemberExpr
+            | SelectExpr
+            | CallExpr
+            | ConcatExpr
+            | CastExpr
     )
 }
 
@@ -1130,7 +1180,10 @@ pub(crate) fn slang_kind(c: &Cst, e: NodeId) -> Option<&'static str> {
     }
     if let Some(p) = c.parent(e) {
         let first = kids(c, p).first() == Some(&e);
-        if first && matches!(c.kind(p), SelectExpr | MemberExpr | CastExpr) && std::env::var_os("DV_EXPRS_ALL").is_none() {
+        if first
+            && matches!(c.kind(p), SelectExpr | MemberExpr | CastExpr)
+            && std::env::var_os("DV_EXPRS_ALL").is_none()
+        {
             return None;
         }
     }
@@ -1211,7 +1264,9 @@ pub fn expr_dump(files: Vec<String>, trees: &[sv_syntax::Tree]) -> Vec<String> {
                 }
                 let Some(x) = ty.final_type(n) else {
                     if std::env::var_os("DV_EXPR_WHY").is_some() {
-                        let chain: Vec<String> = crate::support::slang_ast::ancestors(&cst, n).map(|a| format!("{:?}", cst.kind(a))).collect();
+                        let chain: Vec<String> = crate::support::slang_ast::ancestors(&cst, n)
+                            .map(|a| format!("{:?}", cst.kind(a)))
+                            .collect();
                         eprintln!("{}:{} {} untyped: {}", l.line, l.column, cst.tree.bare_text(n), chain.join(" < "));
                     }
                     continue;
@@ -1227,7 +1282,11 @@ pub fn expr_dump(files: Vec<String>, trees: &[sv_syntax::Tree]) -> Vec<String> {
         .into_iter()
         .map(|(f, line, col, kind, w, s, four, text)| {
             let base = files.get(f as usize).map(|p| p.rsplit('/').next().unwrap_or("")).unwrap_or("");
-            format!("{base}:{line}:{col} {kind} {w} {} {} {text}", if s { "s" } else { "u" }, if four { "4" } else { "2" })
+            format!(
+                "{base}:{line}:{col} {kind} {w} {} {} {text}",
+                if s { "s" } else { "u" },
+                if four { "4" } else { "2" }
+            )
         })
         .collect();
     out.sort();

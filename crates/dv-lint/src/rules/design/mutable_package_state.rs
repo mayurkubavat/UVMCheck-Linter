@@ -1,12 +1,12 @@
 //! SV-DSN-008 (MutablePackageState): Flags non-const variables declared in
 //! packages.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::class_index::decl_names;
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::class_index::{decl_names};
 
 pub(crate) fn mutable_package_state(c: &Cst, s: &mut Sink) {
     for p in c.nodes(PackageDecl) {
@@ -21,9 +21,7 @@ pub(crate) fn mutable_package_state(c: &Cst, s: &mut Sink) {
             continue;
         }
         for item in c.tree.children(p).filter(|&x| c.kind(x) == DataDecl) {
-            if c.toks(item)
-                .any(|t| matches!(c.text_of(t), "const" | "localparam" | "parameter"))
-            {
+            if c.toks(item).any(|t| matches!(c.text_of(t), "const" | "localparam" | "parameter")) {
                 continue;
             }
             // Nets and instances are not variables.
@@ -64,8 +62,5 @@ fn is_net_or_instance(c: &Cst, d: NodeId) -> bool {
     ];
     let first = c.first_tok(d).map(|t| c.text_of(t)).unwrap_or("");
     nets.contains(&first)
-        || c.tree
-            .child(d, DataType)
-            .and_then(|t| c.first_tok(t))
-            .is_some_and(|t| nets.contains(&c.text_of(t)))
+        || c.tree.child(d, DataType).and_then(|t| c.first_tok(t)).is_some_and(|t| nets.contains(&c.text_of(t)))
 }

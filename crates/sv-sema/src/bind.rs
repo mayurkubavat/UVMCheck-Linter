@@ -65,7 +65,9 @@ struct Vis {
 
 impl Vis {
     fn contains(&self, b: &Binder, name: &str) -> bool {
-        self.set.contains(name) || (self.global && b.global.contains(name)) || self.up.iter().any(|u| u.contains(b, name))
+        self.set.contains(name)
+            || (self.global && b.global.contains(name))
+            || self.up.iter().any(|u| u.contains(b, name))
     }
 }
 
@@ -470,8 +472,14 @@ impl Binder<'_> {
                         // No upward lookup outside the instance hierarchy:
                         // a class method in a package or $unit.
                         const CLASS_BUILTINS: [&str; 8] = [
-                            "rand_mode", "constraint_mode", "srandom", "get_randstate", "set_randstate",
-                            "pre_randomize", "post_randomize", "new",
+                            "rand_mode",
+                            "constraint_mode",
+                            "srandom",
+                            "get_randstate",
+                            "set_randstate",
+                            "pre_randomize",
+                            "post_randomize",
+                            "new",
                         ];
                         if !CLASS_BUILTINS.contains(&name) && self.in_class_outside_hierarchy(ix, n) {
                             if let Some(v) = self.visible(scope, 0) {

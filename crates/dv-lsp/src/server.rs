@@ -65,26 +65,15 @@ impl Server {
     }
 
     fn reply(&mut self, id: &Json, result: Json) {
-        self.send(obj(vec![
-            ("jsonrpc", "2.0".into()),
-            ("id", id.clone()),
-            ("result", result),
-        ]));
+        self.send(obj(vec![("jsonrpc", "2.0".into()), ("id", id.clone()), ("result", result)]));
     }
 
     fn notify(&mut self, method: &str, params: Json) {
-        self.send(obj(vec![
-            ("jsonrpc", "2.0".into()),
-            ("method", method.into()),
-            ("params", params),
-        ]));
+        self.send(obj(vec![("jsonrpc", "2.0".into()), ("method", method.into()), ("params", params)]));
     }
 
     fn log(&mut self, msg: &str) {
-        self.notify(
-            "window/logMessage",
-            obj(vec![("type", 4u32.into()), ("message", msg.into())]),
-        );
+        self.notify("window/logMessage", obj(vec![("type", 4u32.into()), ("message", msg.into())]));
     }
 
     /// Runs until `exit`; returns the process exit code.
@@ -98,9 +87,7 @@ impl Server {
             let id = msg.get("id").clone();
             let params = msg.get("params");
             let t0 = Instant::now();
-            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                self.handle(&method, params)
-            }));
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| self.handle(&method, params)));
             match result {
                 Ok(Some(r)) if !id.is_null() => self.reply(&id, r),
                 Ok(None) if !id.is_null() && !method.is_empty() => {
@@ -120,13 +107,7 @@ impl Server {
                     self.send(obj(vec![
                         ("jsonrpc", "2.0".into()),
                         ("id", id),
-                        (
-                            "error",
-                            obj(vec![
-                                ("code", Json::Num(-32603.0)),
-                                ("message", "internal error".into()),
-                            ]),
-                        ),
+                        ("error", obj(vec![("code", Json::Num(-32603.0)), ("message", "internal error".into())])),
                     ]));
                 }
                 _ => {}
@@ -161,13 +142,7 @@ impl Server {
             "textDocument/didChange" => {
                 let path = uri_to_path(p.at(&["textDocument", "uri"]).as_str()?);
                 // Full sync: the last change holds the whole text.
-                let text = p
-                    .get("contentChanges")
-                    .as_arr()
-                    .last()?
-                    .get("text")
-                    .as_str()?
-                    .to_string();
+                let text = p.get("contentChanges").as_arr().last()?.get("text").as_str()?.to_string();
                 self.ws.update(&path, text);
                 None
             }
@@ -215,10 +190,7 @@ impl Server {
     }
 
     fn in_scope(&self, path: &std::path::Path) -> bool {
-        self.roots
-            .iter()
-            .chain(&self.libraries)
-            .any(|r| path.starts_with(r))
+        self.roots.iter().chain(&self.libraries).any(|r| path.starts_with(r))
     }
 
     fn initialize(&mut self, p: &Json) -> Json {
@@ -251,12 +223,7 @@ impl Server {
         }
         for e in opts.get("exclude").as_arr() {
             if let Some(s) = e.as_str() {
-                self.exclude.push(
-                    s.trim_matches('/')
-                        .trim_start_matches("**/")
-                        .trim_end_matches("/**")
-                        .to_string(),
-                );
+                self.exclude.push(s.trim_matches('/').trim_start_matches("**/").trim_end_matches("/**").to_string());
             }
         }
         let sync = obj(vec![("openClose", true.into()), ("change", 1u32.into())]);
@@ -276,22 +243,13 @@ impl Server {
                     (
                         "completionProvider",
                         obj(vec![
-                            (
-                                "triggerCharacters",
-                                Json::Arr(vec![".".into(), ":".into(), "`".into(), "$".into()]),
-                            ),
+                            ("triggerCharacters", Json::Arr(vec![".".into(), ":".into(), "`".into(), "$".into()])),
                             ("resolveProvider", false.into()),
                         ]),
                     ),
                 ]),
             ),
-            (
-                "serverInfo",
-                obj(vec![
-                    ("name", "dv-lsp".into()),
-                    ("version", env!("CARGO_PKG_VERSION").into()),
-                ]),
-            ),
+            ("serverInfo", obj(vec![("name", "dv-lsp".into()), ("version", env!("CARGO_PKG_VERSION").into())])),
         ])
     }
 
@@ -330,14 +288,8 @@ impl Server {
         let (l0, c0) = file.position(a);
         let (l1, c1) = file.position(b);
         obj(vec![
-            (
-                "start",
-                obj(vec![("line", l0.into()), ("character", c0.into())]),
-            ),
-            (
-                "end",
-                obj(vec![("line", l1.into()), ("character", c1.into())]),
-            ),
+            ("start", obj(vec![("line", l0.into()), ("character", c0.into())])),
+            ("end", obj(vec![("line", l1.into()), ("character", c1.into())])),
         ])
     }
 
@@ -364,32 +316,19 @@ impl Server {
         let file = self.ws.file(f);
         let mut kids: HashMap<Option<u32>, Vec<u32>> = HashMap::new();
         for (i, s) in file.symbols.iter().enumerate() {
-            if !s.local
-                || s.kind == SymKind::EnumMember
-                    && s.parent.is_some_and(|p| !file.symbols[p as usize].local)
-            {
+            if !s.local || s.kind == SymKind::EnumMember && s.parent.is_some_and(|p| !file.symbols[p as usize].local) {
                 kids.entry(s.parent).or_default().push(i as u32);
             }
         }
-        fn build(
-            sv: &Server,
-            f: usize,
-            kids: &HashMap<Option<u32>, Vec<u32>>,
-            parent: Option<u32>,
-        ) -> Vec<Json> {
+        fn build(sv: &Server, f: usize, kids: &HashMap<Option<u32>, Vec<u32>>, parent: Option<u32>) -> Vec<Json> {
             let file = sv.ws.file(f);
             let mut out = Vec::new();
             for &i in kids.get(&parent).map(|v| v.as_slice()).unwrap_or(&[]) {
                 let s = &file.symbols[i as usize];
-                let in_class = s
-                    .parent
-                    .is_some_and(|p| file.symbols[p as usize].kind == SymKind::Class);
+                let in_class = s.parent.is_some_and(|p| file.symbols[p as usize].kind == SymKind::Class);
                 let mut detail = s.kind.label().to_string();
                 if let Some(t) = &s.type_name {
-                    if matches!(
-                        s.kind,
-                        SymKind::Variable | SymKind::Port | SymKind::Instance | SymKind::Parameter
-                    ) {
+                    if matches!(s.kind, SymKind::Variable | SymKind::Port | SymKind::Instance | SymKind::Parameter) {
                         detail = t.clone();
                     } else if s.kind == SymKind::Class {
                         detail = format!("extends {}", t);
@@ -434,13 +373,9 @@ impl Server {
                 .map(|(_, r)| {
                     let s = self.ws.sym(r);
                     let file = self.ws.file(r.0);
-                    let container = s
-                        .parent
-                        .map(|p| file.symbols[p as usize].name.clone())
-                        .or_else(|| s.scope_class.clone());
-                    let in_class = s
-                        .parent
-                        .is_some_and(|p| file.symbols[p as usize].kind == SymKind::Class)
+                    let container =
+                        s.parent.map(|p| file.symbols[p as usize].name.clone()).or_else(|| s.scope_class.clone());
+                    let in_class = s.parent.is_some_and(|p| file.symbols[p as usize].kind == SymKind::Class)
                         || s.scope_class.is_some();
                     let mut kv = vec![
                         ("name", s.name.clone().into()),
@@ -461,12 +396,7 @@ impl Server {
             return Json::Null;
         };
         let defs = self.ws.definitions(f, off);
-        Json::Arr(
-            defs.into_iter()
-                .take(50)
-                .map(|r| self.location(r))
-                .collect(),
-        )
+        Json::Arr(defs.into_iter().take(50).map(|r| self.location(r)).collect())
     }
 
     fn type_definition(&mut self, p: &Json) -> Json {
@@ -478,21 +408,13 @@ impl Server {
         for r in defs {
             let s = self.ws.sym(r);
             let t = match s.kind {
-                SymKind::Class | SymKind::Typedef | SymKind::Module | SymKind::Interface => {
-                    Some(s.name.clone())
-                }
+                SymKind::Class | SymKind::Typedef | SymKind::Module | SymKind::Interface => Some(s.name.clone()),
                 _ => s.type_name.clone(),
             };
             if let Some(t) = t {
                 for c in self.ws.scopes_named(
                     &t,
-                    &[
-                        SymKind::Class,
-                        SymKind::Module,
-                        SymKind::Interface,
-                        SymKind::Program,
-                        SymKind::Typedef,
-                    ],
+                    &[SymKind::Class, SymKind::Module, SymKind::Interface, SymKind::Program, SymKind::Typedef],
                 ) {
                     out.push(self.location(c));
                 }
@@ -522,10 +444,7 @@ impl Server {
             let Some(fx) = fx else { continue };
             if let Some(offs) = fx.idents.get(&word) {
                 for &o in offs {
-                    out.push(obj(vec![
-                        ("uri", path_to_uri(&fx.path).into()),
-                        ("range", self.range(fi, o, o + len)),
-                    ]));
+                    out.push(obj(vec![("uri", path_to_uri(&fx.path).into()), ("range", self.range(fi, o, o + len))]));
                     if out.len() >= 5000 {
                         return Json::Arr(out);
                     }
@@ -546,11 +465,7 @@ impl Server {
         let word = &file.text[s..e];
         let len = word.len() as u32;
         let offs = file.idents.get(word).cloned().unwrap_or_default();
-        Json::Arr(
-            offs.into_iter()
-                .map(|o| obj(vec![("range", self.range(f, o, o + len))]))
-                .collect(),
-        )
+        Json::Arr(offs.into_iter().map(|o| obj(vec![("range", self.range(f, o, o + len))])).collect())
     }
 
     fn hover(&mut self, p: &Json) -> Json {
@@ -570,11 +485,7 @@ impl Server {
             .map(|c| format!("{} `{}`", c.kind.label(), c.name))
             .or_else(|| s.scope_class.as_ref().map(|c| format!("class `{}`", c)));
         let (line, _) = file.position(s.sel_start);
-        let fname = file
-            .path
-            .file_name()
-            .map(|n| n.to_string_lossy().into_owned())
-            .unwrap_or_default();
+        let fname = file.path.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
         md.push_str(&format!(
             "\n*{}*{} · {}:{}",
             s.kind.label(),
@@ -592,10 +503,7 @@ impl Server {
         let file_here = self.ws.file(f);
         let ws = word_at(&file_here.text, off).unwrap_or((off as usize, off as usize));
         obj(vec![
-            (
-                "contents",
-                obj(vec![("kind", "markdown".into()), ("value", md.into())]),
-            ),
+            ("contents", obj(vec![("kind", "markdown".into()), ("value", md.into())])),
             ("range", self.range(f, ws.0 as u32, ws.1 as u32)),
         ])
     }
@@ -615,27 +523,20 @@ impl Server {
         let before = if s > 0 { b[s - 1] } else { b'\n' };
         let mut items: Vec<Json> = Vec::new();
         let mut seen: HashSet<String> = HashSet::new();
-        let mut add =
-            |items: &mut Vec<Json>, label: &str, kind: u32, detail: &str, doc: &str, sort: &str| {
-                if !seen.insert(label.to_string()) {
-                    return;
-                }
-                let mut kv = vec![
-                    ("label", label.into()),
-                    ("kind", kind.into()),
-                    ("sortText", format!("{}{}", sort, label).into()),
-                ];
-                if !detail.is_empty() {
-                    kv.push(("detail", detail.into()));
-                }
-                if !doc.is_empty() {
-                    kv.push((
-                        "documentation",
-                        obj(vec![("kind", "markdown".into()), ("value", doc.into())]),
-                    ));
-                }
-                items.push(obj(kv));
-            };
+        let mut add = |items: &mut Vec<Json>, label: &str, kind: u32, detail: &str, doc: &str, sort: &str| {
+            if !seen.insert(label.to_string()) {
+                return;
+            }
+            let mut kv =
+                vec![("label", label.into()), ("kind", kind.into()), ("sortText", format!("{}{}", sort, label).into())];
+            if !detail.is_empty() {
+                kv.push(("detail", detail.into()));
+            }
+            if !doc.is_empty() {
+                kv.push(("documentation", obj(vec![("kind", "markdown".into()), ("value", doc.into())])));
+            }
+            items.push(obj(kv));
+        };
         if before == b'`' {
             let mut macros: Vec<SymRef> = self
                 .ws
@@ -648,14 +549,7 @@ impl Server {
             macros.sort_by_key(|&r| r.0 != f);
             for r in macros {
                 let sy = self.ws.sym(r);
-                add(
-                    &mut items,
-                    &sy.name,
-                    15,
-                    sy.detail.lines().next().unwrap_or(""),
-                    &sy.doc,
-                    "1",
-                );
+                add(&mut items, &sy.name, 15, sy.detail.lines().next().unwrap_or(""), &sy.doc, "1");
             }
             for &(m, d) in UVM_MACROS {
                 add(&mut items, m, 15, d, "", "2");
@@ -663,19 +557,13 @@ impl Server {
             for d in DIRECTIVES {
                 add(&mut items, d, 14, "directive", "", "3");
             }
-            return obj(vec![
-                ("isIncomplete", false.into()),
-                ("items", Json::Arr(items)),
-            ]);
+            return obj(vec![("isIncomplete", false.into()), ("items", Json::Arr(items))]);
         }
         if before == b'$' {
             for &(t, d) in SYSTEM_TASKS {
                 add(&mut items, t, 3, d, "", "1");
             }
-            return obj(vec![
-                ("isIncomplete", false.into()),
-                ("items", Json::Arr(items)),
-            ]);
+            return obj(vec![("isIncomplete", false.into()), ("items", Json::Arr(items))]);
         }
         let sep = chain_sep(text, s);
         if sep != Sep::None {
@@ -684,10 +572,7 @@ impl Server {
                 for (m, d) in [("create", "static function T create(string name, uvm_component parent = null)"), ("get", "static function type_id get()"), ("set_type_override", "static function void set_type_override(uvm_object_wrapper override_type, bit replace = 1)"), ("set_inst_override", "static function void set_inst_override(uvm_object_wrapper override_type, string inst_path, uvm_component parent = null)")] {
                     add(&mut items, m, 2, d, "", "1");
                 }
-                return obj(vec![
-                    ("isIncomplete", false.into()),
-                    ("items", Json::Arr(items)),
-                ]);
+                return obj(vec![("isIncomplete", false.into()), ("items", Json::Arr(items))]);
             }
             if let Some(scope) = self.ws.resolve_chain(f, off, &chain, sep) {
                 let is_class = self.ws.sym(scope).kind == SymKind::Class;
@@ -708,20 +593,10 @@ impl Server {
                     let _ = depth;
                 }
                 if is_class && sep == Sep::Scope {
-                    add(
-                        &mut items,
-                        "type_id",
-                        7,
-                        "factory registration (`uvm_*_utils)",
-                        "",
-                        "0",
-                    );
+                    add(&mut items, "type_id", 7, "factory registration (`uvm_*_utils)", "", "0");
                 }
             }
-            return obj(vec![
-                ("isIncomplete", false.into()),
-                ("items", Json::Arr(items)),
-            ]);
+            return obj(vec![("isIncomplete", false.into()), ("items", Json::Arr(items))]);
         }
         // Plain names: scope first, then workspace types, then keywords.
         let low = prefix.to_lowercase();
@@ -732,17 +607,8 @@ impl Server {
             if sy.kind == SymKind::Macro || !matches(&sy.name) {
                 continue;
             }
-            let in_class = sy
-                .parent
-                .is_some_and(|p| self.ws.file(r.0).symbols[p as usize].kind == SymKind::Class);
-            add(
-                &mut items,
-                &sy.name,
-                completion_kind(sy, in_class),
-                &sy.detail,
-                &sy.doc,
-                "1",
-            );
+            let in_class = sy.parent.is_some_and(|p| self.ws.file(r.0).symbols[p as usize].kind == SymKind::Class);
+            add(&mut items, &sy.name, completion_kind(sy, in_class), &sy.detail, &sy.doc, "1");
         }
         let mut capped = false;
         if !low.is_empty() {
@@ -764,14 +630,7 @@ impl Server {
             }
             for r in types {
                 let sy = self.ws.sym(r);
-                add(
-                    &mut items,
-                    &sy.name,
-                    completion_kind(sy, false),
-                    &sy.detail,
-                    &sy.doc,
-                    "2",
-                );
+                add(&mut items, &sy.name, completion_kind(sy, false), &sy.detail, &sy.doc, "2");
             }
         }
         for k in KEYWORDS {
@@ -779,10 +638,7 @@ impl Server {
                 add(&mut items, k, 14, "", "", "3");
             }
         }
-        obj(vec![
-            ("isIncomplete", capped.into()),
-            ("items", Json::Arr(items)),
-        ])
+        obj(vec![("isIncomplete", capped.into()), ("items", Json::Arr(items))])
     }
 }
 
@@ -820,10 +676,7 @@ fn expand_env(s: &str) -> String {
                 None => (r2, ""),
             }
         } else {
-            let n = r
-                .bytes()
-                .take_while(|b| b.is_ascii_alphanumeric() || *b == b'_')
-                .count();
+            let n = r.bytes().take_while(|b| b.is_ascii_alphanumeric() || *b == b'_').count();
             (&r[..n], &r[n..])
         };
         out.push_str(&std::env::var(name).unwrap_or_default());
@@ -1031,10 +884,7 @@ const UVM_MACROS: &[(&str, &str)] = &[
     ("uvm_error", "`uvm_error(ID, MSG)"),
     ("uvm_fatal", "`uvm_fatal(ID, MSG)"),
     ("uvm_component_utils", "`uvm_component_utils(T)"),
-    (
-        "uvm_component_param_utils",
-        "`uvm_component_param_utils(T #(P))",
-    ),
+    ("uvm_component_param_utils", "`uvm_component_param_utils(T #(P))"),
     ("uvm_component_utils_begin", "`uvm_component_utils_begin(T)"),
     ("uvm_component_utils_end", "`uvm_component_utils_end"),
     ("uvm_object_utils", "`uvm_object_utils(T)"),
@@ -1053,10 +903,7 @@ const UVM_MACROS: &[(&str, &str)] = &[
     ("uvm_create", "`uvm_create(SEQ_OR_ITEM)"),
     ("uvm_send", "`uvm_send(SEQ_OR_ITEM)"),
     ("uvm_rand_send", "`uvm_rand_send(SEQ_OR_ITEM)"),
-    (
-        "uvm_declare_p_sequencer",
-        "`uvm_declare_p_sequencer(SEQUENCER)",
-    ),
+    ("uvm_declare_p_sequencer", "`uvm_declare_p_sequencer(SEQUENCER)"),
     ("uvm_analysis_imp_decl", "`uvm_analysis_imp_decl(SFX)"),
     ("uvm_register_cb", "`uvm_register_cb(T, CB)"),
     ("uvm_do_callbacks", "`uvm_do_callbacks(T, CB, METHOD)"),

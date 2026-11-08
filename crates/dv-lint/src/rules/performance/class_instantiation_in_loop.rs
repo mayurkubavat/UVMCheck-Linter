@@ -2,11 +2,11 @@
 //! via new() inside simulation loops to prevent heap contention and memory
 //! allocation overhead.
 
-use sv_syntax::NodeId;
+use crate::support::spans::child_nodes;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::spans::{child_nodes};
 
 /// A `new` that slang reads as a class instantiation: not an array or a
 /// copy, and not a call argument.

@@ -2,14 +2,14 @@
 //! compared against two or more literals to choose what to do, as in
 //! do_op("read").
 
-use std::collections::HashSet;
-use dv_model::Design;
-use crate::support::overrides::overrides_base;
 use crate::support::class_roles::Index;
+use crate::support::overrides::overrides_base;
+use crate::support::string_codes::{all_uvm_access_policies, dispatches, literal_list, user_routines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
 use sv_syntax::SyntaxKind::*;
-use crate::support::string_codes::{all_uvm_access_policies, dispatches, literal_list, user_routines};
 
 pub(crate) fn string_mode_parameter(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);

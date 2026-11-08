@@ -1,11 +1,11 @@
 //! SV-DED-015 (NeverSetClassParameter): Flags a parameter of a user
 //! parameterized class that no specialization in the linted design ever sets.
 
-use std::collections::BTreeMap;
-use sv_syntax::{NodeId, SyntaxKind};
 use crate::support::class_index::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::BTreeMap;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A class's port parameters (not localparams): name and name token.

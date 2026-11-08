@@ -61,7 +61,9 @@ fn coverpoint_bins(c: &Cst, cp: NodeId, group_abm: u128) -> Option<u128> {
     let counted: Vec<NodeId> = bins
         .iter()
         .copied()
-        .filter(|&b| c.toks(b).next().map(|t| c.text_of(t)) == Some("bins") && !c.toks(b).any(|t| c.text_of(t) == "default"))
+        .filter(|&b| {
+            c.toks(b).next().map(|t| c.text_of(t)) == Some("bins") && !c.toks(b).any(|t| c.text_of(t) == "default")
+        })
         .collect();
     if counted.is_empty() {
         let expr = c.tree.children(cp).find(|&k| c.kind(k) != StmtLabel)?;
@@ -119,9 +121,15 @@ pub(crate) fn cross_bin_count(c: &Cst, s: &mut Sink) {
         if !ok || parts.len() < 2 || total <= LIMIT {
             continue;
         }
-        let at = c.tree.child(x, StmtLabel).and_then(|l| c.first_tok(l)).or_else(|| c.keyword(x)).or_else(|| c.first_tok(x));
+        let at =
+            c.tree.child(x, StmtLabel).and_then(|l| c.first_tok(l)).or_else(|| c.keyword(x)).or_else(|| c.first_tok(x));
         let Some(at) = at else { continue };
-        let label = c.tree.child(x, StmtLabel).and_then(|l| c.first_tok(l)).map(|t| c.text_of(t).to_string()).unwrap_or_else(|| "cross".into());
+        let label = c
+            .tree
+            .child(x, StmtLabel)
+            .and_then(|l| c.first_tok(l))
+            .map(|t| c.text_of(t).to_string())
+            .unwrap_or_else(|| "cross".into());
         s.add(
             "SV-COV-018",
             "CrossBinCountTooLarge",

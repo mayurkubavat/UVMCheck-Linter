@@ -3,14 +3,14 @@
 //! dereferenced later on the same path because the failure branch did not stop
 //! (SpotBugs NP_NULL_ON_SOME_PATH).
 
+use crate::support::handles::{expr_decl, handle_type};
+use crate::support::procedural::{assign_lhs, call_args, items, start, PathHooks, Walker};
+use crate::support::slang_ast::{call_parts, kids, user_routines};
+use crate::syntax::Cst;
+use crate::{Severity, Sink};
 use std::collections::HashSet;
 use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::syntax::Cst;
-use crate::{Severity, Sink};
-use crate::support::slang_ast::{call_parts, kids, user_routines};
-use crate::support::procedural::{assign_lhs, call_args, items, start, PathHooks, Walker};
-use crate::support::handles::{expr_decl, handle_type};
 
 /// The declaration a handle-typed name or member access refers to.
 fn tracked(c: &Cst, e: NodeId) -> Option<(u32, String)> {
@@ -100,7 +100,10 @@ impl NullHooks<'_, '_> {
         let system_callee = c.parent(n).is_some_and(|p| {
             c.kind(p) == CallExpr
                 && kids(c, p).first() == Some(&n)
-                && matches!(c.last_text(n), "randomize" | "srandom" | "get_randstate" | "set_randstate" | "rand_mode" | "constraint_mode")
+                && matches!(
+                    c.last_text(n),
+                    "randomize" | "srandom" | "get_randstate" | "set_randstate" | "rand_mode" | "constraint_mode"
+                )
         });
         if c.kind(n) == MemberExpr && !system_callee {
             if let Some(&b) = kids(c, n).first() {
@@ -157,10 +160,12 @@ impl<'c, 't> PathHooks<'c, 't> for NullHooks<'c, 't> {
         let mut negated = false;
         loop {
             match c.kind(e) {
-                ParenExpr => e = match kids(c, e).first() {
-                    Some(&x) => x,
-                    None => return,
-                },
+                ParenExpr => {
+                    e = match kids(c, e).first() {
+                        Some(&x) => x,
+                        None => return,
+                    }
+                }
                 PrefixExpr if !negated && c.keyword(e).is_some_and(|k| c.text_of(k) == "!") => {
                     negated = true;
                     e = match kids(c, e).first() {

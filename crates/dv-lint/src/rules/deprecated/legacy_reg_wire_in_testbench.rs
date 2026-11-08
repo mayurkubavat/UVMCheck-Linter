@@ -1,11 +1,11 @@
 //! SV-BAN-001 (LegacyRegWireInTestbench): Discourages legacy 'reg' and 'wire'
 //! keywords in SystemVerilog testbenches in favor of 'logic'.
 
-use sv_syntax::Child;
+use crate::support::names::DIRECTIONS;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::Child;
 use sv_syntax::SyntaxKind::*;
-use crate::support::names::{DIRECTIONS};
 
 pub(crate) fn legacy_reg_wire(c: &Cst, s: &mut Sink) {
     for n in c.nodes(DataDecl) {

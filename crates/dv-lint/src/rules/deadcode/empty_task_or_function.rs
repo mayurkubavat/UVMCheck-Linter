@@ -1,9 +1,9 @@
 //! SV-DED-011 (EmptyTaskOrFunction): Flags concrete, non-virtual, non-extern
 //! tasks and functions with empty bodies (zero statements).
 
-use sv_syntax::SyntaxKind;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn empty_routine(c: &Cst, s: &mut Sink) {
@@ -21,10 +21,7 @@ pub(crate) fn empty_routine(c: &Cst, s: &mut Sink) {
         if routine == "body" || routine == "new" {
             continue;
         }
-        let has_stmt = c
-            .tree
-            .child(n, Body)
-            .is_some_and(|b| c.tree.children(b).any(|x| c.kind(x) != EmptyStmt));
+        let has_stmt = c.tree.child(n, Body).is_some_and(|b| c.tree.children(b).any(|x| c.kind(x) != EmptyStmt));
         if has_stmt {
             continue;
         }

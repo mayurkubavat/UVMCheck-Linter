@@ -3,11 +3,11 @@
 //! in C; use 2-state portable types (int, longint, byte) for C99 ABI
 //! compatibility.
 
-use sv_syntax::SyntaxKind;
+use crate::support::ast::last_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::ast::{last_tok};
 
 /// slang's `toString()` of the tokens `a..=b`: each with its leading trivia.
 fn span_text(c: &Cst, a: u32, b: u32) -> String {

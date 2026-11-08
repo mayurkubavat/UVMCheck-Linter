@@ -1,13 +1,13 @@
 //! UVM-SEQ-005 (EmptySequenceBody): Detects sequence classes whose body() task
 //! contains no executable statements.
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use crate::support::uvm_classes::{sequence_bodies, Ix};
 use crate::support::uvm_syntax::body_items;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, sequence_bodies};
 
 pub(crate) fn empty_sequence_body(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);

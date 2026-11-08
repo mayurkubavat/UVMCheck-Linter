@@ -2,12 +2,12 @@
 //! try_get() calls whose return status is ignored, which risks threads
 //! executing critical sections without holding the lock.
 
-use sv_syntax::SyntaxKind;
+use crate::support::procedural::{add_n, start, stmt_call};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::procedural::{add_n, start, stmt_call};
 
 pub(crate) fn try_get_unchecked(c: &Cst, s: &mut Sink) {
     for st in c.nodes(ExprStmt) {

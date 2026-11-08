@@ -3,8 +3,8 @@
 //! super.post_randomize() to prevent bypassing base-class transaction setup and
 //! validation routines.
 
+use crate::{find_method, Severity, Sink};
 use dv_model::Design;
-use crate::{Severity, Sink, find_method};
 
 pub(crate) fn randomize_missing_super(d: &Design, out: &mut Sink) {
     for cls in d.classes() {
@@ -18,17 +18,11 @@ pub(crate) fn randomize_missing_super(d: &Design, out: &mut Sink) {
             if sub.name != "pre_randomize" && sub.name != "post_randomize" {
                 continue;
             }
-            let above = d
-                .ancestors(cls.id)
-                .any(|a| find_method(a, &sub.name).is_some_and(|m| !m.is_builtin));
+            let above = d.ancestors(cls.id).any(|a| find_method(a, &sub.name).is_some_and(|m| !m.is_builtin));
             if !above {
                 continue;
             }
-            if sub
-                .calls
-                .iter()
-                .any(|c| !c.is_system && c.name == sub.name && c.via_super)
-            {
+            if sub.calls.iter().any(|c| !c.is_system && c.name == sub.name && c.via_super) {
                 continue;
             }
             out.add(

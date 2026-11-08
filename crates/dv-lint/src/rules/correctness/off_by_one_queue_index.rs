@@ -1,10 +1,10 @@
 //! SV-ARR-001 (OffByOneQueueIndex): Detects out-of-bounds off-by-one queue and
 //! dynamic array indexing (e.g. 'q[q.size()]').
 
+use crate::support::spans::span;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::spans::{span};
 
 pub(crate) fn off_by_one_index(c: &Cst, s: &mut Sink) {
     for n in c.nodes(SelectExpr) {

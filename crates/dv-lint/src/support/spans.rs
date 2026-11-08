@@ -1,12 +1,8 @@
 //! Node spans and children.
 
-
 use sv_syntax::NodeId;
 
 use crate::syntax::Cst;
-
-
-
 
 /// slang's `toString()` of the tokens `a..=b`.
 pub(crate) fn span(c: &Cst, a: u32, b: u32) -> String {

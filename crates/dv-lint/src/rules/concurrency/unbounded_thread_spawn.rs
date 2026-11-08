@@ -2,12 +2,14 @@
 //! or while loops with no wait fork, disable fork or semaphore get in the loop
 //! to bound outstanding threads (thread-leak checks).
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::procedural::{
+    add_n, is_semaphore_get, is_wait_loop, join_kind, loop_body, loop_kw, routine_name, start,
+};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::procedural::{add_n, is_semaphore_get, is_wait_loop, join_kind, loop_body, loop_kw, routine_name, start};
 
 pub(crate) fn unbounded_spawn(c: &Cst, s: &mut Sink) {
     for (r, n) in user_routines(c) {

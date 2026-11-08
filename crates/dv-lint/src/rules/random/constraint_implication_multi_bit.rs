@@ -2,15 +2,15 @@
 //! expressions 'A -> B' where condition 'A' is a multi-bit vector without an
 //! explicit boolean comparison.
 
-use std::collections::HashMap;
-use sv_syntax::NodeId;
-use crate::support::class_items::{declarators, qualifiers, kids, model_classes, subtree};
-use crate::support::type_text::base_name;
+use crate::support::class_items::{declarators, kids, model_classes, qualifiers, subtree};
+use crate::support::constraints::{const_int, constraint_blocks, param_values, type_width, typedefs};
 use crate::support::data_items::unparen;
+use crate::support::type_text::base_name;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashMap;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::constraints::{const_int, constraint_blocks, param_values, type_width, typedefs};
 
 struct Widths<'a> {
     params: HashMap<String, NodeId>,

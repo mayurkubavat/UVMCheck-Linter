@@ -198,7 +198,6 @@ impl Builder<'_> {
         self.parent_node(v).is_some_and(|d| t.kind(d) == Declarator && t.children(d).any(|c| t.kind(c) == Dim))
     }
 
-
     // ---- the static type of an expression -----------------------------------
 
     /// The declared type of a constant, a function local or argument.
@@ -454,11 +453,11 @@ impl Builder<'_> {
             }
             (PrefixExpr, Some("-")) => {
                 let a = sub(*kids.first()?)?;
-types::unary("-", a)?
+                types::unary("-", a)?
             }
             (PrefixExpr, Some("~")) => {
                 let a = sub(*kids.first()?)?;
-types::unary("~", a)?
+                types::unary("~", a)?
             }
             (CondExpr, _) => {
                 let c = self.eval(*kids.first()?, scope, env, depth + 1)?;

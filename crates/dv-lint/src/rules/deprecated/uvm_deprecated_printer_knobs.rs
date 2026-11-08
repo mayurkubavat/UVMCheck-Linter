@@ -1,12 +1,12 @@
 //! UVM-DEP-003 (UvmDeprecatedPrinterKnobs): Disallow direct access to
 //! 'printer.knobs' (IEEE 1800.2 § 5.5.2).
 
-use std::collections::HashMap;
-use sv_syntax::NodeId;
+use crate::support::copies::copies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashMap;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::copies::{copies};
 
 /// The declared type of variable `name` as seen from `at`: the closest
 /// declaration in an enclosing scope (data declarations and ports).

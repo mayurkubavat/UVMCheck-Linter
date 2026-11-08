@@ -2,9 +2,9 @@
 //! (try_get(), try_peek(), try_put()) where the boolean return status is
 //! ignored.
 
+use crate::support::calls::{callee, statement_calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::calls::{callee, statement_calls};
 
 pub(crate) fn tlm_try_unchecked(c: &Cst, s: &mut Sink) {
     for call in statement_calls(c) {

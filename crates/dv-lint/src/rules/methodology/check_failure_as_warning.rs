@@ -2,12 +2,12 @@
 //! expected-versus-actual mismatch reported only with `uvm_warning or
 //! `uvm_info.
 
-use dv_model::Design;
-use crate::support::routine_bodies::bodies;
+use crate::support::check_failures::{failure_branches, strongest_report, Level};
 use crate::support::class_roles::Index;
+use crate::support::routine_bodies::bodies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::check_failures::{Level, failure_branches, strongest_report};
+use dv_model::Design;
 
 pub(crate) fn check_failure_as_warning(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);

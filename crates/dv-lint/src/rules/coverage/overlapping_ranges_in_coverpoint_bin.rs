@@ -1,12 +1,12 @@
 //! SV-COV-016 (OverlappingRangesInCoverpointBin): Flags coverpoint bins
 //! containing overlapping numerical value ranges.
 
-use sv_syntax::NodeId;
 use crate::support::slang_ast::*;
+use crate::support::sva_cov::bins_name;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{bins_name};
 
 /// `std::stoll(text, nullptr, 0)` of a decimal literal as written.
 fn stoll0(text: &str) -> Option<i64> {

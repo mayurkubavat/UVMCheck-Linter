@@ -1,11 +1,11 @@
 //! SV-DEP-006 (NonAnsiPortList): Disallow obsolete non-ANSI port list
 //! declarations.
 
-use sv_syntax::Child;
+use crate::support::names::DIRECTIONS;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::Child;
 use sv_syntax::SyntaxKind::*;
-use crate::support::names::{DIRECTIONS};
 
 pub(crate) fn non_ansi_ports(c: &Cst, s: &mut Sink) {
     // Module, interface and program headers: `module m(a, b);`.
@@ -14,9 +14,7 @@ pub(crate) fn non_ansi_ports(c: &Cst, s: &mut Sink) {
         let Some(port) = c.tree.children(list).next() else { continue };
         let plain = c.kind(port) == Port
             && c.kids(port).iter().all(|k| matches!(*k, Child::Node(x) if c.kind(x) == Declarator))
-            && c.tree.children(port).next().is_some_and(|d| {
-                c.kids(d).len() == 1 && c.tree.child(d, Name).is_some()
-            });
+            && c.tree.children(port).next().is_some_and(|d| c.kids(d).len() == 1 && c.tree.child(d, Name).is_some());
         let explicit = c.kind(port) == Port && c.keyword(port).is_some_and(|t| matches!(c.text_of(t), "." | "{"));
         if !(plain || explicit) {
             continue;

@@ -4,8 +4,6 @@ use sv_syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
 
-
-
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn kids(c: &Cst, n: NodeId) -> Vec<NodeId> {

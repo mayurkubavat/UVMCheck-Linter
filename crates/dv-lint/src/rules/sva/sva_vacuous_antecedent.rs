@@ -1,10 +1,10 @@
 //! SVA-VAC-001 (SvaVacuousAntecedent): Detects constant-false antecedents in
 //! assertion implications (0 |-> ...).
 
+use crate::support::cross_labels::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::cross_labels::{kids};
 
 pub(crate) fn vacuous_antecedent(c: &Cst, s: &mut Sink) {
     for n in c.nodes(SequenceExpr) {

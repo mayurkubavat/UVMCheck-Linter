@@ -2,15 +2,15 @@
 //! name types with string literals (set_type_override_by_name,
 //! set_inst_override, create_object ...).
 
-use std::collections::HashMap;
-use dv_model::Design;
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::{bodies, calls_in, Calls};
 use crate::support::class_roles::Index;
+use crate::support::free_routines::free_routines;
+use crate::support::routine_bodies::{bodies, calls_in, Calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashMap;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::free_routines::{free_routines};
 
 /// Factory calls that take type names as strings, and which arguments
 /// those are.
@@ -89,7 +89,9 @@ pub(crate) fn override_by_name_string(d: &Design, csts: &[Cst], out: &mut Sink) 
                     continue;
                 }
                 let Some(ty) = names.get(&c.tree.bare_text(obj)) else { continue };
-                let Some(k) = crate::support::class_roles::class_of_type_in(d, Some(&ix.typedefs), ty, None) else { continue };
+                let Some(k) = crate::support::class_roles::class_of_type_in(d, Some(&ix.typedefs), ty, None) else {
+                    continue;
+                };
                 let n = c.callee_name(call);
                 let owner = std::iter::once(k)
                     .chain(d.ancestors(k.id))

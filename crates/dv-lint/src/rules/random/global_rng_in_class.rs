@@ -1,8 +1,8 @@
 //! SV-RND-002 (GlobalRngInClass): Calling $urandom or $random inside class
 //! components or sequences corrupts global thread random stability.
 
-use dv_model::Design;
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn global_rng_in_class(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

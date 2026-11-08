@@ -1,11 +1,11 @@
 //! SV-LANG-003 (UnsizedLiteralInConcat): Disallow unbased unsized integer
 //! literals inside concatenations ({1, 0, data}).
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::literals::{ast_times, compact, integer_literal, is_streaming, unparen};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::literals::{ast_times, compact, integer_literal, is_streaming, unparen};
 
 /// A concatenation whose operands slang keeps as written: not the `n{...}`
 /// of a replicated assignment pattern, nor an unpacked array

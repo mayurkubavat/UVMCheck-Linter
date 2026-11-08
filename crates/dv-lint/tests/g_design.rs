@@ -53,9 +53,7 @@ fn override_only_calls_super_needs_a_known_base() {
 fn metrics_rules_fire_on_complex_routines() {
     let mut body = String::new();
     for i in 0..30 {
-        body.push_str(&format!(
-            "  if (a > {i}) begin if (b) begin if (c) begin if (d) x = {i}; end end end\n"
-        ));
+        body.push_str(&format!("  if (a > {i}) begin if (b) begin if (c) begin if (d) x = {i}; end end end\n"));
     }
     let src = format!(
         "class m;\n int x; bit a, b, c, d;\n function void f();\n{body} endfunction\n\

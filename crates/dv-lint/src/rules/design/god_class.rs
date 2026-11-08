@@ -3,9 +3,9 @@
 //! GodClass detection strategy.
 
 use crate::support::class_index::*;
+use crate::support::class_metrics::each_class;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_metrics::{each_class};
 
 pub(crate) fn god_class(c: &Cst, s: &mut Sink) {
     let (wmc_limit, atfd_limit, tcc_percent) = (47, 5, 33.0);

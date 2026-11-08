@@ -2,14 +2,14 @@
 //! constraint of the class (or its base classes) ties a to b, directly or
 //! through other variables.
 
-use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
 use crate::support::class_items::subtree;
+use crate::support::constraints::{constraint_blocks, user_model_classes};
 use crate::support::type_text::base_name;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::{HashMap, HashSet};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::constraints::{constraint_blocks, user_model_classes};
 
 /// Union-find over variable names.
 #[derive(Default)]

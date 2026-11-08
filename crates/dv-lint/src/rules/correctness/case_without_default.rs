@@ -1,8 +1,8 @@
 //! SV-COR-006 (CaseWithoutDefault): Flags 'case', 'casex', and 'casez'
 //! statements that lack an explicit 'default:' fallback branch.
 
+use crate::syntax::{case_statements, Cst};
 use crate::{Severity, Sink};
-use crate::syntax::{Cst, case_statements};
 
 pub(crate) fn case_without_default(c: &Cst, s: &mut Sink) {
     for (n, kw) in case_statements(c) {

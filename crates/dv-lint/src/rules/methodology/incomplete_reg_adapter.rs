@@ -1,12 +1,12 @@
 //! RAL-ADP-001 (IncompleteRegAdapter): Flags uvm_reg_adapter subclasses whose
 //! bus2reg() never sets rw.status or whose reg2bus() never reads rw.kind.
 
-use dv_model::Design;
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::bodies;
 use crate::support::class_roles::{uvm_base_name, Index};
+use crate::support::routine_bodies::bodies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 #[derive(Default)]

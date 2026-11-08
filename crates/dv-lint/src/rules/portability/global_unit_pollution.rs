@@ -1,14 +1,25 @@
 //! SV-MOD-001 (GlobalUnitPollution): Disallow variables, nets, typedefs, tasks,
 //! and functions declared directly in the $unit compilation unit scope.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::ast::{kids, last_tok};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::ast::{kids, last_tok};
 
 const NET_TYPES: &[&str] = &[
-    "wire", "tri", "wand", "wor", "triand", "trior", "tri0", "tri1", "trireg", "uwire", "supply0", "supply1",
+    "wire",
+    "tri",
+    "wand",
+    "wor",
+    "triand",
+    "trior",
+    "tri0",
+    "tri1",
+    "trireg",
+    "uwire",
+    "supply0",
+    "supply1",
     "interconnect",
 ];
 
@@ -27,10 +38,9 @@ pub(crate) fn unit_pollution(c: &Cst, s: &mut Sink) {
             }
             TypedefDecl => ("typedef", c.tree.child(item, Name).into_iter().collect()),
             // An out-of-block body (`function C::f`) belongs to its class.
-            FunctionDecl | TaskDecl | DpiImport => (
-                "subroutine",
-                c.tree.child(item, Name).filter(|&n| c.tok(n, "::").is_none()).into_iter().collect(),
-            ),
+            FunctionDecl | TaskDecl | DpiImport => {
+                ("subroutine", c.tree.child(item, Name).filter(|&n| c.tok(n, "::").is_none()).into_iter().collect())
+            }
             _ => continue,
         };
         for name in names {

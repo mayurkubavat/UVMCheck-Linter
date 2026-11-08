@@ -1,10 +1,10 @@
 //! SV-OOP-012 (ChainedAssignmentAliasing): Disallows chained assignment
 //! expressions (e.g. a = b = c;).
 
-use sv_syntax::NodeId;
 use crate::support::class_items::{kids, op};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn chained_assignment(c: &Cst, s: &mut Sink) {

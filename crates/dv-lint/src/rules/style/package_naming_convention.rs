@@ -1,10 +1,10 @@
 //! SV-NAM-002 (PackageNamingConvention): Enforces that package identifiers end
 //! with '_pkg' (e.g., 'axi_pkg') to standardize namespaces.
 
+use crate::support::names::name_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::names::{name_tok};
 
 pub(crate) fn package_naming(c: &Cst, s: &mut Sink) {
     for n in c.nodes(PackageDecl) {

@@ -3,9 +3,9 @@
 //! class is really several classes.
 
 use crate::support::class_index::*;
+use crate::support::class_metrics::each_class;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_metrics::{each_class};
 
 pub(crate) fn low_cohesion(c: &Cst, s: &mut Sink) {
     let (min_groups, min_size) = (2, 2);
@@ -18,11 +18,7 @@ pub(crate) fn low_cohesion(c: &Cst, s: &mut Sink) {
         if groups.len() < min_groups {
             return;
         }
-        let desc = groups
-            .iter()
-            .map(|g| format!("{{{}}}", g.join(", ")))
-            .collect::<Vec<_>>()
-            .join("; ");
+        let desc = groups.iter().map(|g| format!("{{{}}}", g.join(", "))).collect::<Vec<_>>().join("; ");
         let cls = &classes.list[cm.cls];
         s.add(
             "SV-DSN-003",

@@ -2,12 +2,12 @@
 //! outside the range of the coverpoint expression (for example bins {[16:31]}
 //! on a 4-bit value).
 
-use sv_syntax::NodeId;
 use crate::support::slang_ast::*;
+use crate::support::sva_cov::{add_n, bins_kw, bins_name, label_of};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{add_n, bins_kw, bins_name, label_of};
 
 /// Width and signedness of a declared integral type, as written.
 fn type_width(c: &Cst, dt: NodeId) -> Option<(u32, bool)> {
@@ -112,7 +112,11 @@ fn literal_value(c: &Cst, e: NodeId) -> Option<i128> {
 
 pub(crate) fn unreachable_bin(c: &Cst, s: &mut Sink) {
     for cp in c.nodes(Coverpoint) {
-        let Some(expr) = kids(c, cp).into_iter().find(|&k| !matches!(c.kind(k), StmtLabel | Attribute | Bins | CoverageOption)) else { continue };
+        let Some(expr) =
+            kids(c, cp).into_iter().find(|&k| !matches!(c.kind(k), StmtLabel | Attribute | Bins | CoverageOption))
+        else {
+            continue;
+        };
         let cp_name = match label_of(c, cp) {
             Some(l) => l,
             None if c.kind(expr) == NameExpr => c.tree.bare_text(expr),
@@ -122,7 +126,9 @@ pub(crate) fn unreachable_bin(c: &Cst, s: &mut Sink) {
             NameExpr => c.first_tok(expr).and_then(|t| lookup(c, expr, c.text_of(t))),
             MemberExpr => {
                 let base = kids(c, expr).first().copied();
-                base.and_then(|b| expr_type(c, b)).and_then(|t| find_class(c, &t, expr)).and_then(|k| class_member(c, k, c.last_text(expr)))
+                base.and_then(|b| expr_type(c, b))
+                    .and_then(|t| find_class(c, &t, expr))
+                    .and_then(|k| class_member(c, k, c.last_text(expr)))
             }
             _ => None,
         };

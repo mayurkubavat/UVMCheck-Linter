@@ -2,11 +2,11 @@
 //! more arguments (same names and types) declared by min_routines (default 3)
 //! or more routines.
 
-use std::collections::BTreeMap;
-use sv_syntax::NodeId;
 use crate::support::class_index::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::BTreeMap;
+use sv_syntax::NodeId;
 
 /// slang's `Type::toString()` of a port type, as far as grouping needs.
 fn type_text(c: &Cst, ty: Option<NodeId>) -> String {
@@ -25,11 +25,7 @@ pub(crate) fn data_clumps(c: &Cst, s: &mut Sink) {
             if classes.override_of(i, &m.name).is_some() || m.ports.len() < min_args {
                 continue;
             }
-            let mut parts: Vec<String> = m
-                .ports
-                .iter()
-                .map(|p| format!("{} {}", type_text(c, p.ty), p.name))
-                .collect();
+            let mut parts: Vec<String> = m.ports.iter().map(|p| format!("{} {}", type_text(c, p.ty), p.name)).collect();
             parts.sort();
             let key: String = parts.iter().map(|p| format!("{p};")).collect();
             groups.entry(key).or_default().push((i, mi));
@@ -42,10 +38,7 @@ pub(crate) fn data_clumps(c: &Cst, s: &mut Sink) {
         let mut sorted = routines.clone();
         let pos = |&(i, m): &(usize, usize)| {
             let l = c.loc(classes.list[i].methods[m].tok);
-            let l = l
-                .expansion
-                .map(|(f, line)| (f, line, 0))
-                .unwrap_or((l.file, l.line, l.column));
+            let l = l.expansion.map(|(f, line)| (f, line, 0)).unwrap_or((l.file, l.line, l.column));
             (l, classes.list[i].methods[m].tok)
         };
         sorted.sort_by_key(pos);
@@ -54,10 +47,7 @@ pub(crate) fn data_clumps(c: &Cst, s: &mut Sink) {
             if !names.is_empty() {
                 names.push_str(", ");
             }
-            names.push_str(&format!(
-                "{}::{}",
-                classes.list[i].name, classes.list[i].methods[m].name
-            ));
+            names.push_str(&format!("{}::{}", classes.list[i].name, classes.list[i].methods[m].name));
         }
         if sorted.len() > 6 {
             names.push_str(", ...");

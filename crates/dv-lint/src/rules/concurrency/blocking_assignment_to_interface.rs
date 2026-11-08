@@ -1,10 +1,10 @@
 //! SV-INT-001 (BlockingAssignmentToInterface): Disallows blocking assignments
 //! ('=') when driving virtual interface or clocking block signals.
 
-use sv_syntax::SyntaxKind;
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn blocking_to_interface(c: &Cst, s: &mut Sink) {

@@ -3,12 +3,12 @@
 //! wrapped in parentheses. `define DOUBLE(x) x*2 turns DOUBLE(a+1) into a+1*2;
 //! write `define DOUBLE(x) ((x)*2).
 
-use std::collections::{HashMap, HashSet};
-use dv_model::Loc;
-use sv_lexer::Kind;
-use sv_syntax::Origin;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Loc;
+use std::collections::{HashMap, HashSet};
+use sv_lexer::Kind;
+use sv_syntax::Origin;
 
 /// A `define in the tree's text, as the preprocessor read it (not in a
 /// branch not taken): its name's position, formal argument names (None for
@@ -113,8 +113,8 @@ fn defines(c: &Cst) -> Vec<Define> {
 }
 
 const OPERATORS: [&str; 27] = [
-    "+", "-", "*", "/", "%", "**", "<<", ">>", "<<<", ">>>", "&", "|", "^", "&&", "||", "==", "!=", "===", "!==",
-    "<", "<=", ">", ">=", "?", "~", "!", "",
+    "+", "-", "*", "/", "%", "**", "<<", ">>", "<<<", ">>>", "&", "|", "^", "&&", "||", "==", "!=", "===", "!==", "<",
+    "<=", ">", ">=", "?", "~", "!", "",
 ];
 
 fn is_operator(k: Kind, s: &str) -> bool {

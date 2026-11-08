@@ -2,12 +2,12 @@
 //! call $fclose, which loses buffered trace data and exhausts file handles in
 //! long regressions (Sonar S2095).
 
-use sv_syntax::SyntaxKind;
+use crate::support::procedural::{calls_in, start};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::procedural::{calls_in, start};
 
 pub(crate) fn file_not_closed(c: &Cst, s: &mut Sink) {
     for cls in user_classes(c) {

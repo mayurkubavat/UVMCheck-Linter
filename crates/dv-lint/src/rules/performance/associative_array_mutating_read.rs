@@ -1,13 +1,13 @@
 //! SV-ASC-001 (AssociativeArrayMutatingRead): Detects direct read lookups on
 //! associative arrays in expressions without checking exists().
 
+use crate::support::procedural::start;
+use crate::support::slang_ast::kids;
+use crate::syntax::Cst;
+use crate::{Severity, Sink};
 use std::collections::HashSet;
 use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::syntax::Cst;
-use crate::{Severity, Sink};
-use crate::support::slang_ast::kids;
-use crate::support::procedural::start;
 
 /// Names declared anywhere in the compile with an unpacked dimension that
 /// reads like an associative index (`[int]`, `[*]`; also `[4]`, as the

@@ -1,10 +1,10 @@
 //! SV-TIM-001 (TimescalePrecisionMismatch): Flags `timescale directives where
 //! the time precision is coarser than the time unit (IEEE 1800 § 3.14.2).
 
-use sv_syntax::Origin;
+use crate::support::data_items::main_files;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::data_items::{main_files};
+use sv_syntax::Origin;
 
 fn time_exp(s: &str) -> i32 {
     let mut s = s.trim_start_matches([' ', '\t']).trim_end_matches([' ', '\t', '\r', '\n', ';']);

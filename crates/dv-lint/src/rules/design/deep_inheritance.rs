@@ -2,9 +2,9 @@
 //! ancestors above the UVM base class (CK depth of inheritance tree, Pylint
 //! too-many-ancestors).
 
+use crate::support::class_metrics::each_class;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::class_metrics::{each_class};
 
 pub(crate) fn deep_inheritance(c: &Cst, s: &mut Sink) {
     let limit = 3;

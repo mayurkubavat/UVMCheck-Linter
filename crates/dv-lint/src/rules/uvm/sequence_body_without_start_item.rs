@@ -2,16 +2,14 @@
 //! inside uvm_sequence::body() that are not preceded by a corresponding
 //! start_item().
 
-use std::collections::HashSet;
-use dv_model::Design;
-use sv_syntax::{NodeId, SyntaxKind};
-use crate::support::uvm_syntax::{
-    arg_list, body_items, params, stmt_expr,
-};
+use crate::support::uvm_classes::{block_stmts, is_name_chain, sequence_bodies, Ix};
+use crate::support::uvm_syntax::{arg_list, body_items, params, stmt_expr};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, block_stmts, is_name_chain, sequence_bodies};
 
 fn start_finish(c: &Cst, cls: &str, n: NodeId, started: &mut HashSet<String>, s: &mut Sink) {
     match c.kind(n) {

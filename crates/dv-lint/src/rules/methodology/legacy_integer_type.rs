@@ -1,10 +1,10 @@
 //! SV-CNS-007 (LegacyIntegerType): Flags the Verilog-1995 type 'integer' in
 //! class code.
 
-use dv_model::Design;
+use crate::support::defines_packages::{container_of, user_types, Container, Files};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::defines_packages::{Container, Files, container_of, user_types};
+use dv_model::Design;
 
 pub(crate) fn legacy_integer_type(_: &Design, csts: &[Cst], out: &mut Sink) {
     for c in csts {

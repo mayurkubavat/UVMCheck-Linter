@@ -2,24 +2,42 @@
 //! constant in components, sequences and other non-test classes; every seed of
 //! the regression then runs the same stimulus.
 
-use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
-use crate::support::class_items::{call_name, class_decls, class_items, decl_name, declarators, kids, subtree,
-    user_code};
+use crate::support::class_items::{
+    call_name, class_decls, class_items, decl_name, declarators, kids, subtree, user_code,
+};
 use crate::support::data_items::{is_number_literal, strip_conv, unparen};
 use crate::support::sema_facts::ast_ok;
+use crate::support::type_text::{base_name, expr_text};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::{HashMap, HashSet};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::type_text::{base_name, expr_text};
 
 /// uvm base classes swe::classRole knows; the first one up the chain
 /// decides the role.
 const UVM_ROLES: &[&str] = &[
-    "uvm_driver", "uvm_push_driver", "uvm_monitor", "uvm_push_sequencer", "uvm_agent", "uvm_scoreboard",
-    "uvm_subscriber", "uvm_env", "uvm_test", "uvm_mem", "uvm_vreg", "uvm_report_catcher", "uvm_sequence",
-    "uvm_sequence_base", "uvm_reg_sequence", "uvm_sequence_item", "uvm_transaction", "uvm_component", "uvm_root",
-    "uvm_object", "uvm_void",
+    "uvm_driver",
+    "uvm_push_driver",
+    "uvm_monitor",
+    "uvm_push_sequencer",
+    "uvm_agent",
+    "uvm_scoreboard",
+    "uvm_subscriber",
+    "uvm_env",
+    "uvm_test",
+    "uvm_mem",
+    "uvm_vreg",
+    "uvm_report_catcher",
+    "uvm_sequence",
+    "uvm_sequence_base",
+    "uvm_reg_sequence",
+    "uvm_sequence_item",
+    "uvm_transaction",
+    "uvm_component",
+    "uvm_root",
+    "uvm_object",
+    "uvm_void",
 ];
 
 fn known_role(n: &str) -> bool {

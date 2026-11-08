@@ -3,12 +3,12 @@
 //! (assert/assume/cover property, immediate asserts, property declarations or
 //! checkers) and is not the target of a bind.
 
-use std::collections::HashSet;
-use dv_model::Design;
-use sv_syntax::{Child, NodeId};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
 use sv_syntax::SyntaxKind::*;
+use sv_syntax::{Child, NodeId};
 
 pub(crate) fn interface_without_assertions(d: &Design, csts: &[Cst], out: &mut Sink) {
     let mut bound = HashSet::new();
@@ -69,8 +69,6 @@ fn is_checker_inst(csts: &[Cst], c: &Cst, n: NodeId) -> bool {
     };
     let name = c.tree.bare_text(ty);
     csts.iter().any(|t| {
-        t.nodes(CheckerDecl)
-            .into_iter()
-            .any(|k| t.tree.child(k, Name).is_some_and(|x| t.tree.bare_text(x) == name))
+        t.nodes(CheckerDecl).into_iter().any(|k| t.tree.child(k, Name).is_some_and(|x| t.tree.bare_text(x) == name))
     })
 }

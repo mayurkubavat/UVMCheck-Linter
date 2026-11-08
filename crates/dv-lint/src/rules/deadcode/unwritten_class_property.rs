@@ -1,11 +1,11 @@
 //! SV-DED-006 (UnwrittenClassProperty): Flags non-rand class properties that
 //! lack an initializer, are read in methods, but never written or assigned.
 
-use sv_syntax::SyntaxKind;
+use crate::support::ast::class_properties;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::ast::{class_properties};
 
 pub(crate) fn unwritten_property(c: &Cst, s: &mut Sink) {
     for cls in c.nodes(ClassDecl) {

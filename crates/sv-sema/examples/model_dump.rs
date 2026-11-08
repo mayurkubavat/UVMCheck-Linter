@@ -16,11 +16,7 @@ fn main() {
             _ => args.push(a),
         }
     }
-    let design = if slang {
-        Design::load(&args)
-    } else {
-        sv_sema::load(&args)
-    };
+    let design = if slang { Design::load(&args) } else { sv_sema::load(&args) };
     match design {
         Ok(d) => print!("{}", d.dump(opts)),
         Err(e) => {

@@ -13,8 +13,6 @@ use crate::support::class_roles::{class_methods, key, user_classes, Ctx, Index};
 
 use crate::syntax::Cst;
 
-
-
 use sv_syntax::SyntaxKind::*;
 
 /// The statements of a block or body (declarations included, as slang's
@@ -128,11 +126,7 @@ pub(crate) fn always_exits(c: &Cst, n: NodeId) -> bool {
             let p = case_parts(c, n);
             p.items.iter().any(|i| i.2) && p.items.iter().all(|i| i.1.is_some_and(|s| always_exits(c, s)))
         }
-        TimedStmt => c
-            .items(n)
-            .into_iter()
-            .find(|&x| c.kind(x) != TimingControl)
-            .is_some_and(|s| always_exits(c, s)),
+        TimedStmt => c.items(n).into_iter().find(|&x| c.kind(x) != TimingControl).is_some_and(|s| always_exits(c, s)),
         _ => false,
     }
 }
@@ -158,7 +152,10 @@ pub(crate) fn is_report_guard(c: &Cst, n: NodeId) -> bool {
     let (mut report, mut other) = (false, false);
     for call in calls_in(c, cond) {
         let name = c.callee_name(call);
-        if matches!(name, "uvm_report_enabled" | "get_report_verbosity_level" | "get_report_action" | "uvm_get_report_object") {
+        if matches!(
+            name,
+            "uvm_report_enabled" | "get_report_verbosity_level" | "get_report_action" | "uvm_get_report_object"
+        ) {
             report = true;
         } else {
             other = true;
@@ -226,7 +223,14 @@ pub(crate) fn creations<'d>(ctx: &Ctx<'d, '_>, calls: &Calls<'d>, c: &Cst, n: No
     out
 }
 
-pub(crate) fn walk_creations<'d>(ctx: &Ctx<'d, '_>, calls: &Calls<'d>, c: &Cst, n: NodeId, guarded: bool, out: &mut Vec<Creation<'d>>) {
+pub(crate) fn walk_creations<'d>(
+    ctx: &Ctx<'d, '_>,
+    calls: &Calls<'d>,
+    c: &Cst,
+    n: NodeId,
+    guarded: bool,
+    out: &mut Vec<Creation<'d>>,
+) {
     match c.kind(n) {
         IfStmt => {
             let (cond, then, other) = if_parts(c, n);
@@ -284,7 +288,12 @@ pub(crate) fn walk_creations<'d>(ctx: &Ctx<'d, '_>, calls: &Calls<'d>, c: &Cst, 
 }
 
 /// `meth::isFactoryCreate`, and the class it creates.
-pub(crate) fn factory_create_type<'d>(ctx: &Ctx<'d, '_>, calls: &Calls<'d>, c: &Cst, call: NodeId) -> Option<&'d Class> {
+pub(crate) fn factory_create_type<'d>(
+    ctx: &Ctx<'d, '_>,
+    calls: &Calls<'d>,
+    c: &Cst,
+    call: NodeId,
+) -> Option<&'d Class> {
     if c.callee_name(call) != "create" {
         return None;
     }
@@ -347,7 +356,10 @@ pub(crate) fn new_type<'d>(ctx: &Ctx<'d, '_>, c: &Cst, n: NodeId) -> Option<&'d 
 }
 
 /// Every method of every user class with a body in the trees.
-pub(crate) fn bodies<'a, 'd, 't>(d: &'d Design, ix: &Index<'a, 't>) -> Vec<(&'d Class, &'d Method, &'a Cst<'t>, NodeId)> {
+pub(crate) fn bodies<'a, 'd, 't>(
+    d: &'d Design,
+    ix: &Index<'a, 't>,
+) -> Vec<(&'d Class, &'d Method, &'a Cst<'t>, NodeId)> {
     let mut v = Vec::new();
     for cls in user_classes(d) {
         for m in class_methods(cls) {
@@ -378,8 +390,8 @@ pub(crate) fn integer_literal(c: &Cst, e: NodeId) -> Option<String> {
         return None;
     }
     let toks = c.tree.token_range(e);
-    let ok = toks
-        .iter()
-        .all(|&t| matches!(c.tree.tokens[t as usize].kind, Kind::IntegerLiteral | Kind::IntegerBase | Kind::VectorDigits));
+    let ok = toks.iter().all(|&t| {
+        matches!(c.tree.tokens[t as usize].kind, Kind::IntegerLiteral | Kind::IntegerBase | Kind::VectorDigits)
+    });
     (ok && !toks.is_empty()).then(|| c.expr_text(e))
 }

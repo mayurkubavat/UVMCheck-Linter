@@ -1,15 +1,17 @@
 //! SV-CNS-004 (StringAsEnum): Flags a string variable compared against three or
 //! more literals in one case statement or if/else-if chain.
 
-use std::collections::HashSet;
-use dv_model::Design;
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::Calls;
 use crate::support::class_roles::{is_library, Index};
+use crate::support::routine_bodies::Calls;
+use crate::support::string_codes::{
+    all_uvm_access_policies, dispatches, literal_list, op_of, referenced, user_routines, Routine, Sym,
+};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use std::collections::HashSet;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::string_codes::{Routine, Sym, all_uvm_access_policies, dispatches, literal_list, op_of, referenced, user_routines};
 
 /// Variables assigned the result of a UVM library call (s = f.get_access()).
 fn from_library(d: &Design, ix: &Index, r: &Routine) -> HashSet<Sym> {
@@ -28,7 +30,8 @@ fn from_library(d: &Design, ix: &Index, r: &Routine) -> HashSet<Sym> {
             continue;
         }
         let owner = calls.owner(c, rhs);
-        let lib = !owner.is_empty() && (owner.starts_with("uvm_") || d.classes().iter().any(|k| k.name == owner && is_library(d, k)));
+        let lib = !owner.is_empty()
+            && (owner.starts_with("uvm_") || d.classes().iter().any(|k| k.name == owner && is_library(d, k)));
         if !lib {
             continue;
         }

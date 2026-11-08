@@ -2,10 +2,10 @@
 //! complexity (nesting-weighted branching, with fork/join counted as nesting)
 //! exceeds the threshold (default 25; Sonar S3776).
 
+use crate::support::routine_metrics::{each_routine, routine_metrics};
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::routine_metrics::{each_routine, routine_metrics};
 
 pub(crate) fn cognitive_complexity(c: &Cst, s: &mut Sink) {
     let limit = 25;

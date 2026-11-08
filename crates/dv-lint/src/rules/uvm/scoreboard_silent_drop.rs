@@ -1,15 +1,13 @@
 //! UVM-SCB-001 (ScoreboardSilentDrop): Detects silent returns in scoreboard
 //! write methods when expected queues are empty without logging an error.
 
-use dv_model::Design;
-use sv_syntax::SyntaxKind;
-use crate::support::uvm_syntax::{
-    routine_last_name, subtree,
-};
+use crate::support::uvm_classes::{if_parts, is_scoreboard, Ix};
+use crate::support::uvm_syntax::{routine_last_name, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Design;
+use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
-use crate::support::uvm_classes::{Ix, if_parts, is_scoreboard};
 
 pub(crate) fn scoreboard_silent_drop(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);
@@ -33,7 +31,9 @@ pub(crate) fn scoreboard_silent_drop(d: &Design, csts: &[Cst], s: &mut Sink) {
                 if !body.contains("return") {
                     continue;
                 }
-                let reported = ["uvm_error", "uvm_fatal", "assert", "error", "fatal", "drop_count"].iter().any(|k| body.contains(k));
+                let reported = ["uvm_error", "uvm_fatal", "assert", "error", "fatal", "drop_count"]
+                    .iter()
+                    .any(|k| body.contains(k));
                 if reported {
                     continue;
                 }

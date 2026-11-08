@@ -2,8 +2,8 @@
 //! signal driving (via '=' or '<=') on virtual interface handles inside passive
 //! uvm_monitor components.
 
-use dv_model::Design;
 use crate::{derives_from, Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn virtual_interface_modport_drive_inversion(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

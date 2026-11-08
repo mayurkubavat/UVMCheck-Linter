@@ -1,8 +1,8 @@
 //! SVA-CTX-001 (ConcurrentAssertInFunction): Disallow concurrent assertions
 //! ('assert/assume/cover property') inside functions.
 
-use crate::support::slang_ast::*;
 use crate::support::procedural::start;
+use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;

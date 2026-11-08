@@ -1,10 +1,10 @@
 //! SV-COV-003 (CrossSameCoverpoint): Detects coverage cross constructs crossing
 //! a coverpoint with itself (cross cp_a, cp_a).
 
+use crate::support::names::cross_parts;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::names::{cross_parts};
 
 pub(crate) fn cross_same_coverpoint(c: &Cst, s: &mut Sink) {
     for n in c.nodes(Cross) {

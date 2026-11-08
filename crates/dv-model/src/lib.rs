@@ -14,9 +14,9 @@
 //! crate's types and do not see which front end built the design;
 //! [`Design::dump`] prints the canonical form the parity gates compare.
 
-use std::fmt;
 #[cfg(feature = "slang")]
 use std::ffi::{CStr, CString};
+use std::fmt;
 #[cfg(feature = "slang")]
 use std::os::raw::c_char;
 #[cfg(feature = "slang")]
@@ -65,10 +65,24 @@ impl UvmKind {
     #[cfg(feature = "slang")]
     fn from_c(v: u8) -> Self {
         use UvmKind::*;
-        [None, Object, SequenceItem, Sequence, Component, Test, Env, Agent, Driver, Monitor, Sequencer, Scoreboard, Subscriber]
-            .get(v as usize)
-            .copied()
-            .unwrap_or(None)
+        [
+            None,
+            Object,
+            SequenceItem,
+            Sequence,
+            Component,
+            Test,
+            Env,
+            Agent,
+            Driver,
+            Monitor,
+            Sequencer,
+            Scoreboard,
+            Subscriber,
+        ]
+        .get(v as usize)
+        .copied()
+        .unwrap_or(None)
     }
 
     /// Any `uvm_component`, whatever its role.
@@ -492,7 +506,12 @@ fn text(p: *const c_char) -> String {
 
 #[cfg(feature = "slang")]
 fn loc(l: ffi::uvmcheck_loc) -> Loc {
-    Loc { file: l.file, line: l.line, column: l.column, expansion: (l.exp_line != 0).then_some((l.exp_file, l.exp_line)) }
+    Loc {
+        file: l.file,
+        line: l.line,
+        column: l.column,
+        expansion: (l.exp_line != 0).then_some((l.exp_file, l.exp_line)),
+    }
 }
 
 #[cfg(feature = "slang")]
@@ -834,7 +853,11 @@ impl Design {
         let qual = |id: Option<ClassId>| match id {
             Some(i) => {
                 let c = self.class(i);
-                if c.scope.is_empty() { c.name.clone() } else { format!("{}::{}", c.scope, c.name) }
+                if c.scope.is_empty() {
+                    c.name.clone()
+                } else {
+                    format!("{}::{}", c.scope, c.name)
+                }
             }
             None => "-".into(),
         };
@@ -916,7 +939,15 @@ impl Design {
                 }
                 s.push('\n');
                 for a in &m.arguments {
-                    let _ = write!(s, "    arg {} {:?} {:?} class={} {}", a.name, a.direction, a.shape, qual(a.type_class), at(a.loc));
+                    let _ = write!(
+                        s,
+                        "    arg {} {:?} {:?} class={} {}",
+                        a.name,
+                        a.direction,
+                        a.shape,
+                        qual(a.type_class),
+                        at(a.loc)
+                    );
                     if opts.types {
                         let _ = write!(s, " type={} canonical={}", a.ty, a.canonical_type);
                     }

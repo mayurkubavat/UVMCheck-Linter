@@ -2,10 +2,10 @@
 //! new() to provide a default value for the string name argument to support UVM
 //! factory creation and cloning.
 
+use crate::support::uvm_syntax::{base_name_node, class_routines, decl_name, name_node, routine_last_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::uvm_syntax::{base_name_node, class_routines, decl_name, name_node, routine_last_name};
 
 pub(crate) fn sequence_item_default_new(c: &Cst, s: &mut Sink) {
     for cls in c.nodes(ClassDecl) {

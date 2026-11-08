@@ -2,8 +2,8 @@
 //! arrays, unpacked arrays, or unpacked structs by value (input) causes
 //! expensive memory duplication on every call.
 
-use dv_model::{Design, Direction, TypeShape};
 use crate::{Severity, Sink};
+use dv_model::{Design, Direction, TypeShape};
 
 pub(crate) fn pass_array_by_value(d: &Design, out: &mut Sink) {
     for cls in d.classes() {

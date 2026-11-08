@@ -2,9 +2,9 @@
 //! uvm_object or uvm_component must declare factory registration macros
 //! (`uvm_component_utils / `uvm_object_utils).
 
-use dv_model::Design;
-use crate::{find_method, find_property, Severity, Sink};
 use crate::support::uvm_kinds::{is_component, is_object};
+use crate::{find_method, find_property, Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn uvm_factory_missing_utils(d: &Design, out: &mut Sink) {
     const REGISTERS: [&str; 4] =
@@ -27,7 +27,8 @@ pub(crate) fn uvm_factory_missing_utils(d: &Design, out: &mut Sink) {
         if cls.macros.iter().any(|m| REGISTERS.iter().any(|r| m.name.starts_with(r))) {
             continue;
         }
-        let (kind, mac) = if comp { ("uvm_component", "`uvm_component_utils") } else { ("uvm_object", "`uvm_object_utils") };
+        let (kind, mac) =
+            if comp { ("uvm_component", "`uvm_component_utils") } else { ("uvm_object", "`uvm_object_utils") };
         out.add(
             "UVM-FAC-003",
             "UvmFactoryMissingUtils",

@@ -1,10 +1,10 @@
 //! SV-RND-021 (ConstraintInsideInvertedRange): Disallows inverted value ranges
 //! [low : high] where low > high in set membership expressions.
 
+use crate::support::spans::child_nodes;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
-use crate::support::spans::{child_nodes};
 
 /// An unsized integer literal, read as `std::stoll(text, nullptr, 0)`
 /// does: a leading 0 means octal, and parsing stops at the first `_`.

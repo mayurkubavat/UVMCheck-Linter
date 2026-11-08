@@ -2,14 +2,14 @@
 //! lock()/grab() that some path leaves without the matching
 //! put()/unlock()/ungrab(), such as an early return (Sonar S2222).
 
-use std::collections::{BTreeMap, BTreeSet, HashMap};
-use dv_model::Loc;
-use sv_syntax::{NodeId, SyntaxKind};
+use crate::support::procedural::{add_n, calls_in, is_semaphore, items, routine_name, start, PathHooks, Walker};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::Loc;
+use std::collections::{BTreeMap, BTreeSet, HashMap};
+use sv_syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
-use crate::support::procedural::{PathHooks, Walker, add_n, calls_in, is_semaphore, items, routine_name, start};
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum LockOp {
@@ -138,7 +138,13 @@ impl LockHooks<'_, '_> {
 
 pub(crate) fn lock_not_released(c: &Cst, s: &mut Sink) {
     for (r, n) in user_routines(c) {
-        let mut hooks = LockHooks { c, released: BTreeSet::new(), acquired_at: HashMap::new(), leaks: Vec::new(), reported: BTreeSet::new() };
+        let mut hooks = LockHooks {
+            c,
+            released: BTreeSet::new(),
+            acquired_at: HashMap::new(),
+            leaks: Vec::new(),
+            reported: BTreeSet::new(),
+        };
         let Some(body) = c.tree.child(r, Body) else { continue };
         for call in calls_in(c, body) {
             let (op, key) = classify(c, call);

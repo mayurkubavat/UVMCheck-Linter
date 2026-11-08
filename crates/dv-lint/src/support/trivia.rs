@@ -1,14 +1,8 @@
 //! Identifier words, comments and library code, for the readability rules.
 
-
-
 use sv_lexer::Kind;
 
-
 use crate::syntax::Cst;
-
-
-
 
 pub(crate) fn lower(s: &str) -> String {
     s.to_ascii_lowercase()
@@ -50,9 +44,7 @@ pub(crate) fn is_library_tok(c: &Cst, t: u32) -> bool {
 }
 
 pub(crate) fn library_file(c: &Cst, f: u32) -> bool {
-    c.tree.files[f as usize]
-        .file_name()
-        .is_some_and(|n| n.to_string_lossy().starts_with("uvm_"))
+    c.tree.files[f as usize].file_name().is_some_and(|n| n.to_string_lossy().starts_with("uvm_"))
 }
 
 #[derive(Clone, Copy, PartialEq)]

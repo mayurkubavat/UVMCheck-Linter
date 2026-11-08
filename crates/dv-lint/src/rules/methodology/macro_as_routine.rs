@@ -2,17 +2,43 @@
 //! nothing only a macro can do: no token pasting, stringification, nested
 //! macros, `__FILE__, type arguments, declarations or return/break.
 
-use std::collections::HashSet;
-use dv_model::Design;
-use sv_lexer::Kind;
+use crate::support::defines_packages::{define_src, is_overridable_default, origin_loc, user_defines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::defines_packages::{define_src, is_overridable_default, origin_loc, user_defines};
+use dv_model::Design;
+use std::collections::HashSet;
+use sv_lexer::Kind;
 
 const DECLARATION_KEYWORDS: &[&str] = &[
-    "class", "function", "task", "typedef", "covergroup", "constraint", "module", "interface", "property", "sequence",
-    "rand", "randc", "local", "protected", "static", "virtual", "assert", "cover", "import", "always", "always_comb",
-    "always_ff", "always_latch", "initial", "final", "assign", "localparam", "parameter", "generate",
+    "class",
+    "function",
+    "task",
+    "typedef",
+    "covergroup",
+    "constraint",
+    "module",
+    "interface",
+    "property",
+    "sequence",
+    "rand",
+    "randc",
+    "local",
+    "protected",
+    "static",
+    "virtual",
+    "assert",
+    "cover",
+    "import",
+    "always",
+    "always_comb",
+    "always_ff",
+    "always_latch",
+    "initial",
+    "final",
+    "assign",
+    "localparam",
+    "parameter",
+    "generate",
 ];
 
 pub(crate) fn macro_as_routine(_: &Design, csts: &[Cst], out: &mut Sink) {

@@ -2,11 +2,11 @@
 //! concatenation or $sformatf recursion inside loop bodies to prevent O(N^2)
 //! memory reallocation overhead.
 
-use sv_syntax::NodeId;
+use crate::support::for_loops::{kids, op_text, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::for_loops::{kids, op_text, subtree};
 
 pub(crate) fn concat_in_loop(c: &Cst, s: &mut Sink) {
     let mut loops = c.nodes(LoopStmt);

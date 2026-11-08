@@ -2,13 +2,13 @@
 //! at least 6 times (option min_foreign) and more than twice as often as its
 //! own class's fields.
 
-use std::collections::BTreeMap;
-use dv_model::{Class, Design};
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::bodies;
 use crate::support::class_roles::{class_methods, derives, is_library, role, Ctx, Index, Role};
+use crate::support::routine_bodies::bodies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Class, Design};
+use std::collections::BTreeMap;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 /// Field uses in one method: its own class's properties, and other
@@ -67,7 +67,9 @@ fn field_uses<'d>(ctx: &Ctx<'d, '_>, c: &Cst, n: NodeId, u: &mut FieldUse<'d>) {
         }
         NameExpr if c.tree.children(n).next().is_none() => {
             let name = c.tree.bare_text(n);
-            let local = ctx.m.is_some_and(|m| m.locals.iter().any(|l| l.name == name) || m.arguments.iter().any(|a| a.name == name));
+            let local = ctx
+                .m
+                .is_some_and(|m| m.locals.iter().any(|l| l.name == name) || m.arguments.iter().any(|a| a.name == name));
             if !local && property_static(d, ctx.cls, &name) == Some(false) {
                 u.own += 1;
             }
@@ -83,8 +85,19 @@ fn field_uses<'d>(ctx: &Ctx<'d, '_>, c: &Cst, n: NodeId, u: &mut FieldUse<'d>) {
 pub(crate) fn feature_envy(d: &Design, csts: &[Cst], out: &mut Sink) {
     const MIN_FOREIGN: usize = 6;
     const EXEMPT: &[&str] = &[
-        "new", "do_copy", "do_compare", "do_print", "do_pack", "do_unpack", "do_record", "copy", "compare", "convert2string",
-        "build_phase", "connect_phase", "end_of_elaboration_phase",
+        "new",
+        "do_copy",
+        "do_compare",
+        "do_print",
+        "do_pack",
+        "do_unpack",
+        "do_record",
+        "copy",
+        "compare",
+        "convert2string",
+        "build_phase",
+        "connect_phase",
+        "end_of_elaboration_phase",
     ];
     let ix = Index::new(csts);
     for (cls, m, c, body) in bodies(d, &ix) {

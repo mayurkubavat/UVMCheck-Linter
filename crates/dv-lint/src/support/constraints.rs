@@ -5,16 +5,13 @@ use std::collections::HashMap;
 
 use sv_syntax::NodeId;
 
-use crate::support::class_items::{declarators, is_parameterized, qualifiers, kids, model_classes, user_code};
-
+use crate::support::class_items::{declarators, is_parameterized, kids, model_classes, qualifiers, user_code};
 
 use crate::support::data_items::{strip_conv, unparen};
 
 use crate::support::sema_facts::ast_ok;
 
 use crate::syntax::Cst;
-
-
 
 use sv_syntax::SyntaxKind::*;
 

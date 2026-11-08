@@ -2,12 +2,12 @@
 //! classes where no `uvm_register_cb(T, CB) registers that pair for T or a base
 //! of T.
 
-use dv_model::{Class, Design};
-use sv_syntax::NodeId;
-use crate::support::routine_bodies::bodies;
 use crate::support::class_roles::{derives, user_classes, Ctx, Index};
+use crate::support::routine_bodies::bodies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use dv_model::{Class, Design};
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 /// The type arguments of `name#(A, B)` written in a data type or name.
@@ -55,10 +55,9 @@ pub(crate) fn callback_not_registered(d: &Design, csts: &[Cst], out: &mut Sink) 
                     continue;
                 }
                 let args = type_args(c, owner);
-                let (Some(t), Some(cb)) = (
-                    args.first().and_then(|a| ctx.class_of_type(a)),
-                    args.get(1).and_then(|a| ctx.class_of_type(a)),
-                ) else {
+                let (Some(t), Some(cb)) =
+                    (args.first().and_then(|a| ctx.class_of_type(a)), args.get(1).and_then(|a| ctx.class_of_type(a)))
+                else {
                     continue;
                 };
                 regs.push((t, cb));
@@ -77,10 +76,9 @@ pub(crate) fn callback_not_registered(d: &Design, csts: &[Cst], out: &mut Sink) 
                 continue;
             }
             let args = type_args(c, ty);
-            let (Some(t), Some(cb)) = (
-                args.first().and_then(|a| ctx.class_of_type(a)),
-                args.get(1).and_then(|a| ctx.class_of_type(a)),
-            ) else {
+            let (Some(t), Some(cb)) =
+                (args.first().and_then(|a| ctx.class_of_type(a)), args.get(1).and_then(|a| ctx.class_of_type(a)))
+            else {
                 continue;
             };
             if regs.iter().any(|(rt, rcb)| same_or_derived(d, t, rt) && same_or_derived(d, cb, rcb)) {

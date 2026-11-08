@@ -2,10 +2,10 @@
 //! from a higher testbench layer, such as an agent package importing an env or
 //! test package.
 
-use dv_model::Design;
+use crate::support::defines_packages::package_graph;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::defines_packages::{package_graph};
+use dv_model::Design;
 
 fn layer_name(l: i32) -> &'static str {
     match l {

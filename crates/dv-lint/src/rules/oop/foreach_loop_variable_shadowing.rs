@@ -2,11 +2,11 @@
 //! 'foreach (arr[i])' loops that shadow an existing class property or routine
 //! local variable.
 
-use std::collections::HashSet;
-use sv_syntax::NodeId;
 use crate::support::class_items::{class_items, declarators, kids};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 /// The loop variables of a `foreach (a[i, j])` header: names and tokens.

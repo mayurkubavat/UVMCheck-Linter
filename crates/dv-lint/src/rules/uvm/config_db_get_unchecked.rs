@@ -2,9 +2,9 @@
 //! 'uvm_config_db#(...)::get()' where the boolean return status is ignored
 //! without being checked in an 'if' condition or assertion.
 
+use crate::support::calls::{callee, statement_calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::calls::{callee, statement_calls};
 
 pub(crate) fn config_db_get_unchecked(c: &Cst, s: &mut Sink) {
     for call in statement_calls(c) {

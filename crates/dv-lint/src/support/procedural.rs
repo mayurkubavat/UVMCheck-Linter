@@ -2,7 +2,6 @@
 //! the concurrency rules read them. Names resolve through
 //! [`crate::support::slang_ast`].
 
-
 use dv_model::Loc;
 
 use sv_syntax::{Child, NodeId, SyntaxKind};
@@ -11,13 +10,20 @@ use crate::support::slang_ast::*;
 
 use crate::syntax::Cst;
 
-
 use crate::{Severity, Sink};
 
 use SyntaxKind::*;
 
 /// Adds the same finding `n` times (once per visit of slang's AST walk).
-pub(crate) fn add_n(s: &mut Sink, n: usize, rule: &'static str, name: &'static str, sev: Severity, msg: String, loc: Loc) {
+pub(crate) fn add_n(
+    s: &mut Sink,
+    n: usize,
+    rule: &'static str,
+    name: &'static str,
+    sev: Severity,
+    msg: String,
+    loc: Loc,
+) {
     for _ in 0..n {
         s.add(rule, name, sev, msg.clone(), loc);
     }
@@ -68,7 +74,10 @@ pub(crate) fn loop_kw<'a>(c: &'a Cst, l: NodeId) -> &'a str {
     if c.kind(l) == DoWhileStmt {
         return "do";
     }
-    c.toks(l).map(|t| c.text_of(t)).find(|t| matches!(*t, "for" | "while" | "repeat" | "forever" | "foreach")).unwrap_or("")
+    c.toks(l)
+        .map(|t| c.text_of(t))
+        .find(|t| matches!(*t, "for" | "while" | "repeat" | "forever" | "foreach"))
+        .unwrap_or("")
 }
 
 /// `forever`, `while` and `do ... while` loops (slang's
@@ -134,10 +143,7 @@ pub(crate) fn is_system_call(c: &Cst, call: NodeId) -> bool {
                 return false;
             }
             match expr_type(c, r) {
-                Some(t) => {
-                    BUILTIN_TYPES.contains(&t.as_str())
-                        || c.named(TypedefDecl).contains_key(&t)
-                }
+                Some(t) => BUILTIN_TYPES.contains(&t.as_str()) || c.named(TypedefDecl).contains_key(&t),
                 None => !matches!(name.as_str(), "randomize"),
             }
         }
@@ -146,8 +152,21 @@ pub(crate) fn is_system_call(c: &Cst, call: NodeId) -> bool {
 }
 
 pub(crate) const BUILTIN_TYPES: &[&str] = &[
-    "bit", "logic", "reg", "int", "integer", "byte", "shortint", "longint", "string", "real", "shortreal", "time",
-    "realtime", "event", "chandle",
+    "bit",
+    "logic",
+    "reg",
+    "int",
+    "integer",
+    "byte",
+    "shortint",
+    "longint",
+    "string",
+    "real",
+    "shortreal",
+    "time",
+    "realtime",
+    "event",
+    "chandle",
 ];
 
 /// The receiver's type is the built-in class `semaphore`.
@@ -212,7 +231,8 @@ pub(crate) fn root_sym(c: &Cst, e: NodeId) -> Option<(Sym, String, Option<Decl>)
     None
 }
 
-pub(crate) const ASSIGN_OPS: &[&str] = &["=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "<<<=", ">>>="];
+pub(crate) const ASSIGN_OPS: &[&str] =
+    &["=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "<<<=", ">>>="];
 
 /// An assignment (`=`, `op=`, or a non-blocking `<=` statement): its left side.
 pub(crate) fn assign_lhs(c: &Cst, n: NodeId) -> Option<NodeId> {
@@ -268,7 +288,8 @@ pub(crate) fn call_args(c: &Cst, call: NodeId) -> Vec<NodeId> {
     c.tree.children(al).filter(|&a| c.kind(a) == Arg).filter_map(|a| kids(c, a).last().copied()).collect()
 }
 
-pub(crate) const MUTATING: &[&str] = &["$cast", "$sscanf", "$fscanf", "$fgets", "$fread", "$value$plusargs", "randomize", "srandom"];
+pub(crate) const MUTATING: &[&str] =
+    &["$cast", "$sscanf", "$fscanf", "$fgets", "$fread", "$value$plusargs", "randomize", "srandom"];
 
 pub(crate) const CONTAINER: &[&str] =
     &["push_back", "push_front", "pop_back", "pop_front", "insert", "delete", "sort", "rsort", "reverse", "shuffle"];
@@ -347,7 +368,10 @@ pub(crate) fn builtin_function(c: &Cst, call: NodeId) -> bool {
         Some("semaphore") => matches!(name.as_str(), "try_get" | "put" | "new"),
         Some("mailbox") => matches!(name.as_str(), "try_get" | "try_put" | "try_peek" | "num" | "new"),
         Some("process") => !matches!(name.as_str(), "await"),
-        _ => matches!(name.as_str(), "randomize" | "new" | "srandom" | "get_randstate" | "set_randstate" | "rand_mode" | "constraint_mode"),
+        _ => matches!(
+            name.as_str(),
+            "randomize" | "new" | "srandom" | "get_randstate" | "set_randstate" | "rand_mode" | "constraint_mode"
+        ),
     }
 }
 
@@ -402,7 +426,10 @@ pub(crate) fn is_report_guard(c: &Cst, cond: NodeId) -> bool {
     let mut report = false;
     for call in calls {
         let n = call_parts(c, call).map(|p| p.1).unwrap_or_default();
-        if matches!(n.as_str(), "uvm_report_enabled" | "get_report_verbosity_level" | "get_report_action" | "uvm_get_report_object") {
+        if matches!(
+            n.as_str(),
+            "uvm_report_enabled" | "get_report_verbosity_level" | "get_report_action" | "uvm_get_report_object"
+        ) {
             report = true;
         } else {
             return false;
@@ -530,15 +557,13 @@ impl<'c, 't: 'c, H: PathHooks<'c, 't>> Walker<'_, H> {
                 merge(&mut out.fall, &o.brk);
                 out
             }
-            TimedStmt | WaitStmt => {
-                match kids(c, s).into_iter().filter(|&x| is_stmt(c.kind(x))).last() {
-                    Some(x) => self.walk(x, input),
-                    None => {
-                        out.fall = input;
-                        out
-                    }
+            TimedStmt | WaitStmt => match kids(c, s).into_iter().filter(|&x| is_stmt(c.kind(x))).last() {
+                Some(x) => self.walk(x, input),
+                None => {
+                    out.fall = input;
+                    out
                 }
-            }
+            },
             ReturnStmt => {
                 for st in &input {
                     self.h.returned(s, st);

@@ -2,19 +2,16 @@
 //! declared in uvm_component must be connected in connect_phase to prevent
 //! runtime fatal errors or null-pointer dereferences.
 
-use dv_model::Design;
 use crate::{Severity, Sink};
+use dv_model::Design;
 
 pub(crate) fn uvm_unconnected_tlm_port(d: &Design, out: &mut Sink) {
     for cls in d.classes() {
         if cls.is_parameterized || !cls.uvm.is_component() {
             continue;
         }
-        let ports: Vec<_> = cls
-            .properties
-            .iter()
-            .filter(|p| p.ty.contains("_port") || p.ty.contains("_export"))
-            .collect();
+        let ports: Vec<_> =
+            cls.properties.iter().filter(|p| p.ty.contains("_port") || p.ty.contains("_export")).collect();
         if ports.is_empty() {
             continue;
         }

@@ -2,10 +2,10 @@
 //! Ce) for each user package from its imports and flags a package that depends
 //! on a less stable one.
 
-use dv_model::Design;
+use crate::support::defines_packages::package_graph;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use crate::support::defines_packages::{package_graph};
+use dv_model::Design;
 
 pub(crate) fn unstable_package_depended_on(d: &Design, csts: &[Cst], out: &mut Sink) {
     let g = package_graph(d, csts);

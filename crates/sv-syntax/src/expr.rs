@@ -194,8 +194,25 @@ fn is_literal(k: Option<Kind>) -> bool {
 
 /// Keywords that can start a cast `type'(...)`.
 const CAST_KEYWORDS: &[&str] = &[
-    "bit", "logic", "reg", "byte", "shortint", "int", "longint", "integer", "time", "real", "shortreal", "realtime",
-    "string", "signed", "unsigned", "void", "const", "chandle", "event",
+    "bit",
+    "logic",
+    "reg",
+    "byte",
+    "shortint",
+    "int",
+    "longint",
+    "integer",
+    "time",
+    "real",
+    "shortreal",
+    "realtime",
+    "string",
+    "signed",
+    "unsigned",
+    "void",
+    "const",
+    "chandle",
+    "event",
 ];
 
 /// The digits after a base: lexed as such, or made by a macro (`32'h`ADDR`,

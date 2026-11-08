@@ -2,14 +2,14 @@
 //! other writes inside the pass or fail action of an immediate or concurrent
 //! assertion.
 
-use std::collections::HashSet;
-use sv_syntax::NodeId;
-use crate::support::slang_ast::*;
 use crate::support::procedural::{start, written};
+use crate::support::slang_ast::*;
+use crate::support::sva_cov::{actions, add_n, ast_asserts, user_code_times};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
+use std::collections::HashSet;
+use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
-use crate::support::sva_cov::{actions, add_n, ast_asserts, user_code_times};
 
 pub(crate) fn side_effect_in_action(c: &Cst, s: &mut Sink) {
     for kind in [AssertStmt, ConcurrentAssert] {
@@ -28,7 +28,9 @@ pub(crate) fn side_effect_in_action(c: &Cst, s: &mut Sink) {
                         !w.2.is_some_and(|d| {
                             d.kind == crate::support::slang_ast::DeclKind::Local
                                 && inside.contains(&d.node)
-                                && c.parent(d.node).and_then(|p| c.parent(p)).is_some_and(|b| matches!(c.kind(b), SeqBlock | ParBlock))
+                                && c.parent(d.node)
+                                    .and_then(|p| c.parent(p))
+                                    .is_some_and(|b| matches!(c.kind(b), SeqBlock | ParBlock))
                         })
                     })
                     .map(|w| w.1)
