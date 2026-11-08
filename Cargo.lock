@@ -29,6 +29,7 @@ dependencies = [
  "dv-model",
  "sv-lexer",
  "sv-sema",
+ "sv-source",
  "sv-syntax",
 ]
 

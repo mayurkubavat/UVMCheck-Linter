@@ -3,6 +3,10 @@
 //!
 //!     dv-lint [--slang] [--time] [--history] [--skip-libraries] [--rule ID]... [-top NAME]... [--list] <compile options>
 //!
+//! `--in-context` lints each header given as a source (`.svh`, `.vh`, or a
+//! `.sv` with no design unit) inside
+//! the file that includes it, found by indexing the repository's includes
+//! (`sv_source::owners`), and reports only the header's findings.
 //! `--frames` prints, under each finding and note, its source line with a
 //! caret under the flagged token (as uvmcheck's text report does).
 //! `--list` prints every rule (`id name model|syntax`, then `native` for a
@@ -24,6 +28,7 @@ fn main() {
     let mut slang = false;
     let mut time = false;
     let mut frames = false;
+    let mut in_context = false;
     let mut specs = false;
     let mut exprs = false;
     let mut only: Vec<String> = Vec::new();
@@ -35,6 +40,8 @@ fn main() {
             "--time" => time = true,
             // Under each finding and note, its source line with a caret.
             "--frames" => frames = true,
+            // A header given as a source is linted inside the file that includes it.
+            "--in-context" => in_context = true,
             "--specs" => specs = true,
             // Each expression's type, as tools/oracles/exprdump.cpp prints slang's.
             "--exprs" => exprs = true,
@@ -67,13 +74,14 @@ fn main() {
         eprintln!("error: {e}");
         std::process::exit(2);
     };
+    let headers = if in_context { in_owner(&mut args) } else { Vec::new() };
     let keep = |id: &str| only.is_empty() || only.iter().any(|o| o == id);
     if !slang && !exprs && !specs {
         // The design is built while the rules' shared caches start.
         let (trees, parse_ms) = sv_sema::parse_args(&args).unwrap_or_else(|e| fail(e.to_string()));
         let t = std::time::Instant::now();
         let (design, (files, found)) = dv_lint::lint_built(|| sv_sema::design_of(&trees, parse_ms), &trees, keep);
-        report(&design, time, frames, t, &files, &found);
+        report(&design, time, frames, t, &files, &only_in(&headers, &files, &found));
     }
     let loaded = if slang {
         load_slang(&args).map(|d| (d, Vec::new()))
@@ -96,7 +104,86 @@ fn main() {
     }
     let t = std::time::Instant::now();
     let (files, found) = dv_lint::lint_all(&design, &trees, keep);
-    report(&design, time, frames, t, &files, &found);
+    report(&design, time, frames, t, &files, &only_in(&headers, &files, &found));
+}
+
+/// `--in-context`: each header source (`.svh`, `.vh`, ...) is replaced by
+/// the compile root that includes it (see `sv_source::owners`), with the
+/// folders on the way as include directories. Returns the headers, whose
+/// findings are the ones to report; a header nothing includes stays a
+/// source of its own.
+fn in_owner(args: &mut Vec<String>) -> Vec<std::path::PathBuf> {
+    use sv_source::owners::{is_header, search_root, IncludeIndex};
+    let incdirs: Vec<std::path::PathBuf> = args
+        .iter()
+        .filter_map(|a| a.strip_prefix("+incdir+"))
+        .flat_map(|d| d.split('+').filter(|x| !x.is_empty()).map(std::path::PathBuf::from).collect::<Vec<_>>())
+        .collect();
+    let mut headers = Vec::new();
+    let mut out: Vec<String> = Vec::new();
+    let mut extra: Vec<String> = Vec::new();
+    let mut prev = String::new();
+    for a in std::mem::take(args) {
+        let p = std::path::Path::new(&a);
+        let takes_value = matches!(prev.as_str(), "-f" | "-F" | "-v" | "-y" | "-top" | "--top" | "--rule");
+        prev = a.clone();
+        if takes_value || a.starts_with(['-', '+']) || !p.is_file() || !(is_header(p) || no_design_unit(p)) {
+            out.push(a);
+            continue;
+        }
+        let idx = IncludeIndex::scan(&[search_root(p)], &incdirs);
+        let canon = p.canonicalize().unwrap_or_else(|_| p.to_path_buf());
+        match idx.owners(p).into_iter().next() {
+            Some(o) => {
+                eprintln!(
+                    "dv-lint: {} is linted inside {}{}",
+                    a,
+                    o.root.display(),
+                    o.package.as_ref().map(|k| format!(" (package {k})")).unwrap_or_default()
+                );
+                for d in &o.include_dirs {
+                    extra.push(format!("+incdir+{}", d.display()));
+                }
+                let root = o.root.display().to_string();
+                if !out.contains(&root) && !extra.contains(&root) {
+                    extra.push(root);
+                }
+            }
+            None => {
+                eprintln!("dv-lint: nothing includes {a}; linting it alone");
+                out.push(a);
+            }
+        }
+        headers.push(canon);
+    }
+    out.extend(extra);
+    *args = out;
+    headers
+}
+
+/// A `.sv` file with no module, package, interface or program, such as a
+/// class meant to be included in a package (core-v-verif names those .sv).
+fn no_design_unit(p: &std::path::Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(p) else { return false };
+    !text.lines().any(|l| {
+        let l = l.trim_start();
+        ["module", "package", "interface", "program", "macromodule", "primitive", "config"]
+            .iter()
+            .any(|k| l.strip_prefix(k).is_some_and(|r| r.starts_with([' ', '\t'])))
+    })
+}
+
+/// The findings in `headers` (all of them when there are none).
+fn only_in(headers: &[std::path::PathBuf], files: &[String], found: &[dv_lint::Finding]) -> Vec<dv_lint::Finding> {
+    if headers.is_empty() {
+        return found.to_vec();
+    }
+    let canon = |f: &str| std::path::Path::new(f).canonicalize().ok();
+    found
+        .iter()
+        .filter(|f| canon(f.position_in(files).0).is_some_and(|p| headers.contains(&p)))
+        .cloned()
+        .collect()
 }
 
 /// Prints the findings (and with `--time` the stage times) and exits.

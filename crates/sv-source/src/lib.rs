@@ -11,6 +11,8 @@
 //! directory; `-F` resolves them against the list's own directory (both
 //! simulators). Absolute paths are kept as written.
 
+pub mod owners;
+
 use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
