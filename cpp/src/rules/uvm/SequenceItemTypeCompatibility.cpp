@@ -3,6 +3,7 @@
 #include "uvmcheck/uvm/UvmModel.h"
 #include "slang/ast/ASTVisitor.h"
 #include "slang/ast/symbols/ClassSymbols.h"
+#include "slang/ast/symbols/ParameterSymbols.h"
 #include "slang/ast/symbols/SubroutineSymbols.h"
 #include "slang/ast/expressions/CallExpression.h"
 #include "slang/ast/expressions/ConversionExpression.h"
@@ -12,6 +13,19 @@ namespace uvmcheck::rules::uvm {
 
 // Visits bad nodes too: against the real UVM library a mismatched connect() does not
 // type-check, so slang wraps the call and its statement in Invalid nodes.
+/// The type a class specialization's first parameter resolves to, when
+/// that parameter is a type (`uvm_analysis_port#(T)` -> what T stands for).
+static const slang::ast::Type* firstTypeArg(const slang::ast::Type& type) {
+    using namespace slang::ast;
+    const auto& t = type.getCanonicalType();
+    if (!t.isClass()) return nullptr;
+    const auto& cls = t.as<ClassType>();
+    if (!cls.genericClass || cls.genericParameters.empty()) return nullptr;
+    const auto* p = cls.genericParameters[0];
+    if (p->kind != SymbolKind::TypeParameter) return nullptr;
+    return &p->as<TypeParameterSymbol>().targetType.getType().getCanonicalType();
+}
+
 class ConnectCallVisitor : public slang::ast::ASTVisitor<ConnectCallVisitor,
                                                          slang::ast::VisitFlags::AllGood | slang::ast::VisitFlags::Bad> {
 public:
@@ -49,26 +63,16 @@ public:
                 std::string thisType(call.thisClass()->type->toString());
                 std::string argType(actualArg->type->toString());
 
-                auto extractTypeParam = [](const std::string& str) -> std::string {
-                    size_t hash = str.find('#');
-                    if (hash == std::string::npos) return "";
-                    size_t openP = str.find('(', hash);
-                    if (openP == std::string::npos) return "";
-                    size_t comma = str.find(',', openP);
-                    size_t closeP = str.find(')', openP);
-                    size_t end = (comma != std::string::npos && comma < closeP) ? comma : closeP;
-                    if (end == std::string::npos) return "";
-                    std::string param = str.substr(openP + 1, end - openP - 1);
-                    size_t first = param.find_first_not_of(" \t\n\r");
-                    size_t last = param.find_last_not_of(" \t\n\r");
-                    if (first == std::string::npos) return "";
-                    return param.substr(first, last - first + 1);
-                };
+                // Compare the item types themselves: slang prints a
+                // specialization with the parameter names of the context
+                // that made it first (`T`, `REQ`), so the same item type can
+                // print two ways.
+                const auto* item1 = firstTypeArg(*call.thisClass()->type);
+                const auto* item2 = firstTypeArg(*actualArg->type);
+                std::string req1 = item1 ? item1->toString() : "";
+                std::string req2 = item2 ? item2->toString() : "";
 
-                std::string req1 = extractTypeParam(thisType);
-                std::string req2 = extractTypeParam(argType);
-
-                if (!req1.empty() && !req2.empty() && req1 != req2) {
+                if (item1 && item2 && !item1->isMatching(*item2)) {
                     diags.addViolation(
                         "UVM-SEQ-013",
                         "SequenceItemTypeCompatibility",

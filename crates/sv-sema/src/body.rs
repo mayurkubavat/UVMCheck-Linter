@@ -516,6 +516,76 @@ impl<'t> Builder<'t> {
         }
     }
 
+    /// The class (and its type arguments) of the value a name or member
+    /// chain names: `x`, `this.x`, `a.b.c`, seen from `scope`. `local` is
+    /// the declared type of a local variable the chain starts from.
+    pub(crate) fn expr_class(&self, n: NodeRef, scope: usize, env: &Env, local: Option<NodeRef>, depth: usize) -> Option<(usize, Env)> {
+        if depth > 16 {
+            return None;
+        }
+        let as_class = |v: Option<Val>| match v {
+            Some(Val::Var(Ty::Class(c, e), _)) => Some((c, e)),
+            _ => None,
+        };
+        match self.kind(n) {
+            ParenExpr => {
+                let k = self.children(n).into_iter().find(|c| is_expr(self.kind(*c)))?;
+                self.expr_class(k, scope, env, local, depth + 1)
+            }
+            NameExpr => {
+                let toks = self.own_tokens(n);
+                let [name] = toks.as_slice() else { return None };
+                let own = self.class_at(scope);
+                if *name == "this" {
+                    return own.map(|c| (c, env.clone()));
+                }
+                if let Some(dt) = local {
+                    let info = self.resolve_env(dt, scope, env, 0);
+                    return match info.resolved {
+                        Resolved::Class(c) => Some((c, info.args)),
+                        _ => None,
+                    };
+                }
+                as_class(self.class_member(own?, env, name))
+            }
+            MemberExpr => {
+                let base = self.children(n).into_iter().find(|c| is_expr(self.kind(*c)))?;
+                let name = *self.own_tokens(n).last()?;
+                let (c, e) = self.expr_class(base, scope, env, local, depth + 1)?;
+                as_class(self.class_member(c, &e, name))
+            }
+            _ => None,
+        }
+    }
+
+    /// The class whose body `scope` is in.
+    fn class_at(&self, scope: usize) -> Option<usize> {
+        let mut cur = Some(scope);
+        while let Some(s) = cur {
+            if let ScopeKind::Class(c) = self.scopes[s].kind {
+                return Some(c);
+            }
+            cur = self.scopes[s].parent;
+        }
+        None
+    }
+
+    /// Class `c`'s type arguments under `env`, each resolved to the type it
+    /// stands for (None for a value parameter).
+    pub(crate) fn resolved_type_args(&self, c: usize, env: &Env) -> Vec<Option<String>> {
+        let full = self.complete_env(c, env);
+        self.classes[c]
+            .params
+            .iter()
+            .map(|(name, is_type, _)| {
+                if !*is_type {
+                    return None;
+                }
+                full.get(name).map(|b| self.ts(b.node, b.scope, &b.env, true, 1))
+            })
+            .collect()
+    }
+
     /// `c` and its bases, each with its type arguments.
     fn chain_env(&self, c: usize, env: &Env) -> Vec<(usize, Env)> {
         let mut out = vec![(c, env.clone())];

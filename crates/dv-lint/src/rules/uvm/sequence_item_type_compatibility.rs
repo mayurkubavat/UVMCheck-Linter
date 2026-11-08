@@ -1,6 +1,7 @@
 //! UVM-SEQ-013 (SequenceItemTypeCompatibility): Statically verifies that
 //! transaction item types between uvm_driver#(REQ) and uvm_sequencer#(REQ) are
 //! type-compatible across connect_phase connections.
+//! The item types are compared resolved, as slang compares types.
 
 use sv_syntax::SyntaxKind::*;
 use crate::support::slang_ast::kids;
@@ -8,20 +9,45 @@ use crate::expr_types::expr_types;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use crate::support::config_db_calls::{strip_parens};
+use crate::support::slang_ast::DeclKind;
+use sv_sema::oracle::TypeOracle;
+use sv_syntax::NodeId;
 
-/// The first type argument in a printed specialization (`a#(B,C)` -> `B`).
-fn first_type_arg(t: &str) -> Option<&str> {
-    let open = t[t.find('#')?..].find('(')? + t.find('#')?;
-    let rest = &t[open + 1..];
-    let close = rest.find(')')?;
-    let end = rest.find(',').filter(|&c| c < close).unwrap_or(close);
-    let p = rest[..end].trim();
-    (!p.is_empty()).then_some(p)
+/// The leftmost name of a chain (`a` of `a.b.c`).
+fn chain_root(c: &Cst, mut e: NodeId) -> NodeId {
+    while matches!(c.kind(e), MemberExpr | ParenExpr) {
+        match kids(c, e).first() {
+            Some(&k) => e = k,
+            None => break,
+        }
+    }
+    e
+}
+
+/// The first type argument of the class an endpoint's value is, resolved
+/// to the type it stands for (what slang compares): None when the value is
+/// not a specialization or its first parameter is not a type.
+fn item_type(c: &Cst, o: &TypeOracle, e: NodeId) -> Option<String> {
+    let root = chain_root(c, e);
+    let local = match c.kind(root) {
+        NameExpr => lookup_local(c, root),
+        _ => None,
+    };
+    let (_, args) = o.class_args(c.index(), e, local.map(|d| (c.index(), d)))?;
+    args.into_iter().next().flatten()
+}
+
+/// The declared type of a local variable or argument a name refers to.
+fn lookup_local(c: &Cst, n: NodeId) -> Option<NodeId> {
+    let name = c.text_of(c.first_tok(n)?);
+    let d = crate::support::slang_ast::lookup(c, n, name)?;
+    matches!(d.kind, DeclKind::Local | DeclKind::Argument).then_some(d.dtype).flatten()
 }
 
 pub(crate) fn item_type_compatibility(c: &Cst, out: &mut Sink) {
     let types = expr_types(c);
     let ix = c.index();
+    let mut oracle: Option<TypeOracle> = None;
     for f in c.nodes(FunctionDecl) {
         if crate::support::slang_ast::last_name(c, f) != "connect_phase" {
             continue;
@@ -50,7 +76,11 @@ pub(crate) fn item_type_compatibility(c: &Cst, out: &mut Sink) {
             let Some(&arg) = crate::expr_types::call_args(c, n).first() else { continue };
             let arg = strip_parens(c, arg);
             let (Some(rt), Some(at)) = (types.get(&(ix, recv)), types.get(&(ix, arg))) else { continue };
-            let (Some(r1), Some(r2)) = (first_type_arg(&rt.text), first_type_arg(&at.text)) else { continue };
+            // Compare the item types themselves: a specialization prints
+            // with the parameter names of the code that made it first (`T`,
+            // `REQ`), so one item type can print two ways.
+            let o = oracle.get_or_insert_with(|| TypeOracle::new(c.all));
+            let (Some(r1), Some(r2)) = (item_type(c, o, recv), item_type(c, o, arg)) else { continue };
             if r1 == r2 {
                 continue;
             }

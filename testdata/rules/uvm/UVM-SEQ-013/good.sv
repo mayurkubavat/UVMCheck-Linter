@@ -37,3 +37,35 @@ class my_agent extends uvm_component;
         driver.seq_item_port.connect(sequencer.seq_item_export);
     endfunction
 endclass
+
+// Clean: the monitor's port is written with its type parameter T, which
+// stands for the same pkt_ahb the scoreboard's export names.
+class my_monitor #(type T = pkt_ahb) extends uvm_component;
+    uvm_analysis_port#(T) ap;
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
+        ap = new("ap", this);
+    endfunction
+endclass
+
+class my_scoreboard extends uvm_component;
+    uvm_analysis_export#(pkt_ahb) item_export;
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
+        item_export = new("item_export", this);
+    endfunction
+endclass
+
+class my_env extends uvm_component;
+    my_monitor#(pkt_ahb) monitor;
+    my_scoreboard scoreboard;
+
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
+    endfunction
+
+    virtual function void connect_phase(uvm_phase phase);
+        super.connect_phase(phase);
+        monitor.ap.connect(scoreboard.item_export);
+    endfunction
+endclass

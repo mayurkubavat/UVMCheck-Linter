@@ -320,6 +320,21 @@ impl<'t> TypeOracle<'t> {
         Some(TypeInfo { text: shown.text, ..actual })
     }
 
+    /// For a name or member chain whose value is a class handle (`x`,
+    /// `this.x`, `a.b.c`): the class's name and its type arguments, each
+    /// resolved to the type it stands for, as slang prints that type's
+    /// canonical form (None for a value parameter). Unlike the printed
+    /// specialization (`C#(T)`), these do not depend on which code made the
+    /// specialization first. `local` is the declared type of a local
+    /// variable the chain starts from.
+    pub fn class_args(&self, tree: usize, e: sv_syntax::NodeId, local: Option<(usize, sv_syntax::NodeId)>) -> Option<(String, Vec<Option<String>>)> {
+        let scope = self.scope_of(tree, e);
+        let env = self.env_of(scope);
+        let local = local.map(|(t, n)| NodeRef { tree: t, node: n });
+        let (c, args) = self.b.expr_class(NodeRef { tree, node: e }, scope, &env, local, 0)?;
+        Some((self.b.classes[c].name.clone(), self.b.resolved_type_args(c, &args)))
+    }
+
     /// The type of member `name` of a struct or union typed value.
     pub fn member(&self, base: &TypeInfo, name: &str) -> Option<TypeInfo> {
         let b = &self.b;
