@@ -12,8 +12,15 @@ marking those under src/deprecated (compiled only with UVM_ENABLE_DEPRECATED_API
 
   tools/codegen/gen_uvm_api_pack.py <uvm-core checkout> [--out data/uvm-api]
 
-A pack is plain data: rules read it through uvm::ApiPack, so supporting a new
-UVM release is running this script on it, with no C++ change.
+UVM 1.1d and 1.2 predate the tags: their packs list the library's macros and
+the methods it deprecates. Deprecated API there is what the library drops
+when UVM_NO_DEPRECATED is defined (`ifndef UVM_NO_DEPRECATED regions, and
+src/deprecated); in UVM 2020 it is what needs UVM_ENABLE_DEPRECATED_API.
+A pack's "deprecatedGuard" names that define.
+
+A pack is plain data: rules read it through uvm::ApiPack (C++) and
+dv-lint's uvm_api (Rust), so supporting a new UVM release is running this
+script on it, with no code change.
 """
 
 import argparse
@@ -31,6 +38,11 @@ OUT_OF_BLOCK = re.compile(r"^\s*(?:function|task)\b.*?\b(\w+)\s*(?:#\(.*?\))?::(
 TYPEDEF = re.compile(r"^\s*typedef\s+.*?(\w+)\s*;")
 VERSION = re.compile(r'UVM_VERSION_STRING\s*=\s*"([^"]+)"')
 MACRO = re.compile(r"^\s*`define\s+(uvm_\w+|UVM_\w+)")
+COND = re.compile(r"^\s*`(ifdef|ifndef|elsif|else|endif)\b\s*(\w*)")
+# The define that deprecated API hangs on, and whether it is tested with
+# `ifndef (1.x: defining it removes the API) or `ifdef (2020: defining it adds it).
+GUARDS = {"UVM_NO_DEPRECATED": "ifndef", "UVM_ENABLE_DEPRECATED_API": "ifdef"}
+REV = re.compile(r"^\s*`define\s+UVM_(MAJOR|MINOR|FIX)_REV\s+(\w+)", re.M)
 
 
 def scan(src: Path):
@@ -41,10 +53,23 @@ def scan(src: Path):
         lines = f.read_text(errors="replace").splitlines()
         current = None
         pending = None
+        # One entry per open `ifdef: is its live branch deprecated API?
+        conds = []
         for line in lines:
+            k = COND.match(line)
+            if k:
+                d, name = k.group(1), k.group(2)
+                if d in ("ifdef", "ifndef"):
+                    conds.append(GUARDS.get(name) == d)
+                elif d in ("else", "elsif") and conds:
+                    conds[-1] = False
+                elif d == "endif" and conds:
+                    conds.pop()
+                continue
+            in_dep = deprecated or any(conds)
             m = MACRO.match(line)
             if m:
-                macros.setdefault(m.group(1), {"file": rel, "deprecated": deprecated})
+                macros.setdefault(m.group(1), {"file": rel, "deprecated": in_dep})
             t = TAG.search(line)
             if t:
                 pending = {"tag": t.group(1), "standard": t.group(2) or None, "clause": t.group(3) or None}
@@ -59,13 +84,15 @@ def scan(src: Path):
                 current = c.group(1)
                 entry = classes.setdefault(current, {"members": {}})
                 entry.setdefault("file", rel)
+                if in_dep:
+                    entry["deprecated"] = True
                 if pending:
                     entry.update({k: v for k, v in pending.items() if v})
                     pending = None
                 continue
             if not stripped or stripped.startswith("//") or stripped.startswith("`"):
                 continue
-            if pending:
+            if pending or (in_dep and current):
                 o = OUT_OF_BLOCK.match(line)
                 m = MEMBER.match(line)
                 cls, name = (o.group(1), o.group(2)) if o else (current, m.group(2) if m else None)
@@ -74,7 +101,9 @@ def scan(src: Path):
                     name = td.group(1) if td and current else None
                 if cls and name:
                     members = classes.setdefault(cls, {"members": {}})["members"]
-                    rec = {k: v for k, v in pending.items() if v}
+                    rec = {k: v for k, v in (pending or {}).items() if v}
+                    if in_dep:
+                        rec["deprecated"] = True
                     # Keep the first tag: an out-of-block body repeats the prototype's.
                     members.setdefault(name, rec)
                 pending = None
@@ -99,17 +128,27 @@ def main():
     # "Accellera:1800.2-2020:UVM:2.0" names the 2020 line's release 2.0 as just "2.0".
     if not version.startswith(("20", "1.")) and len(parts) > 1 and "-" in parts[1]:
         version = parts[1].split("-")[-1] + "-" + version
+    if version_string == "unknown":
+        # UVM 1.x builds its string from macros: "UVM-1.1d".
+        dtext = (src / "macros" / "uvm_version_defines.svh").read_text(errors="replace") \
+            if (src / "macros" / "uvm_version_defines.svh").is_file() else ""
+        rev = dict(REV.findall(dtext))
+        if "MAJOR" in rev and "MINOR" in rev:
+            version = f"{rev['MAJOR']}.{rev['MINOR']}{rev.get('FIX', '')}"
+            version_string = "UVM-" + version
     classes, macros = scan(src)
     counts = {"ieee": 0, "accellera": 0, "contrib": 0}
     for c in classes.values():
         if c.get("tag"):
             counts[c["tag"]] += 1
         for mem in c["members"].values():
-            counts[mem["tag"]] += 1
+            if mem.get("tag"):
+                counts[mem["tag"]] += 1
     pack = {
         "_doc": "Generated by tools/codegen/gen_uvm_api_pack.py from uvm-core; do not edit by hand.",
         "version": version,
         "versionString": version_string,
+        "deprecatedGuard": "UVM_NO_DEPRECATED" if version.startswith("1.") else "UVM_ENABLE_DEPRECATED_API",
         "counts": counts,
         "classes": {k: classes[k] for k in sorted(classes)},
         "macros": {k: macros[k] for k in sorted(macros)},
@@ -119,7 +158,8 @@ def main():
     path = out / f"{version}.json"
     path.write_text(json.dumps(pack, indent=1, sort_keys=False) + "\n")
     print(f"{path}: {len(classes)} classes, {counts}, {len(macros)} macros "
-          f"({sum(1 for m in macros.values() if m['deprecated'])} deprecated)")
+          f"({sum(1 for m in macros.values() if m['deprecated'])} deprecated), "
+          f"{sum(1 for c in classes.values() for m in c['members'].values() if m.get('deprecated'))} deprecated methods")
     return 0
 
 

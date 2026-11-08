@@ -3,7 +3,8 @@
 //!
 //!     dv-lint [--slang] [--time] [--history] [--skip-libraries] [--rule ID]... [-top NAME]... [--list] <compile options>
 //!
-//! `--list` prints every rule (`id name model|syntax`); `-top` names the
+//! `--list` prints every rule (`id name model|syntax`, then `native` for a
+//! rule with no uvmcheck twin); `-top` names the
 //! modules elaboration starts from; `--history` lets SV-EVO-001/002 read git
 //! history. Modules the sources instantiate but do not define are looked up
 //! in `-v` library files and `-y` directories (`+libext+` extensions), as
@@ -46,7 +47,8 @@ fn main() {
             "--list" => {
                 for r in dv_lint::rules() {
                     let kind = if r.is_syntax() { "syntax" } else { "model" };
-                    println!("{} {} {}", r.id, r.name, kind);
+                    let native = if dv_lint::NATIVE_ONLY.contains(&r.id) { " native" } else { "" };
+                    println!("{} {} {}{native}", r.id, r.name, kind);
                     for (id, name) in dv_lint::sub_rules(r.id) {
                         println!("{id} {name} {kind}");
                     }

@@ -1,13 +1,16 @@
 //! The UVM API packs (data/uvm-api/*.json, made by
 //! tools/codegen/gen_uvm_api_pack.py): for each UVM release, which classes,
-//! members and macros the library tags Accellera-only, and which macros it
-//! defines only as deprecated API. Rules UVM-API-001 and UVM-API-002 read
-//! the pack of the release being compiled.
+//! members and macros the library tags Accellera-only, and which macros,
+//! classes and methods it compiles only as deprecated API. Rules UVM-API-001,
+//! UVM-API-002 and UVM-API-003 read the pack of the release being compiled
+//! (UVM 1.1d, 1.2, 2020-2.0, 2020.3.0, 2020.3.1).
 
 use std::collections::HashSet;
 use std::sync::OnceLock;
 
 const EMBEDDED: &[&str] = &[
+    include_str!("../../../data/uvm-api/1.1d.json"),
+    include_str!("../../../data/uvm-api/1.2.json"),
     include_str!("../../../data/uvm-api/2020-2.0.json"),
     include_str!("../../../data/uvm-api/2020.3.0.json"),
     include_str!("../../../data/uvm-api/2020.3.1.json"),
@@ -20,8 +23,22 @@ pub(crate) struct ApiPack {
     pub accellera_classes: HashSet<String>,
     /// (class, member) tagged `accellera`.
     pub accellera_members: HashSet<(String, String)>,
-    /// Macros defined only under UVM_ENABLE_DEPRECATED_API.
+    /// Macros the release compiles only as deprecated API.
     pub deprecated_macros: HashSet<String>,
+    /// Classes and (class, method) it compiles only as deprecated API.
+    pub deprecated_classes: HashSet<String>,
+    pub deprecated_members: HashSet<(String, String)>,
+    /// The define deprecated API hangs on: `UVM_ENABLE_DEPRECATED_API`
+    /// (2020: it must be set) or `UVM_NO_DEPRECATED` (1.x: setting it
+    /// removes the API).
+    pub deprecated_guard: String,
+}
+
+impl ApiPack {
+    /// UVM 1.x: deprecated API is there unless UVM_NO_DEPRECATED is set.
+    pub fn removed_by_define(&self) -> bool {
+        self.deprecated_guard == "UVM_NO_DEPRECATED"
+    }
 }
 
 // ---- a small JSON reader: the packs are the only JSON dv-lint reads ----
@@ -176,15 +193,29 @@ fn parse(text: &str) -> Option<ApiPack> {
         accellera_classes: HashSet::new(),
         accellera_members: HashSet::new(),
         deprecated_macros: HashSet::new(),
+        deprecated_classes: HashSet::new(),
+        deprecated_members: HashSet::new(),
+        deprecated_guard: root
+            .get("deprecatedGuard")
+            .and_then(Json::str)
+            .unwrap_or("UVM_ENABLE_DEPRECATED_API")
+            .to_string(),
     };
     let tag = |j: &Json| j.get("tag").and_then(Json::str) == Some("accellera");
+    let dep = |j: &Json| matches!(j.get("deprecated"), Some(Json::Bool(true)));
     for (name, info) in root.get("classes").map_or(&[][..], Json::entries) {
         if tag(info) {
             p.accellera_classes.insert(name.clone());
         }
+        if dep(info) {
+            p.deprecated_classes.insert(name.clone());
+        }
         for (m, mi) in info.get("members").map_or(&[][..], Json::entries) {
             if tag(mi) {
                 p.accellera_members.insert((name.clone(), m.clone()));
+            }
+            if dep(mi) {
+                p.deprecated_members.insert((name.clone(), m.clone()));
             }
         }
     }

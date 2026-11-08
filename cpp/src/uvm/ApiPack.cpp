@@ -173,6 +173,7 @@ std::unique_ptr<ApiPack> ApiPack::parse(std::string_view json, std::string& erro
         error = "no \"version\"";
         return nullptr;
     }
+    if (auto g = entryString(*root, "deprecatedGuard"); !g.empty()) pack->guard = g;
     if (const auto* cls = root->find("classes"); cls && cls->isObject()) {
         for (const auto& [name, info] : cls->asObject()) {
             if (!info.isObject()) continue;

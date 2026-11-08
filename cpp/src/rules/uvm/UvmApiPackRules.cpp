@@ -140,13 +140,18 @@ public:
             auto loc = usage.directive.location();
             if (!loc.valid() || !sm.isFileLoc(loc) || meth::isLibraryBuffer(sm, loc.buffer())) continue;
             if (!seen.insert(loc).second) continue;
-            diags.addViolation(
-                "UVM-API-002", "DeprecatedUvmMacro",
-                "`" + std::string(name) + " is deprecated in UVM " + pack.version() +
-                    ": the library defines it only when UVM_ENABLE_DEPRECATED_API is set, so this line stops "
-                    "compiling without that define. For the `uvm_do family use `uvm_do(SEQ_OR_ITEM, SEQR, PRIORITY, "
-                    "{CONSTRAINTS}) and its `uvm_send / `uvm_rand_send forms with the extra arguments.",
-                core::Severity::Warning, loc);
+            std::string msg = "`" + std::string(name) + " is deprecated in UVM " + pack.version();
+            if (pack.deprecatedGuard() == "UVM_NO_DEPRECATED") {
+                msg += ": the library drops it when UVM_NO_DEPRECATED is defined, so this line stops compiling "
+                       "with that define, and later UVM releases do not have it. Register sequences and "
+                       "sequencers with `uvm_object_utils / `uvm_component_utils (and `uvm_declare_p_sequencer) "
+                       "instead of the sequence-library macros.";
+            } else {
+                msg += ": the library defines it only when UVM_ENABLE_DEPRECATED_API is set, so this line stops "
+                       "compiling without that define. For the `uvm_do family use `uvm_do(SEQ_OR_ITEM, SEQR, PRIORITY, "
+                       "{CONSTRAINTS}) and its `uvm_send / `uvm_rand_send forms with the extra arguments.";
+            }
+            diags.addViolation("UVM-API-002", "DeprecatedUvmMacro", msg, core::Severity::Warning, loc);
         }
     }
 

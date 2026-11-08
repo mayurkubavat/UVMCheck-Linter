@@ -47,8 +47,12 @@ public:
     const std::string& version() const { return versionName; }
     const ApiEntry* findClass(std::string_view cls) const;
     const ApiEntry* findMember(std::string_view cls, std::string_view member) const;
-    /// True when the release compiles this macro only under UVM_ENABLE_DEPRECATED_API.
+    /// True when the release compiles this macro only as deprecated API (see
+    /// deprecatedGuard()).
     bool isDeprecatedMacro(std::string_view name) const;
+    /// The define deprecated API hangs on: UVM_ENABLE_DEPRECATED_API (2020: it
+    /// must be set) or UVM_NO_DEPRECATED (1.x: setting it removes the API).
+    const std::string& deprecatedGuard() const { return guard; }
     bool hasMacro(std::string_view name) const;
 
     /// Parses a pack; null with `error` set when the text is not one.
@@ -60,6 +64,7 @@ private:
         std::map<std::string, ApiEntry, std::less<>> members;
     };
     std::string versionName;
+    std::string guard = "UVM_ENABLE_DEPRECATED_API";
     std::map<std::string, ClassInfo, std::less<>> classes;
     std::map<std::string, bool, std::less<>> macros; // name -> deprecated
 };

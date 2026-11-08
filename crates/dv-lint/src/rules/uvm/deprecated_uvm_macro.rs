@@ -1,7 +1,9 @@
 //! UVM-API-002 (DeprecatedUvmMacro): Flags uses of UVM macros that the UVM
-//! version being compiled defines only under UVM_ENABLE_DEPRECATED_API (in UVM
-//! 2020: `uvm_do_with, `uvm_do_on, `uvm_do_pri, `uvm_create_on, `uvm_send_pri
-//! and the rest of that family).
+//! version being compiled keeps only as deprecated API: in UVM 2020 the ones
+//! defined only under UVM_ENABLE_DEPRECATED_API (`uvm_do_with, `uvm_do_on,
+//! `uvm_do_pri, `uvm_create_on, `uvm_send_pri and the rest of that family), in
+//! UVM 1.1d/1.2 the ones UVM_NO_DEPRECATED removes (`uvm_sequence_utils,
+//! `uvm_update_sequence_lib and the other sequence-library macros).
 
 use std::collections::HashSet;
 use dv_model::Design;
@@ -37,12 +39,21 @@ pub(crate) fn deprecated_uvm_macro(_: &Design, csts: &[Cst], out: &mut Sink) {
                         "UVM-API-002",
                         "DeprecatedUvmMacro",
                         Severity::Warning,
-                        format!(
-                            "`{name} is deprecated in UVM {}: the library defines it only when UVM_ENABLE_DEPRECATED_API is set, so this line \
+                        if pack.removed_by_define() {
+                            format!(
+                                "`{name} is deprecated in UVM {}: the library drops it when UVM_NO_DEPRECATED is defined, so this line \
+stops compiling with that define, and later UVM releases do not have it. Register sequences and sequencers with `uvm_object_utils / \
+`uvm_component_utils (and `uvm_declare_p_sequencer) instead of the sequence-library macros.",
+                                pack.version
+                            )
+                        } else {
+                            format!(
+                                "`{name} is deprecated in UVM {}: the library defines it only when UVM_ENABLE_DEPRECATED_API is set, so this line \
 stops compiling without that define. For the `uvm_do family use `uvm_do(SEQ_OR_ITEM, SEQR, PRIORITY, {{CONSTRAINTS}}) and its \
 `uvm_send / `uvm_rand_send forms with the extra arguments.",
-                            pack.version
-                        ),
+                                pack.version
+                            )
+                        },
                         origin_loc(c, f as u32, lx.toks[i].1),
                     );
                 }

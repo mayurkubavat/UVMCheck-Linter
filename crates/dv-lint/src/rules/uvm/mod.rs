@@ -12,6 +12,7 @@ mod component_name_mismatch;
 mod component_null_parent_in_create;
 mod config_db_cross_component_resolver;
 mod config_db_get_unchecked;
+mod deprecated_uvm_api;
 mod deprecated_uvm_macro;
 mod direct_do_method_call;
 mod direct_ral_mirror_tampering;
@@ -76,6 +77,7 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule { id: "UVM-ALS-001", name: "UvmTransactionAliasing", check: Check::Syntax(uvm_transaction_aliasing::transaction_aliasing) },
         Rule { id: "UVM-API-001", name: "AccelleraOnlyApi", check: Check::Mixed(accellera_only_api::accellera_only_api) },
         Rule { id: "UVM-API-002", name: "DeprecatedUvmMacro", check: Check::Mixed(deprecated_uvm_macro::deprecated_uvm_macro) },
+        Rule { id: "UVM-API-003", name: "DeprecatedUvmApi", check: Check::Mixed(deprecated_uvm_api::deprecated_uvm_api) },
         Rule { id: "UVM-BAN-003", name: "DirectDoMethodCall", check: Check::Model(direct_do_method_call::direct_do_method_call) },
         Rule { id: "UVM-CFG-001", name: "UvmConfigDbTypeMismatch", check: Check::Mixed(uvm_config_db_type_mismatch::config_db_type_mismatch) },
         Rule { id: "UVM-CFG-002", name: "UvmConfigDbNullContext", check: Check::Model(uvm_config_db_null_context::uvm_config_db_null_context) },

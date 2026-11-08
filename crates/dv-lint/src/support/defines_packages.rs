@@ -429,7 +429,9 @@ pub(crate) fn uvm_version(csts: &[Cst]) -> Option<String> {
     for want in ["UVM_VERSION_STRING", "uvm_revision"] {
         for c in csts {
             for d in c.nodes(ParamDecl) {
-                if !c.toks(d).any(|t| c.text_of(t) == want) {
+                // The name sits in the declarator, below the ParamDecl.
+                let all = c.tree.token_range(d);
+                if !all.iter().any(|&t| c.text_of(t) == want) {
                     continue;
                 }
                 let in_uvm = crate::support::slang_ast::ancestors(c, d)
@@ -437,7 +439,7 @@ pub(crate) fn uvm_version(csts: &[Cst]) -> Option<String> {
                 if !in_uvm {
                     continue;
                 }
-                if let Some(t) = c.toks(d).find(|&t| c.tree.tokens[t as usize].kind == Kind::StringLiteral) {
+                if let Some(&t) = all.iter().find(|&&t| c.tree.tokens[t as usize].kind == Kind::StringLiteral) {
                     return Some(c.text_of(t).trim_matches('"').to_string());
                 }
             }

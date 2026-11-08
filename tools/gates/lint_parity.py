@@ -22,8 +22,9 @@ UVMCHECK = os.environ.get('UVMCHECK', os.path.join(REPO, 'build', 'uvmcheck'))
 DVLINT = os.environ.get('DV_LINT', os.path.join(REPO, 'target', 'release', 'dv-lint'))
 LINE = re.compile(r'^(.*?):(\d+):(\d+): \[(\w+)\] (\S+) \((\w+)\): (.*)$')
 
-KINDS = dict((l.split()[0], l.split()[2]) for l in
-             subprocess.run([DVLINT, '--list'], capture_output=True, text=True).stdout.splitlines())
+# `id name kind [native]`: native rules have no uvmcheck twin and are left out.
+LISTED = [l.split() for l in subprocess.run([DVLINT, '--list'], capture_output=True, text=True).stdout.splitlines()]
+KINDS = dict((f[0], f[2]) for f in LISTED if 'native' not in f[3:])
 RULES = set(KINDS)
 if '--slang' in sys.argv:
     RULES = {r for r, k in KINDS.items() if k == 'model'}
@@ -61,7 +62,7 @@ def ported(args, slang):
     got = collections.Counter()
     for line in res.stdout.splitlines():
         m = LINE.match(line)
-        if m:
+        if m and m[5] in RULES:
             got[(os.path.basename(m[1]), int(m[2]), int(m[3]), m[5], m[7])] += 1
     return files_with_errors(got)
 
