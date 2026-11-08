@@ -24,9 +24,9 @@ if [ "$engine" = auto ]; then
         fi
         case "$a" in
             # Options dv-lint takes, and those that take a value.
-            --rule|--preset|--json|--config|--waivers|--baseline|--update-baseline|-top|--top|-I|-D|-f|-F|-v|-y|-P|-l|-o|--timescale|-incdir|-define)
+            --rule|--preset|--json|--config|--waivers|--baseline|--update-baseline|--sarif|-top|--top|-I|-D|-f|-F|-v|-y|-P|-l|-o|--timescale|-incdir|-define)
                 expect_value=yes ;;
-            --preset=*|--json=*|--config=*|--waivers=*|--baseline=*|--update-baseline=*|--experimental|--no-config|--no-cache|--history|--skip-libraries|--time|--frames|--in-context|--list|--single-unit)
+            --preset=*|--json=*|--config=*|--waivers=*|--baseline=*|--update-baseline=*|--sarif=*|--experimental|--no-config|--no-cache|--history|--skip-libraries|--time|--frames|--in-context|--list|--single-unit)
                 ;;
             +incdir+*|+define+*|+undefine+*|+libext+*|-I*|-D*)
                 ;;

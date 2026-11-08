@@ -51,6 +51,7 @@ fn main() {
     let mut waivers_file: Option<String> = None;
     let mut baseline_file: Option<String> = None;
     let mut update_baseline: Option<String> = None;
+    let mut sarif: Option<String> = None;
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -63,12 +64,13 @@ fn main() {
             ("--waivers=", &mut waivers_file),
             ("--baseline=", &mut baseline_file),
             ("--update-baseline=", &mut update_baseline),
+            ("--sarif=", &mut sarif),
         ] {
             if let Some(v) = a.strip_prefix(flag) {
                 *slot = Some(v.to_string());
             }
         }
-        if a.starts_with("--waivers=") || a.starts_with("--baseline=") || a.starts_with("--update-baseline=") {
+        if ["--waivers=", "--baseline=", "--update-baseline=", "--sarif="].iter().any(|p| a.starts_with(p)) {
             continue;
         }
         if let Some(v) = a.strip_prefix("--config=") {
@@ -102,6 +104,8 @@ fn main() {
             "--waivers" => waivers_file = it.next(),
             "--baseline" => baseline_file = it.next(),
             "--update-baseline" => update_baseline = it.next(),
+            // A SARIF 2.1.0 report.
+            "--sarif" => sarif = it.next(),
             // No result cache here.
             "--no-cache" => {}
             // Also write the findings as uvmcheck's JSON report.
@@ -170,6 +174,9 @@ fn main() {
     let _ = SUPPRESS.set(sup);
     if let Some(u) = update_baseline {
         let _ = UPDATE_BASELINE.set(u);
+    }
+    if let Some(s) = sarif {
+        let _ = SARIF_OUT.set(s);
     }
     let headers = if in_context { in_owner(&mut args) } else { Vec::new() };
     let selected = dv_lint::rule_selection(preset.as_deref(), experimental).unwrap_or_else(|e| fail(e));
@@ -285,6 +292,8 @@ fn only_in(headers: &[std::path::PathBuf], files: &[String], found: &[dv_lint::F
 /// The waivers and baseline in use, and where `--update-baseline` writes.
 static SUPPRESS: std::sync::OnceLock<dv_lint::suppress::Suppress> = std::sync::OnceLock::new();
 static UPDATE_BASELINE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+/// `--sarif FILE`.
+static SARIF_OUT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 /// The project configuration in use, if any.
 static CONFIG: std::sync::OnceLock<dv_lint::project::Config> = std::sync::OnceLock::new();
@@ -401,6 +410,12 @@ fn report(
             if frames {
                 print!("{}", sources.frame(nfile, loc.line, loc.column));
             }
+        }
+    }
+    if let Some(path) = SARIF_OUT.get() {
+        if let Err(e) = std::fs::write(path, dv_lint::report::sarif(files, found)) {
+            eprintln!("error: cannot write {path}: {e}");
+            std::process::exit(2);
         }
     }
     if let Some(path) = JSON_OUT.get() {

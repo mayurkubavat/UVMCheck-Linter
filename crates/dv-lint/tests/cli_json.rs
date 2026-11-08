@@ -216,3 +216,29 @@ fn waiver_files_regrades_and_baselines() {
     assert!(!reported.is_empty(), "{after}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn sarif_report() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-sarif-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("t.sv"), "module m; reg a; endmodule\n").unwrap();
+    let out = dir.join("r.sarif");
+    std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .current_dir(&dir)
+        .args(["--no-config", "--sarif"])
+        .arg(&out)
+        .arg("t.sv")
+        .output()
+        .unwrap();
+    let text = std::fs::read_to_string(&out).unwrap();
+    for key in [
+        "\"version\": \"2.1.0\"",
+        "\"name\": \"dv-lint\"",
+        "\"id\": \"SV-BAN-001\"",
+        "\"ruleId\": \"SV-BAN-001\",\n          \"level\": \"note\"",
+        "\"remediationMinutes\": 5",
+    ] {
+        assert!(text.contains(key), "{key} in {text}");
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}

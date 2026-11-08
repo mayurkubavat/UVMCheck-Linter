@@ -72,6 +72,7 @@ pub fn header_pattern_supported(p: &str) -> bool {
     options::header_alternatives(p).is_some()
 }
 pub mod project;
+pub mod report;
 pub mod suppress;
 
 static INLINE_WAIVED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
