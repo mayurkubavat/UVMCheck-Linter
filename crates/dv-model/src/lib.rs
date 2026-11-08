@@ -4,10 +4,11 @@
 //! A [`Design`] is an owned snapshot; nothing borrows from the front end
 //! afterwards. Two front ends fill it:
 //!
-//! - the native one, `sv_sema::load` (the default for `dv-lint`), which
+//! - the native one, `sv_sema::load` (what every tool uses by default), which
 //!   builds it from `sv-syntax` trees with [`Design::from_parts`];
-//! - slang, through [`Design::load`] (feature `slang`, on by default), which
-//!   copies the C++ `uvmcheck::model` across the C ABI in `sv-slang`.
+//! - slang, through `Design::load` (feature `slang`, off by default; oracle
+//!   and parity use only), which copies the C++ `uvmcheck::model` across the
+//!   C ABI in `sv-slang`.
 //!
 //! Both take the same compile options as `uvmcheck`. Tools read only this
 //! crate's types and do not see which front end built the design;
