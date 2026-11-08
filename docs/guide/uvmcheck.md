@@ -137,6 +137,18 @@ Run or debug a specific rule against a source file in milliseconds:
 ### Compiler errors and warnings
 The compiler's own diagnostics are findings too: errors are `SV-CMP-001` and warnings `SV-CMP-002`. They appear in the console, JSON, SARIF, HTML and the editor, and can be waived or baselined like any other finding. `-W` options and `` `pragma diagnostic `` decide which warnings are reported and at what severity (`-Wno-redef-macro`, `-Werror=index-oob`). Disable the rules to get slang's plain diagnostic output back.
 
+### Exit status
+Both engines (the Slang-backed `uvmcheck` and the native `dv-lint`) exit with:
+
+| Status | Meaning |
+|---|---|
+| 0 | No ERROR finding. |
+| 1 | At least one ERROR finding, compiler errors (`SV-CMP-001`) included; also `--strict-new-files` when a new file has findings. |
+| 2 | The run could not start: an unknown option, a source, file list (nested ones too), library file or `-y` directory that is missing or cannot be read (a directory or device given as a source included), or a configuration that fails to load. A missing `-I` / `+incdir+` directory is not an error. Simulator options (`+acc`, `-l run.log`) are ignored by `dv-lint`; `uvmcheck` takes them with `--override filelist-dialect` or a `--compat-profile`, and stops with status 2 otherwise. |
+| 4 | `--strict-waivers` found unused, expired or stale waivers. |
+
+A file that reads but does not parse is a finding (status 1), not status 2.
+
 ### Performance & Threading
 Rules run on a single-pass, parallel engine: most rules hand their visitors to one
 shared walk per shard, which routes each syntax/AST node only to the rules that

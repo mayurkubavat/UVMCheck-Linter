@@ -98,13 +98,33 @@ pub fn parse_args<S: AsRef<str>>(args: &[S]) -> Result<(Vec<Tree>, f64), Error> 
             .collect(),
         ..Options::default()
     };
+    // Inputs that are missing or cannot be read stop the run, as they stop
+    // uvmcheck (exit 2): file lists (nested ones too), library files and
+    // directories. A missing include directory does not (slang ignores it).
+    if let Some(d) = list.diagnostics.iter().find(|d| {
+        d.severity == sv_source::Severity::Error
+            && (d.message.starts_with("cannot read file list")
+                || d.message.starts_with("file list includes itself")
+                || d.message.starts_with("library file not found")
+                || d.message.starts_with("library directory not found"))
+    }) {
+        return Err(Error(d.message.clone()));
+    }
+    // Simulator options (`-l log`, `+acc`) are ignored, as with uvmcheck's
+    // filelist dialect; a `--name` option nothing knows is a mistake.
+    if let Some(o) = list.ignored.iter().find(|o| o.value.starts_with("--")) {
+        return Err(Error(format!("unknown command line argument '{}'", o.value)));
+    }
     let files: Vec<PathBuf> = list.sources.iter().map(|s| s.value.clone()).collect();
     if files.is_empty() {
         return Err(Error("no sources given".into()));
     }
     let t0 = Instant::now();
+    // A source that is missing or cannot be read stops the run (exit 2 in
+    // dv-lint, as in uvmcheck), rather than becoming a finding.
     for f in &files {
-        if !f.exists() {
+        let regular = std::fs::metadata(f).is_ok_and(|m| m.is_file());
+        if !regular || std::fs::File::open(f).is_err() {
             return Err(Error(format!("could not read the sources: {}", f.display())));
         }
     }

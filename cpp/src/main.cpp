@@ -45,7 +45,9 @@ std::string stateKey(const std::pair<std::string, size_t>& written) {
 int main(int argc, char** argv) {
     uvmcheck::core::LinterDriver driver;
     if (!driver.parseCommandLine(argc, argv)) {
-        return 1;
+        // A bad option or a file list that cannot be read: the run cannot
+        // start (exit 2, as for any input that cannot be read).
+        return 2;
     }
     if (!driver.rewritesFiles()) return driver.run();
 

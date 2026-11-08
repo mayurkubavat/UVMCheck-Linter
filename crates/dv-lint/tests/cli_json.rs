@@ -367,6 +367,40 @@ fn fix_skips_files_with_semantic_errors() {
 }
 
 #[test]
+fn inputs_that_cannot_be_read_exit_2() {
+    // As uvmcheck: the run cannot start (docs/guide/uvmcheck.md, Exit status).
+    let dir = std::env::temp_dir().join(format!("dv-lint-exit2-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join("adir")).unwrap();
+    std::fs::write(dir.join("ok.sv"), "module m; endmodule\n").unwrap();
+    std::fs::write(dir.join("nested.f"), "-f gone.f\n").unwrap();
+    std::fs::write(dir.join("self.f"), "-f self.f\n").unwrap();
+    let code = |args: &[&str]| {
+        std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+            .current_dir(&dir)
+            .args(["--no-config", "--no-cache"])
+            .args(args)
+            .output()
+            .unwrap()
+            .status
+            .code()
+    };
+    for args in [
+        &["missing.sv"][..],
+        &["ok.sv", "adir"],
+        &["ok.sv", "-f", "nested.f"],
+        &["ok.sv", "-f", "self.f"],
+        &["ok.sv", "-v", "missing_lib.v"],
+        &["ok.sv", "-y", "no_dir"],
+        &["--no-such-option", "ok.sv"],
+    ] {
+        assert_eq!(code(args), Some(2), "{args:?}");
+    }
+    assert_eq!(code(&["ok.sv", "-I", "no_dir"]), Some(0), "a missing include directory is not an error");
+    assert_eq!(code(&["ok.sv", "+acc", "-l", "run.log"]), Some(0), "simulator options are ignored");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn exit_status_follows_errors_only() {
     let dir = std::env::temp_dir().join(format!("dv-lint-exit-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();

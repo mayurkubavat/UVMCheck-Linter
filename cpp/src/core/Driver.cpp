@@ -533,8 +533,10 @@ int LinterDriver::run() {
     if (!replayed) {
     compat::CrashGuard::markStage("parse");
     if (!slangDriver.parseAllSources()) {
+        // A source slang could not load (unreadable): an input error, as a
+        // missing file is (exit 2, in both engines).
         (void)slangDriver.reportDiagnostics(false);
-        return 3;
+        return 2;
     }
 
     using Clock = std::chrono::steady_clock;
