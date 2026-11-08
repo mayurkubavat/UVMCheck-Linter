@@ -1,5 +1,5 @@
 //! Scopes and name checks (builder phase N1). The scope dump is checked
-//! against Slang's on sv-tests and the repo by tools/sym_gate.py; these
+//! against Slang's on sv-tests and the repo by tools/gates/sym_gate.py; these
 //! cases pin the shapes that decide it.
 
 use sv_sema::{names, scopes};

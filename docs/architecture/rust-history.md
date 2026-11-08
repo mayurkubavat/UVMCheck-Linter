@@ -136,7 +136,7 @@ semantics, including where whitespace lands inside stringified text.
 cargo run --release -p sv-preproc --example ppdump -- +incdir+DIR... FILE
 ```
 
-Parity with Slang is checked token for token by `tools/pp_parity.py`
+Parity with Slang is checked token for token by `tools/gates/pp_parity.py`
 against the `uvmcheck_pp_dump` reference tool. Measured 2026-11-03:
 uvm-core's `uvm_pkg.sv` (278,335 tokens) is identical, and so are all 949
 sv-tests files that are meant to pass (79 skipped as should-fail).
@@ -160,7 +160,7 @@ balanced token runs inside their nodes for now.
 cargo run --release -p sv-syntax --example outline -- --check +incdir+DIR FILE
 ```
 
-`tools/cst_parity.py` compares the outline (design units, classes,
+`tools/gates/cst_parity.py` compares the outline (design units, classes,
 functions, tasks, typedefs, constraints, covergroups, in order) with
 Slang's parser via `uvmcheck_cst_outline`, and checks the round trip.
 Measured on slice 1: uvm-core's `uvm_pkg.sv` (168 files, 5,402 entries)
@@ -173,7 +173,7 @@ Slice 2 (2026-11-04) adds expressions (precedence climbing over Table
 patterns, `new`, `with`, `inside`, patterns after `matches`), data types
 and declarations (enums, structs, parameters, instantiations, gates,
 non-ANSI ports) and statements built on them. `begin_keywords` is
-honored by the preprocessor. `tools/cst_parity.py --exprs` compares every
+honored by the preprocessor. `tools/gates/cst_parity.py --exprs` compares every
 top-level operator expression in prefix form, `(+ a (* b c))`, with
 Slang's (`uvmcheck_cst_exprs`): uvm-core (8,849 expressions), all 849
 clean sv-tests files and all 772 clean repo test inputs are identical,
@@ -199,7 +199,7 @@ delays with edges, polarity and conditions, system timing checks), UDPs
 `nettype`, net `alias`, elaboration tasks (`$error` and friends as items)
 and randsequence (productions, weights, `rand join`, `if`/`repeat`/`case`
 items, code blocks). Nothing is left out of the gates any more: Slang's
-side of `tools/cst_exprs.cpp` skips nothing, and uvm-core, the 849 clean
+side of `tools/oracles/cst_exprs.cpp` skips nothing, and uvm-core, the 849 clean
 sv-tests files and the 772 clean repo inputs still match.
 
 It also reports what Slang's parser rejects. The preprocessor checks
@@ -234,8 +234,8 @@ sv-sema uses it; `Design::dump` is the canonical text form both sides print.
 
 ```
 cargo run --release -p sv-sema --example model_dump -- [--slang] [--types] +incdir+DIR FILE
-tools/model_parity.py --uvm UVM_SRC        # uvm_pkg.sv, Slang vs native
-tools/model_parity.py --repo UVM_SRC       # every test and example input
+tools/gates/model_parity.py --uvm UVM_SRC        # uvm_pkg.sv, Slang vs native
+tools/gates/model_parity.py --repo UVM_SRC       # every test and example input
 ```
 
 Measured 2026-11-04: on this repo's 783 test and example inputs (32,731
@@ -262,8 +262,8 @@ base, timing in a function, `new` of a virtual class, an assignment used as
 an `if` condition or chained) keeps only its timing controls, as in Slang.
 
 ```
-tools/model_parity.py --bodies --uvm UVM_SRC
-tools/model_parity.py --bodies --repo UVM_SRC
+tools/gates/model_parity.py --bodies --uvm UVM_SRC
+tools/gates/model_parity.py --bodies --repo UVM_SRC
 ```
 
 Measured 2026-11-04 with `--bodies`: 776 of the 783 repo inputs are
@@ -294,8 +294,8 @@ chosen by their full printed form, value arguments included, which also
 narrowed the body and class gaps.
 
 ```
-tools/model_parity.py --types --uvm UVM_SRC
-tools/model_parity.py --types --repo UVM_SRC
+tools/gates/model_parity.py --types --uvm UVM_SRC
+tools/gates/model_parity.py --types --repo UVM_SRC
 ```
 
 Measured 2026-11-04 with `--types`: 762 of the 783 repo inputs are
@@ -326,13 +326,13 @@ outermost expansion with column 0, and nothing is reported in the test
 `uvm_mock.svh`. For that, `Loc` carries the expansion site (`expansion` in
 Rust, `exp_file`/`exp_line` in the C ABI, now version 6).
 
-`tools/lint_parity.py` runs `uvmcheck --preset all --experimental --json`,
+`tools/gates/lint_parity.py` runs `uvmcheck --preset all --experimental --json`,
 keeps the findings of the 27 rules, and compares them with dv-lint's as
 multisets of file name, line, column, rule and message:
 
 ```
-tools/lint_parity.py [--slang] --repo UVM_SRC
-tools/lint_parity.py [--slang] --uvm UVM_SRC
+tools/gates/lint_parity.py [--slang] --repo UVM_SRC
+tools/gates/lint_parity.py [--slang] --uvm UVM_SRC
 ```
 
 Measured 2026-11-04 on the native model: all 783 repo compiles are identical
@@ -377,7 +377,7 @@ are not slang's ProceduralAssignStatement.
 
 The first 13 are SV-COR-006/008/009, SV-DEP-001/002/003/005, SV-DED-009/010,
 SV-DLY-002, SV-RCE-001 and SV-CON-005/007 (44 rules in all). With
-`--slang`, only model rules run. `tools/lint_parity.py --dir DIR` checks each
+`--slang`, only model rules run. `tools/gates/lint_parity.py --dir DIR` checks each
 `.sv` file under a directory on its own. Measured 2026-11-05: repo 783/783
 (941 findings), uvm_pkg.sv only the two `s$N` messages, and all 1028
 sv-tests files identical. On uvm_pkg.sv all 44 rules take about 23 ms.
@@ -403,7 +403,7 @@ reports problems as a compiler would (`file:line:col: error: message`, then
 order. Each builder phase (scopes for every design unit, types, constants,
 elaboration, type checking) adds its checks here.
 
-`tools/ieee_gate.py SV_TESTS` runs every sv-tests file through dv-build and
+`tools/gates/ieee_gate.py SV_TESTS` runs every sv-tests file through dv-build and
 through uvmcheck (Slang) and reports per IEEE 1800 clause how many legal
 tests each accepts and how many `should_fail` tests each rejects; `--gaps`
 lists the ones only Slang rejects. Set `UVM_SRC` so UVM tests compile
@@ -423,9 +423,9 @@ genvars, sequences, properties, lets, net types, specparams, instances,
 `bind` instances in their target). Generate and statement blocks are
 elaboration's (N4). `dv-build --symbols` prints it as sorted
 `<scope path> <kind> <name>` lines, the form of the Slang reference
-`build/uvmcheck_sym_dump` (tools/sym_dump.cpp, which default-instantiates
-every definition). `tools/sym_gate.py SV_TESTS` and
-`tools/sym_gate.py --repo UVM_SRC` compare the two: 949/949 legal sv-tests
+`build/uvmcheck_sym_dump` (tools/oracles/sym_dump.cpp, which default-instantiates
+every definition). `tools/gates/sym_gate.py SV_TESTS` and
+`tools/gates/sym_gate.py --repo UVM_SRC` compare the two: 949/949 legal sv-tests
 and 783/783 repo files identical.
 
 `sv-sema::names` checks what needs only the scopes: redefinitions in a
@@ -446,7 +446,7 @@ and programs (`Builder::designs`, header imports, `type` parameters in
 bodies). Parameters declared without a type take their value's; nets of a
 user net type take its data type. `dv-build --types` prints the dump with
 ` : <type>`; `build/uvmcheck_sym_dump --types` is the reference and
-`tools/sym_gate.py ... --types` compares them: 943/949 legal sv-tests and
+`tools/gates/sym_gate.py ... --types` compares them: 943/949 legal sv-tests and
 779/783 repo files identical. The rest need `type(expr)`, constant
 functions or replications (N3), x/z enum values, and `weak_reference`.
 Not compared: members of parameterized classes (Slang prints a type
@@ -476,7 +476,7 @@ undefined parameters in typedef ranges.
 
 `dv-build --values` prints the value of every parameter, localparam,
 specparam and enum value the way slang prints its `ConstantValue`
-(`uvmcheck_sym_dump --values` is the reference; `tools/sym_gate.py
+(`uvmcheck_sym_dump --values` is the reference; `tools/gates/sym_gate.py
 --values` compares them). Besides expressions, `sv-sema::consteval` runs
 constant functions (13.4.3) on a small interpreter (declarations,
 assignments, `if`, blocks, `for`, `while`, `repeat`, `return`), and
@@ -499,7 +499,7 @@ instance), `bind` to a module or to instances, package functions, casts,
 `$bits` of type names and packed structs. A parameter that cannot be
 evaluated is left out, and nothing that depends on it is guessed from its
 declaration. Elaboration also rejects indexed part-selects with a constant
-width that is not positive. Gate (`tools/sym_gate.py --hier`): sv-tests
+width that is not positive. Gate (`tools/gates/sym_gate.py --hier`): sv-tests
 949/949, repo 783/783; on PULP common_cells 1903 of 1926 lines match with
 no wrong value (the rest are packed values wider than 128 bits). That run
 also fixed the parser for pasted `/``* *``/` comments in macros, typed

@@ -5,7 +5,7 @@ Checks the rule catalog generated from the rules' own metadata:
 - every rule and sub-rule has a unique ID and a category from the closed set;
 - every ID a rule reports appears in the catalog (no rule reports an undeclared ID);
 - docs/rules/catalog.json, docs/rules/README.md and the methodology "Enforced by" lines
-  match what scripts/gen_rule_docs.py generates from the binary.
+  match what tools/codegen/gen_rule_docs.py generates from the binary.
 """
 
 import argparse
@@ -53,7 +53,7 @@ def main():
                 if f["rule"] not in known:
                     failures.append(f"{expect.relative_to(REPO)} expects undeclared rule {f['rule']}")
 
-    res = subprocess.run([sys.executable, str(REPO / "scripts" / "gen_rule_docs.py"), "--binary", binary,
+    res = subprocess.run([sys.executable, str(REPO / "tools" / "codegen" / "gen_rule_docs.py"), "--binary", binary,
                           "--check"], capture_output=True, text=True)
     if res.returncode != 0:
         failures.append(res.stdout.strip() or res.stderr.strip())

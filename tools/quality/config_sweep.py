@@ -11,8 +11,8 @@ Configurations come from --set (repeatable, comma-separated defines, e.g.
 --set "FAST_SIM,WIDTH=64") and, with --auto, one per macro the sources test
 with `ifdef / `ifndef / `elsif and never `define themselves.
 
-  scripts/config_sweep.py --binary build/uvmcheck --auto -- tb.sv -I inc
-  scripts/config_sweep.py --binary build/uvmcheck --set A --set "B,C=2" --json out.json -- -f files.f
+  tools/quality/config_sweep.py --binary build/uvmcheck --auto -- tb.sv -I inc
+  tools/quality/config_sweep.py --binary build/uvmcheck --set A --set "B,C=2" --json out.json -- -f files.f
 
 Exit status: 1 when any configuration reports an error-severity finding (or
 does not run), 0 otherwise.

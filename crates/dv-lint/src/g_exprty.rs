@@ -3,8 +3,8 @@
 //! then the type context-determined operators take from their context
 //! (comparison operands, assignment right-hand sides, arithmetic operands).
 //! Declared types come from sv-sema's [`TypeOracle`], printed as slang's
-//! `Type::toString()`. Gated against slang by tools/expr_gate.py
-//! (tools/exprdump.cpp is the reference).
+//! `Type::toString()`. Gated against slang by tools/gates/expr_gate.py
+//! (tools/oracles/exprdump.cpp is the reference).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -1182,7 +1182,7 @@ pub(crate) fn slang_kind(c: &Cst, e: NodeId) -> Option<&'static str> {
     })
 }
 
-/// One line per typed expression, as tools/exprdump.cpp prints slang's:
+/// One line per typed expression, as tools/oracles/exprdump.cpp prints slang's:
 /// `<file>:<line>:<col> <kind> <bits> <s|u> <4|2> <type>`, sorted.
 pub fn expr_dump(files: Vec<String>, trees: &[sv_syntax::Tree]) -> Vec<String> {
     let o = TypeOracle::new(trees);

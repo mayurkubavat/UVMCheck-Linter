@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-scripts/precision.py: measures findings per rule per kLOC on a corpus and
+tools/quality/precision.py: measures findings per rule per kLOC on a corpus and
 flags rules whose counts jump against a previous result.
 """
 
@@ -37,7 +37,7 @@ def main():
     ap.add_argument("--binary", default="build/uvmcheck")
     args = ap.parse_args()
     binary = str(Path(args.binary).resolve())
-    print("[PRECISION TEST] scripts/precision.py")
+    print("[PRECISION TEST] tools/quality/precision.py")
 
     with tempfile.TemporaryDirectory() as tmp:
         d = Path(tmp)
@@ -51,7 +51,7 @@ def main():
         env.pop("GITHUB_STEP_SUMMARY", None)
 
         def run(out, *extra):
-            return subprocess.run([sys.executable, str(REPO / "scripts/precision.py"), "--binary", binary,
+            return subprocess.run([sys.executable, str(REPO / "tools/quality/precision.py"), "--binary", binary,
                                    "--corpus", str(d / "corpus.json"), "--out", str(d / out), *extra],
                                   capture_output=True, text=True, env=env, cwd=d)
 

@@ -3,7 +3,7 @@
 // binary, unary, conditional and inside expression is written in prefix
 // form, `(+ a (* b c))`, and everything else as its tokens without trivia.
 // "Top-level" means no operator expression above it. Attributes inside
-// an expression are left out. The reference for tools/cst_parity.py
+// an expression are left out. The reference for tools/gates/cst_parity.py
 // --exprs.
 //
 //   uvmcheck_cst_exprs [+incdir+DIR]... [+define+NAME[=VALUE]]... FILE

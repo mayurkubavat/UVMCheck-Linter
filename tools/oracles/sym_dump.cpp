@@ -1,5 +1,5 @@
 // Prints the scopes Slang builds for a design, the reference the native
-// builder's symbol table is checked against (tools/sym_gate.py, builder
+// builder's symbol table is checked against (tools/gates/sym_gate.py, builder
 // phase N1). One line per declared symbol:
 //
 //     <scope path> <kind> <name>

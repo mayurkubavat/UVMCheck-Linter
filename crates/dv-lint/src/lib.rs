@@ -4,7 +4,7 @@
 //! Model rules read only the class model, so any front end that fills a
 //! `Design` (slang or the native sv-sema) can feed them; syntax rules (see
 //! [`syntax`]) read the native syntax tree. Messages are copied verbatim so
-//! findings compare one to one with `uvmcheck` (see `tools/lint_parity.py`).
+//! findings compare one to one with `uvmcheck` (see `tools/gates/lint_parity.py`).
 //!
 //! # How a run works
 //!

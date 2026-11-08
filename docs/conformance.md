@@ -24,14 +24,14 @@ probe first; the test then fails until it is fixed or an override covers it.
 
 ## AST coverage (`ast_coverage_floor_test`)
 
-Compiling a construct is not the same as checking it. `scripts/ast_coverage.py`
+Compiling a construct is not the same as checking it. `tools/quality/ast_coverage.py`
 counts the slang AST kinds (symbols, statements, expressions, timing controls,
 assertion expressions, constraints) that some rule or analysis names, and lists
 the ones nothing inspects:
 
 ```
-python3 scripts/ast_coverage.py               # table of inspected / total, and the gaps
-python3 scripts/ast_coverage.py --json cov.json
+python3 tools/quality/ast_coverage.py               # table of inspected / total, and the gaps
+python3 tools/quality/ast_coverage.py --json cov.json
 ```
 
 `testdata/conformance/ast_coverage_floor.json` records the current counts. The
@@ -50,7 +50,7 @@ version parameters) and loads its API pack from `data/uvm-api/`, generated from
 the `@uvm-ieee`, `@uvm-accellera` and `@uvm-contrib` tags in uvm-core:
 
 ```
-python3 scripts/gen_uvm_api_pack.py ../uvm-core --out data/uvm-api
+python3 tools/codegen/gen_uvm_api_pack.py ../uvm-core --out data/uvm-api
 ```
 
 Packs are embedded in the binary at build time; `UVMCHECK_UVM_API_PACK=<file>`
@@ -60,14 +60,14 @@ new pack, not new code.
 
 ## Keeping up with slang
 
-`scripts/slang_canary.py` builds uvmcheck against slang master in a separate
+`tools/quality/slang_canary.py` builds uvmcheck against slang master in a separate
 folder, runs the conformance, overlay and rule suites, and writes a Markdown
 report. When an override's slang bug is fixed, or a known crash stops
 crashing, the overlay test fails and names it, so the workaround is deleted
 when the pin moves.
 
 ```
-python3 scripts/slang_canary.py --work ../canary --uvm-home ../uvm-core --report canary.md
+python3 tools/quality/slang_canary.py --work ../canary --uvm-home ../uvm-core --report canary.md
 ```
 
 `uvmcheck --list-addons` lists the overrides, profiles and UVM API packs in

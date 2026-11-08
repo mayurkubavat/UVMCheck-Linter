@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """Expression types of dv-lint's typer (`dv-lint --exprs`) against slang's
-(tools/exprdump.cpp), the types rules read as `Expression::type`.
+(tools/oracles/exprdump.cpp), the types rules read as `Expression::type`.
 
 Lines are keyed by (file, line, column, expression kind). slang may print
 several types for one key (a body elaborated per instance or
@@ -8,12 +8,12 @@ specialization); the typer's type matches when it is one of them. Keys only
 one side prints are counted apart: the typer has no type there, or slang
 does not walk that code (an unused generic class).
 
-    tools/expr_gate.py [--show=N] --repo UVM_SRC | --dir DIR | --corpus BUILD... | -- ARGS...
+    tools/gates/expr_gate.py [--show=N] --repo UVM_SRC | --dir DIR | --corpus BUILD... | -- ARGS...
 """
 import collections, concurrent.futures, glob, os, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
+REPO = os.path.dirname(os.path.dirname(HERE))
 EXPRDUMP = os.environ.get('EXPRDUMP', os.path.join(REPO, 'build', 'uvmcheck_exprdump'))
 DVLINT = os.environ.get('DV_LINT', os.path.join(REPO, 'target', 'release', 'dv-lint'))
 

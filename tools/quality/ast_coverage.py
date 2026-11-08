@@ -12,7 +12,7 @@ code mentions, and blind to kinds reached only through generic walks.
 Plain type symbols (IntegralType, StringType, ...) carry no testbench behavior of
 their own and are listed separately.
 
-  scripts/ast_coverage.py [--slang-include DIR] [--json OUT] [--floor FILE]
+  tools/quality/ast_coverage.py [--slang-include DIR] [--json OUT] [--floor FILE]
 
 --floor fails when a category inspects fewer kinds than the floor records, so
 coverage only goes up.
@@ -24,7 +24,7 @@ import re
 import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parent.parent
+REPO = Path(__file__).resolve().parents[2]
 CODE_DIRS = ["cpp/src", "cpp/include", "python"]
 CATEGORIES = [
     # (macro in slang headers, kind enum, class-name suffix)

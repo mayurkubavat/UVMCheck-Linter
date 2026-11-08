@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""scripts/config_sweep.py finds a bug that only compiles under an `ifdef."""
+"""tools/quality/config_sweep.py finds a bug that only compiles under an `ifdef."""
 
 import argparse
 import json
@@ -44,7 +44,7 @@ def main():
             "`endif\n"
             "  end\n"
             "endmodule\n")
-        cmd = [sys.executable, str(ROOT / "scripts" / "config_sweep.py"), "--binary", binary, "--auto",
+        cmd = [sys.executable, str(ROOT / "tools" / "quality" / "config_sweep.py"), "--binary", binary, "--auto",
                "--set", "FAST_PATH,WIDTH=4", "--json", "out.json", "--",
                "--no-config", "--no-cache", "--rule", "SV-COR-009", "-I", ".", "dut.sv"]
         res = subprocess.run(cmd, cwd=root, capture_output=True, text=True)

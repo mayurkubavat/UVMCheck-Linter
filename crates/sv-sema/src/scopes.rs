@@ -4,7 +4,7 @@
 //! in. Generate blocks and statement blocks are elaboration's (phase N4).
 //!
 //! [`Scopes::dump`] prints it in the form of the Slang reference
-//! (tools/sym_dump.cpp), one `<scope path> <kind> <name>` line per symbol.
+//! (tools/oracles/sym_dump.cpp), one `<scope path> <kind> <name>` line per symbol.
 
 use std::collections::{HashMap, HashSet};
 

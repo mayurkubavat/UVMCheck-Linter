@@ -1,5 +1,5 @@
 //! A canonical dump of the operator expressions in a tree, for checking the
-//! parser against Slang (tools/cst_exprs.cpp prints the same form): every
+//! parser against Slang (tools/oracles/cst_exprs.cpp prints the same form): every
 //! top-level binary, unary, conditional and inside expression, written in
 //! prefix form, `(+ a (* b c))`, everything else as its tokens without
 //! trivia. Regions kept as written (headers, constraints, assertions,

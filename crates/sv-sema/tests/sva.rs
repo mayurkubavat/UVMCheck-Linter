@@ -1,6 +1,6 @@
 //! Assertions, checkers, covergroups, procedures and primitives (builder
 //! slice N6.2b). Slang's own unit tests are the wider check
-//! (tools/slang_unit_gate.py); these cases pin each rule, legal forms
+//! (tools/gates/slang_unit_gate.py); these cases pin each rule, legal forms
 //! included.
 
 fn errors(src: &str) -> Vec<String> {

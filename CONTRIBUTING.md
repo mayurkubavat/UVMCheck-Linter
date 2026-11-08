@@ -166,8 +166,8 @@ list to edit. If the rule enforces a guideline of the
 `cpp/src/rules/Guidelines.cpp`. Then regenerate the docs from the rules' own metadata:
 
 ```bash
-python3 scripts/gen_rule_docs.py          # docs/rules/catalog.json, docs/rules/README.md, MG "Enforced by" lines
-python3 scripts/gen_rule_docs.py --check  # what CI runs (cpp/tests/test_catalog.py): fails if any of them is stale
+python3 tools/codegen/gen_rule_docs.py          # docs/rules/catalog.json, docs/rules/README.md, MG "Enforced by" lines
+python3 tools/codegen/gen_rule_docs.py --check  # what CI runs (cpp/tests/test_catalog.py): fails if any of them is stale
 ```
 
 The guide also describes how to turn a software-engineering principle into a rule and how to
@@ -218,5 +218,5 @@ longer fires, so the baseline only shrinks. After fixing a false positive, refre
 
 1. **Commit Hygiene**: Ensure code compiles warning-free on Clang and GCC.
 2. **Zero Regressions**: All 450+ unit tests must pass before opening a PR.
-3. **Documentation**: Run `scripts/gen_rule_docs.py` after adding a rule or changing its metadata; the [Rule Catalog](docs/rules/README.md) is generated, not edited.
+3. **Documentation**: Run `tools/codegen/gen_rule_docs.py` after adding a rule or changing its metadata; the [Rule Catalog](docs/rules/README.md) is generated, not edited.
 4. **Automated Fixes**: If your rule supports `--fix`, include test cases verifying the exact textual rewrite output.

@@ -11,12 +11,12 @@ gate; a should_fail test only Slang rejects is a known gap, listed with
 counted apart: no front end can reject them.
 
     cmake --build build && cargo build --release -p dv-build
-    UVM_SRC=uvm-core/src tools/ieee_gate.py ~/sv-tests [--gaps] [chapter-8]
+    UVM_SRC=uvm-core/src tools/gates/ieee_gate.py ~/sv-tests [--gaps] [chapter-8]
 """
 import collections, concurrent.futures, json, os, re, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
+REPO = os.path.dirname(os.path.dirname(HERE))
 UVMCHECK = os.environ.get('UVMCHECK', os.path.join(REPO, 'build', 'uvmcheck'))
 DVBUILD = os.environ.get('DV_BUILD', os.path.join(REPO, 'target', 'release', 'dv-build'))
 

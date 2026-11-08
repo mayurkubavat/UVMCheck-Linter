@@ -37,7 +37,7 @@ jobs:
         env:
           UVM_HOME: ${{ github.workspace }}/uvm-core
         run: |
-          python3 scripts/precision.py --binary build/uvmcheck --out precision.json \
+          python3 tools/quality/precision.py --binary build/uvmcheck --out precision.json \
             --previous precision-previous.json --summary precision.md
           cp precision.json precision-previous.json
 

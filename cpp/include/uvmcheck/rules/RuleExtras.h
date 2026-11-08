@@ -11,7 +11,7 @@ struct RuleOptionDoc {
 };
 
 /// The tested example and options of a rule, compiled in from testdata/rules/
-/// and the rule sources (scripts/gen_rule_extras.py).
+/// and the rule sources (tools/codegen/gen_rule_extras.py).
 struct RuleExtra {
     std::string_view ruleId;
     std::string_view testDir; // e.g. "testdata/rules/correctness/SV-COR-008"

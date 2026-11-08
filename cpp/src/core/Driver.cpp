@@ -274,8 +274,8 @@ int LinterDriver::run() {
         for (auto p : compat::Overlay::profileNames()) std::cout << " " << p;
         std::cout << "\n\nUVM API packs (data/uvm-api; UVMCHECK_UVM_API_PACK=<file> replaces them):";
         for (const auto& v : uvm::ApiPack::builtinVersions()) std::cout << " " << v;
-        std::cout << "\n\nScripts: scripts/config_sweep.py (lint under several `ifdef configurations), "
-                     "scripts/slang_canary.py (build and test against slang master)\n";
+        std::cout << "\n\nScripts: tools/quality/config_sweep.py (lint under several `ifdef configurations), "
+                     "tools/quality/slang_canary.py (build and test against slang master)\n";
         return 0;
     }
 

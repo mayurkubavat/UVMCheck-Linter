@@ -2,7 +2,7 @@
 //! declaration, data type or untyped parameter has, as slang prints it
 //! (`Type::toString`) and as its integral shape (width, signedness, four
 //! states), seen from where it is written. Rules type expressions on top
-//! of this; see `dv-lint`'s expression typer and tools/exprdump.cpp.
+//! of this; see `dv-lint`'s expression typer and tools/oracles/exprdump.cpp.
 
 use super::types::INT_TYPES;
 use super::*;

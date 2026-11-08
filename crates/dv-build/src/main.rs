@@ -10,9 +10,9 @@
 //! Diagnostics go to stdout as `file:line:col: error: message`, then a
 //! summary line `errors N`. --dump also prints the design: one line per
 //! declaration in source order (`module top`, `  class pkt`), the form the
-//! Slang twin prints for the gate (tools/ieee_gate.py). --symbols prints
+//! Slang twin prints for the gate (tools/gates/ieee_gate.py). --symbols prints
 //! the scopes (phase N1): one sorted `<scope path> <kind> <name>` line per
-//! declared symbol, the form of tools/sym_dump.cpp (tools/sym_gate.py);
+//! declared symbol, the form of tools/oracles/sym_dump.cpp (tools/gates/sym_gate.py);
 //! --types adds ` : <type>` to values and typedefs (phase N2), --values
 //! ` = <value>` to parameters, specparams and enum values (phase N3).
 //! --hier prints the elaborated design instead: instances, generate blocks

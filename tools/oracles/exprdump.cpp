@@ -4,7 +4,7 @@
 // with the type as `Type::toString()` prints it. Implicit conversions are not
 // printed (rules strip them); their operands are. Lines are unique and sorted,
 // so a body walked once per instance or specialization prints each distinct
-// type once. The reference for tools/expr_gate.py.
+// type once. The reference for tools/gates/expr_gate.py.
 // Built as build/uvmcheck_exprdump.
 #include <slang/ast/ASTVisitor.h>
 #include <slang/ast/Compilation.h>

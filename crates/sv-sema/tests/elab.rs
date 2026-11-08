@@ -1,6 +1,6 @@
 //! Elaboration (builder phase N4). The hierarchy is checked against
 //! Slang's (`uvmcheck_sym_dump --hier`) on sv-tests and the repo by
-//! tools/sym_gate.py --hier; these cases pin the rules that decide it.
+//! tools/gates/sym_gate.py --hier; these cases pin the rules that decide it.
 
 fn trees(src: &str) -> Vec<sv_syntax::Tree> {
     let t = sv_syntax::parse_source(src, "t.sv", sv_syntax::Options::default());

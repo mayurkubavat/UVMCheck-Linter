@@ -1,6 +1,6 @@
 //! System calls, assignability, constant expressions, declaration before
 //! use and top-level interface ports (builder slice N6.2c). Slang's own
-//! unit tests are the wider check (tools/slang_unit_gate.py); these cases
+//! unit tests are the wider check (tools/gates/slang_unit_gate.py); these cases
 //! pin each rule, legal forms included.
 
 fn errors(src: &str) -> Vec<String> {

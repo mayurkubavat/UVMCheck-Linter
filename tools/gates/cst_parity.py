@@ -9,8 +9,8 @@ For every .sv file under ROOT/tests (an sv-tests checkout), skipping
 
     cmake --build build --target uvmcheck_cst_outline
     cargo build --release -p sv-syntax --example outline
-    tools/cst_parity.py ~/sv-tests [chapter-8]
-    UVM_SRC=uvm-core/src tools/cst_parity.py ~/sv-tests   # the *-uvm tests need it
+    tools/gates/cst_parity.py ~/sv-tests [chapter-8]
+    UVM_SRC=uvm-core/src tools/gates/cst_parity.py ~/sv-tests   # the *-uvm tests need it
 
 With --exprs, compares the canonical operator expressions instead
 (uvmcheck_cst_exprs against the Rust outline example's --exprs).
@@ -18,7 +18,7 @@ With --exprs, compares the canonical operator expressions instead
 import glob, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
+REPO = os.path.dirname(os.path.dirname(HERE))
 SLANG = os.environ.get('SLANG_OUTLINE', os.path.join(REPO, 'build', 'uvmcheck_cst_outline'))
 SLANG_EXPRS = os.environ.get('SLANG_EXPRS', os.path.join(REPO, 'build', 'uvmcheck_cst_exprs'))
 RUST = os.environ.get('RUST_OUTLINE', os.path.join(REPO, 'target', 'release', 'examples', 'outline'))

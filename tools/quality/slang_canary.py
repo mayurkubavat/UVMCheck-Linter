@@ -12,7 +12,7 @@ Run weekly (or before bumping the pin in CMakeLists.txt). It
   4. writes a Markdown report: the slang commit, each suite's result, and the
      failing lines, ready to paste into the pin-bump commit or an issue.
 
-  scripts/slang_canary.py --work ../canary [--ref master] [--uvm-home ../uvm-core] [--report canary.md]
+  tools/quality/slang_canary.py --work ../canary [--ref master] [--uvm-home ../uvm-core] [--report canary.md]
 
 Exit status: 0 when every suite passes on the new slang (the pin can move),
 1 when one fails, 2 when slang or uvmcheck does not build.
@@ -24,7 +24,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = Path(__file__).resolve().parents[2]
 SLANG_URL = "https://github.com/MikePopoloski/slang.git"
 SUITES = ["lrm_conformance_test", "slang_overlay_test", "rule_regression_suite", "all_rules_stub_suite",
           "engine_equivalence", "ast_coverage_floor_test"]

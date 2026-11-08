@@ -6,9 +6,9 @@ paths are cut to the file name since Slang reports them relative.
 
     cmake --preset model && cmake --build build-model
     cargo build --release -p sv-sema --example model_dump  
-    tools/model_parity.py --uvm UVM_SRC                         # uvm_pkg.sv
-    tools/model_parity.py --repo UVM_SRC                        # tests/ and examples/
-    tools/model_parity.py -- +incdir+DIR FILE...                # any compile
+    tools/gates/model_parity.py --uvm UVM_SRC                         # uvm_pkg.sv
+    tools/gates/model_parity.py --repo UVM_SRC                        # tests/ and examples/
+    tools/gates/model_parity.py -- +incdir+DIR FILE...                # any compile
 
 --bodies also compares method bodies (calls, assignments, timing, super.new),
 --types the type strings. --show=N prints the first N lines of each diff. Lines are compared as
@@ -17,7 +17,7 @@ multisets, so the count is how many member lines one side lacks.
 import collections, difflib, glob, os, re, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
+REPO = os.path.dirname(os.path.dirname(HERE))
 DUMP = os.environ.get('MODEL_DUMP', os.path.join(REPO, 'target', 'release', 'examples', 'model_dump'))
 
 

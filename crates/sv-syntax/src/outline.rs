@@ -1,5 +1,5 @@
 //! The declarations a file holds, in source order, in the same form as
-//! the Slang reference tool (tools/cst_outline.cpp) prints them.
+//! the Slang reference tool (tools/oracles/cst_outline.cpp) prints them.
 
 use crate::{NodeId, SyntaxKind, Tree};
 

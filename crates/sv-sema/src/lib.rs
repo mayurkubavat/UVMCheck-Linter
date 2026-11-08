@@ -435,7 +435,7 @@ pub fn symbol_info(
         }
         envs.insert(c.scope, Rc::new(m));
     }
-    // Not inside a parameterized class (see tools/sym_dump.cpp).
+    // Not inside a parameterized class (see tools/oracles/sym_dump.cpp).
     let in_generic = |scope: usize| {
         let mut cur = Some(scope);
         while let Some(c) = cur {

@@ -22,7 +22,7 @@ struct ApiEntry {
 };
 
 /// The API of one UVM release, generated from its source tags by
-/// scripts/gen_uvm_api_pack.py (data/uvm-api/<version>.json, compiled into the
+/// tools/codegen/gen_uvm_api_pack.py (data/uvm-api/<version>.json, compiled into the
 /// binary). Supporting a new release is adding its pack; no rule changes.
 ///
 /// UVMCHECK_UVM_API_PACK=<file.json> replaces the built-in packs with one file.

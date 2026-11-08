@@ -109,7 +109,7 @@ applied, so output is the same for any thread count. `DV_LINT_PROFILE=1`
 prints the cost of each rule.
 
 Every rule is a port of a C++ rule under `cpp/src/rules/` with the same id,
-name, severity and message text; `tools/lint_parity.py` compares the two
+name, severity and message text; `tools/gates/lint_parity.py` compares the two
 finding for finding.
 
 ## The language server

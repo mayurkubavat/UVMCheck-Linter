@@ -1,7 +1,7 @@
 // Prints the outline Slang's parser finds in one file (with what it
 // includes): one line per declaration, "<kind> <name>", in source order,
 // then "errors <n>" for the parse diagnostics. The reference that
-// crates/sv-syntax's outline is checked against (tools/cst_parity.py).
+// crates/sv-syntax's outline is checked against (tools/gates/cst_parity.py).
 //
 //   uvmcheck_cst_outline [+incdir+DIR]... [+define+NAME[=VALUE]]... FILE
 #include <cstdio>

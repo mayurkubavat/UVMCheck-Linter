@@ -7,7 +7,7 @@
 //! modules elaboration starts from; `--history` lets SV-EVO-001/002 read git
 //! history. For the gates: `--specs` prints how often each generic class is
 //! visited, `--exprs` every expression's type (the form of
-//! `tools/exprdump.cpp`).
+//! `tools/oracles/exprdump.cpp`).
 //!
 //! Rules run on one thread per core (`DV_LINT_JOBS=N` to choose; 1 runs
 //! them serially); the output does not depend on it.
@@ -28,7 +28,7 @@ fn main() {
             "--slang" => slang = true,
             "--time" => time = true,
             "--specs" => specs = true,
-            // Each expression's type, as tools/exprdump.cpp prints slang's.
+            // Each expression's type, as tools/oracles/exprdump.cpp prints slang's.
             "--exprs" => exprs = true,
             "--rule" => only.extend(it.next()),
             // Read git history for SV-EVO-001 and SV-EVO-002.

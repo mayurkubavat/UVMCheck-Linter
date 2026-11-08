@@ -8,12 +8,12 @@ how many both accept, both reject, only Slang rejects (a native gap) and
 only dv-build rejects (a native false error). Cases that set compilation
 options or use several trees are skipped.
 
-    tools/slang_unit_gate.py [--list=gap|false|hang] [Assertion Cover ...]
+    tools/gates/slang_unit_gate.py [--list=gap|false|hang] [Assertion Cover ...]
 """
 import collections, concurrent.futures, glob, json, os, re, resource, subprocess, sys, tempfile
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
+REPO = os.path.dirname(os.path.dirname(HERE))
 UVMCHECK = os.environ.get('UVMCHECK', os.path.join(REPO, 'build', 'uvmcheck'))
 DVBUILD = os.environ.get('DV_BUILD', os.path.join(REPO, 'target', 'release', 'dv-build'))
 TESTS = os.environ.get('SLANG_TESTS', os.path.join(REPO, 'build-model', '_deps', 'slang-src', 'tests', 'unittests', 'ast'))

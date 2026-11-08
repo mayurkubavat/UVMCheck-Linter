@@ -25,7 +25,7 @@ enum class RuleProfile : uint32_t {
 };
 
 /// Experimental rules are new or still being measured on real code (see
-/// scripts/precision.py). They run only with --experimental or --rule.
+/// tools/quality/precision.py). They run only with --experimental or --rule.
 enum class RuleMaturity { Stable, Experimental };
 
 inline uint32_t operator|(RuleProfile a, RuleProfile b) {

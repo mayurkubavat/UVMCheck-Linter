@@ -12,7 +12,7 @@
 //! macros shared, as a simulator compiles a file list), [`parse_unit`]
 //! (one tree for all files, slang's `--single-unit`) and [`parse_source`].
 //! [`outline()`] and [`canonical_exprs`] print the forms the Slang parity
-//! gates (`tools/cst_parity.py`) compare.
+//! gates (`tools/gates/cst_parity.py`) compare.
 //!
 //! Inside: `parser` holds the event-based parser state, `grammar` the
 //! design units, items, data types, declarations and statements, `expr`

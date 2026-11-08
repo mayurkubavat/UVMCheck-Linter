@@ -3,7 +3,7 @@
 Precision tracking: lint a fixed corpus of real UVM code and compare each
 rule's finding count with the previous run.
 
-    python3 scripts/precision.py --binary build/uvmcheck --corpus scripts/precision_corpus.json \\
+    python3 tools/quality/precision.py --binary build/uvmcheck --corpus tools/quality/precision_corpus.json \\
         --out precision.json [--previous last.json] [--summary summary.md] [--fail-on-jump]
 
 The corpus file lists named code bases:

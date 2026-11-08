@@ -70,16 +70,16 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 add_subdirectory(cpp)
 
 # Reference dump of Slang's preprocessor, for checking crates/sv-preproc.
-add_executable(uvmcheck_pp_dump tools/pp_dump.cpp)
+add_executable(uvmcheck_pp_dump tools/oracles/pp_dump.cpp)
 target_link_libraries(uvmcheck_pp_dump PRIVATE slang::slang)
 
 # Reference outline from Slang's parser, for checking crates/sv-syntax.
-add_executable(uvmcheck_cst_outline tools/cst_outline.cpp)
+add_executable(uvmcheck_cst_outline tools/oracles/cst_outline.cpp)
 target_link_libraries(uvmcheck_cst_outline PRIVATE slang::slang)
-add_executable(uvmcheck_sym_dump tools/sym_dump.cpp)
+add_executable(uvmcheck_sym_dump tools/oracles/sym_dump.cpp)
 target_link_libraries(uvmcheck_sym_dump PRIVATE slang::slang)
-add_executable(uvmcheck_cst_exprs tools/cst_exprs.cpp)
+add_executable(uvmcheck_cst_exprs tools/oracles/cst_exprs.cpp)
 target_link_libraries(uvmcheck_cst_exprs PRIVATE slang::slang)
-# Reference expression types, for checking dv-lint's typer (tools/expr_gate.py).
-add_executable(uvmcheck_exprdump tools/exprdump.cpp)
+# Reference expression types, for checking dv-lint's typer (tools/gates/expr_gate.py).
+add_executable(uvmcheck_exprdump tools/oracles/exprdump.cpp)
 target_link_libraries(uvmcheck_exprdump PRIVATE slang::slang)

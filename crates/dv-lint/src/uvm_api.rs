@@ -1,5 +1,5 @@
 //! The UVM API packs (data/uvm-api/*.json, made by
-//! scripts/gen_uvm_api_pack.py): for each UVM release, which classes,
+//! tools/codegen/gen_uvm_api_pack.py): for each UVM release, which classes,
 //! members and macros the library tags Accellera-only, and which macros it
 //! defines only as deprecated API. Rules UVM-API-001 and UVM-API-002 read
 //! the pack of the release being compiled.

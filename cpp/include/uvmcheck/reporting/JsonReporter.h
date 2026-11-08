@@ -29,7 +29,7 @@ public:
     static bool writeGuidelines(const std::string& outputPath);
 
     /// The rule catalog: every registered rule and sub-rule with its metadata, sorted by ID.
-    /// docs/rules/catalog.json is generated from this (scripts/gen_rule_docs.py).
+    /// docs/rules/catalog.json is generated from this (tools/codegen/gen_rule_docs.py).
     static bool writeRuleCatalog(const std::string& outputPath,
                                  const std::vector<std::unique_ptr<rules::Rule>>& rules);
 };

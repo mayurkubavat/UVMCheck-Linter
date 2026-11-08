@@ -2,7 +2,7 @@
 # libuvmcheck_model shared library (C ABI) and their tests. Included from the
 # top-level CMakeLists.txt, which fetches Slang and sets the compile options.
 # Sources and headers are relative to this folder; shared inputs (testdata/,
-# data/, scripts/, python/) are relative to the repository root.
+# data/, tools/, python/) are relative to the repository root.
 
 # Core library sources
 file(GLOB_RECURSE UVMCHECK_SOURCES
@@ -29,21 +29,21 @@ file(GLOB_RECURSE UVMCHECK_RULE_SOURCES CONFIGURE_DEPENDS
 set(UVMCHECK_RULE_EXTRAS ${CMAKE_CURRENT_BINARY_DIR}/generated/RuleExtras.cpp)
 add_custom_command(
     OUTPUT ${UVMCHECK_RULE_EXTRAS}
-    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/gen_rule_extras.py
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/codegen/gen_rule_extras.py
             --repo ${PROJECT_SOURCE_DIR} --out ${UVMCHECK_RULE_EXTRAS}
-    DEPENDS ${PROJECT_SOURCE_DIR}/scripts/gen_rule_extras.py ${UVMCHECK_RULE_EXAMPLES} ${UVMCHECK_RULE_SOURCES}
+    DEPENDS ${PROJECT_SOURCE_DIR}/tools/codegen/gen_rule_extras.py ${UVMCHECK_RULE_EXAMPLES} ${UVMCHECK_RULE_SOURCES}
     COMMENT "Generating rule examples for --explain"
     VERBATIM)
 
-# UVM API packs (data/uvm-api/<version>.json, made by scripts/gen_uvm_api_pack.py from a
+# UVM API packs (data/uvm-api/<version>.json, made by tools/codegen/gen_uvm_api_pack.py from a
 # uvm-core checkout), compiled into the binary for uvm::ApiPack.
 file(GLOB UVMCHECK_UVM_API_PACKS CONFIGURE_DEPENDS ${PROJECT_SOURCE_DIR}/data/uvm-api/*.json)
 set(UVMCHECK_UVM_API_PACKS_CPP ${CMAKE_CURRENT_BINARY_DIR}/generated/UvmApiPacks.cpp)
 add_custom_command(
     OUTPUT ${UVMCHECK_UVM_API_PACKS_CPP}
-    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/embed_uvm_api_packs.py
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/codegen/embed_uvm_api_packs.py
             --packs ${PROJECT_SOURCE_DIR}/data/uvm-api --out ${UVMCHECK_UVM_API_PACKS_CPP}
-    DEPENDS ${PROJECT_SOURCE_DIR}/scripts/embed_uvm_api_packs.py ${UVMCHECK_UVM_API_PACKS}
+    DEPENDS ${PROJECT_SOURCE_DIR}/tools/codegen/embed_uvm_api_packs.py ${UVMCHECK_UVM_API_PACKS}
     COMMENT "Embedding UVM API packs"
     VERBATIM)
 
@@ -146,7 +146,7 @@ add_test(
 )
 add_test(
     NAME ast_coverage_floor_test
-    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/scripts/ast_coverage.py
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/tools/quality/ast_coverage.py
             --slang-include ${slang_SOURCE_DIR}/include
             --floor ${PROJECT_SOURCE_DIR}/testdata/conformance/ast_coverage_floor.json
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}

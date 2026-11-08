@@ -3,15 +3,15 @@
 folds in body-level heuristics) or, with --model, sv-sema's (third column,
 sv_sema::spec_counts: exact per class) against
 slang's, as uvmcheck's AST walk sees them (build/specdump, see
-tools/specdump.cpp). A generic class's body is visited once per count, so
+tools/oracles/specdump.cpp). A generic class's body is visited once per count, so
 every rule that walks bodies depends on these numbers.
 
-    tools/spec_gate.py [--model] [--show=N] --repo UVM_SRC | --uvm UVM_SRC | --dir DIR
+    tools/gates/spec_gate.py [--model] [--show=N] --repo UVM_SRC | --uvm UVM_SRC | --dir DIR
 """
 import concurrent.futures, glob, os, subprocess, sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-REPO = os.path.dirname(HERE)
+REPO = os.path.dirname(os.path.dirname(HERE))
 SPECDUMP = os.environ.get('SPECDUMP', os.path.join(REPO, 'build', 'specdump'))
 DVLINT = os.environ.get('DV_LINT', os.path.join(REPO, 'target', 'release', 'dv-lint'))
 

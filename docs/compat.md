@@ -77,12 +77,12 @@ fails until the override is deleted, so workarounds do not outlive their bug.
 ## Configuration sweep
 
 Code inside an `` `ifdef `` whose macro is not defined is never parsed, so no
-rule checks it. `scripts/config_sweep.py` runs uvmcheck once per configuration
+rule checks it. `tools/quality/config_sweep.py` runs uvmcheck once per configuration
 and merges the findings; a finding seen only under some configurations lists
 them.
 
 ```
-scripts/config_sweep.py --binary build/uvmcheck --auto --set "FAST_SIM,WIDTH=64" -- -f sim/files.f
+tools/quality/config_sweep.py --binary build/uvmcheck --auto --set "FAST_SIM,WIDTH=64" -- -f sim/files.f
 ```
 
 `--auto` adds one configuration per macro the sources test with `` `ifdef ``,

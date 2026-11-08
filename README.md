@@ -388,7 +388,7 @@ unused, expired or stale entry remains:
 ---
 
 ### Rule precision on real code
-`scripts/precision.py` lints a fixed corpus (`scripts/precision_corpus.json`, uvm-core by default) with every rule and records findings per rule per kLOC. Given the previous result it flags rules whose count jumped (+50% and at least +5), dropped to zero, or that are new and report 2 or more per kLOC. The nightly `Precision` workflow runs it and shows the table in the job summary.
+`tools/quality/precision.py` lints a fixed corpus (`tools/quality/precision_corpus.json`, uvm-core by default) with every rule and records findings per rule per kLOC. Given the previous result it flags rules whose count jumped (+50% and at least +5), dropped to zero, or that are new and report 2 or more per kLOC. The nightly `Precision` workflow runs it and shows the table in the job summary.
 
 New rules can declare `getMaturity()` as `RuleMaturity::Experimental`: they stay off unless `--experimental` or `--rule` names them (and in the editor), are marked in the catalog and in `--explain`, and are listed separately in the precision summary until they are promoted.
 

@@ -8,11 +8,11 @@ and Slang's split of based-literal digits (04 c11db6) is merged.
 
     cmake --build build --target uvmcheck_pp_dump
     cargo build --release -p sv-preproc --example ppdump
-    tools/pp_parity.py ~/sv-tests [chapter-22]
+    tools/gates/pp_parity.py ~/sv-tests [chapter-22]
 """
 import sys, os, re, subprocess, glob
 root=sys.argv[1]; sel=sys.argv[2] if len(sys.argv)>2 else ''
-HERE=os.path.dirname(os.path.abspath(__file__)); REPO=os.path.dirname(HERE)
+HERE=os.path.dirname(os.path.abspath(__file__)); REPO=os.path.dirname(os.path.dirname(HERE))
 S=os.environ.get('SLANG_PP', os.path.join(REPO,'build','uvmcheck_pp_dump')); R=os.environ.get('RUST_PP', os.path.join(REPO, 'target','release','examples','ppdump'))
 def norm(txt):
     out=[]
