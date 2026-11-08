@@ -62,7 +62,11 @@ pub(crate) fn redundant_constraint(c: &Cst, s: &mut Sink) {
                         "Duplicate constraint expression '{clean}' in class '{cname}'. Duplicate constraints bloat the solver constraint graph and increase solver compile overhead without introducing new assertions."
                     ),
                     c.loc(at),
-                );
+                )
+                .fixes
+                .extend(c.tree.token_bounds(item).and_then(|(a, b)| {
+                    c.token_fix(a, b, "", &format!("Remove duplicate constraint expression '{clean}'"))
+                }));
             }
         }
     }

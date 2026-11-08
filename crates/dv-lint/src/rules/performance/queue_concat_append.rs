@@ -77,6 +77,25 @@ pub(crate) fn queue_concat_append(c: &Cst, out: &mut Sink) {
         };
         let name = if c.kind(lhs) == MemberExpr { c.last_text(lhs).to_string() } else { c.tree.bare_text(lhs) };
         let Some(t) = c.first_tok(lhs) else { continue };
+        let item = if method == "push_back" { ops[1] } else { ops[0] };
+        let item_text = c.trimmed(item);
+        let fix = (!item_text.is_empty())
+            .then(|| {
+                let (a, b) = c.tree.token_bounds(e)?;
+                let f = c.token_fix(
+                    a,
+                    b,
+                    format!("{name}.{method}({item_text})"),
+                    &format!("Replace concatenation with {method}()"),
+                );
+                // 'q <= {q, x}' updates q in the NBA region; push_back() updates it now.
+                if op == "<=" {
+                    crate::fix::with_safety(f, crate::fix::FixSafety::Unsafe)
+                } else {
+                    f
+                }
+            })
+            .flatten();
         for _ in 0..ast_visits(c, e) {
             out.add(
                 "SV-PRF-007",
@@ -88,7 +107,9 @@ pub(crate) fn queue_concat_append(c: &Cst, out: &mut Sink) {
                      Use in-place '{name}.{method}(...)' instead for amortized O(1) performance."
                 ),
                 c.loc(t),
-            );
+            )
+            .fixes
+            .extend(fix.clone());
         }
     }
 }

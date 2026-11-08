@@ -30,6 +30,11 @@ pub(crate) fn at_least_zero(c: &Cst, s: &mut Sink) {
                  Setting at_least <= 0 causes bins to be trivially covered without verification or invalidates coverage metrics."
             ),
             loc,
-        );
+        )
+        .fixes
+        .extend(crate::fix::with_safety(
+            c.tree.token_bounds(rhs).and_then(|(a, b)| c.token_fix(a, b, "1", "Set at_least to 1")),
+            crate::fix::FixSafety::DisplayOnly,
+        ));
     }
 }

@@ -25,6 +25,23 @@ pub(crate) fn program_block(c: &Cst, s: &mut Sink) {
                  Replace with 'module' and clocking blocks or standard packages."
             ),
             c.loc(kw),
+        )
+        .fixes
+        .extend(
+            [
+                crate::fix::with_safety(
+                    c.token_fix(kw, kw, "module", "Replace 'program' with 'module'"),
+                    crate::fix::FixSafety::Unsafe,
+                ),
+                c.tok(n, "endprogram").and_then(|e| {
+                    crate::fix::with_safety(
+                        c.token_fix(e, e, "endmodule", "Replace 'endprogram' with 'endmodule'"),
+                        crate::fix::FixSafety::Unsafe,
+                    )
+                }),
+            ]
+            .into_iter()
+            .flatten(),
         );
     }
 }

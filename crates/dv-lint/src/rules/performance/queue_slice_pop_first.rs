@@ -62,7 +62,11 @@ fn queue_slice(c: &Cst, a: &Ast, s: &mut Sink) {
                  Use in-place 'void'({name}.pop_front())' or 'item = {name}.pop_front()' for O(1) pointer adjustment."
             ),
             c.loc(at),
-        );
+        )
+        .fixes
+        .extend(c.tree.token_bounds(n).and_then(|(x, y)| {
+            c.token_fix(x, y, format!("void'({name}.pop_front())"), &format!("Replace queue slice with void'({name}.pop_front())"))
+        }));
         a.again(s, c, n);
     }
 }
