@@ -21,6 +21,9 @@
 - [Slang compatibility layer](reference/compat.md): the overlay that works
   around Slang limitations.
 - [IEEE 1800 conformance corpus](reference/conformance.md).
+- [Measured vendor tables](reference/vendor-tables.md): which non-standard
+  SystemVerilog each tool accepts, and the slang options that match it.
+- [Rules only dv-lint has](rules/native-rules.md).
 - [Slang: pin, patches and updating it](../third_party/slang/README.md).
 
 ## Architecture

@@ -1,0 +1,56 @@
+{
+ "tool": "uvmcheck",
+ "version": "uvmcheck at 6c930fa",
+ "measured": "2026-11-08",
+ "_doc": "Measured by tools/quality/vendor_table.py on testdata/vendor; do not edit by hand.",
+ "probes": {
+  "array-concat-pattern": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/array-concat-pattern.sv:5:16: [ERROR] SV-CMP-001 (CompilerError): assignment pattern target type cannot be deduced in this context"
+  },
+  "bare-value-param": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/bare-value-param.sv:7:10: [ERROR] SV-CMP-001 (CompilerError): missing '(' in parameter list"
+  },
+  "cross-auto-bin-max": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/cross-auto-bin-max.sv:6:12: [ERROR] SV-CMP-001 (CompilerError): no member named 'cross_auto_bin_max' in 'struct{string name, int weight, int goal, strin"
+  },
+  "declarations-after-statements": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/declarations-after-statements.sv:6:5: [ERROR] SV-CMP-001 (CompilerError): declaration must come before all statements in the block"
+  },
+  "genblk-reference": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/genblk-reference.sv:7:11: [ERROR] SV-CMP-001 (CompilerError): cannot reference unnamed generate block via external name 'genblk1' (use --allow-genblk-re"
+  },
+  "hierarchical-const": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/hierarchical-const.sv:8:22: [ERROR] SV-CMP-001 (CompilerError): reference to 'P' by hierarchical name is not allowed in a constant expression"
+  },
+  "merging-ansi-ports": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/merging-ansi-ports.sv:3:26: [ERROR] SV-CMP-001 (CompilerError): redefinition of 'a' [-Wredefinition]"
+  },
+  "relax-enum": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/relax-enum.sv:7:13: [ERROR] SV-CMP-001 (CompilerError): no implicit conversion from 'int' to 'color_t'; explicit conversion exists, are you missing a ca"
+  },
+  "relax-string": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/relax-string.sv:6:13: [ERROR] SV-CMP-001 (CompilerError): no implicit conversion from 'string' to 'int'; explicit conversion exists, are you missing a c"
+  },
+  "self-determined-stream": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/self-determined-stream.sv:6:28: [ERROR] SV-CMP-001 (CompilerError): streaming operator can only be used in an assignment or bit-stream cast argument"
+  },
+  "toplevel-iface-ports": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/toplevel-iface-ports.sv:6:21: [ERROR] SV-CMP-001 (CompilerError): top-level module 'probe' has unconnected interface port 'b'"
+  },
+  "use-before-declare": {
+   "accepts": false,
+   "message": "../../home/user/UVMCheck-Linter/testdata/vendor/use-before-declare.sv:4:11: [ERROR] SV-CMP-001 (CompilerError): identifier 'x' used before its declaration"
+  }
+ }
+}

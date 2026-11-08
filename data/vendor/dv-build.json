@@ -1,0 +1,49 @@
+{
+ "tool": "dv-build",
+ "version": "dv-build at 6c930fa",
+ "measured": "2026-11-08",
+ "_doc": "Measured by tools/quality/vendor_table.py on testdata/vendor; do not edit by hand.",
+ "probes": {
+  "array-concat-pattern": {
+   "accepts": true
+  },
+  "bare-value-param": {
+   "accepts": true
+  },
+  "cross-auto-bin-max": {
+   "accepts": false,
+   "message": "/home/user/UVMCheck-Linter/testdata/vendor/cross-auto-bin-max.sv:6:5: error: no member named 'cross_auto_bin_max' in 'option'"
+  },
+  "declarations-after-statements": {
+   "accepts": true
+  },
+  "genblk-reference": {
+   "accepts": false,
+   "message": "/home/user/UVMCheck-Linter/testdata/vendor/genblk-reference.sv:7:11: error: use of undeclared identifier 'genblk1'"
+  },
+  "hierarchical-const": {
+   "accepts": true
+  },
+  "merging-ansi-ports": {
+   "accepts": false,
+   "message": "/home/user/UVMCheck-Linter/testdata/vendor/merging-ansi-ports.sv:4:9: error: redefinition of 'a'"
+  },
+  "relax-enum": {
+   "accepts": true
+  },
+  "relax-string": {
+   "accepts": true
+  },
+  "self-determined-stream": {
+   "accepts": true
+  },
+  "toplevel-iface-ports": {
+   "accepts": false,
+   "message": "/home/user/UVMCheck-Linter/testdata/vendor/toplevel-iface-ports.sv:6:21: error: top-level module 'probe' has unconnected interface port 'b'"
+  },
+  "use-before-declare": {
+   "accepts": false,
+   "message": "/home/user/UVMCheck-Linter/testdata/vendor/use-before-declare.sv:4:11: error: identifier 'x' used before its declaration"
+  }
+ }
+}

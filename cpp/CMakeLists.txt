@@ -157,6 +157,11 @@ add_test(
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
 )
 add_test(
+    NAME vendor_probes_test
+    COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/cpp/tests/test_vendor_probes.py --binary $<TARGET_FILE:uvmcheck>
+    WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+)
+add_test(
     NAME methodology_guide_test
     COMMAND ${Python3_EXECUTABLE} ${PROJECT_SOURCE_DIR}/cpp/tests/test_guidelines.py --binary $<TARGET_FILE:uvmcheck>
     WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}

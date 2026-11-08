@@ -1,0 +1,50 @@
+{
+ "tool": "verilator",
+ "version": "Verilator 5.020 2024-01-01 rev (Debian 5.020-1)",
+ "measured": "2026-11-08",
+ "_doc": "Measured by tools/quality/vendor_table.py on testdata/vendor; do not edit by hand.",
+ "probes": {
+  "array-concat-pattern": {
+   "accepts": true
+  },
+  "bare-value-param": {
+   "accepts": true
+  },
+  "cross-auto-bin-max": {
+   "accepts": false,
+   "message": "%Error-UNSUPPORTED: /home/user/UVMCheck-Linter/testdata/vendor/cross-auto-bin-max.sv:5:3: Unsupported: covergroup"
+  },
+  "declarations-after-statements": {
+   "accepts": false,
+   "message": "%Error: /home/user/UVMCheck-Linter/testdata/vendor/declarations-after-statements.sv:6:9: syntax error, unexpected IDENTIFIER, expecting \"'{\""
+  },
+  "genblk-reference": {
+   "accepts": true
+  },
+  "hierarchical-const": {
+   "accepts": false,
+   "message": "%Error: /home/user/UVMCheck-Linter/testdata/vendor/hierarchical-const.sv:8:24: Parameter-resolved constants must not use dotted references: 'P'"
+  },
+  "merging-ansi-ports": {
+   "accepts": false,
+   "message": "%Error: /home/user/UVMCheck-Linter/testdata/vendor/merging-ansi-ports.sv:4:9: Duplicate declaration of signal: 'a'"
+  },
+  "relax-enum": {
+   "accepts": false,
+   "message": "%Error-ENUMVALUE: /home/user/UVMCheck-Linter/testdata/vendor/relax-enum.sv:7:15: Implicit conversion to enum 'probe.color_t' from 'int' (IEEE 1800-2017 6.19.3)"
+  },
+  "relax-string": {
+   "accepts": false,
+   "message": "%Error: Internal Error: /home/user/UVMCheck-Linter/testdata/vendor/relax-string.sv:6:15: ../V3Number.cpp:2300: Number operation called with non-logic (double or string) argument: '\"A\"\""
+  },
+  "self-determined-stream": {
+   "accepts": true
+  },
+  "toplevel-iface-ports": {
+   "accepts": true
+  },
+  "use-before-declare": {
+   "accepts": true
+  }
+ }
+}
