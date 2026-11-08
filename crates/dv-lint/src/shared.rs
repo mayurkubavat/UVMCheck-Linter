@@ -19,7 +19,7 @@ type Key = (&'static str, usize, usize, usize);
 pub(crate) type CompileCache<T> = std::cell::RefCell<Option<((usize, usize), std::rc::Rc<T>)>>;
 
 /// [`Key`] with the name as its address, plus the generation.
-type LocalKey = (usize, usize, usize, usize, usize);
+type LocalSlot = (usize, usize, usize, usize, usize);
 
 static SLOTS: Mutex<Option<HashMap<Key, Arc<OnceLock<Value>>>>> = Mutex::new(None);
 static NEXT_GEN: AtomicUsize = AtomicUsize::new(1);
@@ -27,7 +27,7 @@ static NEXT_GEN: AtomicUsize = AtomicUsize::new(1);
 thread_local! {
     static GEN: Cell<usize> = const { Cell::new(0) };
     /// This thread's copies of the values it got, by (name, key, generation).
-    static LOCAL: std::cell::RefCell<sv_sema::fx::FxMap<LocalKey, Value>> = Default::default();
+    static LOCAL: std::cell::RefCell<sv_sema::fx::FxMap<LocalSlot, Value>> = Default::default();
 }
 
 /// Starts a generation for one lint run and makes it this thread's.
