@@ -78,6 +78,7 @@ ctest --test-dir build                 # uvmcheck suites
 ctest --test-dir build-model           # + C ABI, Python binding, cargo test --features slang
 python3 cpp/tests/regression.py --rule UVM-CFG-002
 cargo test                             # Rust, native only
+tools/gates/rust_gate.sh               # cargo fmt --check + Clippy -D warnings
 ```
 
 ## Contributing

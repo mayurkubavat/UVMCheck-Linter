@@ -56,7 +56,9 @@ workspace.
 - `tools/gates/` compare the Rust side with them: `pp_parity.py`,
   `cst_parity.py`, `sym_gate.py`, `expr_gate.py`, `model_parity.py`,
   `ieee_gate.py` (sv-tests), `slang_unit_gate.py`, `spec_gate.py`, and
-  `lint_parity.py` (dv-lint findings against uvmcheck's).
+  `lint_parity.py` (dv-lint findings against uvmcheck's). `rust_gate.sh`
+  is the Rust format and Clippy gate (`cargo fmt --check`, `clippy -D
+  warnings`).
 - The real-code corpus (UVM releases, riscv-dv, ibex, core-v-verif, cva6,
   common_cells) and its gate live outside git, under the ignored
   `references/` folder.

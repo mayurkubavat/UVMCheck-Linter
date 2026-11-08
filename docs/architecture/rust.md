@@ -165,7 +165,11 @@ built with `--features slang` where a gate uses `--slang`; most need
 | `lint_parity.py` | dv-lint findings against uvmcheck's |
 
 Plus `cargo test` (native) and `cargo test --workspace --features slang`
-(also the Slang bridge and the tests that load through Slang). A change to the front end should keep
+(also the Slang bridge and the tests that load through Slang), and
+`rust_gate.sh`: `cargo fmt --check` (`rustfmt.toml`) and Clippy with
+`-D warnings` on all targets, natively and with `--features slang` when
+libuvmcheck_model is built. Clippy takes the MSRV from `rust-version` in
+the root `Cargo.toml`. A change to the front end should keep
 every gate where it was; a change to a rule should keep `lint_parity.py`
 identical.
 
