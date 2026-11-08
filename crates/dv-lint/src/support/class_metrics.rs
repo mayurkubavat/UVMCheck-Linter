@@ -96,9 +96,33 @@ impl<'a, 'c> Env<'a, 'c> {
 
     pub fn ty_of(&self, ty: Option<NodeId>, array: bool) -> Option<Ty> {
         let ty = ty?;
-        let name = type_name(self.c, ty)?;
+        let mut name = type_name(self.c, ty)?;
+        // A typedef of the class around (or a base) hides one of the same
+        // name elsewhere: every UVM class has its own `this_type`.
+        if let Some(t) = self.class_typedef(&name) {
+            name = t;
+        }
         let class = self.classes.find(&name);
         Some(Ty { name: self.classes.resolve_name(&name), class, array })
+    }
+
+    /// The target of typedef `name` declared in the class around or one of
+    /// its bases, nearest first.
+    fn class_typedef(&self, name: &str) -> Option<String> {
+        let c = self.c;
+        let mut cur = self.class?;
+        for _ in 0..64 {
+            let node = self.classes.list[cur].node;
+            let hit = c.tree.children(node).filter(|&x| c.kind(x) == TypedefDecl).find_map(|t| {
+                let nm = c.tree.child(t, Name)?;
+                (c.tree.bare_text(nm) == name).then(|| c.tree.child(t, DataType).and_then(|d| type_name(c, d)))?
+            });
+            if hit.is_some() {
+                return hit;
+            }
+            cur = self.classes.base(cur)?;
+        }
+        None
     }
 
     /// The type of a name and where it was declared.

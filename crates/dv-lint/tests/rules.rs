@@ -1122,3 +1122,18 @@ fn enum_case_through_type_parameters() {
     assert_eq!(m.len(), 1);
     assert!(m[0].contains("enum 'op_t'") && m[0].contains("'SUB', 'MUL'"), "{m:?}");
 }
+
+/// `this_type v; v = new(...)` resolves the typedef of the class around it,
+/// not another class's typedef of the same name.
+#[test]
+fn component_new_through_the_class_own_this_type() {
+    let src = "class uvm_object; endclass\n\
+               class uvm_component extends uvm_object; function new(string n, uvm_component p = null); endfunction endclass\n\
+               class chan #(type REQ = int) extends uvm_component;\n\
+               typedef chan #(REQ) this_type;\n\
+               function new(string n, uvm_component p = null); super.new(n, p); endfunction\n\
+               function uvm_object create(string name = \"\"); this_type v; v = new(name); return v; endfunction\n\
+               endclass\n\
+               class item extends uvm_object; typedef item this_type; endclass\n";
+    assert_eq!(rule_lines(src, "UVM-FAC-001"), vec![6]);
+}
