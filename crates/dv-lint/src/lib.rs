@@ -45,6 +45,7 @@ use dv_model::{Class, ClassId, Design, Loc, Method, PhaseKind, Property};
 mod rules;
 mod support;
 pub mod expr_types;
+pub mod frames;
 
 pub(crate) mod shared;
 

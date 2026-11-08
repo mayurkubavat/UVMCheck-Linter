@@ -3,6 +3,8 @@
 //!
 //!     dv-lint [--slang] [--time] [--history] [--skip-libraries] [--rule ID]... [-top NAME]... [--list] <compile options>
 //!
+//! `--frames` prints, under each finding and note, its source line with a
+//! caret under the flagged token (as uvmcheck's text report does).
 //! `--list` prints every rule (`id name model|syntax`, then `native` for a
 //! rule with no uvmcheck twin); `-top` names the
 //! modules elaboration starts from; `--history` lets SV-EVO-001/002 read git
@@ -21,6 +23,7 @@ use dv_model::Design;
 fn main() {
     let mut slang = false;
     let mut time = false;
+    let mut frames = false;
     let mut specs = false;
     let mut exprs = false;
     let mut only: Vec<String> = Vec::new();
@@ -30,6 +33,8 @@ fn main() {
         match a.as_str() {
             "--slang" => slang = true,
             "--time" => time = true,
+            // Under each finding and note, its source line with a caret.
+            "--frames" => frames = true,
             "--specs" => specs = true,
             // Each expression's type, as tools/oracles/exprdump.cpp prints slang's.
             "--exprs" => exprs = true,
@@ -68,7 +73,7 @@ fn main() {
         let (trees, parse_ms) = sv_sema::parse_args(&args).unwrap_or_else(|e| fail(e.to_string()));
         let t = std::time::Instant::now();
         let (design, (files, found)) = dv_lint::lint_built(|| sv_sema::design_of(&trees, parse_ms), &trees, keep);
-        report(&design, time, t, &files, &found);
+        report(&design, time, frames, t, &files, &found);
     }
     let loaded = if slang {
         load_slang(&args).map(|d| (d, Vec::new()))
@@ -91,11 +96,12 @@ fn main() {
     }
     let t = std::time::Instant::now();
     let (files, found) = dv_lint::lint_all(&design, &trees, keep);
-    report(&design, time, t, &files, &found);
+    report(&design, time, frames, t, &files, &found);
 }
 
 /// Prints the findings (and with `--time` the stage times) and exits.
-fn report(design: &Design, time: bool, t: std::time::Instant, files: &[String], found: &[dv_lint::Finding]) -> ! {
+fn report(design: &Design, time: bool, frames: bool, t: std::time::Instant, files: &[String], found: &[dv_lint::Finding]) -> ! {
+    let mut sources = dv_lint::frames::Sources::default();
     if time {
         let tm = design.timings();
         eprintln!(
@@ -119,14 +125,15 @@ fn report(design: &Design, time: bool, t: std::time::Instant, files: &[String], 
             f.name,
             f.message
         );
+        if frames {
+            print!("{}", sources.frame(file, line, column));
+        }
         for (loc, note) in &f.related {
-            println!(
-                "    note: {}:{}:{}: {}",
-                files.get(loc.file as usize).map(String::as_str).unwrap_or(""),
-                loc.line,
-                loc.column,
-                note
-            );
+            let nfile = files.get(loc.file as usize).map(String::as_str).unwrap_or("");
+            println!("    note: {}:{}:{}: {}", nfile, loc.line, loc.column, note);
+            if frames {
+                print!("{}", sources.frame(nfile, loc.line, loc.column));
+            }
         }
     }
     std::process::exit(if found.is_empty() { 0 } else { 1 });
