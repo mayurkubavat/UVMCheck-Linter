@@ -146,6 +146,18 @@ fn packed_dimensions_after_an_alias() {
 }
 
 #[test]
+fn dimensions_slang_rejects_make_an_error_type() {
+    let d = types(
+        "module m #(parameter N = 0, parameter W = 0, parameter K = 2) ();\n logic a [N]; logic [8/W-1:0] b; logic c [K]; logic [N-1:0] d;\nendmodule\n",
+    );
+    for l in
+        ["m variable a : <error>", "m variable b : <error>", "m variable c : logic$[0:1]", "m variable d : logic[-1:0]"]
+    {
+        assert!(d.contains(&l.to_string()), "{l} in {d:?}");
+    }
+}
+
+#[test]
 fn values_as_slang_prints_them() {
     let t = trees(
         "package glb; localparam int arr[3] = '{1, 2, 3}; endpackage\nfunction int clog(int n); int r = 0; for (int i = 1; i < n; i = i * 2) r++; return r; endfunction\nmodule m;\n parameter int A = clog(17);\n parameter logic [7:0] B = {2{4'ha}};\n parameter int C = glb::arr[1] + 1;\n parameter int X = 32'hzz;\n parameter int F = '1;\n parameter logic [31:0] P [1:0] = '{5, 6};\n enum integer {a = 0, b = {32{1'bx}}, c = 1} e;\nendmodule\n",

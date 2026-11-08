@@ -433,6 +433,33 @@ impl<'t> Builder<'t> {
     }
 
     /// The bounds of a `[a:b]` or `[n]` dimension.
+    /// A dimension slang rejects, which makes the declaration's type an
+    /// error: a division or modulo by a constant zero in a bound, or (when
+    /// `unpacked`) a size `[N]` that is not positive.
+    pub(crate) fn dim_is_error(&self, d: NodeRef, scope: usize, env: &Env, unpacked: bool) -> bool {
+        let exprs: Vec<NodeRef> = self.children(d).into_iter().filter(|c| body_is_expr(self.kind(*c))).collect();
+        if unpacked && !self.own_tokens(d).contains(&":") {
+            if let [n] = exprs.as_slice() {
+                if self.eval(*n, scope, env, 0).and_then(dim_bound).is_some_and(|v| v <= 0) {
+                    return true;
+                }
+            }
+        }
+        let mut todo = exprs;
+        while let Some(e) = todo.pop() {
+            let kids = self.children(e);
+            if self.kind(e) == BinaryExpr && self.own_tokens(e).iter().any(|t| matches!(*t, "/" | "%")) {
+                if let [_, r] = kids.as_slice() {
+                    if self.eval(*r, scope, env, 0).is_some_and(|v| v.known() && v.i() == 0) {
+                        return true;
+                    }
+                }
+            }
+            todo.extend(kids);
+        }
+        false
+    }
+
     pub(crate) fn dim_range(&self, d: NodeRef, scope: usize, env: &Env) -> Option<(i128, i128)> {
         let exprs: Vec<NodeRef> = self.children(d).into_iter().filter(|c| body_is_expr(self.kind(*c))).collect();
         let own = self.own_tokens(d);
@@ -834,6 +861,9 @@ impl<'t> Builder<'t> {
     ) -> String {
         let dims: Vec<NodeRef> =
             item.map(|i| self.children(i).into_iter().filter(|c| self.kind(*c) == Dim).collect()).unwrap_or_default();
+        if dims.iter().any(|&d| self.dim_is_error(d, scope, env, true)) {
+            return "<error>".into();
+        }
         if dims.is_empty() {
             return match dt {
                 Some(d) => self.ts(d, scope, env, canonical, 0),
@@ -963,6 +993,9 @@ impl<'t> Builder<'t> {
             }
             for d in self.children(dt) {
                 if self.kind(d) == Dim {
+                    if self.dim_is_error(d, scope, env, false) {
+                        return "<error>".into();
+                    }
                     match self.dim_range(d, scope, env) {
                         Some((a, b)) => s.push_str(&format!("[{a}:{b}]")),
                         None => s.push_str(&self.toks_of(d).concat()),
