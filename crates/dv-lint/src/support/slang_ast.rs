@@ -858,6 +858,16 @@ fn index_declarators(c: &Cst, decl: NodeId, param: bool, m: &mut ItemIndex) {
 }
 
 fn index_items(c: &Cst, scope: NodeId, m: &mut ItemIndex) {
+    // A non-ANSI port (`output x;`, or `x` in the header list) takes the
+    // type of a separate declaration of the same name (`reg x;`): those
+    // declarations go in first.
+    let directed =
+        |d: NodeId| c.first_tok(d).is_some_and(|t| matches!(c.text_of(t), "input" | "output" | "inout" | "ref"));
+    for d in kids(c, scope) {
+        if c.kind(d) == DataDecl && !directed(d) {
+            index_declarators(c, d, false, m);
+        }
+    }
     for d in kids(c, scope) {
         match c.kind(d) {
             DataDecl => index_declarators(c, d, false, m),

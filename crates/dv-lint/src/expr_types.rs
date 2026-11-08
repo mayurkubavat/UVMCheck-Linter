@@ -454,6 +454,10 @@ impl<'a, 't> Typer<'a, 't> {
                     return Some(t);
                 }
                 let _ = bw;
+                // One bit of a `reg` vector is a `reg`.
+                if base.text.starts_with("reg") {
+                    return Some(vector(1, false, f).named("reg"));
+                }
                 Some(vector(1, false, f))
             }
             Some(_) => {
@@ -478,7 +482,14 @@ impl<'a, 't> Typer<'a, 't> {
                         base_ix.map(|b| if up { (b + w as i128 - 1, b) } else { (b, b - w as i128 + 1) })
                     };
                     if let Some((a, b)) = lo_hi {
-                        let kw = if f { "logic" } else { "bit" };
+                        // slang keeps a `reg` vector's keyword (`reg[11:0]`).
+                        let kw = if base.text.starts_with("reg") {
+                            "reg"
+                        } else if f {
+                            "logic"
+                        } else {
+                            "bit"
+                        };
                         return Some(ETy {
                             text: format!("{kw}[{a}:{b}]"),
                             integral: Some((w, false, f)),

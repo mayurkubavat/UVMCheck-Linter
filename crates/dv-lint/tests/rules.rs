@@ -1061,3 +1061,17 @@ fn component_new_through_a_type_parameter() {
     assert_eq!(msgs.len(), 2, "{msgs:?}");
     assert!(msgs.iter().all(|m| m.contains("uvm_component 'reg_t::T'")), "{msgs:?}");
 }
+
+#[test]
+fn reg_keyword_and_non_ansi_ports_in_expression_types() {
+    // slang keeps `reg` on selects of a reg vector, and a non-ANSI port
+    // takes the type of its separate `reg` declaration.
+    let src = "module m(o, clk); output o; input clk; reg o; reg signed [7:0] a; reg [7:0] b;\n\
+               initial begin a[3:0] = b[5:2]; o = b[2]; end endmodule\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let lines = dv_lint::expr_types::expr_dump(d.files().to_vec(), std::slice::from_ref(&tree));
+    for want in ["RangeSelect 4 u 4 reg[3:0]", "ElementSelect 1 u 4 reg", "NamedValue 1 u 4 reg"] {
+        assert!(lines.iter().any(|l| l.ends_with(want)), "{want} in {lines:?}");
+    }
+}
