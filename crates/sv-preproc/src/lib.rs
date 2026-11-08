@@ -338,11 +338,13 @@ impl Preprocessor {
                 self.run_source(&src, &path.to_string_lossy())
             }
             Err(e) => {
+                // The file goes in the file table, empty, so the
+                // diagnostic has a place to point at.
+                let id = self.add_file(path.to_path_buf(), "");
+                self.diag(Origin { file: id, offset: 0 }, format!("cannot read {}: {e}", path.display()));
                 let mut out = std::mem::take(&mut self.out);
-                out.diagnostics.push(Diagnostic {
-                    origin: Origin::default(),
-                    message: format!("cannot read {}: {e}", path.display()),
-                });
+                out.files = self.paths.clone();
+                out.sources = self.sources.clone();
                 out
             }
         }

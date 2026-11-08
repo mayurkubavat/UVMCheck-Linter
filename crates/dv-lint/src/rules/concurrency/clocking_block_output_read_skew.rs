@@ -24,11 +24,12 @@ fn clocking_outputs(c: &Cst) -> std::rc::Rc<HashSet<String>> {
         if !t.nodes.iter().any(|n| n.kind == ClockingItem) {
             continue;
         }
-        let own;
+        let mut own;
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
             own = Cst::new(t, i, sv_sema::Locator::default());
+            own.all = c.all;
             &own
         };
         for item in tc.nodes(ClockingItem) {

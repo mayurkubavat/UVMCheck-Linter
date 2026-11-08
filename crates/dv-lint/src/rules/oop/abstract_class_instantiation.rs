@@ -62,8 +62,13 @@ pub(crate) fn abstract_new(c: &Cst, s: &mut Sink) {
         }
         let Some(dt) = new_target(c, &classes, n) else { continue };
         let m = model.get_or_insert_with(|| sv_sema::SpecModel::new(c.all));
-        let any_virtual = m.class_per_named_spec(c.index(), dt).into_iter().flatten().any(|(_, cls)| {
-            c.toks(cls).any(|t| c.text_of(t) == "virtual") && c.toks(cls).any(|t| c.text_of(t) == "class")
+        // The class may be declared in another tree of the compile.
+        let any_virtual = m.class_per_named_spec(c.index(), dt).into_iter().flatten().any(|(ti, cls)| {
+            let t = &c.all[ti];
+            let own = |w: &str| {
+                t.node(cls).children.iter().any(|k| matches!(*k, sv_syntax::Child::Token(x) if &*t.tokens[x as usize].text == w))
+            };
+            own("virtual") && own("class")
         });
         if !any_virtual {
             continue;

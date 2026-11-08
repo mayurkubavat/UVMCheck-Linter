@@ -103,11 +103,12 @@ pub(crate) fn instantiations(c: &Cst) -> std::rc::Rc<Insts> {
     }
     let mut out: Insts = HashMap::new();
     for (i, t) in c.all.iter().enumerate() {
-        let own;
+        let mut own;
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
             own = Cst::new(t, i, sv_sema::Locator::default());
+            own.all = c.all;
             &own
         };
         // `bind target m #(...) u (...);` instantiates m in target.

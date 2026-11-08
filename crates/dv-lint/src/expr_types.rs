@@ -911,11 +911,12 @@ fn build_facts(c: &Cst) -> Facts {
     let mut cfg_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::new();
     let mut scoped_calls: Vec<(usize, NodeId)> = Vec::new();
     for (i, t) in c.all.iter().enumerate() {
-        let own;
+        let mut own;
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
             own = Cst::new(t, i, sv_sema::Locator::default());
+            own.all = c.all;
             &own
         };
         let exprs: Vec<NodeId> = (0..t.nodes.len() as u32).map(NodeId).filter(|&n| is_expr(tc.kind(n))).collect();
@@ -934,7 +935,8 @@ fn build_facts(c: &Cst) -> Facts {
                         .spawn_scoped(s, move || {
                             crate::shared::enter(gen);
                             let o = TypeOracle::new(all);
-                            let tc = Cst::new(t, i, sv_sema::Locator::default());
+                            let mut tc = Cst::new(t, i, sv_sema::Locator::default());
+                            tc.all = all;
                             let mut ty = Typer::new(&tc, &o);
                             ch.iter().filter_map(|&n| ty.final_type(n).map(|x| (n, x))).collect::<Vec<_>>()
                         })
@@ -1013,11 +1015,12 @@ fn build_facts(c: &Cst) -> Facts {
     groups.sort_by_key(|g| g.0);
     for ((i, g, k), nodes) in groups {
         let t = &c.all[i];
-        let own;
+        let mut own;
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
             own = Cst::new(t, i, sv_sema::Locator::default());
+            own.all = c.all;
             &own
         };
         for spec in 0..k {
@@ -1048,11 +1051,12 @@ fn build_facts(c: &Cst) -> Facts {
     }
     for (i, nodes) in by_tree {
         let t = &c.all[i];
-        let own;
+        let mut own;
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
             own = Cst::new(t, i, sv_sema::Locator::default());
+            own.all = c.all;
             &own
         };
         let mut ty = Typer::new(tc, &o);
@@ -1074,11 +1078,12 @@ fn build_facts(c: &Cst) -> Facts {
     groups.sort_by_key(|g| g.0);
     for ((i, g, k), nodes) in groups {
         let t = &c.all[i];
-        let own;
+        let mut own;
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
             own = Cst::new(t, i, sv_sema::Locator::default());
+            own.all = c.all;
             &own
         };
         for spec in 0..k {

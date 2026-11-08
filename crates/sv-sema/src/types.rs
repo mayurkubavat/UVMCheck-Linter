@@ -1081,6 +1081,9 @@ impl<'t> Builder<'t> {
                     }),
                 }
             }
+            // No name before `#` or `[`: not a type this can name; give
+            // it back as written.
+            None if path.is_empty() => toks.concat(),
             None => {
                 let name = if path.len() == 2 && path[0] == "std" {
                     path[1]

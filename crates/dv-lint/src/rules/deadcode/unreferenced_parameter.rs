@@ -96,11 +96,12 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
         }
     }
     for (i, t) in c.all.iter().enumerate() {
-        let own;
+        let mut own;
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
             own = Cst::new(t, i, sv_sema::Locator::default());
+            own.all = c.all;
             &own
         };
         let visited = |n: NodeId| crate::support::slang_ast::elab_copies(tc, n) != Some(0);
