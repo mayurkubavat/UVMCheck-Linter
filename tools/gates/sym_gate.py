@@ -78,8 +78,8 @@ def main():
     cases = []  # (label, group, args)
     if '--repo' in sys.argv:
         uvm = argv[0]
-        for f in sorted(glob.glob(os.path.join(REPO, 'tests/**/*.sv*'), recursive=True)
-                        + glob.glob(os.path.join(REPO, 'examples/**/*.sv*'), recursive=True)):
+        for f in sorted(glob.glob(os.path.join(REPO, 'testdata/**/*.sv*'), recursive=True)
+                        + glob.glob(os.path.join(REPO, 'python/**/*.sv*'), recursive=True)):
             rel = os.path.relpath(f, REPO)
             cases.append((rel, rel.split('/')[0], ['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'testdata/common'),
                                                    '+incdir+' + os.path.dirname(f), f]))

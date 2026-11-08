@@ -7,7 +7,7 @@ paths are cut to the file name since Slang reports them relative.
     cmake --preset model && cmake --build build-model
     cargo build --release -p sv-sema --example model_dump  
     tools/gates/model_parity.py --uvm UVM_SRC                         # uvm_pkg.sv
-    tools/gates/model_parity.py --repo UVM_SRC                        # tests/ and examples/
+    tools/gates/model_parity.py --repo UVM_SRC                        # testdata/ and python/
     tools/gates/model_parity.py -- +incdir+DIR FILE...                # any compile
 
 --bodies also compares method bodies (calls, assignments, timing, super.new),
@@ -44,8 +44,8 @@ def main():
         argv = argv[1:]
     if argv[:1] == ['--repo']:
         uvm = argv[1]
-        files = sorted(glob.glob(os.path.join(REPO, 'tests/**/*.sv*'), recursive=True)
-                       + glob.glob(os.path.join(REPO, 'examples/**/*.sv*'), recursive=True))
+        files = sorted(glob.glob(os.path.join(REPO, 'testdata/**/*.sv*'), recursive=True)
+                       + glob.glob(os.path.join(REPO, 'python/**/*.sv*'), recursive=True))
         bad = 0
         for f in files:
             a, b = both(['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'testdata/common'),

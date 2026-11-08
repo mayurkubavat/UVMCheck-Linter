@@ -260,7 +260,7 @@ class ProjectConfig:
                    `uvm_object_utils in your class, counts as library code.
     waivers        List of Waiver objects or Waiver subclasses.
     style, naming  Optional dicts with the same keys as the JSON config.
-    compat         Opt-in slang overlay (docs/compat.md), e.g.
+    compat         Opt-in slang overlay (docs/reference/compat.md), e.g.
                    {"profile": "questa", "overrides": ["-auto-uvm"],
                     "uvm_home": "$UVM_HOME"}.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-How much of slang's AST the rules inspect (docs/conformance.md).
+How much of slang's AST the rules inspect (docs/reference/conformance.md).
 
 For each kind of symbol, statement, expression, timing control, assertion
 expression and constraint that slang defines, the kind counts as inspected when

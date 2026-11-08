@@ -29,7 +29,7 @@ inline constexpr std::string_view kToolVersion = "0.1.0";
 
 /// True for a rule whose findings can change because some other file changed,
 /// and that file is not an include or an imported package of the file that
-/// holds the finding. Listed in docs/result_cache.md.
+/// holds the finding. Listed in docs/guide/result_cache.md.
 bool isWholeProgramRule(std::string_view ruleId);
 
 struct EnvInput {

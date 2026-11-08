@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-The slang overlay (cpp/src/compat/, docs/compat.md):
+The slang overlay (cpp/src/compat/, docs/reference/compat.md):
 
 - every override is off by default, --list-overrides names them all, and none
   is still registered once the linked slang has the fix it stands in for;

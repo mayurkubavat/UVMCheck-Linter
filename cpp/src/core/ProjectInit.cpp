@@ -271,7 +271,7 @@ std::string renderConfig(const Discovery& d, const std::vector<NamingChoice>& na
     os << R"PY("""UVMCheck project configuration, written by `uvmcheck --init`.
 
 Paths are relative to the project root (the folder holding .uvmcheck/).
-See docs/project_config.md for every setting.
+See docs/guide/project_config.md for every setting.
 """
 from uvmcheck.config import ProjectConfig, RuleConfig, Waiver, Severity
 

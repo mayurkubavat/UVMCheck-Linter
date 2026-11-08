@@ -594,7 +594,7 @@ class Project(ProjectConfig):
         # "**/generated/**",
     ]
 
-    # Slang overlay (docs/compat.md): opt-in fixes for simulator file lists,
+    # Slang overlay (docs/reference/compat.md): opt-in fixes for simulator file lists,
     # built-in UVM and vendor system tasks. uvmcheck --list-overrides shows them.
     compat = {
         # "profile": "questa",          # questa, xcelium, vcs or none
