@@ -63,8 +63,9 @@ fn waives(text: &str, f: &Finding, same_line: bool) -> bool {
     false
 }
 
-/// Drops findings an inline comment waives.
-pub(crate) fn apply(findings: &mut Vec<Finding>, files: &[String]) {
+/// Drops findings an inline comment waives; returns how many.
+pub(crate) fn apply(findings: &mut Vec<Finding>, files: &[String]) -> usize {
+    let before = findings.len();
     let mut texts: HashMap<String, Option<Vec<String>>> = HashMap::new();
     findings.retain(|f| {
         let (path, line, _) = f.position_in(files);
@@ -79,4 +80,5 @@ pub(crate) fn apply(findings: &mut Vec<Finding>, files: &[String]) {
         let waived = waives(at(line), f, true) || (line > 1 && waives(at(line - 1), f, false));
         !waived
     });
+    before - findings.len()
 }

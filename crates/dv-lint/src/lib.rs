@@ -72,6 +72,14 @@ pub fn header_pattern_supported(p: &str) -> bool {
     options::header_alternatives(p).is_some()
 }
 pub mod project;
+pub mod suppress;
+
+static INLINE_WAIVED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// How many findings inline waiver comments have dropped so far.
+pub fn inline_waived() -> usize {
+    INLINE_WAIVED.load(std::sync::atomic::Ordering::Relaxed)
+}
 
 /// Which rules run without `--rule`, as uvmcheck selects them: `preset`
 /// (`--preset`: soundness, methodology, performance, style, security,
@@ -358,7 +366,7 @@ pub(crate) fn lint_from(
         let file = x.position_in(&files).0;
         !file.contains("uvm_mock.svh") && !library.contains(file)
     });
-    waivers::apply(&mut f, &files);
+    INLINE_WAIVED.fetch_add(waivers::apply(&mut f, &files), std::sync::atomic::Ordering::Relaxed);
     f.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
     (built.into_inner(), (files, f))
 }

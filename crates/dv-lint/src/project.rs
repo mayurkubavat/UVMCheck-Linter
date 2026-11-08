@@ -33,7 +33,7 @@ const NAMES: [&str; 6] = [
 /// relative patterns are under the config's folder, `**` spans folders and a
 /// pattern naming a folder covers everything under it.
 #[derive(Clone, Debug)]
-struct Pattern(Option<String>);
+pub(crate) struct Pattern(Option<String>);
 
 impl Pattern {
     fn new(pat: &str, base: &Path) -> Pattern {
@@ -66,7 +66,7 @@ impl Pattern {
         Pattern(Some(g))
     }
 
-    fn matches(&self, path: &str) -> bool {
+    pub(crate) fn matches(&self, path: &str) -> bool {
         let Some(g) = &self.0 else { return false };
         let gs: Vec<&str> = g.split('/').collect();
         let ps: Vec<&str> = path.split('/').collect();
@@ -169,7 +169,7 @@ fn match_segments(g: &[&str], mut gi: usize, p: &[&str], mut pi: usize) -> bool 
 }
 
 /// A file path as patterns compare it: absolute, symlinks resolved.
-fn normalized(path: &str) -> String {
+pub(crate) fn normalized(path: &str) -> String {
     let p = Path::new(path);
     let abs = if p.is_relative() {
         std::env::current_dir().map(|d| d.join(p)).unwrap_or(p.to_path_buf())
@@ -192,13 +192,78 @@ struct RuleSettings {
     only: Vec<Pattern>,
 }
 
+/// A waiver from the config (`waivers`) or a waiver file (`--waivers`,
+/// `.uvmcheck/waivers.json`), as uvmcheck's ExternalWaiver.
 #[derive(Debug)]
-struct Waiver {
-    rule: String,
-    path: Option<Pattern>,
-    line: u32,
-    message: String,
-    severity: Option<Severity>,
+pub(crate) struct Waiver {
+    pub(crate) rule: String,
+    /// Config waivers: a path pattern. Waiver files: text the path must
+    /// contain (leading and trailing `*` dropped), as uvmcheck reads them.
+    pub(crate) path: Option<Pattern>,
+    pub(crate) contains: Option<String>,
+    pub(crate) line: u32,
+    pub(crate) message: String,
+    pub(crate) severity: Option<Severity>,
+    /// What a re-graded finding's message names (`waiver #1 (SV-STY-002)`).
+    pub(crate) label: String,
+}
+
+impl Waiver {
+    pub(crate) fn matches(&self, rule: &str, path: &str, raw_path: &str, line: u32, message: &str) -> bool {
+        (self.rule == "*" || self.rule == rule)
+            && (self.line == 0 || self.line == line)
+            && self.path.as_ref().is_none_or(|p| p.matches(path))
+            && self.contains.as_ref().is_none_or(|s| s.is_empty() || raw_path.contains(s.as_str()))
+            // No regex engine here: a message pattern matches as text.
+            && (self.message.is_empty() || message.contains(&self.message))
+    }
+}
+
+/// Reads a waiver file: a list of waivers, or an object with `waivers`;
+/// each with `rule` (or `id`), `path` (or `file`), `line`, `reason`,
+/// `owner`, `message`, `severity`.
+pub(crate) fn load_waiver_file(file: &Path) -> Result<Vec<Waiver>, String> {
+    let root = load_json(file)?;
+    let list = match &root {
+        Json::Arr(_) => &root,
+        Json::Obj(_) => root.get("waivers"),
+        _ => &Json::Null,
+    };
+    let Json::Arr(items) = list else {
+        return Err(format!("{}: expected a list of waivers, or an object with \"waivers\"", file.display()));
+    };
+    let name = file.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let mut out = Vec::new();
+    for w in items.iter().filter(|w| matches!(w, Json::Obj(_))) {
+        let rule = w.get("rule").as_str().or(w.get("id").as_str()).unwrap_or("").to_string();
+        if rule.is_empty() {
+            continue;
+        }
+        let path =
+            w.get("path").as_str().filter(|s| !s.is_empty()).or(w.get("file").as_str()).unwrap_or("").to_string();
+        let sev = match w.get("severity") {
+            Json::Null => None,
+            v => Some(v.as_str().and_then(severity).ok_or_else(|| {
+                format!("{}: waiver for {rule}: severity must be error, warning or info", file.display())
+            })?),
+        };
+        let label = format!(
+            "{name} #{} ({rule}{})",
+            out.len() + 1,
+            if path.is_empty() { String::new() } else { format!(" in {path}") }
+        );
+        let contains = path.trim_matches('*').to_string();
+        out.push(Waiver {
+            rule,
+            path: None,
+            contains: Some(contains),
+            line: w.get("line").as_u32().unwrap_or(0),
+            message: w.get("message").as_str().unwrap_or("").to_string(),
+            severity: sev,
+            label,
+        });
+    }
+    Ok(out)
 }
 
 /// A loaded project configuration.
@@ -224,6 +289,8 @@ pub struct Config {
     pub style: Vec<(String, crate::options::StyleValue)>,
     /// The `naming` block.
     pub naming: Vec<(String, crate::options::NamingOverride)>,
+    /// The project root: the folder holding `.uvmcheck/` (or the config).
+    pub root: PathBuf,
 }
 
 fn severity(s: &str) -> Option<Severity> {
@@ -432,11 +499,7 @@ impl Config {
             }
         }
         c.add_waivers(root.get("waivers"), &base)?;
-        let wfile = project.join(".uvmcheck").join("waivers.json");
-        if wfile.is_file() {
-            let w = load_json(&wfile)?;
-            c.add_waivers(w.get("waivers"), &project)?;
-        }
+        c.root = project;
         // Compile settings.
         for s in strings(root.get("filelists")) {
             c.compile_args.extend(["-f".to_string(), anchor(&s, &base)]);
@@ -455,7 +518,7 @@ impl Config {
 
     fn add_waivers(&mut self, list: &Json, base: &Path) -> Result<(), String> {
         let today = today();
-        for w in list.as_arr() {
+        for (i, w) in list.as_arr().iter().enumerate() {
             let mut rules = strings(w.get("rules"));
             rules.extend(strings(w.get("rule")));
             if rules.is_empty() {
@@ -464,6 +527,8 @@ impl Config {
             if w.get("reason").as_str().is_none_or(str::is_empty) {
                 return Err(format!("waiver for {} needs a \"reason\"", rules[0]));
             }
+            let label =
+                w.get("label").as_str().map_or_else(|| format!("waiver #{} ({})", i + 1, rules[0]), str::to_string);
             if let Some(e) = w.get("expires").as_str() {
                 if e < today.as_str() {
                     self.warnings.push(format!("waiver for {} expired on {e}; it no longer applies", rules[0]));
@@ -485,14 +550,19 @@ impl Config {
             let sev = w.get("severity").as_str().and_then(severity);
             let globs: Vec<Option<Pattern>> =
                 if globs.is_empty() { vec![None] } else { globs.into_iter().map(Some).collect() };
+            let all = crate::rules();
             for r in &rules {
+                // A rule's name names its ID, as uvmcheck resolves it.
+                let id = all.iter().find(|x| x.name == r.as_str()).map_or(r.clone(), |x| x.id.to_string());
                 for g in &globs {
                     self.waivers.push(Waiver {
-                        rule: r.clone(),
+                        rule: id.clone(),
                         path: g.clone(),
+                        contains: None,
                         line,
                         message: message.clone(),
                         severity: sev,
+                        label: label.clone(),
                     });
                 }
             }
@@ -509,10 +579,10 @@ impl Config {
         self.rule(id, name).and_then(|r| r.enabled) != Some(false)
     }
 
-    /// Applies the config to `found`: drops findings in library and
-    /// excluded files and those waived, regrades severities. Returns how
-    /// many were waived.
-    pub fn apply(&self, found: &mut Vec<Finding>, files: &[String]) -> usize {
+    /// Applies the config to `found`: drops findings of rules it turns off
+    /// and in library and excluded files, and regrades severities (waivers
+    /// come after, in [`crate::suppress`]).
+    pub fn apply(&self, found: &mut Vec<Finding>, files: &[String]) {
         // Config keys and waivers name a rule by ID or by a rule's name, as
         // uvmcheck resolves them: a sub-rule (SV-STY-102 ...) by its ID only.
         let all = crate::rules();
@@ -524,7 +594,6 @@ impl Config {
                 .or_insert_with(|| normalized(files.get(f as usize).map(String::as_str).unwrap_or("")))
                 .clone()
         };
-        let mut waived = 0;
         found.retain_mut(|x| {
             let name = names.get(x.rule).copied().unwrap_or("");
             if !self.enabled(x.rule, name) {
@@ -554,26 +623,13 @@ impl Config {
             if let Some(sev) = self.rule(x.rule, name).and_then(|r| r.severity) {
                 x.severity = sev;
             }
-            let line = x.position_in(files).1;
-            for w in &self.waivers {
-                let rule_ok = w.rule == "*" || w.rule == x.rule || (!name.is_empty() && w.rule == name);
-                let path_ok = w.path.as_ref().is_none_or(|p| p.matches(&path));
-                let line_ok = w.line == 0 || w.line == line;
-                // No regex engine here: a message pattern matches as text.
-                let msg_ok = w.message.is_empty() || x.message.contains(&w.message);
-                if rule_ok && path_ok && line_ok && msg_ok {
-                    match w.severity {
-                        Some(s) => x.severity = s,
-                        None => {
-                            waived += 1;
-                            return false;
-                        }
-                    }
-                }
-            }
             true
         });
-        waived
+    }
+
+    /// The config's waivers, in order.
+    pub(crate) fn waivers(&self) -> &[Waiver] {
+        &self.waivers
     }
 }
 

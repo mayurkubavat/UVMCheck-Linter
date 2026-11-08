@@ -177,3 +177,42 @@ fn naming_block_from_the_config() {
     assert!(err.contains("naming.Coverpoint"), "a regex pattern is reported as not applied: {err}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn waiver_files_regrades_and_baselines() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-baseline-{}", std::process::id()));
+    std::fs::create_dir_all(dir.join(".uvmcheck")).unwrap();
+    std::fs::write(
+        dir.join(".uvmcheck/config.json"),
+        r#"{"waivers": [{"rule": "SV-BAN-001", "severity": "error", "reason": "regrade"}]}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("w.json"),
+        r#"{"waivers": [{"rule": "SV-STY-010", "file": "*t.sv*", "line": 3, "reason": "known"}]}"#,
+    )
+    .unwrap();
+    let src = dir.join("t.sv");
+    std::fs::write(&src, "module m;\nreg a; integer i;\ninitial i = 5;\ninitial i = 6;\nendmodule\n").unwrap();
+    let run = |extra: &[&str]| {
+        let o = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+            .current_dir(&dir)
+            .args(extra)
+            .arg("t.sv")
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&o.stdout).into_owned()
+    };
+    let with = run(&["--waivers", "w.json"]);
+    assert!(with.contains("[ERROR] SV-BAN-001") && with.contains("[re-graded by waiver #1 (SV-BAN-001)]"), "{with}");
+    assert!(!with.contains("Unsized decimal literal '5'") && with.contains("Unsized decimal literal '6'"), "{with}");
+    // A baseline of everything, then a line moves: still matched.
+    run(&["--update-baseline", "b.json"]);
+    let moved = std::fs::read_to_string(&src).unwrap();
+    std::fs::write(&src, format!("// moved\n{moved}module n; reg z; endmodule\n")).unwrap();
+    let after = run(&["--baseline", "b.json"]);
+    let reported: Vec<&str> = after.lines().filter(|l| l.contains(": [")).collect();
+    assert!(reported.iter().all(|l| l.contains("t.sv:7:")), "only the new module's findings: {after}");
+    assert!(!reported.is_empty(), "{after}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -48,12 +48,27 @@ fn main() {
     let mut experimental = false;
     let mut no_config = false;
     let mut config_file: Option<String> = None;
+    let mut waivers_file: Option<String> = None;
+    let mut baseline_file: Option<String> = None;
+    let mut update_baseline: Option<String> = None;
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
         // `--name=value`, as uvmcheck also takes them.
         if let Some(v) = a.strip_prefix("--preset=") {
             preset = Some(v.to_string());
+            continue;
+        }
+        for (flag, slot) in [
+            ("--waivers=", &mut waivers_file),
+            ("--baseline=", &mut baseline_file),
+            ("--update-baseline=", &mut update_baseline),
+        ] {
+            if let Some(v) = a.strip_prefix(flag) {
+                *slot = Some(v.to_string());
+            }
+        }
+        if a.starts_with("--waivers=") || a.starts_with("--baseline=") || a.starts_with("--update-baseline=") {
             continue;
         }
         if let Some(v) = a.strip_prefix("--config=") {
@@ -83,6 +98,10 @@ fn main() {
             // The project configuration (docs/guide/project_config.md).
             "--no-config" => no_config = true,
             "--config" => config_file = it.next(),
+            // A waiver file, a baseline to filter by, a baseline to write.
+            "--waivers" => waivers_file = it.next(),
+            "--baseline" => baseline_file = it.next(),
+            "--update-baseline" => update_baseline = it.next(),
             // No result cache here.
             "--no-cache" => {}
             // Also write the findings as uvmcheck's JSON report.
@@ -141,6 +160,16 @@ fn main() {
             dv_lint::options::set_naming(&cfg.naming);
             let _ = CONFIG.set(cfg);
         }
+    }
+    let sup =
+        dv_lint::suppress::Suppress::load(CONFIG.get(), waivers_file.as_deref(), baseline_file.as_deref(), no_config)
+            .unwrap_or_else(|e| fail(e));
+    for w in &sup.warnings {
+        eprintln!("Warning: {w}");
+    }
+    let _ = SUPPRESS.set(sup);
+    if let Some(u) = update_baseline {
+        let _ = UPDATE_BASELINE.set(u);
     }
     let headers = if in_context { in_owner(&mut args) } else { Vec::new() };
     let selected = dv_lint::rule_selection(preset.as_deref(), experimental).unwrap_or_else(|e| fail(e));
@@ -253,6 +282,10 @@ fn only_in(headers: &[std::path::PathBuf], files: &[String], found: &[dv_lint::F
 }
 
 /// Prints the findings (and with `--time` the stage times) and exits.
+/// The waivers and baseline in use, and where `--update-baseline` writes.
+static SUPPRESS: std::sync::OnceLock<dv_lint::suppress::Suppress> = std::sync::OnceLock::new();
+static UPDATE_BASELINE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
 /// The project configuration in use, if any.
 static CONFIG: std::sync::OnceLock<dv_lint::project::Config> = std::sync::OnceLock::new();
 
@@ -330,7 +363,19 @@ fn report(
     files: &[String],
     mut found: Vec<dv_lint::Finding>,
 ) -> ! {
-    let waived = CONFIG.get().map_or(0, |c| c.apply(&mut found, files));
+    if let Some(c) = CONFIG.get() {
+        c.apply(&mut found, files);
+    }
+    if let (Some(path), Some(s)) = (UPDATE_BASELINE.get(), SUPPRESS.get()) {
+        match s.save_baseline(std::path::Path::new(path), &found, files) {
+            Ok(()) => eprintln!("[dv-lint] Saved {} findings to baseline: {path}", found.len()),
+            Err(e) => {
+                eprintln!("error: cannot write the baseline {e}");
+                std::process::exit(2);
+            }
+        }
+    }
+    let waived = dv_lint::inline_waived() + SUPPRESS.get().map_or(0, |s| s.apply(&mut found, files));
     let found = &found[..];
     let mut sources = dv_lint::frames::Sources::default();
     if time {
