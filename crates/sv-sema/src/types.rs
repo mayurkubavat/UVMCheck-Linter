@@ -906,6 +906,21 @@ impl<'t> Builder<'t> {
         s
     }
 
+    /// The packed dimensions written after a type name (`fu_data_t [N-1:0]`),
+    /// as slang prints them after the alias.
+    fn alias_dims(&self, dt: NodeRef, scope: usize, env: &Env) -> String {
+        let mut s = String::new();
+        for d in self.children(dt) {
+            if self.kind(d) == Dim {
+                match self.dim_range(d, scope, env) {
+                    Some((a, b)) => s.push_str(&format!("[{a}:{b}]")),
+                    None => s.push_str(&self.toks_of(d).concat()),
+                }
+            }
+        }
+        s
+    }
+
     /// A data type (or a name standing for one) as slang prints it.
     pub(crate) fn ts(&self, dt: NodeRef, scope: usize, env: &Env, canonical: bool, depth: usize) -> String {
         if depth > 24 {
@@ -983,7 +998,7 @@ impl<'t> Builder<'t> {
             Some(Found::Typedef(t, s)) => {
                 let name = self.name_of(t).map(|n| n.0).unwrap_or_default();
                 if !canonical {
-                    return format!("{}{name}", self.scope_path(s));
+                    return format!("{}{name}{}", self.scope_path(s), self.alias_dims(dt, scope, env));
                 }
                 let tenv = self.scope_env(s, env);
                 let inner = self.child(t, DataType);
@@ -1007,7 +1022,7 @@ impl<'t> Builder<'t> {
             Some(Found::Param(default, s)) => {
                 let name = path[path.len() - 1];
                 if !canonical {
-                    return format!("{}{name}", self.scope_path(s));
+                    return format!("{}{name}{}", self.scope_path(s), self.alias_dims(dt, scope, env));
                 }
                 match env.get(name) {
                     Some(b) => self.ts(b.node, b.scope, &b.env, true, depth + 1),

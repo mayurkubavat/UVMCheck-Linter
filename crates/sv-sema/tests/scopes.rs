@@ -121,6 +121,17 @@ fn types_as_slang_prints_them() {
 }
 
 #[test]
+fn packed_dimensions_after_an_alias() {
+    // slang prints the alias, then the dimensions written after it.
+    let d = types(
+        "module m #(parameter N = 2, type T = logic) (input T [N-1:0] a);\n typedef struct packed {logic v;} s_t;\n s_t [3:0] q;\nendmodule\n",
+    );
+    for l in ["m net a : m.T[1:0]", "m variable q : m.s_t[3:0]"] {
+        assert!(d.contains(&l.to_string()), "{l} in {d:?}");
+    }
+}
+
+#[test]
 fn values_as_slang_prints_them() {
     let t = trees(
         "package glb; localparam int arr[3] = '{1, 2, 3}; endpackage\nfunction int clog(int n); int r = 0; for (int i = 1; i < n; i = i * 2) r++; return r; endfunction\nmodule m;\n parameter int A = clog(17);\n parameter logic [7:0] B = {2{4'ha}};\n parameter int C = glb::arr[1] + 1;\n parameter int X = 32'hzz;\n parameter int F = '1;\n parameter logic [31:0] P [1:0] = '{5, 6};\n enum integer {a = 0, b = {32{1'bx}}, c = 1} e;\nendmodule\n",
