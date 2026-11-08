@@ -7,6 +7,10 @@
     {
       "rule": "SV-STY-010",
       "line": 15
+    },
+    {
+      "rule": "SV-STY-010",
+      "line": 23
     }
   ]
 }

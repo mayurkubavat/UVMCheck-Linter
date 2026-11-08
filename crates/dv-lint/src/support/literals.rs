@@ -148,6 +148,17 @@ pub(crate) fn units(c: &Cst) -> std::sync::Arc<Units> {
 /// How many times slang's AST holds the literal `n` (0 where elaboration
 /// folds it away).
 pub(crate) fn ast_times(c: &Cst, n: NodeId) -> usize {
+    times(c, n, false)
+}
+
+/// [`ast_times`], with a parameter's default counted as bound even where
+/// every instance or specialization overrides it: the code as written,
+/// for rules about how a literal is spelled.
+pub(crate) fn written_times(c: &Cst, n: NodeId) -> usize {
+    times(c, n, true)
+}
+
+fn times(c: &Cst, n: NodeId, written: bool) -> usize {
     let mut x = n;
     let mut loops = 1usize;
     let mut class_param = false;
@@ -205,7 +216,7 @@ pub(crate) fn ast_times(c: &Cst, n: NodeId) -> usize {
             }
             // A streaming concatenation's slice size is a constant, not an
             // operand.
-            ConcatExpr if is_streaming(c, p) && c.kind(x) != ConcatExpr => return 0,
+            ConcatExpr if is_streaming(c, p) && is_slice_size(c, p, x) => return 0,
             // A generate condition or loop header, not its blocks.
             IfGenerate | LoopGenerate | CaseGenerate if is_expr(c.kind(x)) => return 0,
             LoopGenerate => loops = loops.saturating_mul(loop_iterations(c, p).unwrap_or(1)),
@@ -219,7 +230,7 @@ pub(crate) fn ast_times(c: &Cst, n: NodeId) -> usize {
                         if c.keyword(p).is_some_and(|k| c.text_of(k) != "localparam")
                             && c.parent(p).is_some_and(|q| q == u || c.kind(q) == ParamList) =>
                     {
-                        if let Some(k) = overridden_everywhere(c, u, p) {
+                        if let Some(k) = overridden_everywhere(c, u, p).filter(|_| !written) {
                             return if k > 0 && ast_ok(c, n) { k } else { 0 };
                         }
                     }
@@ -335,6 +346,16 @@ pub(crate) fn is_instance_call(c: &Cst, call: NodeId) -> bool {
 }
 
 /// `{<< n {...}}` / `{>> {...}}`.
+/// `x` is the slice size of the streaming concatenation `n` (`8` or a type
+/// in `{<<8{a}}`), written before the braces around its items.
+fn is_slice_size(c: &Cst, n: NodeId, x: NodeId) -> bool {
+    let inner = c.toks(n).filter(|&t| c.text_of(t) == "{").nth(1);
+    match (inner, c.first_tok(x)) {
+        (Some(b), Some(t)) => t < b,
+        _ => false,
+    }
+}
+
 pub(crate) fn is_streaming(c: &Cst, n: NodeId) -> bool {
     c.tok(n, "<<").is_some() || c.tok(n, ">>").is_some()
 }

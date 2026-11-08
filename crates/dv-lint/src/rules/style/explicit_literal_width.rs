@@ -1,7 +1,7 @@
 //! SV-STY-010 (ExplicitLiteralWidth): Disallow unsized integer and numeric
 //! literals without explicit bit-width declarations.
 
-use crate::support::literals::{ast_times, compact, integer_literal};
+use crate::support::literals::{compact, integer_literal, written_times};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::{NodeId, SyntaxKind};
@@ -20,7 +20,9 @@ pub(crate) fn explicit_literal_width(c: &Cst, s: &mut Sink) {
         if lit.sized || (!lit.based && !above_one(&lit.digits)) {
             continue;
         }
-        if ast_times(c, n) == 0 {
+        // A parameter default is written code even when every instance
+        // overrides it (slang then never binds it).
+        if written_times(c, n) == 0 {
             continue;
         }
         let outer = outer_paren(c, n);

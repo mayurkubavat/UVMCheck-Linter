@@ -17,3 +17,15 @@ module unsized_literal_tester;
         word_data = 16'hDEAD;
     end
 endmodule
+
+// VIOLATION SV-STY-010: the default 'hF is written code, though every instance
+// overrides it (reported once).
+module literal_width_leaf #(parameter logic [7:0] MASK = 'hF) (output logic [7:0] y);
+    assign y = MASK;
+endmodule
+
+module literal_width_top;
+    logic [7:0] a, b;
+    literal_width_leaf #(.MASK(8'h01)) u_a (.y(a));
+    literal_width_leaf #(.MASK(8'h02)) u_b (.y(b));
+endmodule

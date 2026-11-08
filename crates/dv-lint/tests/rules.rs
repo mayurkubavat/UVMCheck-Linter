@@ -653,10 +653,10 @@ fn literal_width_follows_bound_expressions() {
                function void f(); #10; endfunction\n\
                endmodule\n\
                module top; m #(.W(8)) u(); endmodule\n";
-    // The overridden default (line 2), member access through a class with
-    // an unknown base (line 5) and a delay in a function (line 6) do not
-    // bind in slang, so it never sees those literals.
-    assert_eq!(rule_lines(src, "SV-STY-010"), vec![4, 4, 8]);
+    // The overridden default (line 2) is written code and counts; member
+    // access through a class with an unknown base (line 5) and a delay in a
+    // function (line 6) do not bind in slang, so it never sees those.
+    assert_eq!(rule_lines(src, "SV-STY-010"), vec![2, 4, 4, 8]);
 }
 
 #[test]
@@ -768,7 +768,8 @@ fn literal_per_generate_copy() {
                endmodule\n";
     let mut lines = rule_lines(src, "SV-STY-010");
     lines.sort();
-    assert_eq!(lines, vec![3, 6, 12]);
+    // Line 1: the default `W = 2`, though both instances override it.
+    assert_eq!(lines, vec![1, 3, 6, 12]);
 }
 
 #[test]
