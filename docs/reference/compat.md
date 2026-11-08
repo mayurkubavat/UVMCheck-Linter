@@ -88,5 +88,19 @@ tools/quality/config_sweep.py --binary build/uvmcheck --auto --set "FAST_SIM,WID
 `--auto` adds one configuration per macro the sources test with `` `ifdef ``,
 `` `ifndef `` or `` `elsif `` and never define (UVM's own switches excluded).
 
+`--specializations` sweeps parameterized classes the same way. A compiler
+checks a generic class only for the specializations the design names (and its
+default), so code that depends on a type parameter can be wrong for types
+nobody uses yet. The sweep adds one run per stand-in type (`int`, `string`,
+`logic [7:0]`, `real`, and `uvm_pkg::uvm_object` when UVM is compiled): a
+generated module declares a handle of every generic class at package or
+`$unit` level, with each type parameter set to that type and value parameters
+at their defaults. An error seen only in such a run (for example `v + 1` when
+`T` is `string`) lists the stand-in that breaks it.
+
+```
+tools/quality/config_sweep.py --binary build/uvmcheck --specializations -- -f sim/files.f
+```
+
 Overrides never silence a real IEEE 1800 error by default; turning one of
 slang's errors off stays an explicit `-Wno-...` choice.

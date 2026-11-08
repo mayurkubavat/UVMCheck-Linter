@@ -57,6 +57,29 @@ def main():
               "the casex inside `ifdef FAST_PATH is found, tagged with its configurations", str(hits))
         check(res.returncode == 1 and "1 only outside the default configuration" in res.stdout,
               "summary names it; the error-severity finding makes the exit status 1", res.stdout + res.stderr)
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "box.sv").write_text(
+            "package boxes;\n"
+            "class box #(type T = int, int W = 4);\n"
+            "  T v;\n"
+            "  function int next(); return v + 1; endfunction\n"
+            "endclass\n"
+            "class plain; endclass\n"
+            "endpackage\n"
+            "module top; boxes::box b; endmodule\n")
+        cmd = [sys.executable, str(ROOT / "tools" / "quality" / "config_sweep.py"), "--binary", binary,
+               "--specializations", "--json", "out.json", "--", "--no-config", "--no-cache", "box.sv"]
+        res = subprocess.run(cmd, cwd=root, capture_output=True, text=True)
+        out = json.loads((root / "out.json").read_text()) if (root / "out.json").exists() else {}
+        names = [c["name"] for c in out.get("configurations", [])]
+        check(names == ["default", "T=int", "T=string", "T=logic [7:0]", "T=real"],
+              "--specializations adds one run per stand-in type", str(names) + res.stderr)
+        hits = [v for v in out.get("violations", []) if v["ruleId"] == "SV-CMP-001"]
+        check(len(hits) == 1 and hits[0]["line"] == 4 and hits[0].get("configurations") == ["T=string"],
+              "'v + 1' breaks only when T is a string", str(hits))
+        check(not any("__uvmcheck_spec_sweep" in v["file"] for v in out.get("violations", [])),
+              "nothing is reported in the generated sweep module", res.stdout)
     print("config sweep: " + ("PASSED" if not FAILS else f"{FAILS} failure(s)"))
     return 1 if FAILS else 0
 
