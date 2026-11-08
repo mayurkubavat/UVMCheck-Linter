@@ -8,5 +8,13 @@ rust-version.workspace = true
 build = "build.rs"
 
 [dependencies]
-dv-model = { path = "../dv-model" }
-sv-slang = { path = "../sv-slang" }
+dv-model = { path = "../dv-model", default-features = false }
+sv-sema = { path = "../sv-sema" }
+# Only for the rpath to libuvmcheck_model (build.rs), with the slang feature.
+sv-slang = { path = "../sv-slang", optional = true }
+
+[features]
+default = []
+# `--slang`: build the map from the Slang-backed model instead of the native
+# one (needs libuvmcheck_model). Oracle and parity use only.
+slang = ["dep:sv-slang", "dv-model/slang"]

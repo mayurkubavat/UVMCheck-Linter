@@ -9,5 +9,13 @@ build = "build.rs"
 
 [dependencies]
 sv-source = { path = "../sv-source" }
-dv-model = { path = "../dv-model" }
-sv-slang = { path = "../sv-slang" }
+dv-model = { path = "../dv-model", default-features = false }
+sv-sema = { path = "../sv-sema" }
+# Only for the rpath to libuvmcheck_model (build.rs), with the slang feature.
+sv-slang = { path = "../sv-slang", optional = true }
+
+[features]
+default = []
+# `--load --slang`: compile through Slang instead of the native front end
+# (needs libuvmcheck_model). Oracle and parity use only.
+slang = ["dep:sv-slang", "dv-model/slang"]

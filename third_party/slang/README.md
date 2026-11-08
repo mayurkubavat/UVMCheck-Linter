@@ -21,9 +21,30 @@ is kept out of this repository:
   [`patches/`](patches/). It is applied automatically after the download.
   Today there are none.
 
-The Rust side does not depend on Slang except through the C ABI
-(`crates/sv-slang`, `crates/dv-model`) and `dv-lint --slang`, which are the
-reference the native front end is compared against.
+## The `slang` Cargo feature: oracle and parity only
+
+The Rust tools have their own front end (`sv-lexer`, `sv-preproc`,
+`sv-syntax`, `sv-sema`) and do not need Slang. Slang is reachable from Rust
+only through the C ABI bridge (`crates/sv-slang`, used by `crates/dv-model`'s
+`Design::load`), and only behind a Cargo feature named `slang`:
+
+- **Off by default.** `cargo build` and `cargo test` at the repository root
+  build every tool (`dv-lint`, `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist`)
+  natively, with no C++ build and no libuvmcheck_model. `sv-slang` is not a
+  default workspace member.
+- **Never the default front end.** With the feature on, a tool still loads
+  natively unless asked: `dv-lint --slang`, `dv-map --slang`,
+  `dv-filelist --load --slang`, and `model_dump --slang` (sv-sema example).
+  Built without it, `--slang` exits with an error that names the feature.
+- **Who turns it on:** the parity gates (`tools/gates/lint_parity.py --slang`,
+  `model_parity.py`) and ctest's `rust_model_test`
+  (`cargo test --workspace --features slang`). Build them with
+  `cargo build --release --features slang` after `cmake --preset model &&
+  cmake --build build-model`.
+
+Removing Slang from the Rust side later means deleting `crates/sv-slang`, the
+`slang` features and the `#[cfg(feature = "slang")]` items; nothing in the
+default build changes.
 
 How deep the coupling goes: the C++ rules are written against Slang's AST and
 syntax tree (`slang/ast/*`, `slang/syntax/*`), so an API change in Slang can

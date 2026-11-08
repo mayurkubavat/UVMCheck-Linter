@@ -8,8 +8,9 @@ rust-version.workspace = true
 build = "build.rs"
 
 [features]
-default = ["slang"]
-# `--slang`: load the design through slang too (needs libuvmcheck_model).
+default = []
+# `--slang`: load the design through Slang instead of the native front end
+# (needs libuvmcheck_model). Oracle and parity use only, never the default.
 slang = ["dv-model/slang"]
 
 [dependencies]

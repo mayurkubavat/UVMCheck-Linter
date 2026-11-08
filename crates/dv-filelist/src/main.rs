@@ -1,12 +1,14 @@
 //! dv-filelist: read a VCS/Xcelium file list, report what is wrong with it,
 //! and write it back normalized.
 //!
-//!     dv-filelist [--dialect any|vcs|xcelium] [--json | --args] [--load] <options, e.g. -f top.f>
+//!     dv-filelist [--dialect any|vcs|xcelium] [--json | --args] [--load [--slang]] <options, e.g. -f top.f>
 //!
 //! Default output is a summary plus every problem with its file:line.
 //! --args prints the normalized compile options, one per line: a flat .f
 //! that uvmcheck (and slang) read directly. --json prints everything.
-//! --load also compiles the design through dv-model and reports the result.
+//! --load also compiles the design with the native front end (sv-sema) and
+//! reports the result; --slang compiles it through Slang instead, when built
+//! with the `slang` feature.
 //! Exit status: 0 clean, 1 problems found, 2 bad usage.
 
 use dv_model::Design;
@@ -93,7 +95,7 @@ fn to_json(fl: &FileList) -> String {
 
 fn main() -> ExitCode {
     let mut dialect = Dialect::Any;
-    let (mut json, mut args_out, mut load) = (false, false, false);
+    let (mut json, mut args_out, mut load, mut slang) = (false, false, false, false);
     let mut rest = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -101,6 +103,7 @@ fn main() -> ExitCode {
             "--json" => json = true,
             "--args" => args_out = true,
             "--load" => load = true,
+            "--slang" => slang = true,
             "--dialect" => {
                 dialect = match it.next().as_deref() {
                     Some("any") => Dialect::Any,
@@ -113,14 +116,14 @@ fn main() -> ExitCode {
                 }
             }
             "-h" | "--help" => {
-                eprintln!("usage: dv-filelist [--dialect any|vcs|xcelium] [--json | --args] [--load] <options, e.g. -f top.f>");
+                eprintln!("usage: dv-filelist [--dialect any|vcs|xcelium] [--json | --args] [--load [--slang]] <options, e.g. -f top.f>");
                 return ExitCode::from(2);
             }
             _ => rest.push(a),
         }
     }
     if rest.is_empty() {
-        eprintln!("usage: dv-filelist [--dialect any|vcs|xcelium] [--json | --args] [--load] <options, e.g. -f top.f>");
+        eprintln!("usage: dv-filelist [--dialect any|vcs|xcelium] [--json | --args] [--load [--slang]] <options, e.g. -f top.f>");
         return ExitCode::from(2);
     }
     let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
@@ -157,7 +160,9 @@ fn main() -> ExitCode {
     }
 
     if load {
-        match Design::load(fl.to_compile_args()) {
+        let args = fl.to_compile_args();
+        let loaded = if slang { load_slang(&args) } else { sv_sema::load(&args).map_err(|e| e.to_string()) };
+        match loaded {
             Ok(d) => {
                 eprintln!(
                     "dv-filelist: loaded {} classes from {} files, {} compile errors",
@@ -178,4 +183,14 @@ fn main() -> ExitCode {
     } else {
         ExitCode::SUCCESS
     }
+}
+
+#[cfg(feature = "slang")]
+fn load_slang(args: &[String]) -> Result<Design, String> {
+    Design::load(args).map_err(|e| e.to_string())
+}
+
+#[cfg(not(feature = "slang"))]
+fn load_slang(_: &[String]) -> Result<Design, String> {
+    Err("--slang needs a build with the slang feature (cargo build --features slang)".into())
 }

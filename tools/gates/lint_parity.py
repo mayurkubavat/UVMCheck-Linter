@@ -8,7 +8,7 @@ rules need the native trees). Findings are compared as multisets of (file
 name, line, column, rule, message).
 
     cmake --build build && cmake --build build-model
-    cargo build --release -p dv-lint               
+    cargo build --release -p dv-lint --features slang   # the slang feature only for --slang
     tools/gates/lint_parity.py --repo UVM_SRC [--slang] [--show=N]
     tools/gates/lint_parity.py --uvm UVM_SRC [--slang] [--show=N]
     tools/gates/lint_parity.py --dir DIR [--show=N]     # each .sv under DIR alone (sv-tests)

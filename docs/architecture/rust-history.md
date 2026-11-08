@@ -34,7 +34,8 @@ on it.
 
 ```sh
 cmake --preset model && cmake --build build-model   # libuvmcheck_model.so + model_capi_smoke
-cargo test && cargo build --release
+cargo test && cargo build --release                  # native only, no C++ needed
+cargo test --workspace --features slang              # + the Slang bridge and oracle paths
 cargo doc --workspace --no-deps --open               # API docs of every crate
 ```
 
@@ -233,7 +234,7 @@ Locations of macro-made members point where Slang points: into the
 sv-sema uses it; `Design::dump` is the canonical text form both sides print.
 
 ```
-cargo run --release -p sv-sema --example model_dump -- [--slang] [--types] +incdir+DIR FILE
+cargo run --release -p sv-sema --features slang --example model_dump -- [--slang] [--types] +incdir+DIR FILE
 tools/gates/model_parity.py --uvm UVM_SRC        # uvm_pkg.sv, Slang vs native
 tools/gates/model_parity.py --repo UVM_SRC       # every test and example input
 ```
@@ -317,7 +318,7 @@ built natively by sv-sema, or through Slang with `--slang`, and prints findings
 in uvmcheck's text form:
 
 ```
-cargo build --release -p dv-lint
+cargo build --release -p dv-lint                     # add --features slang for --slang
 target/release/dv-lint [--slang] [--rule ID]... [--list] <compile options>
 ```
 

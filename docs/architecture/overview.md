@@ -26,8 +26,9 @@ workspace.
   SARIF, HTML), fixes, baselines, waivers, project config and the Python rule
   SDK, and serves lint diagnostics over LSP (`uvmcheck --lsp`).
 - **dv-lint** (`crates/dv-lint`) runs every uvmcheck rule on the native Rust
-  front end, in parallel. With `--slang` it builds the design through Slang
-  instead, so the two front ends can be compared.
+  front end, in parallel. Built with the `slang` Cargo feature (off by
+  default), `--slang` builds the design through Slang instead, so the two
+  front ends can be compared.
 - **libuvmcheck_model** (built by the `model` CMake preset) puts Slang's view
   of a design behind a C ABI. `sv-slang` binds it, `dv-model` wraps it in safe
   Rust, and `python/uvmcheck/model.py` reads the same ABI from Python.
@@ -76,5 +77,6 @@ our own code, in the overlay under `cpp/src/compat/`
 | `cmake --preset model && cmake --build build-model` | the same plus `build-model/libuvmcheck_model.so` (position independent, no mimalloc) |
 | `cargo build --release` (repository root) | `target/release/dv-lint`, `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist` |
 
-The Rust build finds the model library in `build-model/`, or wherever
-`UVMCHECK_BUILD_DIR` points.
+A plain `cargo build` needs neither CMake build. Only with
+`--features slang` (the parity gates) does the Rust build link the model
+library, from `build-model/` or wherever `UVMCHECK_BUILD_DIR` points.

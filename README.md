@@ -12,7 +12,7 @@ There are two engines that share one rule set and one test suite:
 | Engine | Where | Front end | Binary |
 |---|---|---|---|
 | **uvmcheck** (C++20) | [`cpp/`](cpp/) | [Slang](https://github.com/MikePopoloski/slang) | `build/uvmcheck` |
-| **dv-lint** and the DV tools (Rust) | [`crates/`](crates/) | native lexer, preprocessor, parser and elaborator (Slang optional, as a reference) | `target/release/dv-lint`, `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist` |
+| **dv-lint** and the DV tools (Rust) | [`crates/`](crates/) | native lexer, preprocessor, parser and elaborator (Slang only as an opt-in reference) | `target/release/dv-lint`, `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist` |
 
 Every rule has a `bad.sv` / `good.sv` pair under [`testdata/rules/`](testdata/rules/)
 that both engines are tested against, and parity gates check that their
@@ -31,11 +31,13 @@ cmake --preset default
 cmake --build build -j 4
 build/uvmcheck tb/*.sv -I tb --preset methodology
 
-# The Rust tools: they link the shared model library from the "model" preset
-cmake --preset model && cmake --build build-model
+# The Rust tools: native front end, no C++ build needed
 cargo build --release
 target/release/dv-lint +incdir+tb tb/top.sv
 ```
+
+The Rust tools reach Slang only for the parity gates, behind the `slang`
+Cargo feature (off by default); see [third_party/slang](third_party/slang/README.md).
 
 The full uvmcheck guide (profiles, fixes, reports, Python rules, baselines,
 waivers, CI) is [docs/guide/uvmcheck.md](docs/guide/uvmcheck.md). The Rust
@@ -73,9 +75,9 @@ pre-commit hook ([.pre-commit-hooks.yaml](.pre-commit-hooks.yaml)); see
 
 ```sh
 ctest --test-dir build                 # uvmcheck suites
-ctest --test-dir build-model           # + C ABI, Python binding and cargo test
+ctest --test-dir build-model           # + C ABI, Python binding, cargo test --features slang
 python3 cpp/tests/regression.py --rule UVM-CFG-002
-cargo test
+cargo test                             # Rust, native only
 ```
 
 ## Contributing

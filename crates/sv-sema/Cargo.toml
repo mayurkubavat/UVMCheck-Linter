@@ -12,6 +12,12 @@ sv-syntax = { path = "../sv-syntax" }
 sv-source = { path = "../sv-source" }
 dv-model = { path = "../dv-model", default-features = false }
 
-[dev-dependencies]
-# The examples and tests compare against the slang-backed model.
-dv-model = { path = "../dv-model" }
+[features]
+default = []
+# The model_dump example's `--slang` (the model_parity gate): the Slang-backed
+# model to compare against. Oracle use only.
+slang = ["dv-model/slang"]
+
+[[example]]
+name = "model_dump"
+required-features = ["slang"]

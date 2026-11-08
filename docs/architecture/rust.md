@@ -37,7 +37,11 @@ compile options / file lists (-f, +incdir+, +define+, -top, ...)
 
 Everything from `sv-source` to `sv-sema` is native Rust with no C++ and no
 slang. Slang is still reachable through `sv-slang` and `Design::load`, as
-the reference the parity gates compare against and as `dv-lint --slang`.
+the reference the parity gates compare against and as `dv-lint --slang`,
+but only behind the `slang` Cargo feature, which is off by default: a plain
+`cargo build` or `cargo test` builds every tool natively and needs no C++
+build, and `sv-slang` is not a default workspace member. The gates build
+with `--features slang`; see `third_party/slang/README.md`.
 
 ## Crates
 
@@ -49,7 +53,7 @@ the reference the parity gates compare against and as `dv-lint --slang`.
 | `sv-syntax` | lib | Event-based recovering parser. A `Tree` is a token array plus a node arena (`SyntaxKind` per node); trivia rides on tokens, so `Tree::file_text` rebuilds each file byte for byte. |
 | `sv-sema` | lib | Everything slang did above syntax: scopes and name resolution, constant evaluation (arbitrary width, four-state), type strings, the class model, elaboration and the semantic checks a compiler makes. |
 | `dv-model` | lib | The design model tools read: classes, UVM roles, properties, methods and body facts, all owned. Filled by `sv-sema` (native) or by slang through `sv-slang`. |
-| `sv-slang` | lib | Raw FFI to `libuvmcheck_model` (`cpp/include/uvmcheck/model/CApi.h`). Only `dv-model` uses it. |
+| `sv-slang` | lib | Raw FFI to `libuvmcheck_model` (`cpp/include/uvmcheck/model/CApi.h`). Only `dv-model` uses it, and only with the `slang` feature. |
 | `dv-lint` | lib + bin | The linter: every uvmcheck rule ported to Rust, run in parallel over the model and the syntax trees. |
 | `dv-build` | bin | The native builder: reports file list, preprocessor, syntax and semantic errors like a compiler; dumps symbols, types, values and hierarchy for the gates. |
 | `dv-lsp` | bin | Language server for code browsing (symbols, definition, references, hover, completion) on `sv-syntax`. Lint diagnostics come from `uvmcheck --lsp`. |
@@ -124,7 +128,8 @@ workspace.
 
 ## How correctness is checked
 
-Each layer has a gate against slang, run from `tools/` (most need
+Each layer has a gate against slang, run from `tools/gates/` (the Rust side
+built with `--features slang` where a gate uses `--slang`; most need
 `UVM_SRC` pointing at a UVM source tree):
 
 | Gate | Compares |
@@ -139,7 +144,8 @@ Each layer has a gate against slang, run from `tools/` (most need
 | `spec_gate.py` | specialization counts from `dv-lint --specs` |
 | `lint_parity.py` | dv-lint findings against uvmcheck's |
 
-Plus `cargo test` in each crate. A change to the front end should keep
+Plus `cargo test` (native) and `cargo test --workspace --features slang`
+(also the Slang bridge and the tests that load through Slang). A change to the front end should keep
 every gate where it was; a change to a rule should keep `lint_parity.py`
 identical.
 

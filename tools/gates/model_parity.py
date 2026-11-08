@@ -5,7 +5,7 @@ Both sides print dv_model::Design::dump through the model_dump example;
 paths are cut to the file name since Slang reports them relative.
 
     cmake --preset model && cmake --build build-model
-    cargo build --release -p sv-sema --example model_dump  
+    cargo build --release -p sv-sema --example model_dump --features slang
     tools/gates/model_parity.py --uvm UVM_SRC                         # uvm_pkg.sv
     tools/gates/model_parity.py --repo UVM_SRC                        # testdata/ and python/
     tools/gates/model_parity.py -- +incdir+DIR FILE...                # any compile

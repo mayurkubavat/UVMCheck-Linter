@@ -1,6 +1,9 @@
 //! dv-map: the component tree of a UVM testbench, as text or JSON.
 //!
-//!     dv-map [--json] [--bench N] [--include-library] -- <uvmcheck compile options>
+//!     dv-map [--json] [--bench N] [--include-library] [--slang] -- <uvmcheck compile options>
+//!
+//! The design comes from the native front end (sv-sema); --slang loads it
+//! through Slang instead, when built with the `slang` feature.
 //!
 //! The tree is static: each test, then every component-typed property of each
 //! component, recursively. --bench N loads the design N times and prints the
@@ -16,16 +19,18 @@ struct Opts {
     json: bool,
     bench: usize,
     include_library: bool,
+    slang: bool,
     compile: Vec<String>,
 }
 
 fn parse() -> Result<Opts, String> {
-    let mut o = Opts { json: false, bench: 0, include_library: false, compile: vec![] };
+    let mut o = Opts { json: false, bench: 0, include_library: false, slang: false, compile: vec![] };
     let mut args = std::env::args().skip(1);
     while let Some(a) = args.next() {
         match a.as_str() {
             "--json" => o.json = true,
             "--include-library" => o.include_library = true,
+            "--slang" => o.slang = true,
             "--bench" => {
                 o.bench = args.next().and_then(|n| n.parse().ok()).ok_or("--bench needs a count")?;
             }
@@ -101,7 +106,7 @@ fn main() -> ExitCode {
             if !e.is_empty() {
                 eprintln!("dv-map: {e}");
             }
-            eprintln!("usage: dv-map [--json] [--bench N] [--include-library] -- <compile options>");
+            eprintln!("usage: dv-map [--json] [--bench N] [--include-library] [--slang] -- <compile options>");
             return ExitCode::from(2);
         }
     };
@@ -110,7 +115,7 @@ fn main() -> ExitCode {
         return bench(&o);
     }
 
-    let d = match Design::load(&o.compile) {
+    let d = match load(&o) {
         Ok(d) => d,
         Err(e) => {
             eprintln!("dv-map: {e}");
@@ -150,7 +155,7 @@ fn bench(o: &Opts) -> ExitCode {
     let mut rows = Vec::new();
     for _ in 0..o.bench {
         let start = std::time::Instant::now();
-        let d = match Design::load(&o.compile) {
+        let d = match load(&o) {
             Ok(d) => d,
             Err(e) => {
                 eprintln!("dv-map: {e}");
@@ -190,4 +195,23 @@ fn bench(o: &Opts) -> ExitCode {
         (wall - cpp) / cpp * 100.0
     );
     ExitCode::SUCCESS
+}
+
+/// The design, from the native front end or (`--slang`) through Slang.
+fn load(o: &Opts) -> Result<Design, String> {
+    if o.slang {
+        load_slang(&o.compile)
+    } else {
+        sv_sema::load(&o.compile).map_err(|e| e.to_string())
+    }
+}
+
+#[cfg(feature = "slang")]
+fn load_slang(args: &[String]) -> Result<Design, String> {
+    Design::load(args).map_err(|e| e.to_string())
+}
+
+#[cfg(not(feature = "slang"))]
+fn load_slang(_: &[String]) -> Result<Design, String> {
+    Err("--slang needs a build with the slang feature (cargo build --features slang)".into())
 }

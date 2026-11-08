@@ -5,6 +5,14 @@
 [workspace]
 resolver = "2"
 members = ["crates/*"]
+# Everything but the Slang bridge: a plain `cargo build` / `cargo test` needs no
+# C++ build. sv-slang (the C ABI binding to libuvmcheck_model) is built only
+# when a crate's `slang` feature asks for it; see third_party/slang/README.md.
+default-members = [
+    "crates/sv-source", "crates/sv-lexer", "crates/sv-preproc", "crates/sv-syntax", "crates/sv-sema",
+    "crates/dv-model", "crates/dv-lint", "crates/dv-lsp", "crates/dv-build", "crates/dv-map",
+    "crates/dv-filelist",
+]
 
 [workspace.package]
 version = "0.1.0"

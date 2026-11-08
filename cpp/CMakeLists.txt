@@ -279,7 +279,7 @@ if(UVMCHECK_BUILD_MODEL_LIB)
         add_test(
             NAME rust_model_test
             COMMAND ${CMAKE_COMMAND} -E env UVMCHECK_BUILD_DIR=${CMAKE_BINARY_DIR}
-                    ${CARGO_PROGRAM} test --quiet --manifest-path ${PROJECT_SOURCE_DIR}/Cargo.toml
+                    ${CARGO_PROGRAM} test --quiet --workspace --features slang --manifest-path ${PROJECT_SOURCE_DIR}/Cargo.toml
             WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         )
     endif()
