@@ -1,7 +1,12 @@
 //! Runs the ported rules over a design, built natively (default) or through
 //! slang (`--slang`, model rules only), and prints findings as uvmcheck does:
 //!
-//!     dv-lint [--slang] [--time] [--history] [--skip-libraries] [--rule ID]... [-top NAME]... [--list] <compile options>
+//!     dv-lint [--slang] [--time] [--history] [--skip-libraries] [--rule ID]... [-top NAME]... [--json FILE] [--list] <compile options>
+//!
+//! `--json FILE` also writes the findings as uvmcheck's JSON report (`tool`,
+//! `version`, `compileErrors`, `waived`, `violations` with `ruleId`,
+//! `ruleName`, `severity`, `file`, `line`, `column`, `message` and any
+//! `related` notes).
 //!
 //! `--in-context` lints each header given as a source (`.svh`, `.vh`, or a
 //! `.sv` with no design unit) inside
@@ -46,6 +51,14 @@ fn main() {
             // Each expression's type, as tools/oracles/exprdump.cpp prints slang's.
             "--exprs" => exprs = true,
             "--rule" => only.extend(it.next()),
+            // Also write the findings as uvmcheck's JSON report.
+            "--json" => {
+                let path = it.next().unwrap_or_else(|| {
+                    eprintln!("error: --json needs a file");
+                    std::process::exit(2);
+                });
+                let _ = JSON_OUT.set(path);
+            }
             // Read git history for SV-EVO-001 and SV-EVO-002.
             "--history" => dv_lint::set_history(true),
             // Report nothing in -v/-y library files.
@@ -183,6 +196,72 @@ fn only_in(headers: &[std::path::PathBuf], files: &[String], found: &[dv_lint::F
 }
 
 /// Prints the findings (and with `--time` the stage times) and exits.
+/// `--json FILE`: where to write the JSON report.
+static JSON_OUT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+
+/// A JSON string literal.
+fn json_str(s: &str) -> String {
+    let mut o = String::with_capacity(s.len() + 2);
+    o.push('"');
+    for ch in s.chars() {
+        match ch {
+            '"' => o.push_str("\\\""),
+            '\\' => o.push_str("\\\\"),
+            '\n' => o.push_str("\\n"),
+            '\r' => o.push_str("\\r"),
+            '\t' => o.push_str("\\t"),
+            c if (c as u32) < 0x20 => o.push_str(&format!("\\u{:04x}", c as u32)),
+            c => o.push(c),
+        }
+    }
+    o.push('"');
+    o
+}
+
+/// The findings in uvmcheck's JSON report form (`--json`): `tool`,
+/// `version`, `compileErrors`, `waived` and one `violations` entry per
+/// finding with its rule, severity, position, message and notes.
+fn json_report(files: &[String], found: &[dv_lint::Finding]) -> String {
+    let mut out = String::from("{\n");
+    let compile = found.iter().filter(|f| f.rule == "SV-CMP-001").count();
+    out.push_str(&format!(
+        "  \"tool\": \"dv-lint\",\n  \"version\": {},\n  \"compileErrors\": {compile},\n  \"waived\": 0,\n  \"violations\": [",
+        json_str(env!("CARGO_PKG_VERSION"))
+    ));
+    for (i, f) in found.iter().enumerate() {
+        let (file, line, column) = f.position_in(files);
+        out.push_str(if i == 0 { "\n" } else { ",\n" });
+        out.push_str(&format!(
+            "    {{\"ruleId\": {}, \"ruleName\": {}, \"severity\": {}, \"file\": {}, \"line\": {line}, \"column\": {column}, \"message\": {}",
+            json_str(f.rule),
+            json_str(f.name),
+            json_str(f.severity.as_str()),
+            json_str(file),
+            json_str(&f.message)
+        ));
+        if !f.related.is_empty() {
+            let notes: Vec<String> = f
+                .related
+                .iter()
+                .map(|(loc, note)| {
+                    let nfile = files.get(loc.file as usize).map(String::as_str).unwrap_or("");
+                    format!(
+                        "{{\"file\": {}, \"line\": {}, \"column\": {}, \"message\": {}}}",
+                        json_str(nfile),
+                        loc.line,
+                        loc.column,
+                        json_str(note)
+                    )
+                })
+                .collect();
+            out.push_str(&format!(", \"related\": [{}]", notes.join(", ")));
+        }
+        out.push('}');
+    }
+    out.push_str(if found.is_empty() { "]\n}\n" } else { "\n  ]\n}\n" });
+    out
+}
+
 fn report(
     design: &Design,
     time: bool,
@@ -215,6 +294,12 @@ fn report(
             if frames {
                 print!("{}", sources.frame(nfile, loc.line, loc.column));
             }
+        }
+    }
+    if let Some(path) = JSON_OUT.get() {
+        if let Err(e) = std::fs::write(path, json_report(files, found)) {
+            eprintln!("error: cannot write {path}: {e}");
+            std::process::exit(2);
         }
     }
     std::process::exit(if found.is_empty() { 0 } else { 1 });
