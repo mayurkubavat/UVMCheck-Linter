@@ -13,7 +13,7 @@ pub(crate) fn macro_trailing_semicolon(c: &Cst, s: &mut Sink) {
         if !u.name.starts_with("uvm_") {
             continue;
         }
-        let Some(end) = macro_use_end(c, &u.name, u.origin) else { continue };
+        let Some(end) = macro_use_end(c, &u.name, u.origin, u.function_like) else { continue };
         let src = t.sources[u.origin.file as usize].as_bytes();
         let mut cur = end;
         while cur < src.len() && (src[cur] == b' ' || src[cur] == b'\t') {
@@ -38,19 +38,22 @@ pub(crate) fn macro_trailing_semicolon(c: &Cst, s: &mut Sink) {
     }
 }
 
-/// The end of a macro use in its file: after the name, or after the
-/// closing parenthesis of its arguments when the macro takes arguments and
-/// they follow.
-fn macro_use_end(c: &Cst, name: &str, origin: Origin) -> Option<usize> {
+/// The end of a macro use in its file: after the name, or, for a macro that
+/// takes arguments, after the closing parenthesis of its argument list,
+/// which may follow the name after whitespace.
+fn macro_use_end(c: &Cst, name: &str, origin: Origin, function_like: bool) -> Option<usize> {
     let src = &c.tree.sources[origin.file as usize];
     let start = origin.offset as usize + 1 + name.len();
     if src.get(origin.offset as usize..start)? != format!("`{name}") {
         return None;
     }
     let b = src.as_bytes();
-    // Arguments start right after the name, or after whitespace when the
-    // macro has formal arguments; here: a '(' directly or after spaces.
     let mut i = start;
+    if function_like {
+        while b.get(i).is_some_and(u8::is_ascii_whitespace) {
+            i += 1;
+        }
+    }
     if b.get(i) != Some(&b'(') {
         return Some(start);
     }

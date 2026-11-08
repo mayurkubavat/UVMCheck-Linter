@@ -12,3 +12,12 @@ class StyleViolationComponent extends uvm_component;
     // VIOLATION SV-STY-002: Trailing semicolon after macro invocation in declarative scope
     `uvm_component_utils(StyleViolationComponent);
 endclass
+
+class StyleViolationSpaced extends uvm_component;
+    // VIOLATION SV-STY-002: whitespace may separate a macro's name from its arguments
+    `uvm_component_utils (StyleViolationSpaced);
+
+    function new(string name, uvm_component parent);
+        super.new(name, parent);
+    endfunction
+endclass

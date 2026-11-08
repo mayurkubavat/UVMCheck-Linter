@@ -105,6 +105,9 @@ pub struct MacroUse {
     pub name: Arc<str>,
     /// Where the backtick is.
     pub origin: Origin,
+    /// The macro takes arguments, so a parenthesized list follows the name,
+    /// possibly after whitespace. False for `undef.
+    pub function_like: bool,
 }
 
 /// A token inside the preprocessor: no trivia, but whether trivia came
@@ -487,7 +490,11 @@ impl Preprocessor {
                     if let Some(n) = self.line_next() {
                         let builtin = STANDARD_MACROS.iter().any(|(k, _)| *k == &*n.text);
                         if self.macros.remove(&*n.text).is_some() && !builtin && self.top_level(&t) {
-                            self.out.macro_uses.push(MacroUse { name: n.text.clone(), origin: t.origin });
+                            self.out.macro_uses.push(MacroUse {
+                                name: n.text.clone(),
+                                origin: t.origin,
+                                function_like: false,
+                            });
                         }
                     }
                 }
@@ -557,7 +564,11 @@ impl Preprocessor {
                 _ => {
                     if let Some(m) = self.macros.get(name).cloned() {
                         if self.top_level(&t) {
-                            self.out.macro_uses.push(MacroUse { name: Arc::from(name), origin: t.origin });
+                            self.out.macro_uses.push(MacroUse {
+                                name: Arc::from(name),
+                                origin: t.origin,
+                                function_like: m.params.is_some(),
+                            });
                         }
                         self.expand(&t, name, &m);
                     } else {
