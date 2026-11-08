@@ -998,3 +998,16 @@ fn bodies_that_fail_in_the_default_specialization_are_not_walked() {
                endpackage\n";
     assert_eq!(rule_lines(src, "SV-STY-010"), vec![3, 9]);
 }
+
+#[test]
+fn coverpoint_on_a_member_of_a_sample_argument() {
+    let src = "parameter int XLEN = 32;\n\
+               class ins; rand bit [XLEN-1:0] v; endclass\n\
+               class cov;\n\
+               covergroup cg with function sample(ins instr);\n\
+               cp_v : coverpoint instr.v { bins big[] = {64'h7ff0_0000_0000_0000}; bins ok = {1}; }\n\
+               endgroup\n\
+               function new(); cg = new(); endfunction\n\
+               endclass\n";
+    assert_eq!(rule_count(src, "SV-COV-017"), 1);
+}

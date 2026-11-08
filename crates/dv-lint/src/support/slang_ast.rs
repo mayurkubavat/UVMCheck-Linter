@@ -921,6 +921,19 @@ pub(crate) fn lookup(c: &Cst, at: NodeId, name: &str) -> Option<Decl> {
                     }
                 }
             }
+            // `covergroup cg (args)` and `with function sample(args)`.
+            CovergroupDecl => {
+                let lists = c
+                    .tree
+                    .children(a)
+                    .filter(|&k| c.kind(k) == PortList)
+                    .chain(c.tree.child(a, WithClause).and_then(|w| c.tree.child(w, PortList)));
+                for pl in lists {
+                    if let Some(d) = in_ports(c, pl, name, DeclKind::Argument) {
+                        return Some(d);
+                    }
+                }
+            }
             ClassDecl => {
                 if let Some(d) = class_member(c, a, name) {
                     return Some(d);

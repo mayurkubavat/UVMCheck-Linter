@@ -132,7 +132,14 @@ pub(crate) fn unreachable_bin(c: &Cst, s: &mut Sink) {
             }
             _ => None,
         };
-        let Some((width, signed)) = decl.and_then(|d| d.dtype).and_then(|dt| type_width(c, dt)) else { continue };
+        // As written, else the expression's type (a width set by a
+        // parameter of another file or package, `bit [XLEN-1:0]`).
+        let typed = || {
+            crate::expr_types::expr_types(c).get(&(c.index(), expr)).and_then(|t| t.integral).map(|(w, s, _)| (w, s))
+        };
+        let Some((width, signed)) = decl.and_then(|d| d.dtype).and_then(|dt| type_width(c, dt)).or_else(typed) else {
+            continue;
+        };
         if width == 0 || width > 62 {
             continue;
         }
