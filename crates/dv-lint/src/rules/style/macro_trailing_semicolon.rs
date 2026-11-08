@@ -29,7 +29,11 @@ pub(crate) fn macro_trailing_semicolon(c: &Cst, s: &mut Sink) {
                     u.name
                 ),
                 at(c, u.origin.file, cur),
-            );
+            )
+            // The macros expand to complete statements or declarations, so
+            // the ';' is an empty item and deleting it changes nothing.
+            .fixes
+            .push(c.file_fix(u.origin.file, cur, cur + 1, "", "Remove the semicolon after the macro call"));
         }
     }
 }

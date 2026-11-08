@@ -26,7 +26,9 @@ pub(crate) fn space_keyword_paren(c: &Cst, s: &mut Sink) {
                     "Missing space between '{kw_text}' keyword and opening parenthesis '('. Common SystemVerilog formatting requires a space (e.g. '{kw_text} (...)')."
                 ),
                 c.loc(kw),
-            );
+            )
+            .fixes
+            .extend((!o.from_macro).then(|| c.file_fix(o.origin.file, oo as usize, oo as usize, " ", "Insert a space before '('")));
         }
     };
     let pairs = |n: NodeId, kws: &[&str]| -> Option<(u32, u32)> {
