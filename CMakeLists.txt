@@ -36,26 +36,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|AppleClang|GNU")
     add_compile_options(-Wall -Wextra -Wpedantic -Wno-unused-parameter $<$<COMPILE_LANGUAGE:CXX>:-fvisibility-inlines-hidden>)
 endif()
 
-# Disable unneeded slang targets to keep build fast
-set(SLANG_INCLUDE_TOOLS OFF CACHE BOOL "" FORCE)
-set(SLANG_INCLUDE_TESTS OFF CACHE BOOL "" FORCE)
-set(SLANG_INCLUDE_DOCS OFF CACHE BOOL "" FORCE)
-set(SLANG_INCLUDE_EXAMPLES OFF CACHE BOOL "" FORCE)
-set(SLANG_INCLUDE_INSTALL OFF CACHE BOOL "" FORCE)
-
-message(STATUS "Fetching Slang from GitHub")
-include(FetchContent)
-FetchContent_Declare(
-    slang
-    GIT_REPOSITORY https://github.com/MikePopoloski/slang.git
-    # Pinned: rule findings and the test baselines depend on slang's elaboration and
-    # diagnostics, which change between releases. Bump deliberately and refresh baselines.
-    # A master commit after v12.1: it has the randomize/constraint scoping fixes and the
-    # macro location API. Move back to a release tag once one includes them.
-    GIT_TAG d02b7cda02d3183f35c6c4d4db2b2fc03f19f4ae # master, 2026-11-02
-    # A commit hash cannot be fetched shallowly.
-    GIT_SHALLOW OFF)
-FetchContent_MakeAvailable(slang)
+# Slang, the upstream SystemVerilog compiler (not our code): pinned, fetched at
+# configure time, never edited in place. See third_party/slang/README.md.
+include(third_party/slang/slang.cmake)
 
 # Every binary and library lands at the top of the build tree (build/uvmcheck,
 # build-model/libuvmcheck_model.so), wherever its CMakeLists.txt lives.

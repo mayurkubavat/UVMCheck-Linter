@@ -1,16 +1,18 @@
 #!/usr/bin/env python3
 """Build uvmcheck against slang master and report what changed.
 
-Run weekly (or before bumping the pin in CMakeLists.txt). It
-  1. clones or updates slang at --ref (default: master) under --work,
+Run weekly (or before bumping the pin in third_party/slang/slang.cmake). It
+  1. clones or updates slang at --ref (default: master) under --work, and
+     applies our patches (third_party/slang/patches/*.patch), reporting each
+     as applying, already upstream (delete it) or not applying (rebase it),
   2. configures a separate build with FETCHCONTENT_SOURCE_DIR_SLANG pointing at
      that checkout, so the pinned build is untouched,
   3. runs the suites that measure slang itself: the LRM conformance probes, the
      overlay test (which fails when an override has outlived its slang bug, or a
      known crash no longer crashes), the rule suites and, with --uvm-home, the
      real-UVM suite,
-  4. writes a Markdown report: the slang commit, each suite's result, and the
-     failing lines, ready to paste into the pin-bump commit or an issue.
+  4. writes a Markdown report: the slang commit, each patch and suite result,
+     and the failing lines, ready to paste into the pin-bump commit or an issue.
 
   tools/quality/slang_canary.py --work ../canary [--ref master] [--uvm-home ../uvm-core] [--report canary.md]
 
@@ -38,9 +40,9 @@ def sh(cmd, cwd=None, log=None):
 
 
 def pinned_commit():
-    for line in (ROOT / "CMakeLists.txt").read_text().splitlines():
-        if "GIT_TAG" in line:
-            return line.split("GIT_TAG", 1)[1].split()[0]
+    for line in (ROOT / "third_party" / "slang" / "slang.cmake").read_text().splitlines():
+        if line.startswith("set(UVMCHECK_SLANG_TAG"):
+            return line.split()[1].rstrip(")")
     return "?"
 
 
@@ -64,9 +66,21 @@ def main():
             print("could not clone slang; see canary.log", file=sys.stderr)
             return 2
     sh(["git", "fetch", "--quiet", "origin"], cwd=slang, log=logf)
+    sh(["git", "reset", "--quiet", "--hard"], cwd=slang, log=logf)  # drop patches from the last run
     sh(["git", "checkout", "--quiet", "--detach", f"origin/{opts.ref}"], cwd=slang, log=logf).returncode and \
         sh(["git", "checkout", "--quiet", "--detach", opts.ref], cwd=slang, log=logf)
     head = sh(["git", "log", "-1", "--format=%H %cs %s"], cwd=slang).stdout.strip()
+
+    # Our local patches (third_party/slang/patches), as the pinned build applies
+    # them: FETCHCONTENT_SOURCE_DIR_SLANG skips CMake's own patch step.
+    patches = []
+    for p in sorted((ROOT / "third_party" / "slang" / "patches").glob("*.patch")):
+        if sh(["git", "apply", "--reverse", "--check", str(p)], cwd=slang).returncode == 0:
+            patches.append((p.name, "already upstream: delete the patch"))
+        elif sh(["git", "apply", "--whitespace=nowarn", str(p)], cwd=slang, log=logf).returncode == 0:
+            patches.append((p.name, "applies"))
+        else:
+            patches.append((p.name, "DOES NOT APPLY: rebase it on this commit"))
 
     cfg = ["cmake", "-S", str(ROOT), "-B", str(build), "-G", "Ninja", "-DCMAKE_BUILD_TYPE=Release",
            f"-DFETCHCONTENT_SOURCE_DIR_SLANG={slang}"]
@@ -85,6 +99,9 @@ def main():
 
     lines = [f"# Slang canary, {datetime.date.today().isoformat()}", "",
              f"- pinned: `{pinned_commit()}`", f"- tested: `{head}` ({opts.ref})", ""]
+    if patches:
+        lines += ["| Local patch | On this commit |", "| --- | --- |"]
+        lines += [f"| {n} | {st} |" for n, st in patches] + [""]
     if not built:
         lines += ["**Build failed.** slang's API changed in a way uvmcheck does not compile against; "
                   f"see `{work / 'canary.log'}`."]
@@ -95,7 +112,7 @@ def main():
             if not ok:
                 lines += ["", f"## {s}", "", "```", *fails, "```"]
         if all(ok for ok, _ in results.values()):
-            lines += ["", f"Every suite passes: the pin in CMakeLists.txt can move to `{head.split()[0]}`."]
+            lines += ["", f"Every suite passes: the pin in third_party/slang/slang.cmake can move to `{head.split()[0]}`."]
         else:
             lines += ["", "A failing overlay check that names an override or a slang issue usually means slang "
                       "fixed the bug: delete the override or retire the crash pattern, then move the pin."]

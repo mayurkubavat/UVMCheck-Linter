@@ -60,6 +60,14 @@ workspace.
   common_cells) and its gate live outside git, under the ignored
   `references/` folder.
 
+## Slang, the third-party front end
+
+Slang is fetched at a pinned commit and never edited in place:
+[third_party/slang/](../../third_party/slang/README.md) holds the pin, the
+(empty) patch folder and the update procedure. Workarounds for Slang live in
+our own code, in the overlay under `cpp/src/compat/`
+([compat.md](../reference/compat.md)).
+
 ## Build trees
 
 | Command | Output |

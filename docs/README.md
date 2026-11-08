@@ -21,6 +21,7 @@
 - [Slang compatibility layer](reference/compat.md): the overlay that works
   around Slang limitations.
 - [IEEE 1800 conformance corpus](reference/conformance.md).
+- [Slang: pin, patches and updating it](../third_party/slang/README.md).
 
 ## Architecture
 

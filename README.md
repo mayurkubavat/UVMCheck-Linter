@@ -54,6 +54,7 @@ tools/oracles/     Slang reference dumpers the gates compare against (built by C
 tools/gates/       parity and conformance gates
 tools/codegen/     generators run by the build and for the docs
 tools/quality/     precision, config sweep, AST coverage, Slang canary
+third_party/slang/ the Slang pin, local patches (none today) and how to update it
 docs/              guides, architecture, rule catalog, methodology guide
 .uvmcheck/         this repository's own lint config
 ```
