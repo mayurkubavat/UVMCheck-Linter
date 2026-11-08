@@ -47,6 +47,7 @@ pub mod classes;
 mod consteval;
 mod elab;
 pub mod fx;
+pub mod hier;
 pub mod iclass;
 pub mod library;
 pub mod names;
@@ -321,6 +322,7 @@ impl SemaChecks {
         let mut out = self.names.clone();
         out.extend(self.checks.iter().cloned());
         out.extend(elab.diags.iter().cloned());
+        out.extend(hier::check(trees, &elab.hierarchy));
         // Names in what no instance elaborates are not checked (as in slang).
         let skipped: Vec<(usize, u32, u32)> =
             elab.skipped.iter().filter_map(|&(tr, n)| trees[tr].token_bounds(n).map(|(a, b)| (tr, a, b))).collect();

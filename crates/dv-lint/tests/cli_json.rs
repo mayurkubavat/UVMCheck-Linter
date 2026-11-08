@@ -348,6 +348,25 @@ fn fix_rewrites_and_dry_run_shows_the_diff() {
 }
 
 #[test]
+fn fix_skips_files_with_semantic_errors() {
+    // A `solve before` on a non-random property: slang rejects the file and
+    // uvmcheck applies no fix in it; the native front end now agrees.
+    let dir = std::env::temp_dir().join(format!("dv-lint-fix-cmp-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let text = "class c;   \n  rand int w; int plain;\n  constraint k_c { solve plain before w; }\nendclass\n";
+    std::fs::write(dir.join("a.sv"), text).unwrap();
+    let o = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .current_dir(&dir)
+        .args(["--no-config", "--no-cache", "--fix-rule", "SV-STY-015", "--fix", "a.sv"])
+        .output()
+        .unwrap();
+    let out = String::from_utf8_lossy(&o.stdout);
+    assert!(out.contains("1 in files with compile errors not applied"), "{out}");
+    assert_eq!(std::fs::read_to_string(dir.join("a.sv")).unwrap(), text, "the file is left as it was");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn exit_status_follows_errors_only() {
     let dir = std::env::temp_dir().join(format!("dv-lint-exit-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();

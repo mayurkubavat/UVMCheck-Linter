@@ -87,6 +87,10 @@ struct Over {
 
 type Overrides = HashMap<String, Over>;
 
+/// A `bind`: its target (a definition or instance path), the instances
+/// listed after `:` (if any), the directive, and the definition holding it.
+type Bind = (String, Option<Vec<String>>, NodeRef, Option<NodeRef>);
+
 struct Def {
     decl: NodeRef,
     scope: usize,
@@ -95,8 +99,11 @@ struct Def {
 pub(crate) struct Elab<'b, 't> {
     b: &'b Builder<'t>,
     defs: HashMap<String, Def>,
-    /// `bind` directives by target: a definition's name or an instance path.
-    binds: Vec<(String, Option<Vec<String>>, NodeRef)>,
+    /// `bind` directives by target: a definition's name or an instance path,
+    /// with the definition that holds the directive (none: the compilation
+    /// unit). A directive in a definition no instance elaborates does not
+    /// bind (23.11): [`Elab::run`] drops it and elaborates again.
+    binds: Vec<Bind>,
     /// Defparams of the instances being elaborated: the target path from
     /// here and the value (evaluated where the defparam is).
     defparams: Vec<Vec<(Vec<String>, Over)>>,
@@ -160,10 +167,24 @@ impl<'b, 't> Elab<'b, 't> {
         }
         let mut binds = Vec::new();
         for (ti, t) in b.trees.iter().enumerate() {
+            // The definition each node is in, by preorder (definitions do not nest
+            // other definitions here, so the last one opened is the innermost).
+            let mut ends: Vec<(u32, NodeRef)> = Vec::new();
             for n in t.preorder() {
+                if matches!(t.kind(n), ModuleDecl | InterfaceDecl | ProgramDecl) {
+                    if let Some((_, hi)) = t.token_bounds(n) {
+                        ends.push((hi, NodeRef { tree: ti, node: n }));
+                    }
+                }
                 if t.kind(n) != BindDirective {
                     continue;
                 }
+                let at = t.token_bounds(n).map_or(0, |(lo, _)| lo);
+                let container = ends
+                    .iter()
+                    .rev()
+                    .find(|(hi, d)| t.token_bounds(d.node).is_some_and(|(lo, _)| lo <= at) && at <= *hi);
+                let container = container.map(|c| c.1);
                 let r = NodeRef { tree: ti, node: n };
                 let kids = b.children(r);
                 let Some(&target) = kids.first() else { continue };
@@ -179,7 +200,7 @@ impl<'b, 't> Elab<'b, 't> {
                         .map(|k| b.toks_of(*k).concat())
                         .collect()
                 });
-                binds.push((target, list, r));
+                binds.push((target, list, r, container));
             }
         }
         Elab {
@@ -330,6 +351,41 @@ impl<'b, 't> Elab<'b, 't> {
     }
 
     pub fn run(&mut self) {
+        loop {
+            self.run_once();
+            // A bind directive in a definition nothing elaborated binds nothing;
+            // without it, fewer definitions may be reached: again until none drops.
+            let before = self.binds.len();
+            let reached = &self.reached;
+            self.binds.retain(|bd| bd.3.is_none_or(|c| reached.contains(&c)));
+            if self.binds.len() == before {
+                return;
+            }
+            self.reset();
+        }
+    }
+
+    /// Forgets what one elaboration recorded (not the definitions and binds).
+    fn reset(&mut self) {
+        self.defparams.clear();
+        self.envs = vec![Rc::new(HashMap::default())];
+        self.out.clear();
+        self.diags.clear();
+        self.checked.clear();
+        self.taken.clear();
+        self.considered.clear();
+        self.reached.clear();
+        self.skipped.clear();
+        self.copies.clear();
+        self.uninst = 0;
+        self.bound = 0;
+        self.recording = 0;
+        self.rec.clear();
+        self.inst_log.clear();
+        self.inst_stack.clear();
+    }
+
+    fn run_once(&mut self) {
         for top in self.tops() {
             self.interface_ports(&top);
             self.out.push(format!("$root instance {top} : {top}"));
@@ -473,7 +529,7 @@ impl<'b, 't> Elab<'b, 't> {
         let binds: Vec<NodeRef> = self
             .binds
             .iter()
-            .filter(|(target, list, _)| match list {
+            .filter(|(target, list, _, _)| match list {
                 _ if target == path || path.ends_with(&format!(".{target}")) => true,
                 None => target == def,
                 Some(l) => target == def && l.iter().any(|i| i == path || path.ends_with(&format!(".{i}"))),
