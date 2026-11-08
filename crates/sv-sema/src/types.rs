@@ -921,6 +921,24 @@ impl<'t> Builder<'t> {
         s
     }
 
+    /// `v_t [1:0]` with `v_t` a packed vector (`logic [3:0]`): slang makes
+    /// one packed array of both and prints it without the alias,
+    /// `logic[1:0][3:0]`. None when there are no dimensions after the
+    /// alias or it is not such a vector (a struct, `int`, a scalar keep it).
+    fn merged_vector(&self, dt: NodeRef, scope: usize, env: &Env, outer: &str, depth: usize) -> Option<String> {
+        if outer.is_empty() {
+            return None;
+        }
+        let inner = self.ts(dt, scope, env, true, depth + 1);
+        let at = inner.find('[')?;
+        let base = &inner[..at];
+        let simple = matches!(
+            base,
+            "logic" | "bit" | "reg" | "logic signed" | "bit signed" | "reg signed" | "logic unsigned" | "bit unsigned"
+        );
+        (simple && !inner.contains('$')).then(|| format!("{base}{outer}{}", &inner[at..]))
+    }
+
     /// A data type (or a name standing for one) as slang prints it.
     pub(crate) fn ts(&self, dt: NodeRef, scope: usize, env: &Env, canonical: bool, depth: usize) -> String {
         if depth > 24 {
@@ -998,7 +1016,11 @@ impl<'t> Builder<'t> {
             Some(Found::Typedef(t, s)) => {
                 let name = self.name_of(t).map(|n| n.0).unwrap_or_default();
                 if !canonical {
-                    return format!("{}{name}{}", self.scope_path(s), self.alias_dims(dt, scope, env));
+                    let outer = self.alias_dims(dt, scope, env);
+                    if let Some(v) = self.merged_vector(dt, scope, env, &outer, depth) {
+                        return v;
+                    }
+                    return format!("{}{name}{outer}", self.scope_path(s));
                 }
                 let tenv = self.scope_env(s, env);
                 let inner = self.child(t, DataType);
@@ -1022,7 +1044,11 @@ impl<'t> Builder<'t> {
             Some(Found::Param(default, s)) => {
                 let name = path[path.len() - 1];
                 if !canonical {
-                    return format!("{}{name}{}", self.scope_path(s), self.alias_dims(dt, scope, env));
+                    let outer = self.alias_dims(dt, scope, env);
+                    if let Some(v) = self.merged_vector(dt, scope, env, &outer, depth) {
+                        return v;
+                    }
+                    return format!("{}{name}{outer}", self.scope_path(s));
                 }
                 match env.get(name) {
                     Some(b) => self.ts(b.node, b.scope, &b.env, true, depth + 1),

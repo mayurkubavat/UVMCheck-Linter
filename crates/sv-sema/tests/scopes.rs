@@ -126,6 +126,20 @@ fn packed_dimensions_after_an_alias() {
     let d = types(
         "module m #(parameter N = 2, type T = logic) (input T [N-1:0] a);\n typedef struct packed {logic v;} s_t;\n s_t [3:0] q;\nendmodule\n",
     );
+    let v = types(
+        "module m #(type V = logic [3:0], type E = bit signed [2:0]) (input V [1:0] b, input E [1:0] e);\n typedef logic [3:0] v_t; typedef logic b_t; typedef int i_t;\n v_t [1:0] z; b_t [1:0] w; i_t [1:0] ii; v_t zz;\nendmodule\n",
+    );
+    // A packed vector alias merges with the dimensions after it.
+    for l in [
+        "m net b : logic[1:0][3:0]",
+        "m net e : bit signed[1:0][2:0]",
+        "m variable z : logic[1:0][3:0]",
+        "m variable w : m.b_t[1:0]",
+        "m variable ii : m.i_t[1:0]",
+        "m variable zz : m.v_t",
+    ] {
+        assert!(v.contains(&l.to_string()), "{l} in {v:?}");
+    }
     for l in ["m net a : m.T[1:0]", "m variable q : m.s_t[3:0]"] {
         assert!(d.contains(&l.to_string()), "{l} in {d:?}");
     }
