@@ -19,4 +19,7 @@ sv-sema = { path = "../sv-sema" }
 sv-lexer = { path = "../sv-lexer" }
 sv-syntax = { path = "../sv-syntax" }
 sv-source = { path = "../sv-source" }
+# Waiver, header and naming patterns (src/pattern.rs): bytes, ASCII, no
+# Unicode tables or SIMD literal search; the inputs are one line long.
+regex = { version = "1.13", default-features = false, features = ["std"] }
 

@@ -60,6 +60,7 @@ mod rule_profiles;
 #[allow(dead_code)]
 pub(crate) mod json;
 pub mod options;
+pub mod pattern;
 
 /// A `naming.<target>.pattern` the native naming engine can check, and
 /// whether the target is one it knows.

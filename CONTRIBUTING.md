@@ -217,7 +217,9 @@ longer fires, so the baseline only shrinks. After fixing a false positive, refre
 ## Working on the Rust tools
 
 The Rust workspace (`crates/`, `Cargo.toml` at the root) builds `dv-lint`, `dv-lsp`,
-`dv-build`, `dv-map` and `dv-filelist` on a native front end with no external crates.
+`dv-build`, `dv-map` and `dv-filelist` on a native front end. The one external crate is
+`regex` (in `dv-lint`, for waiver, header and naming patterns; Unicode and SIMD features
+off), behind an ECMAScript check that `tools/gates/regex_gate.py` holds to `std::regex`.
 It needs Rust 1.82 or newer (the MSRV in `Cargo.toml`).
 
 ```bash
