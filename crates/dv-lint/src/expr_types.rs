@@ -874,7 +874,7 @@ type Facts = (
 pub(crate) type CfgDbTypes = HashMap<(usize, NodeId), (bool, Vec<(ETy, String, bool)>)>;
 
 /// Per specialization of the generic class around them: the type and its
-/// matching form of each cast and `$cast` argument there.
+/// matching form of each cast and `$cast` argument and each `new` there.
 pub(crate) type SpecTypes = HashMap<(usize, NodeId), Vec<Option<(ETy, String)>>>;
 
 /// A `uvm_config_db#(T)::set/get` call `n`: None when it is not one, else
@@ -1019,6 +1019,13 @@ fn build_facts(c: &Cst) -> Facts {
                 }
                 CallExpr if kids(tc, n).first().is_some_and(|&f| tc.tree.bare_text(f) == "$cast") => {
                     want.extend(call_args(tc, n).into_iter().take(2));
+                }
+                // `x = new(...)`: the class it makes, per specialization
+                // (UVM-FAC-001 prints it).
+                NewExpr => {
+                    if let Some(p) = tc.parent(n).filter(|&p| tc.kind(p) == BinaryExpr && tc.tok(p, "=").is_some()) {
+                        want.extend(kids(tc, p).first().copied());
+                    }
                 }
                 _ => {}
             }

@@ -46,12 +46,39 @@ pub(crate) fn component_direct_new(c: &Cst, s: &mut Sink) {
             }
             _ => None,
         };
-        let Some((k, name)) = target else { continue };
+        let Some((k, name)) = target else {
+            // `T obj; obj = new(...)` with T a type parameter: slang prints
+            // the parameter (`pkg::cls::T`) in each specialization where it
+            // is a component.
+            for (loc, text) in type_param_targets(c, &classes, &is_component, nx) {
+                s.add(
+                    "UVM-FAC-001",
+                    "UvmComponentDirectNew",
+                    Severity::Error,
+                    format!(
+                        "Direct instantiation of uvm_component '{text}' using new(). Use type_id::create() to enable factory overrides."
+                    ),
+                    loc,
+                );
+            }
+            continue;
+        };
         if !is_component(k) {
             continue;
         }
-        let times = ast_times(c, nx);
-        for _ in 0..times {
+        // The class as slang's `Type::toString()` prints `new`'s type: once
+        // per specialization of a generic class around it, else per visit.
+        let ix = c.index();
+        let lhs = c.parent(nx).filter(|&p| c.kind(p) == BinaryExpr).and_then(|p| c.tree.children(p).next());
+        let per = lhs.and_then(|l| crate::expr_types::spec_types(c).get(&(ix, l)).cloned());
+        let names: Vec<String> = match per {
+            Some(per) => per.iter().flatten().map(|(t, _)| t.text.clone()).collect(),
+            None => {
+                let typed = lhs.and_then(|l| crate::expr_types::expr_types(c).get(&(ix, l)).map(|t| t.text.clone()));
+                vec![typed.unwrap_or(name); ast_times(c, nx)]
+            }
+        };
+        for name in names {
             s.add(
                 "UVM-FAC-001",
                 "UvmComponentDirectNew",
@@ -63,4 +90,35 @@ pub(crate) fn component_direct_new(c: &Cst, s: &mut Sink) {
             );
         }
     }
+}
+
+/// `x = new(...)` where x is declared with a type parameter of the generic
+/// class around it (`T obj`): one finding per specialization in which the
+/// parameter is a component class, named as slang prints the type
+/// (`pkg::cls::T`).
+fn type_param_targets(
+    c: &Cst,
+    classes: &Classes,
+    is_component: &dyn Fn(usize) -> bool,
+    nx: NodeId,
+) -> Vec<(crate::Loc, String)> {
+    let Some(p) = c.parent(nx).filter(|&p| c.kind(p) == BinaryExpr && c.tok(p, "=").is_some()) else {
+        return Vec::new();
+    };
+    let Some(l) = c.tree.children(p).next() else { return Vec::new() };
+    let Some(per) = crate::expr_types::spec_types(c).get(&(c.index(), l)).cloned() else { return Vec::new() };
+    per.iter()
+        .flatten()
+        .filter(|(_, canon)| {
+            let base = canon.split('#').next().unwrap_or("");
+            let base = base.rsplit("::").next().unwrap_or(base);
+            // `new` of a virtual class does not bind, so neither does the
+            // body (uvm_component_registry's default, T = uvm_component).
+            classes.find(base).is_some_and(|k| {
+                (classes.list[k].name == "uvm_component" || is_component(k))
+                    && c.tok(classes.list[k].node, "virtual").is_none()
+            })
+        })
+        .map(|(t, _)| (c.loc_of(nx), t.text.clone()))
+        .collect()
 }

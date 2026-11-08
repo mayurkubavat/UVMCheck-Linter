@@ -1041,3 +1041,23 @@ fn redundant_cast_in_a_body_that_fails_in_the_default_specialization() {
                endclass\n";
     assert_eq!(rule_lines(src, "SV-TYP-008"), vec![4]);
 }
+
+#[test]
+fn component_new_through_a_type_parameter() {
+    // `T obj; obj = new(...)`: once per specialization where T is a
+    // concrete component, named as slang prints the parameter.
+    let src = "class uvm_object; endclass\n\
+               class uvm_component extends uvm_object; function new(string n, uvm_component p); endfunction endclass\n\
+               class my_comp extends uvm_component; function new(string n, uvm_component p); super.new(n, p); endfunction endclass\n\
+               class my_obj extends uvm_object; endclass\n\
+               class reg_t #(type T=uvm_component, string Tname=\"x\");\n\
+               function uvm_component make(string name, uvm_component parent); T obj; obj = new(name, parent); return obj; endfunction\n\
+               endclass\n\
+               class user; reg_t #(my_comp, \"a\") r1; reg_t #(my_obj, \"b\") r2; endclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "UVM-FAC-001").map(|f| f.message).collect();
+    assert_eq!(msgs.len(), 2, "{msgs:?}");
+    assert!(msgs.iter().all(|m| m.contains("uvm_component 'reg_t::T'")), "{msgs:?}");
+}
