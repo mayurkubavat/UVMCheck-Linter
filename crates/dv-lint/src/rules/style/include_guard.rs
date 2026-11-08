@@ -42,5 +42,30 @@ pub(crate) fn include_guard(c: &Cst, s: &mut Sink) {
              By convention, all header files (.svh) must be protected by include guards to prevent multiple inclusion errors."
         ),
         loc,
+    )
+    .fixes
+    .push(guard_fix(c, file, &path, text));
+}
+
+/// Wraps the whole file in `ifndef/`define/`endif as one edit, so the
+/// halves can never be applied apart. Unsafe: a header meant to be included
+/// more than once (to stamp out code per define) stops working.
+fn guard_fix(c: &Cst, file: u32, path: &str, text: &str) -> crate::fix::Fix {
+    let text = text.strip_suffix('\0').unwrap_or(text);
+    let base = std::path::Path::new(path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_default();
+    let name: String =
+        base.chars().map(|ch| if ch.is_ascii_alphanumeric() { ch.to_ascii_uppercase() } else { '_' }).collect();
+    let mut body = text.to_string();
+    if !body.is_empty() && !body.ends_with('\n') {
+        body.push('\n');
+    }
+    let mut f = c.file_fix(
+        file,
+        0,
+        text.len(),
+        format!("`ifndef {name}\n`define {name}\n\n{body}\n`endif // {name}\n"),
+        &format!("Wrap the file in an `ifndef {name} include guard"),
     );
+    f.safety = crate::fix::FixSafety::Unsafe;
+    f
 }

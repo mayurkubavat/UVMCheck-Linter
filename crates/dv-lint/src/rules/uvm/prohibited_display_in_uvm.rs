@@ -50,8 +50,50 @@ pub(crate) fn display_in_uvm(d: &Design, csts: &[Cst], s: &mut Sink) {
                         cls.name
                     ),
                     c.loc(t),
-                );
+                )
+                .fixes
+                .extend(info_fix(c, n, name));
             }
         }
     }
+}
+
+/// `$display("..", args);` as a statement becomes
+/// `` `uvm_info(get_type_name(), $sformatf("..", args), UVM_LOW) ``. Unsafe:
+/// the message now obeys verbosity (UVM_LOW) and report catchers.
+fn info_fix(c: &Cst, call: sv_syntax::NodeId, name: &str) -> Option<crate::fix::Fix> {
+    use sv_syntax::SyntaxKind::*;
+    if name != "$display" {
+        return None;
+    }
+    let stmt = c.parent(call).filter(|&p| c.kind(p) == ExprStmt)?;
+    let first_arg = crate::support::uvm_classes::args(c, call).first().copied().flatten()?;
+    if c.kind(c.strip(first_arg)) != Literal || !c.tree.bare_text(c.strip(first_arg)).starts_with('"') {
+        return None;
+    }
+    let (a, b) = c.tree.token_bounds(stmt)?;
+    let (ca, cb) = c.tree.token_bounds(call)?;
+    let toks = &c.tree.tokens;
+    if [a, b, ca, cb].iter().any(|&t| toks[t as usize].from_macro)
+        || toks[ca as usize].origin.file != toks[cb as usize].origin.file
+    {
+        return None;
+    }
+    let src = c.tree.sources.get(toks[ca as usize].origin.file as usize)?;
+    let text = src.get(
+        toks[ca as usize].origin.offset as usize
+            ..toks[cb as usize].origin.offset as usize + toks[cb as usize].text.len(),
+    )?;
+    let (open, close) = (text.find('(')?, text.rfind(')')?);
+    if close <= open {
+        return None;
+    }
+    let mut f = c.token_fix(
+        a,
+        b,
+        format!("`uvm_info(get_type_name(), $sformatf{}, UVM_LOW)", &text[open..=close]),
+        "Report through `uvm_info",
+    )?;
+    f.safety = crate::fix::FixSafety::Unsafe;
+    Some(f)
 }

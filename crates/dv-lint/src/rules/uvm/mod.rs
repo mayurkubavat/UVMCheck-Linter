@@ -150,7 +150,7 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule {
             id: "UVM-FAC-003",
             name: "UvmFactoryMissingUtils",
-            check: Check::Model(uvm_factory_missing_utils::uvm_factory_missing_utils),
+            check: Check::Mixed(uvm_factory_missing_utils::uvm_factory_missing_utils),
         },
         Rule {
             id: "UVM-FAC-004",
