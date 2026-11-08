@@ -321,6 +321,9 @@ pub(crate) struct Units {
     pub(crate) specs: HashMap<u32, usize>,
     /// Generic class declaration nodes by name, for out-of-block bodies.
     pub(crate) generic_names: HashMap<String, u32>,
+    /// Routines whose body fails to bind in their class's default
+    /// specialization (see [`crate::support::default_spec`]).
+    pub(crate) default_bad: std::collections::HashSet<u32>,
 }
 
 impl Units {
@@ -332,7 +335,8 @@ impl Units {
             .filter(|n| specs.contains_key(&n.0))
             .filter_map(|n| c.tree.child(n, Name).map(|x| (c.tree.bare_text(x), n.0)))
             .collect();
-        Units { times: Self::count(c, false), direct: Self::count(c, true), specs, generic_names }
+        let default_bad = crate::support::default_spec::default_bad_bodies(c);
+        Units { times: Self::count(c, false), direct: Self::count(c, true), specs, generic_names, default_bad }
     }
 
     pub(crate) fn count(c: &Cst, direct_only: bool) -> HashMap<u32, usize> {
@@ -369,15 +373,22 @@ impl Units {
     pub(crate) fn spec_times(&self, c: &Cst, n: NodeId) -> usize {
         let mut k = 1;
         let mut x = Some(n);
+        // The routine around `n` fails to bind in its class's default
+        // specialization: that one does not count.
+        let mut bad_body = false;
         while let Some(y) = x {
             if let Some(&m) = self.specs.get(&y.0) {
-                k *= m;
+                k *= if bad_body { m.saturating_sub(1) } else { m };
+                bad_body = false;
             } else if matches!(c.kind(y), FunctionDecl | TaskDecl) {
+                bad_body = self.default_bad.contains(&y.0);
                 if let Some(nm) = c.tree.child(y, Name) {
                     let toks: Vec<u32> = c.toks(nm).collect();
                     if toks.len() >= 3 && c.text_of(toks[1]) == "::" {
                         if let Some(&g) = self.generic_names.get(c.text_of(toks[0])) {
-                            k *= self.specs.get(&g).copied().unwrap_or(1);
+                            let m = self.specs.get(&g).copied().unwrap_or(1);
+                            k *= if bad_body { m.saturating_sub(1) } else { m };
+                            bad_body = false;
                         }
                     }
                 }

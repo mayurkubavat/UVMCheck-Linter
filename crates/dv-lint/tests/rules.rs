@@ -973,3 +973,28 @@ fn queue_concat_append() {
     // Once per specialization: the default one and c#(byte).
     assert_eq!(rule_lines(src, "SV-PRF-007"), vec![5, 5, 6, 6]);
 }
+
+fn rule_count(src: &str, rule: &str) -> usize {
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    found.iter().filter(|f| f.rule == rule).count()
+}
+
+#[test]
+fn bodies_that_fail_in_the_default_specialization_are_not_walked() {
+    // With T at its default (int), `x == null`, `x = null` and `x.put()`
+    // do not bind, so slang drops those bodies from the default
+    // specialization; `$cast(x, h)` binds, and so does an untouched body.
+    let src = "package p;\n\
+               class H; endclass\n\
+               class E #(type T=int); T x; H h; function void f(); int y; y = 11; $cast(x, h); endfunction endclass\n\
+               class F #(type T=int); T x; function void f(); int y; y = 12; x = null; endfunction endclass\n\
+               class I #(type T=int); typedef T tt; tt x; function void f(); int y; y = 14; if (x == null) y = 1; endfunction endclass\n\
+               class J #(type T=int, type U=T); U x; function void f(); int y; y = 15; if (x != null) y = 1; endfunction endclass\n\
+               class C #(type T=int); T x; function void f(); int y; y = 16; x.put(y); endfunction endclass\n\
+               class N #(type T=int); T x; task f(); int y; y = 19; begin if (x == null) y = 1; end endtask\n\
+               function void g(); int z; z = 20; endfunction endclass\n\
+               endpackage\n";
+    assert_eq!(rule_lines(src, "SV-STY-010"), vec![3, 9]);
+}
