@@ -34,6 +34,13 @@ if [ "$engine" = auto ]; then
                 expect_value=yes ;;
             --explain=*|--changed-since=*|--cache-dir=*|--map=*|--python-rules=*|--strict-new-files|--waiver-report|--report-unused-waivers|--strict-waivers|--clear-cache|--init)
                 ;;
+            # Fix-its. Native fixes match the C++ engine on the corpus;
+            # dv-lint holds back a file only for errors its own front end
+            # finds, so it can still edit a file Slang would reject.
+            --fix-rule)
+                expect_value=yes ;;
+            --fix|--fix-dry-run|--unsafe-fixes|--fix-rule=*)
+                ;;
             +incdir+*|+define+*|+undefine+*|+libext+*|-I*|-D*)
                 ;;
             -*) engine=slang; why=$a; break ;;
