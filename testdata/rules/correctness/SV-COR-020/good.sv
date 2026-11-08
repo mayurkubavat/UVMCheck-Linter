@@ -7,3 +7,10 @@ class compliant_proceduralassignmentassubexpression extends uvm_object;
         super.new(name);
     endfunction
 endclass
+
+// Continuous assignments are standalone assignments, one or several per
+// statement.
+module cor020_assign(input logic a, output logic b, c, d);
+    assign b = a;
+    assign c = a, d = ~a;
+endmodule : cor020_assign

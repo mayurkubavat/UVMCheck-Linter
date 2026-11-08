@@ -24,6 +24,7 @@ public:
 
             bool isStandalone = false;
             if (curr && (curr->kind == slang::syntax::SyntaxKind::ExpressionStatement ||
+                         curr->kind == slang::syntax::SyntaxKind::ContinuousAssign ||
                          curr->kind == slang::syntax::SyntaxKind::ForLoopStatement ||
                          curr->kind == slang::syntax::SyntaxKind::CoverageOption)) {
                 isStandalone = true;

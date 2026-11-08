@@ -14,7 +14,8 @@ pub(crate) fn assignment_sub_expr(c: &Cst, s: &mut Sink) {
             up = c.parent(p);
         }
         let standalone = up.is_some_and(|p| match c.kind(p) {
-            ExprStmt | CoverageOption => true,
+            // `assign a = b, c = d;` is a list of standalone assignments.
+            ExprStmt | CoverageOption | ContinuousAssign => true,
             LoopStmt => c.keyword(p).is_some_and(|k| c.text_of(k) == "for"),
             _ => false,
         });
