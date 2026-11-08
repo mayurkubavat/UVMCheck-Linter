@@ -19,25 +19,68 @@ that both engines are tested against, and parity gates check that their
 findings match on real code. The rule catalog is in
 [docs/rules/README.md](docs/rules/README.md).
 
-## Quick start
+## Install
 
-Requirements: a C++20 compiler (clang 15+, AppleClang 15+ or gcc 12+), CMake
-3.28+, Ninja, Python 3.9+, and a Rust toolchain (1.75+) for the Rust tools.
-`ccache` is recommended.
+Build from source. The Rust tools need only a Rust toolchain (1.82+); the C++
+engine needs a C++20 compiler (clang 15+, AppleClang 15+ or gcc 12+), CMake
+3.28+, Ninja and Python 3.9+, and fetches Slang at configure time. `ccache`
+is recommended.
 
 ```sh
-# uvmcheck (C++)
-cmake --preset default
-cmake --build build -j 4
-build/uvmcheck tb/*.sv -I tb --preset methodology
+git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
+cd UVMCheck-Linter
 
-# The Rust tools: native front end, no C++ build needed
-cargo build --release
-target/release/dv-lint +incdir+tb tb/top.sv
+# dv-lint and the other Rust tools (native front end, no C++ build)
+cargo build --release            # -> target/release/dv-lint, dv-lsp, dv-build, dv-map, dv-filelist
+
+# uvmcheck, the C++ engine on Slang (optional)
+cmake --preset default
+cmake --build build -j 4         # -> build/uvmcheck
 ```
 
-The Rust tools reach Slang only for the parity gates, behind the `slang`
-Cargo feature (off by default); see [third_party/slang](third_party/slang/README.md).
+[`tools/front/uvmcheck`](tools/front/uvmcheck) is a `uvmcheck` command that
+runs dv-lint and falls back to the C++ binary for options dv-lint does not
+take yet; put it (or a link to it) on your `PATH`. Release builds of
+`uvmcheck` and the VS Code extension are attached to tagged
+[releases](https://github.com/mayurkubavat/UVMCheck-Linter/releases).
+
+## Quick start
+
+```sh
+# Lint a testbench with the methodology profile
+uvmcheck tb/*.sv -I tb --preset methodology
+
+# The same with dv-lint directly, as JSON or SARIF for CI
+target/release/dv-lint +incdir+tb tb/top.sv --preset methodology
+target/release/dv-lint -f tb.f --json findings.json --sarif findings.sarif
+
+# Every rule, including experimental ones
+target/release/dv-lint -f tb.f --preset all --experimental
+```
+
+Both engines take simulator-style compile options (`-f`, `+incdir+`,
+`+define+`, `-top`), read `.uvmcheck/` project config, and honor waivers and
+baselines. The Rust tools reach Slang only for the parity gates, behind the
+`slang` Cargo feature (off by default); see
+[third_party/slang](third_party/slang/README.md).
+
+## Rules
+
+409 rules in 20 categories. The largest groups:
+
+| Area | What it catches |
+|---|---|
+| UVM (94) | factory and `config_db` misuse, phasing and objections, sequences, RAL maps and adapters, deprecated API |
+| Style, naming, maintainability (80) | layout, naming conventions, long routines, deep nesting, god classes, magic numbers, duplication |
+| Correctness, concurrency (60) | width mismatches, delta-cycle races, fork/join and clocking pitfalls, unchecked failures |
+| Randomization, coverage, SVA (56) | unchecked `randomize()`, constraint conflicts, coverage that cannot close, vacuous assertions |
+| OOP, architecture (33) | missing `virtual`, unsafe casts, layer violations, coupling and reach-through |
+
+Profiles (`--preset`) pick a set for a purpose, such as `methodology`. The
+generated [rule catalog](docs/rules/README.md) lists every rule with its
+severity, profiles and `bad.sv`/`good.sv` examples, and the
+[UVM Methodology Guide](docs/methodology/README.md) explains the reasoning
+behind the design rules.
 
 The full uvmcheck guide (profiles, fixes, reports, Python rules, baselines,
 waivers, CI) is [docs/guide/uvmcheck.md](docs/guide/uvmcheck.md). The Rust

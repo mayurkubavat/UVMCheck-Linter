@@ -23,7 +23,7 @@ UVMCheck is configured with CMake presets and Ninja job pools to prevent out-of-
 
 ```bash
 # Clone the repository
-git clone https://github.com/<your-org>/UVMCheck-Linter.git
+git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
 cd UVMCheck-Linter
 
 # Configure using Release preset
@@ -214,9 +214,42 @@ longer fires, so the baseline only shrinks. After fixing a false positive, refre
 
 ---
 
+## Working on the Rust tools
+
+The Rust workspace (`crates/`, `Cargo.toml` at the root) builds `dv-lint`, `dv-lsp`,
+`dv-build`, `dv-map` and `dv-filelist` on a native front end with no external crates.
+It needs Rust 1.82 or newer (the MSRV in `Cargo.toml`).
+
+```bash
+cargo build --release              # native only; no C++ build
+cargo test                         # unit and rule tests (default members)
+tools/gates/rust_gate.sh --native  # rule-profile check, cargo fmt --check, Clippy -D warnings
+```
+
+A Rust rule reads the same `testdata/rules/<category>/<RULE_ID>/` cases as its C++
+twin. `rule_profiles.rs` is generated from the catalog
+(`python3 tools/codegen/gen_rule_profiles.py`); the gate fails if it is stale. The
+`slang` Cargo feature, and the parity gates in `tools/gates/` that use it, need the
+C++ model library (`cmake --preset model && cmake --build build-model`); they are not
+required for a pull request that touches only the native engine.
+
+---
+
 ## Pull Request Guidelines
 
-1. **Commit Hygiene**: Ensure code compiles warning-free on Clang and GCC.
-2. **Zero Regressions**: All 450+ unit tests must pass before opening a PR.
+1. **Commit Hygiene**: Ensure code compiles warning-free on Clang and GCC, and that
+   `tools/gates/rust_gate.sh --native` and `cargo test` pass for Rust changes.
+2. **Zero Regressions**: All unit and rule tests must pass before opening a PR.
 3. **Documentation**: Run `tools/codegen/gen_rule_docs.py` after adding a rule or changing its metadata; the [Rule Catalog](docs/rules/README.md) is generated, not edited.
 4. **Automated Fixes**: If your rule supports `--fix`, include test cases verifying the exact textual rewrite output.
+
+## Licensing of contributions
+
+By submitting a contribution you agree that it is licensed under the project's
+[LICENSE](LICENSE), and that you have the right to submit it. Code copied from
+another project must keep its license notice and be listed in
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
+
+## Reporting security issues
+
+Please do not open public issues for vulnerabilities; see [SECURITY.md](SECURITY.md).
