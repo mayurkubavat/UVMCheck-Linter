@@ -13,3 +13,8 @@ class fifo_model;
     return mode == 1;
   endfunction
 endclass
+
+// A counter one bit wide only when its width parameter is 1.
+module fifo_count #(parameter int unsigned UsageWidth = 1) (input logic [UsageWidth-1:0] cnt_q, output logic empty_o);
+  assign empty_o = (cnt_q == 0);
+endmodule

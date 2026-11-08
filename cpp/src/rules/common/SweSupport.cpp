@@ -294,6 +294,79 @@ const Expression& stripConversions(const Expression& expr) {
     return *e;
 }
 
+bool syntaxDependsOnParams(const slang::syntax::SyntaxNode& node, const Scope& scope, int depth) {
+    if (depth > 8) return true;
+    for (size_t i = 0, n = node.getChildCount(); i < n; i++) {
+        if (const auto* kid = node.childNode(i)) {
+            if (syntaxDependsOnParams(*kid, scope, depth)) return true;
+            continue;
+        }
+        const slang::parsing::Token tok = node.childToken(i);
+        if (tok.kind != slang::parsing::TokenKind::Identifier) continue;
+        const Symbol* sym = scope.lookupName(tok.valueText());
+        if (!sym) continue;
+        if (sym->kind == SymbolKind::Parameter || sym->kind == SymbolKind::TypeParameter) return true;
+        if (sym->kind == SymbolKind::TypeAlias) {
+            const auto* syn = sym->getSyntax();
+            const Scope* where = sym->getParentScope();
+            if (syn && where && syn->kind == slang::syntax::SyntaxKind::TypedefDeclaration &&
+                syntaxDependsOnParams(*syn->as<slang::syntax::TypedefDeclarationSyntax>().type, *where, depth + 1))
+                return true;
+        }
+    }
+    return false;
+}
+
+bool declaredTypeDependsOnParams(const Expression& expr) {
+    const Expression& x = stripConversions(expr);
+    if (x.kind != ExpressionKind::NamedValue) return false;
+    const auto& sym = x.as<NamedValueExpression>().symbol;
+    const auto* ts = sym.getDeclaredType()->getTypeSyntax();
+    const Scope* scope = sym.getParentScope();
+    return ts && scope && syntaxDependsOnParams(*ts, *scope);
+}
+
+bool castDependsOnParams(const Expression& e) {
+    // `(T'(x))`: the parentheses' syntax stands for the cast.
+    const slang::syntax::SyntaxNode* syn = e.syntax;
+    while (syn && syn->kind == slang::syntax::SyntaxKind::ParenthesizedExpression)
+        syn = syn->as<slang::syntax::ParenthesizedExpressionSyntax>().expression;
+    if (e.kind != ExpressionKind::Conversion || !syn || syn->kind != slang::syntax::SyntaxKind::CastExpression)
+        return false;
+    const auto& conv = e.as<ConversionExpression>();
+    const auto& left = *syn->as<slang::syntax::CastExpressionSyntax>().left;
+    // The operand declared with the type written: redundant for every parameter value.
+    const Expression* op = &conv.operand();
+    while (op->kind == ExpressionKind::Conversion && op->as<ConversionExpression>().isImplicit())
+        op = &op->as<ConversionExpression>().operand();
+    if (op->kind == ExpressionKind::NamedValue) {
+        const auto* ts = op->as<NamedValueExpression>().symbol.getDeclaredType()->getTypeSyntax();
+        if (ts && normalizedText(ts) == normalizedText(&left)) return false;
+    }
+    const Type* t = conv.type;
+    if (t && t->isAlias()) {
+        // A typedef: its definition decides; a type parameter's alias always depends.
+        const auto* syn = t->getSyntax();
+        const Scope* where = t->getParentScope();
+        if (syn && where && syn->kind == slang::syntax::SyntaxKind::TypedefDeclaration)
+            return syntaxDependsOnParams(*syn->as<slang::syntax::TypedefDeclarationSyntax>().type, *where);
+        return true;
+    }
+    // A size cast by a name or an expression of names (`W'(x)`, `(W+1)'(x)`); keywords
+    // (`signed'`, `int'`) and literal sizes (`4'(x)`) are fixed.
+    std::function<bool(const slang::syntax::SyntaxNode&)> named = [&](const slang::syntax::SyntaxNode& n) {
+        for (size_t i = 0, k = n.getChildCount(); i < k; i++) {
+            if (const auto* kid = n.childNode(i)) {
+                if (named(*kid)) return true;
+            } else if (n.childToken(i).kind == slang::parsing::TokenKind::Identifier) {
+                return true;
+            }
+        }
+        return false;
+    };
+    return named(left);
+}
+
 const Symbol* referencedSymbol(const Expression& expr) {
     const Expression& e = stripConversions(expr);
     switch (e.kind) {

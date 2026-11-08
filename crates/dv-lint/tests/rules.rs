@@ -877,8 +877,11 @@ fn unreferenced_parameter() {
                function int f(); return M; endfunction\n\
                endclass\n\
                class user; box#(byte, 4) b; endclass\n";
-    // A dimension is not a reference; `int N` after `type T` is a value parameter.
-    assert_eq!(rule_lines(src, "SV-DED-012"), vec![1]);
+    // A dimension is a reference (`items[N]`), as `return M` is; `int N`
+    // after `type T` is a value parameter.
+    assert_eq!(rule_lines(src, "SV-DED-012"), Vec::<u32>::new());
+    let unused = "class box #(int N = 2, int M = 3); int items[N]; endclass\n";
+    assert_eq!(rule_lines(unused, "SV-DED-012"), vec![1], "M is never used");
 }
 
 #[test]

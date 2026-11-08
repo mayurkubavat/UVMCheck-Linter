@@ -1544,7 +1544,6 @@
   ],
   "deadcode/SV-DED-015/bad.sv": [
     "SV-DED-012@4",
-    "SV-DED-012@4",
     "SV-STY-005@8",
     "SV-STY-005@9",
     "SV-STY-005@16",
@@ -1558,7 +1557,6 @@
     "UVM-FAC-003@11"
   ],
   "deadcode/SV-DED-015/good.sv": [
-    "SV-DED-012@4",
     "SV-STY-005@8",
     "SV-STY-005@9",
     "SV-STY-005@16",
@@ -2778,7 +2776,6 @@
     "SV-TIM-002@19"
   ],
   "methodology/SV-CNS-001/good.sv": [
-    "SV-DED-012@13",
     "SV-STY-005@24",
     "SV-STY-005@25",
     "SV-STY-010@13",
@@ -7431,6 +7428,8 @@
   "types/SV-TYP-008/good.sv": [
     "SV-STY-005@8",
     "SV-STY-005@9",
+    "SV-STY-010@14",
+    "SV-STY-010@15",
     "SV-STY-104@8",
     "SV-STY-104@9",
     "UVM-FAC-003@5"

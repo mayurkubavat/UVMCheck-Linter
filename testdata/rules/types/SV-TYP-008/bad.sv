@@ -15,3 +15,10 @@ class RedundantCastBench;
         void'($cast(p1, p2));
     endfunction : test_redundant_cast
 endclass : RedundantCastBench
+
+// The operand is declared with the very type the cast names: redundant for
+// every parameter value.
+module param_cast_same_type #(parameter type data_t = logic) (input data_t d_i, output data_t d_o);
+    // VIOLATION SV-TYP-008: d_i is already a data_t.
+    assign d_o = data_t'(d_i);
+endmodule

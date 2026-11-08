@@ -1,5 +1,6 @@
 #include "uvmcheck/rules/Rule.h"
 #include "uvmcheck/rules/RuleRegistry.h"
+#include "uvmcheck/rules/SweSupport.h"
 #include "slang/ast/ASTVisitor.h"
 #include "slang/ast/expressions/CallExpression.h"
 #include "slang/ast/expressions/ConversionExpression.h"
@@ -48,7 +49,8 @@ public:
                 op = &op->as<slang::ast::ConversionExpression>().operand();
             }
 
-            if (op->type && conv.type->isMatching(*op->type)) {
+            // Redundant only for some parameter values: not for the code as written.
+            if (op->type && conv.type->isMatching(*op->type) && !swe::castDependsOnParams(conv)) {
                 diags.addViolation(
                     "SV-TYP-008",
                     "RedundantCastToSameType",

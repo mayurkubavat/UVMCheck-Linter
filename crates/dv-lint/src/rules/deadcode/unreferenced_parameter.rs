@@ -198,17 +198,24 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
                 declare(nm, &mut decls);
             }
         }
-        // Names slang binds as values: not in types, dimensions or the
-        // headers of generate constructs (elaboration evaluates those).
+        // Names slang binds as values, plus those in dimensions and the
+        // headers of generate constructs (elaboration evaluates those: a width
+        // parameter used only in `logic [W-1:0]` is referenced). Not names in
+        // other parts of types.
         let mut roots: HashMap<NodeId, bool> = HashMap::new();
         for e in tc.nodes(NameExpr).into_iter().chain(tc.nodes(ScopedExpr)) {
             if tc.kind(e) == NameExpr && tc.parent(e).is_some_and(|p| tc.kind(p) == ScopedExpr) {
                 continue;
             }
             let mut skip = false;
+            let mut evaluated = false;
             let mut x = e;
             while let Some(p) = tc.parent(x) {
                 match tc.kind(p) {
+                    Dim => {
+                        evaluated = true;
+                        break;
+                    }
                     // Parameter values of an instantiation or a base class are bound.
                     DataType
                         if tc.parent(p).is_some_and(|q| {
@@ -219,13 +226,13 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
                                         tc.kind(r) == ParamDecl && tc.toks(r).any(|k| tc.text_of(k) == "type")
                                     }))
                         }) => {}
-                    DataType | Dim => {
+                    DataType => {
                         skip = true;
                         break;
                     }
                     // The header, not the generated blocks.
                     IfGenerate | CaseGenerate | LoopGenerate if !matches!(tc.kind(x), GenerateBlock | ElseClause) => {
-                        skip = true;
+                        evaluated = true;
                         break;
                     }
                     _ => {}
@@ -233,6 +240,11 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
                 x = p;
             }
             if skip {
+                continue;
+            }
+            let name = if tc.kind(e) == ScopedExpr { tc.last_text(e).to_string() } else { tc.tree.bare_text(e) };
+            if evaluated {
+                referenced.insert(name);
                 continue;
             }
             // Not in what elaboration skips, nor what slang could not bind.
@@ -245,7 +257,6 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
             {
                 continue;
             }
-            let name = if tc.kind(e) == ScopedExpr { tc.last_text(e).to_string() } else { tc.tree.bare_text(e) };
             referenced.insert(name);
         }
     }

@@ -1,8 +1,13 @@
 //! SV-TYP-008 (RedundantCastToSameType): Flags dynamic '$cast' calls or static
 //! type casts where the source and destination already have identical static
 //! types.
+//!
+//! A cast whose type or size depends on parameters is not redundant for the
+//! code as written, even where one specialization makes it so (see
+//! `support::param_dep`), unless the operand is declared with that type.
 
 use crate::support::config_db_calls::{in_generate_header, strip_parens};
+use crate::support::param_dep::{declared_as, depends_on_params};
 use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
@@ -67,6 +72,12 @@ pub(crate) fn redundant_cast(c: &Cst, out: &mut Sink) {
         let Some(&inner) = ks.get(1) else { continue };
         let inner = strip_parens(c, inner);
         if in_generate_header(c, e) {
+            continue;
+        }
+        // `idx_t'(sel)`, `Width'(x)`: redundant only for some parameter
+        // values, unless the operand is declared with that very type.
+        let target = ks[0];
+        if depends_on_params(c, e, target) && !declared_as(c, inner, target) {
             continue;
         }
         let Some(t) = c.first_tok(e) else { continue };

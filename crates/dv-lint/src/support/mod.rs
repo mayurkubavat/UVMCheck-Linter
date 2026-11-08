@@ -27,6 +27,7 @@ pub(crate) mod literal_values;
 pub(crate) mod literals;
 pub(crate) mod names;
 pub(crate) mod overrides;
+pub(crate) mod param_dep;
 pub(crate) mod procedural;
 pub(crate) mod real_types;
 pub(crate) mod routine_bodies;

@@ -3,6 +3,10 @@
     {
       "rule": "SV-TYP-008",
       "line": 15
+    },
+    {
+      "rule": "SV-TYP-008",
+      "line": 23
     }
   ]
 }

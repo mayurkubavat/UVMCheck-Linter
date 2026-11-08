@@ -61,6 +61,10 @@ pub(crate) fn redundant_boolean(c: &Cst, out: &mut Sink) {
         if !types.get(&(ix, o)).and_then(|t| t.integral).is_some_and(|(w, ..)| w == 1) {
             continue;
         }
+        // One bit only for some parameter values (`logic [W-1:0] cnt`).
+        if crate::support::param_dep::width_depends_on_params(c, o) {
+            continue;
+        }
         if in_generate_header(c, e) {
             continue;
         }

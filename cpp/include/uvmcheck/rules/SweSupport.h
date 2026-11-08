@@ -84,6 +84,20 @@ slang::SourceLocation locOf(const slang::ast::Expression& expr);
 /// Strips conversions and parentheses-like wrappers.
 const slang::ast::Expression& stripConversions(const slang::ast::Expression& expr);
 
+/// Some identifier in `node`, looked up from `scope`, is a parameter, a type parameter
+/// or a typedef whose definition depends on one. A fact about one specialization of such
+/// a type (its width, that it matches another type) is not a fact about the code as
+/// written; the native engine's support/param_dep.rs is the same test.
+bool syntaxDependsOnParams(const slang::syntax::SyntaxNode& node, const slang::ast::Scope& scope, int depth = 0);
+
+/// The declared type of the variable `expr` names (not a select of it) depends on parameters.
+bool declaredTypeDependsOnParams(const slang::ast::Expression& expr);
+
+/// An explicit cast whose type or size depends on parameters (`idx_t'(x)` with
+/// `idx_t = logic [W-1:0]`, `W'(x)`), unless its operand is a name declared with that
+/// very type (`data_t'(d)` on `data_t d`).
+bool castDependsOnParams(const slang::ast::Expression& conv);
+
 /// The variable or member symbol an lvalue/rvalue expression ultimately names, if simple.
 const slang::ast::Symbol* referencedSymbol(const slang::ast::Expression& expr);
 

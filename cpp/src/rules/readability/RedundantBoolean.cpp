@@ -26,7 +26,8 @@ int boolLiteral(const Expression& e) {
 
 bool isOneBit(const Expression& e) {
     const Expression& x = swe::stripConversions(e);
-    return x.type && x.type->isIntegral() && x.type->getBitWidth() == 1;
+    // One bit only for some parameter values (`logic [W-1:0] cnt`): not reported.
+    return x.type && x.type->isIntegral() && x.type->getBitWidth() == 1 && !swe::declaredTypeDependsOnParams(x);
 }
 
 const Statement* unwrap(const Statement& s) {
