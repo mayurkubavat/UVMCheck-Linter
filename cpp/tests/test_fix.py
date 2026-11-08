@@ -350,6 +350,22 @@ def main():
               helper.rstrip().endswith("`endif // HELPER_SVH") and "endclass : helper_c" in helper,
               "--unsafe-fixes wraps the header in a guard, and the end label fix also lands", helper)
 
+    with tempfile.TemporaryDirectory() as tmp:
+        # SV-PRF-007: each queue append gets its push_back/push_front fix, including an item
+        # that is implicitly converted; the nonblocking one only with --unsafe-fixes.
+        qd = Path(tmp)
+        (qd / "top.sv").write_text(
+            "module q_top;\n  int q[$]; byte b; int x;\n  initial begin\n"
+            "    q = {q, x};\n    q = {x + 1, q};\n    q = {q, b};\n    q <= {q, x};\n  end\nendmodule\n")
+        run(binary, qd, "--fix", "--fix-rule", "SV-PRF-007")
+        text = (qd / "top.sv").read_text()
+        check("q.push_back(x);" in text and "q.push_front(x + 1);" in text and "q.push_back(b);" in text,
+              "SV-PRF-007 fixes every append, with no stray space, also for a converted item", text)
+        check("q <= {q, x};" in text, "the nonblocking append is unsafe: plain --fix leaves it", text)
+        run(binary, qd, "--fix", "--unsafe-fixes", "--fix-rule", "SV-PRF-007")
+        text = (qd / "top.sv").read_text()
+        check("{q" not in text, "--unsafe-fixes rewrites the nonblocking append too", text)
+
     if failures:
         print(f"{len(failures)} check(s) failed")
         return 1

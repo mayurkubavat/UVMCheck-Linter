@@ -33,13 +33,24 @@ public:
                         if (isPushBack || isPushFront) {
                             std::string methodName = isPushBack ? "push_back" : "push_front";
                             const auto* itemExpr = isPushBack ? operands[1] : operands[0];
+                            // An item of another type ('byte' into an 'int' queue) is an implicit
+                            // conversion, which has no syntax of its own: use its operand's.
+                            while (!itemExpr->syntax && itemExpr->kind == slang::ast::ExpressionKind::Conversion)
+                                itemExpr = &itemExpr->as<slang::ast::ConversionExpression>().operand();
 
                             std::vector<core::FixItHint> fixIts;
                             if (assign.sourceRange.start().valid() && itemExpr->syntax) {
+                                // toString() keeps the token's leading trivia: "{q, x}" gives " x".
                                 std::string itemText = std::string(itemExpr->syntax->toString());
+                                auto first = itemText.find_first_not_of(" \t\r\n");
+                                auto last = itemText.find_last_not_of(" \t\r\n");
+                                itemText = first == std::string::npos ? "" : itemText.substr(first, last - first + 1);
                                 if (!itemText.empty()) {
                                     std::string replacement = std::string(lhsSym->name) + "." + methodName + "(" + itemText + ")";
-                                    fixIts.push_back({assign.sourceRange, replacement, "Replace concatenation with " + methodName + "()"});
+                                    core::FixItHint fix{assign.sourceRange, replacement, "Replace concatenation with " + methodName + "()"};
+                                    // 'q <= {q, x}' updates q in the NBA region; push_back() updates it now.
+                                    if (assign.isNonBlocking()) fix.safety = core::FixSafety::Unsafe;
+                                    fixIts.push_back(std::move(fix));
                                 }
                             }
 
