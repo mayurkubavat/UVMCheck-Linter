@@ -9,7 +9,7 @@ fn repo() -> PathBuf {
 fn load(example: &str) -> Design {
     let r = repo();
     Design::load([
-        format!("+incdir+{}", r.join("tests/common").display()),
+        format!("+incdir+{}", r.join("testdata/common").display()),
         r.join(example).display().to_string(),
     ])
     .expect("design loads")
@@ -17,7 +17,7 @@ fn load(example: &str) -> Design {
 
 #[test]
 fn reads_a_component_with_a_static_member() {
-    let d = load("tests/rules/oop/SV-OOP-007/bad.sv");
+    let d = load("testdata/rules/oop/SV-OOP-007/bad.sv");
     assert_eq!(d.compile_errors(), 0);
     let c = d.find_class("MultiChannelMonitor").expect("class in model");
     assert_eq!(c.uvm, UvmKind::Component);
@@ -31,7 +31,7 @@ fn reads_a_component_with_a_static_member() {
 
 #[test]
 fn reads_sequence_methods() {
-    let d = load("tests/rules/oop/UVM-SEQ-002/bad.sv");
+    let d = load("testdata/rules/oop/UVM-SEQ-002/bad.sv");
     let seqs: Vec<_> = d.classes().iter().filter(|c| c.uvm == UvmKind::Sequence && !c.name.starts_with("uvm_")).collect();
     assert!(!seqs.is_empty());
     assert!(seqs.iter().any(|c| c.methods.iter().any(|m| m.name == "pre_body" || m.name == "post_body")));
@@ -46,7 +46,7 @@ fn reports_unreadable_sources() {
 
 #[test]
 fn parameterized_bases_are_in_the_model() {
-    let d = load("tests/map/map_tb.sv");
+    let d = load("testdata/map/map_tb.sv");
     let drv = d.find_class("my_drv").expect("driver");
     assert_eq!(drv.uvm, UvmKind::Driver);
     let base = d.class(drv.base.expect("base resolved to the parameterized definition"));
@@ -59,7 +59,7 @@ fn parameterized_bases_are_in_the_model() {
 
 #[test]
 fn reads_arguments_locals_constraints_and_extern_methods() {
-    let d = load("tests/model/facts.sv");
+    let d = load("testdata/model/facts.sv");
     assert_eq!(d.compile_errors(), 0);
     let c = d.find_class("facts_item").expect("class in model");
     assert_eq!(c.uvm, UvmKind::SequenceItem);

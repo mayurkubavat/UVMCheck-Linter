@@ -48,7 +48,7 @@ def main():
                        + glob.glob(os.path.join(REPO, 'examples/**/*.sv*'), recursive=True))
         bad = 0
         for f in files:
-            a, b = both(['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'tests/common'),
+            a, b = both(['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'testdata/common'),
                          '+incdir+' + os.path.dirname(f), f])
             if a != b:
                 bad += 1

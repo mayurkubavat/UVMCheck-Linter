@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
---map: the testbench map built from tests/map/map_tb.sv (test > env > agent
+--map: the testbench map built from testdata/map/map_tb.sv (test > env > agent
 > driver/monitor, scoreboard) has the right tree, the TLM connection split
 into source and target, the unconnected port, config_db flows with the
 unmatched get and the unread set, and findings attached to components; the
@@ -31,7 +31,7 @@ def main():
     ap.add_argument("--binary", default=str(REPO / "build" / "uvmcheck"))
     binary = str(Path(ap.parse_args().binary).resolve())
     with tempfile.TemporaryDirectory() as tmp:
-        base = [binary, "--no-config", str(REPO / "tests/map/map_tb.sv"), "-I", str(REPO / "tests/common")]
+        base = [binary, "--no-config", str(REPO / "testdata/map/map_tb.sv"), "-I", str(REPO / "testdata/common")]
         subprocess.run(base + ["--map", "map.json"], cwd=tmp, capture_output=True)
         subprocess.run(base + ["--map", "map.html"], cwd=tmp, capture_output=True)
         data = json.loads(Path(tmp, "map.json").read_text())

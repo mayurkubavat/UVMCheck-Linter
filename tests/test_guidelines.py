@@ -19,7 +19,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 DOCS = REPO / "docs" / "methodology"
-COMMON = REPO / "tests" / "common"
+COMMON = REPO / "testdata" / "common"
 
 failures = []
 

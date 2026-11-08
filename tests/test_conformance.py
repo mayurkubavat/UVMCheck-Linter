@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-IEEE 1800-2023 conformance corpus (tests/conformance/, docs/conformance.md).
+IEEE 1800-2023 conformance corpus (testdata/conformance/, docs/conformance.md).
 
 Every clause of the LRM from 5 to 35, and the 2023 additions, has a probe file
 of legal SystemVerilog (or is marked out of scope in clauses.json). Each probe
@@ -23,7 +23,7 @@ from collections import Counter
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
-CORPUS = REPO / "tests" / "conformance"
+CORPUS = REPO / "testdata" / "conformance"
 
 
 def main():

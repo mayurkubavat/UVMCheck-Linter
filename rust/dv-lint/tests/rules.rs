@@ -310,10 +310,10 @@ fn uvm_and_ral_rules_on_fixtures() {
     ];
     for id in ids {
         let area = if id == "UVM-RAL-001" { "oop" } else { "uvm" };
-        let dir = root.join("tests/rules").join(area).join(id);
+        let dir = root.join("testdata/rules").join(area).join(id);
         let json = std::fs::read_to_string(dir.join("expect.json")).unwrap();
         let args = [
-            format!("+incdir+{}", root.join("tests/common").display()),
+            format!("+incdir+{}", root.join("testdata/common").display()),
             dir.join("bad.sv").display().to_string(),
         ];
         let (d, trees) = sv_sema::load_with_trees(&args).unwrap();
@@ -386,7 +386,7 @@ fn group_g_rules() {
 /// as often as the C++ rule does.
 #[test]
 fn concurrency_sva_coverage_rules() {
-    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../tests");
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata");
     let cases = [
         ("SV-CNC-002", "concurrency/SV-CNC-002", 1),
         ("SV-CNC-003", "concurrency/SV-CNC-003", 2),

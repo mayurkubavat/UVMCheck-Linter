@@ -262,7 +262,7 @@ def main():
         # UVM fixes: factory registration, super.<phase>(), $display to `uvm_info. All unsafe.
         uv = Path(tmp, "uvm")
         uv.mkdir()
-        common = str(Path(__file__).resolve().parent / "common")
+        common = str(Path(__file__).resolve().parent.parent / "testdata" / "common")
         (uv / "top.sv").write_text(UVM_TOP)
         uvm_rules = "UVM-FAC-003,UVM-PHS-001,UVM-LOG-002"
         res = run(binary, uv, "-I", common, "--fix", "--fix-rule", uvm_rules)

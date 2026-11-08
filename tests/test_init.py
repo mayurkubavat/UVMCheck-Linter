@@ -35,7 +35,7 @@ def check(cond, msg, detail=""):
 def make_project(root: Path):
     agents = root / "tb" / "agents"
     agents.mkdir(parents=True)
-    shutil.copy(REPO / "tests" / "common" / "uvm_mock.svh", root / "tb" / "uvm_mock.svh")
+    shutil.copy(REPO / "testdata" / "common" / "uvm_mock.svh", root / "tb" / "uvm_mock.svh")
     pkg = ['`include "uvm_mock.svh"']
     for a in ["axi", "apb", "spi"]:
         (agents / f"{a}_item.svh").write_text(

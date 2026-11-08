@@ -175,7 +175,7 @@ score a candidate before it runs by default.
 
 ### 4. Create Paired Unit Tests
 Every rule in UVMCheck **must** have paired `bad.sv` and `good.sv` test cases plus an `expect.json`:
-1. Create directory `tests/rules/<category>/<RULE_ID>/`.
+1. Create directory `testdata/rules/<category>/<RULE_ID>/`.
 2. Add `bad.sv` containing an isolated violation that should trigger the rule.
 3. Add `good.sv` containing the compliant implementation that should pass cleanly without warnings.
 4. Add `expect.json` listing every finding `bad.sv` must produce, by rule and line:
@@ -191,7 +191,7 @@ The runner reads findings from the linter's `--json` report and compile errors f
 slang's `--diag-json`. It has three suites, all of which run in CI:
 
 ```bash
-# 1. Isolated: only the rule under test, against the UVM stub (tests/common/uvm_mock.svh)
+# 1. Isolated: only the rule under test, against the UVM stub (testdata/common/uvm_mock.svh)
 python3 tests/regression.py --rule <RULE_ID>
 
 # 2. All rules enabled, against the UVM stub

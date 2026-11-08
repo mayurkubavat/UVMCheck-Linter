@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Generates the data behind `uvmcheck --explain RULE`: each rule's tested
-example (tests/rules/<category>/<ID>/bad.sv and good.sv) and the options it
+example (testdata/rules/<category>/<ID>/bad.sv and good.sv) and the options it
 reads (found in the rule sources), as a C++ source file compiled into the
 binary. Run by CMake at build time:
 
@@ -32,12 +32,12 @@ def main():
     repo = Path(args.repo)
 
     examples = {}
-    for case in sorted((repo / "tests" / "rules").glob("*/*")):
+    for case in sorted((repo / "testdata" / "rules").glob("*/*")):
         if not case.is_dir():
             continue
         bad, good = case / "bad.sv", case / "good.sv"
         examples[case.name] = (
-            f"tests/rules/{case.parent.name}/{case.name}",
+            f"testdata/rules/{case.parent.name}/{case.name}",
             bad.read_text(errors="replace") if bad.exists() else "",
             good.read_text(errors="replace") if good.exists() else "",
         )

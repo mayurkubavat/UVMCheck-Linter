@@ -47,7 +47,7 @@ def main():
 
     # IDs that rule tests expect must be declared in the catalog.
     known = {r["id"] for r in rules}
-    for expect in (REPO / "tests" / "rules").glob("*/*/expect.json"):
+    for expect in (REPO / "testdata" / "rules").glob("*/*/expect.json"):
         for findings in json.loads(expect.read_text()).values():
             for f in findings:
                 if f["rule"] not in known:

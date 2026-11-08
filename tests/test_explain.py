@@ -25,11 +25,11 @@ def main():
 
     r = run("--explain", "SV-DUP-002")
     out = r.stdout
-    bad = (REPO / "tests/rules/methodology/SV-DUP-002/bad.sv").read_text().splitlines()[1]
+    bad = (REPO / "testdata/rules/methodology/SV-DUP-002/bad.sv").read_text().splitlines()[1]
     check(r.returncode == 0 and "CloneFragments" in out, "rule found by ID", out)
     check("MG-7.1" in out, "guideline listed", out)
     check("min_tokens = 50" in out, "option and its default listed", out)
-    check("tests/rules/methodology/SV-DUP-002/bad.sv" in out and bad.strip() in out, "tested bad example shown", out)
+    check("testdata/rules/methodology/SV-DUP-002/bad.sv" in out and bad.strip() in out, "tested bad example shown", out)
     check("good.sv" in out, "good example shown", out)
 
     r = run("--explain", "CloneFragments")

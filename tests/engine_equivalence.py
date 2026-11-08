@@ -7,7 +7,7 @@ Runs every input with all rules enabled under the reference engine
 single-pass parallel engine at several thread counts, and asserts that the
 findings are identical.
 
-By default the inputs are every tests/rules/*/*/{bad,good}.sv file. Extra
+By default the inputs are every testdata/rules/*/*/{bad,good}.sv file. Extra
 inputs (for example a real UVM library) can be passed with --extra:
 
     tests/engine_equivalence.py --extra "uvm-core/src/uvm_pkg.sv -I uvm-core/src"
@@ -70,8 +70,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--binary", default="build/uvmcheck")
-    parser.add_argument("--rules-dir", default="tests/rules")
-    parser.add_argument("--common-dir", default="tests/common")
+    parser.add_argument("--rules-dir", default="testdata/rules")
+    parser.add_argument("--common-dir", default="testdata/common")
     parser.add_argument("--threads", default="1,4",
                         help="comma-separated thread counts for the single-pass engine")
     parser.add_argument("--extra", action="append", default=[],

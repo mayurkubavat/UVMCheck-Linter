@@ -2,7 +2,7 @@
 """
 UVMCheck Per-Rule Test Runner
 
-Each rule has a folder tests/rules/<category>/<RULE-ID>/ holding:
+Each rule has a folder testdata/rules/<category>/<RULE-ID>/ holding:
   bad.sv       must trigger the rule
   good.sv      must not trigger the rule
   expect.json  the exact (rule, line) findings bad.sv must produce
@@ -22,11 +22,11 @@ Modes:
              reported as stale so the baseline only ever shrinks.
 
 UVM library:
-  By default tests compile against the stub in tests/common/uvm_mock.svh. With
+  By default tests compile against the stub in testdata/common/uvm_mock.svh. With
   --uvm-home <uvm-core checkout> they compile against the real Accellera library
-  instead: uvm_pkg.sv is added as a source and tests/common/real_uvm/uvm_mock.svh
+  instead: uvm_pkg.sv is added as a source and testdata/common/real_uvm/uvm_mock.svh
   replaces the stub with `include "uvm_macros.svh" + import uvm_pkg::*. Both
-  include tests/common/test_fixtures.svh for the non-UVM helpers tests share.
+  include testdata/common/test_fixtures.svh for the non-UVM helpers tests share.
 
 Compile errors (from slang's --diag-json) are tracked as pseudo-findings named
 COMPILE:<code> in the all-rules baselines, so a test file that newly stops
@@ -56,6 +56,7 @@ BOLD = "\033[1m"
 RESET = "\033[0m"
 
 TESTS_DIR = Path(__file__).resolve().parent
+DATA_DIR = Path(__file__).resolve().parent.parent / "testdata"
 EXPECT_FILE = "expect.json"
 
 
@@ -94,7 +95,7 @@ class Linter:
         if self.uvm_home:
             uvm_src = self.uvm_home / "src"
             cmd += [str(uvm_src / "uvm_pkg.sv"), str(sv_file),
-                    "-I", str(TESTS_DIR / "common" / "real_uvm"), "-I", str(uvm_src),
+                    "-I", str(DATA_DIR / "common" / "real_uvm"), "-I", str(uvm_src),
                     "-I", str(self.common_dir)]
         else:
             cmd += [str(sv_file), "-I", str(self.common_dir)]
@@ -274,8 +275,8 @@ def main():
     parser.add_argument("-j", "--jobs", type=int, default=os.cpu_count() or 1,
                         help="Parallel linter processes")
     parser.add_argument("-v", "--verbose", action="store_true", help="Show passing tests and linter output")
-    parser.add_argument("--rules-dir", default=str(TESTS_DIR / "rules"), help="Path to tests/rules directory")
-    parser.add_argument("--common-dir", default=str(TESTS_DIR / "common"), help="Path to tests/common include directory")
+    parser.add_argument("--rules-dir", default=str(DATA_DIR / "rules"), help="Path to testdata/rules directory")
+    parser.add_argument("--common-dir", default=str(DATA_DIR / "common"), help="Path to testdata/common include directory")
     args = parser.parse_args()
 
     binary = find_uvmcheck_binary(args.binary)

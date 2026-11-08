@@ -181,7 +181,7 @@ def test_project(binary, workdir):
     (proj / "tb_pkg.sv").write_text(PKG)
     (proj / ".uvmcheck" / "config.json").write_text(json.dumps({
         "sources": ["tb_pkg.sv"],
-        "include_dirs": [".", str(ROOT / "tests" / "common")],
+        "include_dirs": [".", str(ROOT / "testdata" / "common")],
     }))
 
     # Start outside the project: the config is found from the workspace root.

@@ -74,9 +74,9 @@ file(GLOB_RECURSE UVMCHECK_SOURCES
 
 find_package(Python3 COMPONENTS Interpreter REQUIRED)
 # --explain data: each rule's tested bad/good example and its options, generated from
-# tests/rules/ and the rule sources so the examples shown are the ones the tests run.
+# testdata/rules/ and the rule sources so the examples shown are the ones the tests run.
 file(GLOB_RECURSE UVMCHECK_RULE_EXAMPLES CONFIGURE_DEPENDS
-    ${CMAKE_CURRENT_SOURCE_DIR}/tests/rules/*.sv)
+    ${CMAKE_CURRENT_SOURCE_DIR}/testdata/rules/*.sv)
 file(GLOB_RECURSE UVMCHECK_RULE_SOURCES CONFIGURE_DEPENDS
     ${CMAKE_CURRENT_SOURCE_DIR}/src/rules/*.cpp ${CMAKE_CURRENT_SOURCE_DIR}/src/style/*.cpp)
 set(UVMCHECK_RULE_EXTRAS ${CMAKE_CURRENT_BINARY_DIR}/generated/RuleExtras.cpp)
@@ -203,7 +203,7 @@ add_test(
     NAME ast_coverage_floor_test
     COMMAND ${Python3_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/scripts/ast_coverage.py
             --slang-include ${slang_SOURCE_DIR}/include
-            --floor ${CMAKE_CURRENT_SOURCE_DIR}/tests/conformance/ast_coverage_floor.json
+            --floor ${CMAKE_CURRENT_SOURCE_DIR}/testdata/conformance/ast_coverage_floor.json
     WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
 )
 add_test(
@@ -316,9 +316,9 @@ if(UVMCHECK_BUILD_MODEL_LIB)
     target_link_libraries(model_capi_smoke PRIVATE uvmcheck_model)
     add_test(
         NAME model_capi_test
-        COMMAND model_capi_smoke ${CMAKE_CURRENT_SOURCE_DIR}/tests/common
-                ${CMAKE_CURRENT_SOURCE_DIR}/tests/rules/oop/SV-OOP-007/bad.sv
-                ${CMAKE_CURRENT_SOURCE_DIR}/tests/model/facts.sv
+        COMMAND model_capi_smoke ${CMAKE_CURRENT_SOURCE_DIR}/testdata/common
+                ${CMAKE_CURRENT_SOURCE_DIR}/testdata/rules/oop/SV-OOP-007/bad.sv
+                ${CMAKE_CURRENT_SOURCE_DIR}/testdata/model/facts.sv
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
     )
     # The Python binding (python/uvmcheck/model.py) over the same ABI.

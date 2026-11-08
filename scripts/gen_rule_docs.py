@@ -27,7 +27,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 RULES_DOCS = REPO / "docs" / "rules"
 GUIDE_DOCS = REPO / "docs" / "methodology"
-TESTS = REPO / "tests" / "rules"
+TESTS = REPO / "testdata" / "rules"
 
 
 def run_json(binary, *args):

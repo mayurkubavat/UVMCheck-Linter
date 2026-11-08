@@ -20,7 +20,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 CASES = REPO / "tests" / "python_rules" / "cases"
 RULES = REPO / "tests" / "python_rules" / "rules"
-COMMON = REPO / "tests" / "common"
+COMMON = REPO / "testdata" / "common"
 
 failures = []
 

@@ -214,7 +214,7 @@ See [Python Rule SDK Documentation](docs/python_rule_sdk.md) for full API refere
 ### Explain a rule
 `--explain SV-DUP-002` (ID or name) prints what the rule checks, the methodology guidelines
 it enforces, the options it reads with their defaults, and a flagged and a fixed example.
-The examples are the rule's regression tests (`tests/rules/<category>/<ID>/`), compiled into
+The examples are the rule's regression tests (`testdata/rules/<category>/<ID>/`), compiled into
 the binary at build time, so they always match what the rule does.
 
 ### Testbench map
@@ -424,7 +424,7 @@ Every rule in UVMCheck inherits from `uvmcheck::rules::Rule`:
 1. Create `src/rules/<category>/YourRule.cpp`.
 2. Implement either `slang::ast::ASTVisitor` (typed AST) or `slang::syntax::SyntaxVisitor` (CST/tokens).
 3. Register the rule factory in `src/rules/BuiltinRules.cpp`.
-4. Add unit tests in `tests/rules/<category>/<RULE_ID>/bad.sv` and `good.sv`.
+4. Add unit tests in `testdata/rules/<category>/<RULE_ID>/bad.sv` and `good.sv`.
 5. Run `python3 tests/regression.py --rule <RULE_ID>` to verify.
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for full development guidelines, memory-bounded compilation instructions, and pull request conventions.

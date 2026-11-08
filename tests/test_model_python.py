@@ -23,7 +23,7 @@ def main() -> int:
         if not cond:
             failures.append(what)
 
-    d = Design.load([f"+incdir+{REPO / 'tests/common'}", str(REPO / "tests/map/map_tb.sv")])
+    d = Design.load([f"+incdir+{REPO / 'testdata/common'}", str(REPO / "testdata/map/map_tb.sv")])
     check(d.compile_errors == 0, "map_tb compiles")
     drv = d.find_class("my_drv")
     check(drv is not None and drv.uvm == "driver", "my_drv is a driver")
@@ -37,7 +37,7 @@ def main() -> int:
     check(d.file_name(drv.loc).endswith("map_tb.sv") and drv.loc.line == 7, "my_drv location")
     check(any(m.phase != "none" for c in d.classes for m in c.methods), "phase methods are marked")
 
-    f = Design.load([f"+incdir+{REPO / 'tests/common'}", str(REPO / "tests/model/facts.sv")])
+    f = Design.load([f"+incdir+{REPO / 'testdata/common'}", str(REPO / "testdata/model/facts.sv")])
     item = f.find_class("facts_item")
     check(item is not None and [k.name for k in item.constraints] == ["addr_c"], "constraints")
     s = next((m for m in item.methods if m.name == "sum"), None) if item else None

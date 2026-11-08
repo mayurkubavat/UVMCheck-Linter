@@ -2,8 +2,8 @@
 """
 Invariants of the --fix pipeline, checked on every rule test file and on mutated copies.
 
-For each tests/rules/<category>/<RULE>/{bad,good}.sv that has a fix to apply, a copy (with its
-own copy of tests/common, since --fix also rewrites included files) is
+For each testdata/rules/<category>/<RULE>/{bad,good}.sv that has a fix to apply, a copy (with its
+own copy of testdata/common, since --fix also rewrites included files) is
 fixed with `--fix --unsafe-fixes --preset all --experimental` and must:
   1. finish (no crash, no hang) within the timeout;
   2. not add compile errors: the fixed file has no more slang errors than the original;
@@ -29,8 +29,9 @@ from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 TESTS_DIR = Path(__file__).resolve().parent
-RULES_DIR = TESTS_DIR / "rules"
-COMMON_DIR = TESTS_DIR / "common"
+DATA_DIR = Path(__file__).resolve().parent.parent / "testdata"
+RULES_DIR = DATA_DIR / "rules"
+COMMON_DIR = DATA_DIR / "common"
 MACRO_CALL = re.compile(r"`[A-Za-z_]\w*")
 FIX_ARGS = ["--fix", "--unsafe-fixes", "--preset", "all", "--experimental"]
 
@@ -39,7 +40,7 @@ def lint(binary, work, name, extra, timeout):
     """Runs the linter on work/name; returns (returncode, report dict or None, stdout)."""
     report = work / "report.json"
     report.unlink(missing_ok=True)
-    # A private copy of tests/common: --fix also rewrites included files.
+    # A private copy of testdata/common: --fix also rewrites included files.
     common = work / "common"
     if not common.is_dir():
         shutil.copytree(COMMON_DIR, common)

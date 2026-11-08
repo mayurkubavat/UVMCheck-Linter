@@ -6,9 +6,9 @@ that claim measured, and make the parts slang cannot do explicit add-ons.
 
 ## LRM probes (`lrm_conformance_test`)
 
-`tests/conformance/lrm/` holds one probe file per clause group of IEEE
+`testdata/conformance/lrm/` holds one probe file per clause group of IEEE
 1800-2023 (clauses 5 to 35) plus one for the constructs 2023 added.
-`tests/conformance/clauses.json` maps each clause to its probe. The test runs
+`testdata/conformance/clauses.json` maps each clause to its probe. The test runs
 every probe with all rules on and fails when:
 
 - uvmcheck crashes or does not write a JSON report;
@@ -34,7 +34,7 @@ python3 scripts/ast_coverage.py               # table of inspected / total, and 
 python3 scripts/ast_coverage.py --json cov.json
 ```
 
-`tests/conformance/ast_coverage_floor.json` records the current counts. The
+`testdata/conformance/ast_coverage_floor.json` records the current counts. The
 test fails when a category drops below its floor. When new rules inspect more
 kinds, raise the floor in the same change.
 

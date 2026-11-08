@@ -28,10 +28,10 @@ def check(cond, msg):
 
 
 def lint(binary, case, rule, tmp):
-    src = REPO / "tests" / "rules" / case / "bad.sv"
+    src = REPO / "testdata" / "rules" / case / "bad.sv"
     out_json = Path(tmp, rule + ".json")
     out_sarif = Path(tmp, rule + ".sarif")
-    res = subprocess.run([binary, str(src), "-I", str(REPO / "tests" / "common"), "--rule", rule,
+    res = subprocess.run([binary, str(src), "-I", str(REPO / "testdata" / "common"), "--rule", rule,
                           "--json", str(out_json), "--sarif", str(out_sarif)],
                          capture_output=True, text=True, cwd=tmp)
     return json.loads(out_json.read_text())["violations"], json.loads(out_sarif.read_text()), res.stdout

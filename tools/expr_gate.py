@@ -50,7 +50,7 @@ def cases(argv):
         uvm = argv[1]
         files = sorted(glob.glob(os.path.join(REPO, 'tests/**/*.sv*'), recursive=True)
                        + glob.glob(os.path.join(REPO, 'examples/**/*.sv*'), recursive=True))
-        return [(os.path.relpath(f, REPO), ['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'tests/common'),
+        return [(os.path.relpath(f, REPO), ['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'testdata/common'),
                                            '+incdir+' + os.path.dirname(f), f], [], [], None) for f in files]
     if argv[:1] == ['--dir']:
         files = sorted(glob.glob(os.path.join(argv[1], '**/*.sv'), recursive=True))

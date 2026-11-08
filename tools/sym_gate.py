@@ -81,7 +81,7 @@ def main():
         for f in sorted(glob.glob(os.path.join(REPO, 'tests/**/*.sv*'), recursive=True)
                         + glob.glob(os.path.join(REPO, 'examples/**/*.sv*'), recursive=True)):
             rel = os.path.relpath(f, REPO)
-            cases.append((rel, rel.split('/')[0], ['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'tests/common'),
+            cases.append((rel, rel.split('/')[0], ['+incdir+' + uvm, '+incdir+' + os.path.join(REPO, 'testdata/common'),
                                                    '+incdir+' + os.path.dirname(f), f]))
     else:
         root, sel = argv[0], (argv[1] if len(argv) > 1 else '')

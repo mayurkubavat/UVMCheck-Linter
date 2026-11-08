@@ -14,7 +14,7 @@
     } while (0)
 
 int main(int argc, char** argv) {
-    CHECK(argc == 4); /* <tests/common dir> <bad.sv> <facts.sv> */
+    CHECK(argc == 4); /* <testdata/common dir> <bad.sv> <facts.sv> */
     CHECK(uvmcheck_model_abi_version() == UVMCHECK_MODEL_ABI_VERSION);
     /* rust/sv-slang asserts the same sizes for its copies of these structs */
     if (sizeof(void*) == 8) {

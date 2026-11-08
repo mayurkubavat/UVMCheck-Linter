@@ -48,7 +48,7 @@ def main():
     if argv[:1] == ['--repo']:
         files = sorted(glob.glob(os.path.join(REPO, 'tests/**/*.sv*'), recursive=True)
                        + glob.glob(os.path.join(REPO, 'examples/**/*.sv*'), recursive=True))
-        cases = [(os.path.relpath(f, REPO), ['+incdir+' + argv[1], '+incdir+' + os.path.join(REPO, 'tests/common'),
+        cases = [(os.path.relpath(f, REPO), ['+incdir+' + argv[1], '+incdir+' + os.path.join(REPO, 'testdata/common'),
                                             '+incdir+' + os.path.dirname(f), f]) for f in files]
     elif argv[:1] == ['--dir']:
         files = sorted(glob.glob(os.path.join(argv[1], '**/*.sv'), recursive=True))

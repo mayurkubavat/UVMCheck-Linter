@@ -46,7 +46,7 @@ another directory.
 ## dv-map
 
 ```sh
-rust/target/release/dv-map -- +incdir+tests/common tests/map/map_tb.sv
+rust/target/release/dv-map -- +incdir+testdata/common testdata/map/map_tb.sv
 rust/target/release/dv-map --json -- -f my_files.f
 rust/target/release/dv-map --bench 5 -- +incdir+$UVM/src $UVM/src/uvm_pkg.sv
 ```
