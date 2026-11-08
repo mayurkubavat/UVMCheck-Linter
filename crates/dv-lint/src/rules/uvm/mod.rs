@@ -205,7 +205,7 @@ pub(crate) fn rules() -> Vec<Rule> {
         Rule {
             id: "UVM-PHS-001",
             name: "UvmMissingSuperPhase",
-            check: Check::Model(uvm_missing_super_phase::uvm_missing_super_phase),
+            check: Check::Mixed(uvm_missing_super_phase::uvm_missing_super_phase),
         },
         Rule {
             id: "UVM-PHS-002",
