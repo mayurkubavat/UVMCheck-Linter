@@ -73,7 +73,7 @@ pub(crate) fn wait_in_loop(c: &Cst, s: &mut Sink) {
             if ids.is_empty() || ids.iter().any(|i| modified.contains(i)) {
                 continue;
             }
-            let Some(order) = std_unordered_order(&ids) else { continue };
+            let order = first_seen(&ids);
             let list = order.iter().map(|i| format!("'{i}'")).collect::<Vec<_>>().join(", ");
             let Some(kw) = c.tok(w, "wait") else { continue };
             s.add(

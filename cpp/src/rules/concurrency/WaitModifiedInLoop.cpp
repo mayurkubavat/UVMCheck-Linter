@@ -6,15 +6,18 @@
 #include "slang/syntax/SyntaxFacts.h"
 #include <unordered_set>
 #include <string>
+#include <vector>
 
 namespace uvmcheck::rules::concurrency {
 
 class IdentifierCollector : public slang::syntax::SyntaxVisitor<IdentifierCollector> {
 public:
     std::unordered_set<std::string> ids;
+    std::vector<std::string> order; // ids in source order, for messages
 
     void handle(const slang::syntax::IdentifierNameSyntax& id) {
-        ids.insert(std::string(id.identifier.valueText()));
+        std::string name(id.identifier.valueText());
+        if (ids.insert(name).second) order.push_back(std::move(name));
         visitDefault(id);
     }
 };
@@ -100,7 +103,7 @@ public:
             if (!isAnyModified) {
                 std::string idList;
                 size_t count = 0;
-                for (const auto& id : condIds.ids) {
+                for (const auto& id : condIds.order) {
                     if (count > 0) idList += ", ";
                     idList += "'" + id + "'";
                     count++;

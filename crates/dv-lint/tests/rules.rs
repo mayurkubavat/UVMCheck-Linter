@@ -710,6 +710,34 @@ fn enum_case_with_default() {
 }
 
 #[test]
+fn enum_case_lists_missing_variants_in_declaration_order() {
+    // Declaration order, not a hash table's: the message must read the same
+    // whichever standard library the C++ twin was built with.
+    let src = "typedef enum {A, B, C, D, E, F, G, H, I, J} e_t;\n\
+               module m; e_t s; initial case (s) C: ; default: ; endcase endmodule\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "SV-FSM-001").map(|f| f.message).collect();
+    assert_eq!(msgs.len(), 1);
+    assert!(msgs[0].contains("variant(s): 'A', 'B', 'D', 'E', 'F', 'G', 'H', 'I', 'J'."), "{}", msgs[0]);
+}
+
+#[test]
+fn enum_case_through_a_package_type_and_scoped_labels() {
+    let src = "package p; typedef enum logic [1:0] {OFF, TOR, NA4, NAPOT} m_t; endpackage\n\
+               module m(input p::m_t mi); logic x;\n\
+               always_comb case (mi) p::TOR: x = 1; p::NAPOT: x = 0; default: x = 0; endcase\n\
+               endmodule\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "SV-FSM-001").map(|f| f.message).collect();
+    assert_eq!(msgs.len(), 1);
+    assert!(msgs[0].contains("enum 'm_t' does not explicitly handle variant(s): 'OFF', 'NA4'."), "{}", msgs[0]);
+}
+
+#[test]
 fn part_select_reversed() {
     let src = "module m;\n\
                logic [7:0] v;\n\

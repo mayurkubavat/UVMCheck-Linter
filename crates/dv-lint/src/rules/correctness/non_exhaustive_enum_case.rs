@@ -33,7 +33,12 @@ fn enum_of(c: &Cst, dt: NodeId) -> Option<EnumMembers> {
             return Some((name, members));
         }
         let toks: Vec<u32> = c.toks(dt).collect();
-        let [t] = toks[..] else { return None };
+        // `name`, or `pkg::name` for a typedef in package `pkg`.
+        let (pkg, t) = match toks[..] {
+            [t] => (None, t),
+            [p, sep, t] if c.text_of(sep) == "::" => (Some(c.text_of(p)), t),
+            _ => return None,
+        };
         let tn = c.text_of(t);
         // The typedef in scope: in a unit around the use (innermost first),
         // else in a package or at the top of the file.
@@ -50,6 +55,13 @@ fn enum_of(c: &Cst, dt: NodeId) -> Option<EnumMembers> {
             .nodes(TypedefDecl)
             .into_iter()
             .filter(|&td| c.tree.child(td, Name).is_some_and(|n| c.tree.bare_text(n) == tn))
+            .filter(|&td| {
+                pkg.is_none_or(|p| {
+                    scope_of(td).is_some_and(|sc| {
+                        c.kind(sc) == PackageDecl && c.tree.child(sc, Name).is_some_and(|n| c.tree.bare_text(n) == p)
+                    })
+                })
+            })
             .filter_map(|td| match scope_of(td) {
                 None => Some((usize::MAX, td)),
                 Some(sc) => match around.iter().position(|&a| a == sc) {
@@ -97,6 +109,10 @@ pub(crate) fn non_exhaustive_enum_case(c: &Cst, s: &mut Sink) {
                 let l = c.strip(l);
                 if c.kind(l) == NameExpr {
                     handled.insert(c.tree.bare_text(l));
+                } else if c.kind(l) == ScopedExpr {
+                    // `pkg::NAME` (or `cls::NAME`): the member is the last name.
+                    let Some(last) = c.toks(l).last() else { continue };
+                    handled.insert(c.text_of(last).to_string());
                 } else {
                     // A constant label compares the enum's value with an
                     // int; uvmcheck reports nothing for such a case.
@@ -108,7 +124,7 @@ pub(crate) fn non_exhaustive_enum_case(c: &Cst, s: &mut Sink) {
             continue;
         }
         let names: Vec<&str> = members.iter().map(|(m, _)| m.as_str()).collect();
-        let Some(order) = crate::support::slang_ast::std_unordered_order(&names) else { continue };
+        let order = crate::support::slang_ast::first_seen(&names);
         let missing: Vec<String> =
             order.into_iter().filter(|m| !handled.contains(m)).map(|m| format!("'{m}'")).collect();
         if missing.is_empty() {

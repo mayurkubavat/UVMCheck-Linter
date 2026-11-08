@@ -22,6 +22,7 @@ public:
             std::string name;
             std::string kind; // "bins", "illegal_bins", "ignore_bins"
             std::unordered_set<std::string> values;
+            std::vector<std::string> order; // values as written, for messages
             slang::SourceLocation loc;
         };
 
@@ -36,6 +37,7 @@ public:
                 slang::SourceLocation loc = bin->sourceRange().start();
 
                 std::unordered_set<std::string> values;
+                std::vector<std::string> order;
                 if (const auto* rInit = bin->initializer->as_if<slang::syntax::RangeCoverageBinInitializerSyntax>()) {
                     if (rInit->ranges) {
                         for (const auto* expr : rInit->ranges->valueRanges) {
@@ -45,17 +47,17 @@ public:
                             if (size_t end = valStr.find_last_not_of(" \t\n\r"); end != std::string::npos) {
                                 valStr.erase(end + 1);
                             }
-                            if (!valStr.empty()) {
-                                values.insert(valStr);
+                            if (!valStr.empty() && values.insert(valStr).second) {
+                                order.push_back(valStr);
                             }
                         }
                     }
                 }
 
                 if (kw == "bins") {
-                    regularBins.push_back({ bName, kw, std::move(values), loc });
+                    regularBins.push_back({ bName, kw, std::move(values), std::move(order), loc });
                 } else if (kw == "illegal_bins" || kw == "ignore_bins") {
-                    specialBins.push_back({ bName, kw, std::move(values), loc });
+                    specialBins.push_back({ bName, kw, std::move(values), std::move(order), loc });
                 }
             }
         }
@@ -63,7 +65,7 @@ public:
         // Check for overlaps between regularBins and specialBins
         for (const auto& sBin : specialBins) {
             for (const auto& rBin : regularBins) {
-                for (const auto& sVal : sBin.values) {
+                for (const auto& sVal : sBin.order) {
                     if (rBin.values.count(sVal)) {
                         diags.addViolation(
                             "SV-COV-004",

@@ -8,8 +8,8 @@
 //!   class property from a local and to read a declared type.
 //! - [`user_routines`] and [`user_classes`]: `swe::allUserRoutines` and
 //!   `swe::userClasses`.
-//! - [`std_unordered_order`]: the iteration order of a libstdc++
-//!   `std::unordered_set<std::string>`, which some messages list names in.
+//! - [`first_seen`]: names in insertion order without duplicates, the order
+//!   some messages list them in.
 
 use std::sync::{Arc, Mutex};
 use sv_sema::fx::{FxMap as HashMap, FxSet as HashSet};
@@ -19,147 +19,18 @@ use SyntaxKind::*;
 
 use crate::syntax::Cst;
 
-/// libstdc++'s `std::hash<std::string>` (`_Hash_bytes`, seed 0xc70f6907).
-pub(crate) fn std_hash(b: &[u8]) -> u64 {
-    const MUL: u64 = (0xc6a4_a793u64 << 32) + 0x5bd1_e995;
-    let shift_mix = |v: u64| v ^ (v >> 47);
-    let len = b.len();
-    let mut hash = 0xc70f_6907u64 ^ (len as u64).wrapping_mul(MUL);
-    let aligned = len & !7;
-    for ch in b[..aligned].chunks(8) {
-        let data = u64::from_le_bytes(ch.try_into().unwrap());
-        let data = shift_mix(data.wrapping_mul(MUL)).wrapping_mul(MUL);
-        hash ^= data;
-        hash = hash.wrapping_mul(MUL);
-    }
-    if len & 7 != 0 {
-        let mut data = 0u64;
-        for &x in b[aligned..].iter().rev() {
-            data = (data << 8) + x as u64;
-        }
-        hash ^= data;
-        hash = hash.wrapping_mul(MUL);
-    }
-    hash = shift_mix(hash).wrapping_mul(MUL);
-    shift_mix(hash)
-}
-
-/// The order a libstdc++ `std::unordered_set<std::string>` iterates after
-/// inserting `items` in turn (duplicates dropped); `None` past the sizes
-/// modelled here.
-pub(crate) fn std_unordered_order<S: AsRef<str>>(items: &[S]) -> Option<Vec<String>> {
-    const PRIMES: &[usize] = &[
-        29, 31, 37, 41, 43, 47, 53, 59, 61, 67, 71, 73, 79, 83, 89, 97, 103, 109, 113, 127, 137, 139, 149, 157, 167,
-        179, 193, 199, 211, 227, 241, 257, 277, 293, 313, 337, 359, 383, 409, 439, 467, 503, 541,
-    ];
-    const FAST: [usize; 14] = [2, 2, 2, 3, 5, 5, 7, 7, 11, 11, 11, 11, 13, 13];
-    #[derive(Clone, Copy)]
-    enum Before {
-        Head,
-        Node(usize),
-    }
-    let mut keys: Vec<String> = Vec::new();
-    let mut hashes: Vec<u64> = Vec::new();
-    let mut next: Vec<Option<usize>> = Vec::new();
-    let mut head: Option<usize> = None;
-    let mut buckets: Vec<Option<Before>> = vec![None; 1];
-    let mut next_resize = 0usize;
+/// `items` in first-seen order with duplicates dropped: the order the C++
+/// rules list names and values in (they keep insertion order so the message
+/// does not depend on the standard library's hash tables).
+pub(crate) fn first_seen<S: AsRef<str>>(items: &[S]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::with_capacity(items.len());
     for it in items {
         let k = it.as_ref();
-        if keys.iter().any(|x| x == k) {
-            continue;
-        }
-        let n_elt = keys.len();
-        let n_bkt = buckets.len();
-        if n_elt + 1 > next_resize {
-            let min_bkts = (n_elt + 1).max(if next_resize != 0 { 0 } else { 11 });
-            if min_bkts >= n_bkt {
-                let want = (min_bkts + 1).max(n_bkt * 2);
-                let nb = if want < FAST.len() {
-                    next_resize = FAST[want];
-                    FAST[want]
-                } else {
-                    let p = *PRIMES.iter().find(|&&p| p >= want)?;
-                    if p == 541 {
-                        return None;
-                    }
-                    next_resize = p;
-                    p
-                };
-                // Rehash.
-                let mut nb_v: Vec<Option<Before>> = vec![None; nb];
-                let mut p = head;
-                head = None;
-                let mut bbegin = 0usize;
-                while let Some(i) = p {
-                    let nx = next[i];
-                    let b = (hashes[i] % nb as u64) as usize;
-                    match nb_v[b] {
-                        None => {
-                            next[i] = head;
-                            head = Some(i);
-                            nb_v[b] = Some(Before::Head);
-                            if next[i].is_some() {
-                                nb_v[bbegin] = Some(Before::Node(i));
-                            }
-                            bbegin = b;
-                        }
-                        Some(bf) => {
-                            let after = match bf {
-                                Before::Head => head,
-                                Before::Node(j) => next[j],
-                            };
-                            next[i] = after;
-                            match bf {
-                                Before::Head => head = Some(i),
-                                Before::Node(j) => next[j] = Some(i),
-                            }
-                        }
-                    }
-                    p = nx;
-                }
-                buckets = nb_v;
-            } else {
-                next_resize = n_bkt;
-            }
-        }
-        let i = keys.len();
-        let h = std_hash(k.as_bytes());
-        keys.push(k.to_string());
-        hashes.push(h);
-        next.push(None);
-        let nb = buckets.len();
-        let b = (h % nb as u64) as usize;
-        match buckets[b] {
-            Some(bf) => {
-                let after = match bf {
-                    Before::Head => head,
-                    Before::Node(j) => next[j],
-                };
-                next[i] = after;
-                match bf {
-                    Before::Head => head = Some(i),
-                    Before::Node(j) => next[j] = Some(i),
-                }
-            }
-            None => {
-                next[i] = head;
-                head = Some(i);
-                if let Some(n) = next[i] {
-                    let nbk = (hashes[n] % nb as u64) as usize;
-                    buckets[nbk] = Some(Before::Node(i));
-                }
-                buckets[b] = Some(Before::Head);
-            }
+        if !out.iter().any(|x| x == k) {
+            out.push(k.to_string());
         }
     }
-    let mut out = Vec::new();
-    let mut p = head;
-    while let Some(i) = p {
-        out.push(keys[i].clone());
-        p = next[i];
-    }
-    Some(out)
+    out
 }
 
 // ---- tree walking ----

@@ -22,7 +22,7 @@ pub(crate) fn illegal_bin_overlap(c: &Cst, s: &mut Sink) {
             let Some(loc) = start(c, b) else { continue };
             let vals: Vec<String> =
                 bins_values(c, b).into_iter().map(|v| slang_trimmed(c, v)).filter(|v| !v.is_empty()).collect();
-            let Some(vals) = std_unordered_order(&vals) else { continue };
+            let vals = first_seen(&vals);
             if kw == "bins" {
                 regular.push((name, vals));
             } else if kw == "illegal_bins" || kw == "ignore_bins" {

@@ -19,9 +19,10 @@ public:
         if (exprType.isEnum()) {
             const auto& enumType = exprType.getCanonicalType().as<slang::ast::EnumType>();
 
-            std::unordered_set<std::string> declaredVariants;
+            // Declaration order: the message must not depend on a hash table's.
+            std::vector<std::string> declaredVariants;
             for (const auto& member : enumType.values()) {
-                declaredVariants.insert(std::string(member.name));
+                declaredVariants.push_back(std::string(member.name));
             }
 
             std::unordered_set<std::string> handledVariants;
