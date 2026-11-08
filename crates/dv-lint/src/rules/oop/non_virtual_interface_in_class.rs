@@ -21,6 +21,20 @@ pub(crate) fn non_virtual_interface(c: &Cst, s: &mut Sink) {
             if ty.starts_with("virtual") || !(ty.ends_with("_if") || ty.ends_with("_vif")) {
                 continue;
             }
+            // Unsafe: the member becomes a handle that must be set (config_db) before use.
+            let fix = c.first_tok(dt).filter(|&t| !c.tree.tokens[t as usize].from_macro).map(|t| {
+                let tok = &c.tree.tokens[t as usize];
+                let at = tok.origin.offset as usize;
+                let mut f = c.file_fix(
+                    tok.origin.file,
+                    at,
+                    at,
+                    "virtual ",
+                    "Insert 'virtual' keyword to declare a virtual interface handle",
+                );
+                f.safety = crate::fix::FixSafety::Unsafe;
+                f
+            });
             for (_, var, at) in declarators(c, d) {
                 s.add(
                     "SV-OOP-008",
@@ -30,7 +44,9 @@ pub(crate) fn non_virtual_interface(c: &Cst, s: &mut Sink) {
                         "Interface property '{var}' of type '{ty}' in class '{cname}' is declared without the 'virtual' keyword. In SystemVerilog (IEEE 1800 § 25.9), classes cannot instantiate physical interfaces; only virtual interface handles ('virtual {ty} {var};') can be stored as class members."
                     ),
                     c.loc(at),
-                );
+                )
+                .fixes
+                .extend(fix.clone());
             }
         }
     }

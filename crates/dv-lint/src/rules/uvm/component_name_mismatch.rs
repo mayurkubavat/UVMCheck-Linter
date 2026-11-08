@@ -52,8 +52,18 @@ pub(crate) fn component_name_mismatch(d: &Design, csts: &[Cst], s: &mut Sink) {
                         "Constructor of UVM component '{cls}' passes hardcoded string literal {text} to super.new(...) instead of forwarding parameter '{param}'. Hardcoded component names override factory instance names and break hierarchical config_db resolution."
                     ),
                     c.loc(t),
-                );
+                )
+                .fixes
+                .extend((!param.is_empty()).then(|| unsafe_fix(c.tree.token_bounds(e).and_then(|(a, b)| {
+                    c.token_fix(a, b, param.clone(), &format!("Replace hardcoded literal with constructor parameter '{param}'"))
+                }))).flatten());
             }
         }
     }
+}
+
+fn unsafe_fix(f: Option<crate::fix::Fix>) -> Option<crate::fix::Fix> {
+    let mut x = f?;
+    x.safety = crate::fix::FixSafety::Unsafe;
+    Some(x)
 }

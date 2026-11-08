@@ -36,7 +36,24 @@ pub(crate) fn sequence_item_default_new(c: &Cst, s: &mut Sink) {
                     "Constructor 'new' of sequence item class '{class}' defines argument '{port_name}' without a default value. In UVM, sequence item constructors must provide a default string name (e.g. 'string name = \"{class}\"') to support factory creation (`uvm_object_utils) and .clone() / .copy() operations."
                 ),
                 c.loc(at),
-            );
+            )
+            .fixes
+            .extend(default_fix(c, nm, &class));
         }
     }
+}
+
+/// `string name` becomes `string name = "cls"`. Unsafe: callers that relied
+/// on the argument being required now get the default.
+fn default_fix(c: &Cst, nm: sv_syntax::NodeId, class: &str) -> Option<crate::fix::Fix> {
+    let t = c.tree.token_bounds(nm)?.1;
+    let tok = &c.tree.tokens[t as usize];
+    if tok.from_macro {
+        return None;
+    }
+    let at = tok.origin.offset as usize + tok.text.len();
+    let mut f =
+        c.file_fix(tok.origin.file, at, at, format!(" = \"{class}\""), "Add default constructor string argument");
+    f.safety = crate::fix::FixSafety::Unsafe;
+    Some(f)
 }
