@@ -18,7 +18,10 @@ fn type_text(c: &Cst, ty: Option<NodeId>) -> String {
 
 pub(crate) fn data_clumps(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);
-    let (min_args, min_routines) = (4, 3);
+    let (min_args, min_routines) = (
+        crate::options::get("SV-DUP-006", "min_args", 4) as _,
+        crate::options::get("SV-DUP-006", "min_routines", 3) as _,
+    );
     let mut groups: BTreeMap<String, Vec<(usize, usize)>> = BTreeMap::new();
     for i in classes.user() {
         for (mi, m) in classes.list[i].methods.iter().enumerate() {

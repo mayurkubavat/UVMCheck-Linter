@@ -64,7 +64,10 @@ fn trim_comment(s: &str) -> &str {
 }
 
 pub(crate) fn commented_out_code(c: &Cst, s: &mut Sink) {
-    const MIN_LINES: usize = 2;
+    // Option `min_lines` (rules.SV-RDB-003.options).
+    fn min_lines() -> usize {
+        crate::options::get("SV-RDB-003", "min_lines", 2) as usize
+    }
     let t = c.tree;
     for (tok, f, triv) in token_trivia(c) {
         if tok.is_some_and(|x| t.tokens[x as usize].from_macro) || library_file(c, f) {
@@ -76,7 +79,7 @@ pub(crate) fn commented_out_code(c: &Cst, s: &mut Sink) {
         let mut eols = 0;
         let flush = |group: &mut Vec<&str>, start: u32, s: &mut Sink| {
             let code = group.iter().filter(|l| looks_like_code_line(l)).count();
-            if code >= MIN_LINES {
+            if code >= min_lines() {
                 let mut text = String::new();
                 for l in group.iter() {
                     text.push_str(l);

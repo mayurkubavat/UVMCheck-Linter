@@ -7,13 +7,16 @@ use crate::{Severity, Sink};
 use dv_model::Design;
 
 pub(crate) fn config_knob_budget(d: &Design, out: &mut Sink) {
-    const LIMIT: usize = 12;
+    // Option `max_knobs` (rules.SV-MET-009.options).
+    fn limit() -> usize {
+        crate::options::get("SV-MET-009", "max_knobs", 12) as usize
+    }
     for cls in user_classes(d) {
         if role(d, cls) != Role::Config {
             continue;
         }
         let knobs = cls.properties.iter().filter(|p| !p.is_static && !p.is_const).count();
-        if knobs <= LIMIT {
+        if knobs <= limit() {
             continue;
         }
         out.add(
@@ -21,9 +24,10 @@ pub(crate) fn config_knob_budget(d: &Design, out: &mut Sink) {
             "ConfigKnobBudget",
             Severity::Warning,
             format!(
-                "Config '{}' has {knobs} knobs (budget {LIMIT}). Group related knobs into sub-config objects so each agent or feature \
+                "Config '{}' has {knobs} knobs (budget {}). Group related knobs into sub-config objects so each agent or feature \
 reads only its own.",
-                cls.name
+                cls.name,
+                limit()
             ),
             cls.loc,
         );

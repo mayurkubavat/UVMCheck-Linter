@@ -2,7 +2,7 @@
 //! complex (summed cyclomatic complexity of their routines) and often changed
 //! in git, the top five by complexity times commits.
 
-use crate::support::history::{base_name, file_of, log_for, HISTORY, MAX_COMMITS};
+use crate::support::history::{base_name, file_of, log_for, max_commits, HISTORY};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::BTreeMap;
@@ -13,7 +13,11 @@ pub(crate) fn hotspot(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {
     if !HISTORY.load(Ordering::Relaxed) {
         return;
     }
-    let (top_files, min_commits, min_complexity) = (5usize, 3usize, 15i64);
+    let (top_files, min_commits, min_complexity) = (
+        crate::options::get("SV-EVO-001", "top_files", 5) as usize,
+        crate::options::get("SV-EVO-001", "min_commits", 3) as usize,
+        crate::options::get("SV-EVO-001", "min_complexity", 15),
+    );
     struct Stats {
         complexity: i64,
         worst: i64,
@@ -42,7 +46,7 @@ pub(crate) fn hotspot(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {
     }
     let mut ranked: Vec<(i64, String)> = Vec::new();
     for (file, f) in files.iter_mut() {
-        let Some(log) = log_for(file, MAX_COMMITS) else { continue };
+        let Some(log) = log_for(file, max_commits("SV-EVO-001")) else { continue };
         f.churn = log.files.get(file).map_or(0, Vec::len);
         f.log_size = log.sizes.len();
         if f.churn < min_commits || f.complexity < min_complexity {

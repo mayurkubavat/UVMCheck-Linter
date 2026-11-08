@@ -72,7 +72,10 @@ fn count_into(c: &Cst, n: NodeId, count: &mut usize) {
 
 pub(crate) fn no_extension_point(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);
-    const MIN: usize = 25;
+    // Option `min_statements` (rules.UVM-PAT-003.options).
+    fn min() -> usize {
+        crate::options::get("UVM-PAT-003", "min_statements", 25) as usize
+    }
     for cls in user_classes(d) {
         let r = role(d, cls);
         if r != Role::Driver && r != Role::Monitor {
@@ -81,7 +84,7 @@ pub(crate) fn no_extension_point(d: &Design, csts: &[Cst], out: &mut Sink) {
         let Some(run) = class_methods(cls).filter(|m| m.name == "run_phase").last() else { continue };
         let Some((c, body)) = ix.body(run) else { continue };
         let statements = count_statements(c, body);
-        if statements < MIN {
+        if statements < min() {
             continue;
         }
         let mut hooks = false;

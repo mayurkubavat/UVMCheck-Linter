@@ -84,7 +84,10 @@ fn worth_naming(v: &str) -> bool {
 }
 
 pub(crate) fn repeated_string_literal(d: &Design, csts: &[Cst], out: &mut Sink) {
-    const MIN_COUNT: usize = 4;
+    // Option `min_count` (rules.SV-DUP-004.options).
+    fn min_count() -> usize {
+        crate::options::get("SV-DUP-004", "min_count", 4) as usize
+    }
     let mut generated = Generated::new(d, csts);
     let mut seen = HashSet::new();
     let mut uses: Vec<(String, Loc)> = Vec::new();
@@ -156,7 +159,7 @@ pub(crate) fn repeated_string_literal(d: &Design, csts: &[Cst], out: &mut Sink) 
         }
     }
     for (value, locs) in by_value {
-        if locs.len() < MIN_COUNT {
+        if locs.len() < min_count() {
             continue;
         }
         let files: BTreeSet<&str> = locs.iter().map(|l| d.file_name(*l)).collect();

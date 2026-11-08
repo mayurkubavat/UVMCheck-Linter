@@ -56,7 +56,7 @@ pub(crate) fn repeated_enum_switch(c: &Cst, s: &mut Sink) {
             v.push((i, st));
         }
     }
-    let min = 3;
+    let min = crate::options::get("SV-DSN-009", "min_classes", 3) as _;
     for ty in order {
         let v = &sites[&ty];
         if v.len() < min {

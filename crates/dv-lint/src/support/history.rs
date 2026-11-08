@@ -109,7 +109,10 @@ pub(crate) fn log_for(path: &str, max: usize) -> Option<Arc<Log>> {
     c.logs.entry((root.clone(), max)).or_insert_with(|| read_log(&root, max).map(Arc::new)).clone()
 }
 
-pub(crate) const MAX_COMMITS: usize = 1000;
+/// Option `max_commits` of the history rules (default 1000).
+pub(crate) fn max_commits(rule: &str) -> usize {
+    crate::options::get(rule, "max_commits", 1000).max(1) as usize
+}
 
 pub(crate) fn base_name(p: &str) -> &str {
     p.rsplit(['/', '\\']).next().unwrap_or(p)

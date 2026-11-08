@@ -23,7 +23,10 @@ fn is_integral_type(td: &Typedefs, ty: &str) -> bool {
 }
 
 pub(crate) fn manual_bit_field_slicing(d: &Design, csts: &[Cst], out: &mut Sink) {
-    const THRESHOLD: usize = 3;
+    // Option `min_fields` (rules.SV-CNS-005.options).
+    fn threshold() -> usize {
+        crate::options::get("SV-CNS-005", "min_fields", 3) as usize
+    }
     let ix = Index::new(csts);
     let mut uses: Vec<(SymInfo, BTreeSet<String>, Loc)> = Vec::new();
     let mut index: HashMap<Sym, usize> = HashMap::new();
@@ -51,7 +54,7 @@ pub(crate) fn manual_bit_field_slicing(d: &Design, csts: &[Cst], out: &mut Sink)
         }
     }
     for (s, ranges, loc) in uses {
-        if ranges.len() < THRESHOLD {
+        if ranges.len() < threshold() {
             continue;
         }
         let list: Vec<String> = ranges.iter().map(|r| format!("[{r}]")).collect();

@@ -7,7 +7,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn deep_inheritance(c: &Cst, s: &mut Sink) {
-    let limit = 3;
+    let limit = crate::options::get("SV-DSN-005", "max_depth", 3) as _;
     each_class(c, |classes, cm| {
         if cm.dit <= limit {
             return;

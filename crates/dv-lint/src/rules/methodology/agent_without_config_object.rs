@@ -39,7 +39,10 @@ fn is_handle_or_array(ctx: &Ctx<'_, '_>, c: &Cst, e: NodeId) -> bool {
 
 pub(crate) fn agent_without_config_object(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);
-    const LIMIT: usize = 2;
+    // Option `max_scalar_fields` (rules.UVM-RUS-002.options).
+    fn limit() -> usize {
+        crate::options::get("UVM-RUS-002", "max_scalar_fields", 2) as usize
+    }
     for cls in user_classes(d) {
         let r = role(d, cls);
         if r != Role::Agent && r != Role::Env {
@@ -66,7 +69,7 @@ pub(crate) fn agent_without_config_object(d: &Design, csts: &[Cst], out: &mut Si
                 }
             }
         }
-        if fields.len() <= LIMIT {
+        if fields.len() <= limit() {
             continue;
         }
         let list = fields.iter().cloned().collect::<Vec<_>>().join(", ");

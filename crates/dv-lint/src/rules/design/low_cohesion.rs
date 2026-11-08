@@ -8,7 +8,10 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn low_cohesion(c: &Cst, s: &mut Sink) {
-    let (min_groups, min_size) = (2, 2);
+    let (min_groups, min_size) = (
+        crate::options::get("SV-DSN-003", "groups", 2) as _,
+        crate::options::get("SV-DSN-003", "min_group_size", 2) as _,
+    );
     each_class(c, |classes, cm| {
         let role = classes.role(cm.cls);
         if matches!(role, Role::Config | Role::Item | Role::RegModel) {

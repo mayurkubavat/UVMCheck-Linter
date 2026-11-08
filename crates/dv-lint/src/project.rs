@@ -7,8 +7,9 @@
 //!
 //! A Python config (`.uvmcheck/config.py`) is evaluated by the uvmcheck
 //! Python SDK (`python3 -m uvmcheck.config_runner`), as the C++ engine does,
-//! into the same JSON a `.json` config holds. Rule options, `style` and
-//! `naming` blocks are not applied by the native rules yet: [`Config::unapplied`]
+//! into the same JSON a `.json` config holds. Integer and boolean rule
+//! options go to [`crate::options`]; `style` and `naming` blocks and other
+//! options are not applied by the native rules yet: [`Config::unapplied`]
 //! names them so the caller can say so.
 
 use std::path::{Path, PathBuf};
@@ -188,7 +189,6 @@ struct RuleSettings {
     severity: Option<Severity>,
     exclude: Vec<Pattern>,
     only: Vec<Pattern>,
-    options: bool,
 }
 
 #[derive(Debug)]
@@ -217,6 +217,8 @@ pub struct Config {
     pub warnings: Vec<String>,
     /// Settings the native rules do not apply yet.
     pub unapplied: Vec<String>,
+    /// Integer rule options: (rule ID or name, key, value).
+    pub options: Vec<(String, String, i64)>,
 }
 
 fn severity(s: &str) -> Option<Severity> {
@@ -348,9 +350,16 @@ impl Config {
                         rs.severity = entry.get("severity").as_str().and_then(severity);
                         rs.exclude = pats(&mut c, entry.get("exclude_paths"), &format!("rules.{key}.exclude_paths"));
                         rs.only = pats(&mut c, entry.get("only_paths"), &format!("rules.{key}.only_paths"));
-                        rs.options = matches!(entry.get("options"), Json::Obj(o) if !o.is_empty());
-                        if rs.options {
-                            c.unapplied.push(format!("rules.{key}.options"));
+                        if let Json::Obj(opts) = entry.get("options") {
+                            for (k, v) in opts {
+                                match v {
+                                    Json::Num(n) if n.fract() == 0.0 => {
+                                        c.options.push((key.clone(), k.clone(), *n as i64))
+                                    }
+                                    Json::Bool(b) => c.options.push((key.clone(), k.clone(), i64::from(*b))),
+                                    _ => c.unapplied.push(format!("rules.{key}.options.{k}")),
+                                }
+                            }
                         }
                     }
                     _ => return Err(format!("rules.{key}: expected an object, true/false, or \"off\"")),

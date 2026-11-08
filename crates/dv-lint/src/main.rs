@@ -136,6 +136,7 @@ fn main() {
                 );
             }
             args.extend(cfg.compile_args.iter().cloned());
+            dv_lint::options::set(&cfg.options);
             let _ = CONFIG.set(cfg);
         }
     }

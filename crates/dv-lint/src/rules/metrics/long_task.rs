@@ -31,7 +31,7 @@ fn line_span(c: &Cst, r: &Routine) -> i64 {
 }
 
 pub(crate) fn long_task(c: &Cst, s: &mut Sink) {
-    let limit = 40;
+    let limit = crate::options::get("SV-MET-007", "max_lines", 40) as _;
     each_routine(c, |_, r| {
         if !r.is_task {
             return;

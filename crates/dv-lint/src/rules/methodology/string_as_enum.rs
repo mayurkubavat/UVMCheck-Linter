@@ -46,7 +46,7 @@ pub(crate) fn string_as_enum(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);
     for r in user_routines(d, &ix) {
         let lib = from_library(d, &ix, &r);
-        for x in dispatches(d, &ix, &r, false, 3) {
+        for x in dispatches(d, &ix, &r, false, crate::options::get("SV-CNS-004", "min_values", 3) as _) {
             if lib.contains(&x.sym.sym) || all_uvm_access_policies(&x.lits) {
                 continue;
             }

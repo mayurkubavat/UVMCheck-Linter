@@ -7,7 +7,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn too_many_arguments(c: &Cst, s: &mut Sink) {
-    let limit = 7;
+    let limit = crate::options::get("SV-MET-003", "max_args", 7) as _;
     each_routine(c, |classes, r| {
         if r.name == "new" && r.class.is_some() {
             return;

@@ -10,7 +10,10 @@ use std::collections::HashMap;
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn duplicated_constraint(d: &Design, csts: &[Cst], out: &mut Sink) {
-    const MIN_TOKENS: usize = 8;
+    // Option `min_tokens` (rules.SV-DUP-003.options).
+    fn min_tokens() -> usize {
+        crate::options::get("SV-DUP-003", "min_tokens", 8) as usize
+    }
     let ix = Index::new(csts);
     let mut generated = Generated::new(d, csts);
     let mut seen: HashMap<String, Vec<(&Class, String, String)>> = HashMap::new();
@@ -33,7 +36,7 @@ pub(crate) fn duplicated_constraint(d: &Design, csts: &[Cst], out: &mut Sink) {
             let at = tok_where(c, nt);
             let mut toks = Vec::new();
             written_tokens(c, blk, &mut toks);
-            if toks.len() < MIN_TOKENS + 2 {
+            if toks.len() < min_tokens() + 2 {
                 continue;
             }
             let firsts = seen.entry(token_key(&toks, false)).or_default();

@@ -7,22 +7,23 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn max_line_length(c: &Cst, s: &mut Sink) {
-    const MAX: usize = 120;
+    // Option `max_columns`.
+    let max = crate::options::get("SV-STY-016", "max_columns", 120).max(1) as usize;
     for (f, text) in buffers(c) {
         if text.len() == 1 {
             continue;
         }
         for (start, end, num) in lines(&text) {
             let len = end - start;
-            if len > MAX {
+            if len > max {
                 s.add(
                     "SV-STY-016",
                     "MaxLineLength",
                     Severity::Info,
                     format!(
-                        "Line {num} length ({len} characters) exceeds maximum recommended threshold of {MAX} characters. Wrap long expressions or break statements across lines."
+                        "Line {num} length ({len} characters) exceeds maximum recommended threshold of {max} characters. Wrap long expressions or break statements across lines."
                     ),
-                    at(c, f, start + MAX),
+                    at(c, f, start + max),
                 );
             }
         }

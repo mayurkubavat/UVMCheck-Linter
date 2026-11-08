@@ -36,9 +36,18 @@ fn class_shape(d: &Design, ix: &Index, cls: &Class) -> (String, usize) {
 }
 
 pub(crate) fn copied_agent_package(d: &Design, csts: &[Cst], out: &mut Sink) {
-    const MIN_CLASSES: usize = 3;
-    const MIN_PERCENT: usize = 80;
-    const MIN_TOKENS: usize = 12;
+    // Option `min_classes` (rules.SV-DUP-005.options).
+    fn min_classes() -> usize {
+        crate::options::get("SV-DUP-005", "min_classes", 3) as usize
+    }
+    // Option `min_similarity` (rules.SV-DUP-005.options).
+    fn min_percent() -> usize {
+        crate::options::get("SV-DUP-005", "min_similarity", 80) as usize
+    }
+    // Option `min_class_tokens` (rules.SV-DUP-005.options).
+    fn min_tokens() -> usize {
+        crate::options::get("SV-DUP-005", "min_class_tokens", 12) as usize
+    }
     let ix = Index::new(csts);
     let mut generated = Generated::new(d, csts);
     // Package name -> (where it is declared, class shapes).
@@ -54,7 +63,7 @@ pub(crate) fn copied_agent_package(d: &Design, csts: &[Cst], out: &mut Sink) {
         let Some((_, pt)) = c.tree.child(p, Name).and_then(|n| c.tree.token_bounds(n)) else { continue };
         let pkg = c.text_of(pt).to_string();
         let (shape, tokens) = class_shape(d, &ix, cls);
-        if tokens < MIN_TOKENS {
+        if tokens < min_tokens() {
             continue;
         }
         if !count.contains_key(&pkg) {
@@ -70,7 +79,7 @@ pub(crate) fn copied_agent_package(d: &Design, csts: &[Cst], out: &mut Sink) {
             let (sa, sb) = (&shapes[a], &shapes[b]);
             let common: usize = sa.iter().map(|(k, n)| (*n).min(sb.get(k).copied().unwrap_or(0))).sum();
             let largest = count[a].max(count[b]);
-            if common < MIN_CLASSES || common * 100 < MIN_PERCENT * largest {
+            if common < min_classes() || common * 100 < min_percent() * largest {
                 continue;
             }
             out.add(

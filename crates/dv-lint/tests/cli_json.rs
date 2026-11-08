@@ -91,3 +91,24 @@ fn project_config_paths_rules_and_waivers() {
     assert!(without.contains("SV-STY-003") && without.contains("v.sv"), "{without}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn rule_options_from_the_config() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-options-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("uvmcheck.json"),
+        r#"{"rules": {"MaxLineLength": {"options": {"max_columns": 40}}, "SV-MET-003": {"options": {"max_args": 2}}}}"#,
+    )
+    .unwrap();
+    std::fs::write(
+        dir.join("a.sv"),
+        "module m;\nfunction automatic int f(int a, int b, int c); return a + b + c; endfunction // a long line here\nendmodule\n",
+    )
+    .unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint")).current_dir(&dir).arg("a.sv").output().unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    assert!(text.contains("'f' takes 3 arguments (limit 2)"), "{text}");
+    assert!(text.contains("threshold of 40 characters"), "{text}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

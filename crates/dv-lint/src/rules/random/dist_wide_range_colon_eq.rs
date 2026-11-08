@@ -44,7 +44,8 @@ pub(crate) fn dist_wide_range(c: &Cst, s: &mut Sink) {
                 }
                 for (&it, w) in items.iter().zip(&widths) {
                     let Some(w) = *w else { continue };
-                    if w <= 16 || c.tok(it, ":=").is_none() {
+                    if w <= crate::options::get("SV-RND-025", "max_range_values", 16) as _ || c.tok(it, ":=").is_none()
+                    {
                         continue;
                     }
                     let Some(at) = c.tree.children(it).next().and_then(|v| c.first_tok(v)) else { continue };

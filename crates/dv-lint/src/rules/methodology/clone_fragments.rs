@@ -111,8 +111,14 @@ struct Window {
 }
 
 pub(crate) fn clone_fragments(d: &Design, csts: &[Cst], out: &mut Sink) {
-    const MIN_TOKENS: usize = 50;
-    const MIN_STMTS: usize = 3;
+    // Option `min_tokens` (rules.SV-DUP-002.options).
+    fn min_tokens() -> usize {
+        crate::options::get("SV-DUP-002", "min_tokens", 50) as usize
+    }
+    // Option `min_statements` (rules.SV-DUP-002.options).
+    fn min_stmts() -> usize {
+        crate::options::get("SV-DUP-002", "min_statements", 3) as usize
+    }
     let generated = Generated::new(d, csts);
     let mut names: Vec<String> = Vec::new();
     let mut lists: Vec<StmtList> = Vec::new();
@@ -144,7 +150,7 @@ pub(crate) fn clone_fragments(d: &Design, csts: &[Cst], out: &mut Sink) {
             let mut j = i;
             while j < l.stmts.len() {
                 tokens += l.stmts[j].toks.len();
-                if tokens >= MIN_TOKENS && j - i + 1 >= MIN_STMTS {
+                if tokens >= min_tokens() && j - i + 1 >= min_stmts() {
                     break;
                 }
                 j += 1;

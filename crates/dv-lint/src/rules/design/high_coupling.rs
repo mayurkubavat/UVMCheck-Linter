@@ -8,7 +8,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn high_coupling(c: &Cst, s: &mut Sink) {
-    let limit = 10;
+    let limit = crate::options::get("SV-DSN-004", "max_cbo", 10) as _;
     each_class(c, |classes, cm| {
         let role = classes.role(cm.cls);
         if matches!(role, Role::Env | Role::Test | Role::RegModel) || cm.cbo <= limit {

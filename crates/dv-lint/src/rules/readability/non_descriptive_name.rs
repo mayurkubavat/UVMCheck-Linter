@@ -57,7 +57,10 @@ fn locals(c: &Cst, routine: NodeId) -> Vec<(String, u32)> {
 }
 
 pub(crate) fn non_descriptive_name(_: &Design, csts: &[Cst], s: &mut Sink) {
-    const MIN_LINES: u32 = 10;
+    // Option `min_lines` (rules.SV-RDB-007.options).
+    fn min_lines() -> u32 {
+        crate::options::get("SV-RDB-007", "min_lines", 10) as u32
+    }
     let classes = Classes::new(csts);
     let report = |s: &mut Sink, name: &str, where_: String, loc: Loc| {
         s.add(
@@ -80,7 +83,7 @@ pub(crate) fn non_descriptive_name(_: &Design, csts: &[Cst], s: &mut Sink) {
         }
         for m in class_methods(csts, k) {
             let mc = &csts[m.ix];
-            if !body_lines(mc, m.node).is_some_and(|n| n >= MIN_LINES) {
+            if !body_lines(mc, m.node).is_some_and(|n| n >= min_lines()) {
                 continue;
             }
             for (v, t) in locals(mc, m.node) {

@@ -8,7 +8,11 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn god_class(c: &Cst, s: &mut Sink) {
-    let (wmc_limit, atfd_limit, tcc_percent) = (47, 5, 33.0);
+    let (wmc_limit, atfd_limit, tcc_percent) = (
+        crate::options::get("SV-DSN-002", "wmc", 47) as _,
+        crate::options::get("SV-DSN-002", "atfd", 5) as _,
+        crate::options::get("SV-DSN-002", "tcc_percent", 33) as f64,
+    );
     each_class(c, |classes, cm| {
         let role = classes.role(cm.cls);
         if role == Role::RegModel {

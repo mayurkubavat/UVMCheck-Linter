@@ -10,7 +10,7 @@ use SyntaxKind::*;
 
 pub(crate) fn rand_field_budget(c: &Cst, s: &mut Sink) {
     let classes = Classes::new(c);
-    let limit = 8;
+    let limit = crate::options::get("SV-MET-008", "max_rand", 8) as _;
     for i in classes.user() {
         if classes.role(i) != Role::Item {
             continue;

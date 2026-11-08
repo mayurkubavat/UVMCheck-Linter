@@ -8,7 +8,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn complex_condition(c: &Cst, s: &mut Sink) {
-    let limit = 5;
+    let limit = crate::options::get("SV-MET-005", "max_bool_ops", 5) as _;
     each_routine(c, |_, r| {
         let m = routine_metrics(c, r.body);
         if m.max_bool_ops <= limit {

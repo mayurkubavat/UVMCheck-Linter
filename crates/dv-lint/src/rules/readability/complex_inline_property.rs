@@ -8,7 +8,10 @@ use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
 
 pub(crate) fn complex_inline_property(c: &Cst, s: &mut Sink) {
-    const LIMIT: usize = 3;
+    // Option `max_temporal_ops` (rules.SV-SVA-006.options).
+    fn limit() -> usize {
+        crate::options::get("SV-SVA-006", "max_temporal_ops", 3) as usize
+    }
     const TEMPORAL: [&str; 15] = [
         "##",
         "|->",
@@ -36,7 +39,7 @@ pub(crate) fn complex_inline_property(c: &Cst, s: &mut Sink) {
         }
         let Some(spec) = c.tree.child(n, PropertyExpr) else { continue };
         let ops = c.tree.token_range(spec).iter().filter(|&&t| TEMPORAL.contains(&c.text_of(t))).count();
-        if ops > LIMIT {
+        if ops > limit() {
             s.add(
                 "SV-SVA-006",
                 "ComplexInlineProperty",

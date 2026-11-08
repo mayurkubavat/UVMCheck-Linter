@@ -8,7 +8,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn cognitive_complexity(c: &Cst, s: &mut Sink) {
-    let limit = 25;
+    let limit = crate::options::get("SV-MET-001", "threshold", 25) as _;
     each_routine(c, |_, r| {
         let m = routine_metrics(c, r.body);
         if m.cognitive <= limit {

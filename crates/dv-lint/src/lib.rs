@@ -59,6 +59,7 @@ mod rule_profiles;
 
 #[allow(dead_code)]
 pub(crate) mod json;
+pub mod options;
 pub mod project;
 
 /// Which rules run without `--rule`, as uvmcheck selects them: `preset`

@@ -9,7 +9,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn long_routine(c: &Cst, s: &mut Sink) {
-    let limit = 100;
+    let limit = crate::options::get("SV-MET-002", "max_statements", 100) as _;
     each_routine(c, |_, r| {
         let n = r.body.map(|b| count_statements(c, b)).unwrap_or(0);
         if n <= limit {

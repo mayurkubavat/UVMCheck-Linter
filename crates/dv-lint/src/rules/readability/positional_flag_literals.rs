@@ -10,7 +10,10 @@ use sv_syntax::NodeId;
 use sv_syntax::SyntaxKind::*;
 
 /// The `min_flags` default.
-const MIN_FLAGS: usize = 2;
+// Option `min_flags` (rules.SV-RDB-001.options).
+fn min_flags() -> usize {
+    crate::options::get("SV-RDB-001", "min_flags", 2) as usize
+}
 
 /// A call of a user routine passing two or more 0/1 literals positionally
 /// to one-bit formals.
@@ -54,7 +57,7 @@ pub(crate) fn positional_flags(c: &Cst, out: &mut Sink) {
                 names.push(c.tree.child(f, Name).map(|n| c.tree.bare_text(n)).unwrap_or_default());
             }
         }
-        if names.len() < MIN_FLAGS {
+        if names.len() < min_flags() {
             continue;
         }
         let named: Vec<String> = names.iter().map(|n| format!(".{n}(...)")).collect();

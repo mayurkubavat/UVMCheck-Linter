@@ -83,7 +83,10 @@ fn field_uses<'d>(ctx: &Ctx<'d, '_>, c: &Cst, n: NodeId, u: &mut FieldUse<'d>) {
 }
 
 pub(crate) fn feature_envy(d: &Design, csts: &[Cst], out: &mut Sink) {
-    const MIN_FOREIGN: usize = 6;
+    // Option `min_foreign` (rules.SV-DSN-011.options).
+    fn min_foreign() -> usize {
+        crate::options::get("SV-DSN-011", "min_foreign", 6) as usize
+    }
     const EXEMPT: &[&str] = &[
         "new",
         "do_copy",
@@ -114,7 +117,7 @@ pub(crate) fn feature_envy(d: &Design, csts: &[Cst], out: &mut Sink) {
             }
         }
         let Some((key, &(count, t))) = top else { continue };
-        if count < MIN_FOREIGN || count <= 2 * u.own {
+        if count < min_foreign() || count <= 2 * u.own {
             continue;
         }
         out.add(

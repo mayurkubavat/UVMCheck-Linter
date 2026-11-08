@@ -9,7 +9,11 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
 pub(crate) fn large_class(c: &Cst, s: &mut Sink) {
-    let (max_fields, max_data_fields, max_methods) = (30, 80, 30);
+    let (max_fields, max_data_fields, max_methods) = (
+        crate::options::get("SV-MET-006", "max_fields", 30) as _,
+        crate::options::get("SV-MET-006", "max_data_fields", 80) as _,
+        crate::options::get("SV-MET-006", "max_methods", 30) as _,
+    );
     each_class(c, |classes, cm| {
         let role = classes.role(cm.cls);
         if role == Role::RegModel {

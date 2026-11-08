@@ -30,9 +30,11 @@ fn role_name(r: Role) -> &'static str {
 }
 
 pub(crate) fn global_factory_override(d: &Design, s: &mut Sink) {
+    // Option `allow_in_env`: environments may set global overrides too.
+    let allow_in_env = crate::options::get("UVM-FAC-005", "allow_in_env", 0) != 0;
     for cls in user_classes(d) {
         let role = class_role(d, cls.id);
-        if role == Role::Test || role == Role::None {
+        if role == Role::Test || role == Role::None || (role == Role::Env && allow_in_env) {
             continue;
         }
         for m in &cls.methods {

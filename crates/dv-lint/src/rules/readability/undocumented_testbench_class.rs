@@ -36,7 +36,10 @@ fn prose_words(comments: &[(u32, String)]) -> usize {
 }
 
 pub(crate) fn undocumented_testbench_class(_: &Design, csts: &[Cst], s: &mut Sink) {
-    const MIN_WORDS: usize = 10;
+    // Option `min_words` (rules.SV-RDB-010.options).
+    fn min_words() -> usize {
+        crate::options::get("SV-RDB-010", "min_words", 10) as usize
+    }
     let classes = Classes::new(csts);
     for (_, k) in classes.user() {
         if !k.role.is_component() && k.role != Role::Sequence {
@@ -50,7 +53,7 @@ pub(crate) fn undocumented_testbench_class(_: &Design, csts: &[Cst], s: &mut Sin
         if library_tok(c, first) {
             continue;
         }
-        if prose_words(&own_comments(c, first)) >= MIN_WORDS {
+        if prose_words(&own_comments(c, first)) >= min_words() {
             continue;
         }
         let Some(nt) = name_tok(c, k.node) else { continue };
