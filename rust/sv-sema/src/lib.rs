@@ -1,12 +1,30 @@
-//! Native symbols: the class model that `dv-model` describes, built from
-//! `sv-syntax` trees instead of slang (R3 of the Rust front end).
+//! The native semantic layer: everything above the syntax tree that slang
+//! used to provide. It reads `sv-syntax` trees and gives three things:
 //!
-//! [`load`] takes compile options (`+incdir+`, `+define+`, files) and returns
-//! a [`dv_model::Design`] like `Design::load` does. What it resolves today:
-//! packages, `$unit`, nested classes, typedefs, imports, base classes (with
-//! specializations), UVM roles, properties, methods (extern bodies and
-//! virtual overrides included), arguments, locals and constraints. Type
-//! strings and method bodies (calls, assignments, timing) are not built yet.
+//! - **The class model.** [`load`] takes compile options (`-f`, `+incdir+`,
+//!   `+define+`, files, `--single-unit`) and returns a [`dv_model::Design`]
+//!   like `Design::load` does: packages, `$unit`, nested and parameterized
+//!   classes (with the specializations the design names), typedefs,
+//!   imports, base classes, UVM roles, properties, methods with their
+//!   bodies (calls, assignments, timing controls, `super.new`), arguments,
+//!   locals, constraints and type strings as slang prints them.
+//!   [`load_with_trees`] also hands back the trees, for syntax rules.
+//! - **Elaboration.** [`elaborate_full`] builds the instance tree from the
+//!   top modules: instances, generate blocks taken, parameter values.
+//! - **Semantic checks.** [`SemaChecks`] runs the checks a compiler makes
+//!   (the `check` function of each public module below) and
+//!   [`semantic_diags`] merges them with elaboration's, which is what
+//!   `dv-build` reports.
+//!
+//! Rules that need more than the model read it here too: [`oracle`] gives
+//! the declared type of any name for expression typing, [`SpecModel`] and
+//! [`spec_counts`] answer per-specialization questions, and [`Locator`]
+//! turns token positions into the model's [`Loc`]s.
+//!
+//! Inside, a `Builder` collects every declaration into scopes
+//! ([`scopes`]), resolves names with constant evaluation (`consteval`,
+//! `packed`, [`bigint`]) and fills the model (`types` for type strings,
+//! `body` for method bodies); `elab` elaborates on the same builder.
 
 use sv_source::{Dialect, FileList, ProcessEnv};
 use std::collections::{HashMap, HashSet};
@@ -129,6 +147,8 @@ impl Default for Locator {
 }
 
 impl Locator {
+    /// A locator with `files` as its file table (start it with `[""]` so 0
+    /// stays "no file").
     pub fn new(files: Vec<String>) -> Self {
         Locator {
             files,
@@ -142,6 +162,7 @@ impl Locator {
         &self.files
     }
 
+    /// The file table, for [`dv_model::Design::from_parts`].
     pub fn into_files(self) -> Vec<String> {
         self.files
     }
@@ -231,8 +252,13 @@ pub fn elaborate_tops(trees: &[Tree], tops: &[String]) -> (Vec<String>, Vec<name
 /// What elaboration finds: the hierarchy lines, errors, and the nodes no
 /// instance elaborates (whose name errors slang does not report).
 pub struct Elaborated {
+    /// Instances, taken generate blocks and parameter values, one line each, in
+    /// the form `uvmcheck_sym_dump --hier` prints.
     pub hierarchy: Vec<String>,
+    /// Errors only elaboration finds (they depend on parameter values or on
+    /// how an instance is connected).
     pub diags: Vec<names::Diag>,
+    /// Definition bodies no instance elaborates, by (tree, node).
     pub skipped: Vec<(usize, sv_syntax::NodeId)>,
     /// Copies of each definition body and generate item (by tree and
     /// node): all of them, and those instantiated (see `Elab::copies`).
@@ -251,19 +277,31 @@ pub fn semantic_diags(trees: &[Tree], tops: &[String]) -> (Vec<names::Diag>, Ela
 /// The semantic checks of a compile, each on its own, so that callers
 /// that need some of them (and elaboration separately) compute them once.
 pub struct SemaChecks {
+    /// What [`names::check`] found.
     pub names: Vec<names::Diag>,
+    /// What [`checks::check`] found.
     pub checks: Vec<names::Diag>,
+    /// What [`bind::check`] found.
     pub bind: Vec<names::Diag>,
+    /// What [`iclass::check`] found.
     pub iclass: Vec<names::Diag>,
+    /// What [`udp::check`] found.
     pub udp: Vec<names::Diag>,
+    /// What [`sva::check`] found.
     pub sva: Vec<names::Diag>,
+    /// What [`calls::check`] found.
     pub calls: Vec<names::Diag>,
+    /// What [`order::check`] found.
     pub order: Vec<names::Diag>,
+    /// What [`classes::check`] found.
     pub classes: Vec<names::Diag>,
+    /// What [`typed::check`] found.
     pub typed: Vec<names::Diag>,
 }
 
 impl SemaChecks {
+    /// Builds the scopes once and runs every check on them, the slowest on
+    /// threads of their own.
     pub fn new(trees: &[Tree]) -> SemaChecks {
         let scopes = scopes::build(trees);
         // The checks are independent: the slowest run on threads of their own.
@@ -309,6 +347,8 @@ impl SemaChecks {
     }
 }
 
+/// Collects every declaration of `trees` and elaborates from `tops` (none:
+/// every module nothing instantiates), keeping everything [`Elaborated`] holds.
 pub fn elaborate_full(trees: &[Tree], tops: &[String]) -> Elaborated {
     let mut b = Builder::new(trees);
     b.designs = true;
@@ -489,6 +529,8 @@ pub struct SpecModel<'t> {
 }
 
 impl<'t> SpecModel<'t> {
+    /// Collects the declarations of `trees` and the specializations of every
+    /// generic class.
     pub fn new(trees: &'t [Tree]) -> Self {
         let mut b = Builder::new(trees);
         b.designs = true;
@@ -548,6 +590,8 @@ impl<'t> SpecModel<'t> {
     }
 }
 
+/// The class model of parsed trees, with every file numbered as it is first
+/// seen. [`load`] wraps this with option handling, parsing and timings.
 pub fn build(trees: &[Tree]) -> Design {
     let mut b = Builder::new(trees);
     b.collect_names();

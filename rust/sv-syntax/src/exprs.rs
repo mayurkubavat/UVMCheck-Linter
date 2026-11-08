@@ -19,6 +19,8 @@ fn skipped(k: SyntaxKind) -> bool {
     matches!(k, OtherBlock)
 }
 
+/// Every top-level operator expression of `tree`, in source order, in the
+/// canonical form described above.
 pub fn canonical_exprs(tree: &Tree) -> Vec<String> {
     let mut out = Vec::new();
     walk(tree, tree.root, false, &mut out);

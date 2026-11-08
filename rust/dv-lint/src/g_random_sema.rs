@@ -618,7 +618,7 @@ pub(crate) fn first_kid(c: &Cst, n: NodeId) -> Option<NodeId> {
 }
 
 /// How often slang's AST visitor reaches this node: once, or once per
-/// specialization of the generic class around it (see [`spec_counts`]).
+/// specialization of the generic class around it (see [`sv_sema::spec_counts`]).
 pub(crate) fn visits(_c: &Cst, _n: NodeId) -> usize {
     1
 }

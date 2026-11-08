@@ -250,6 +250,8 @@ fn arg_error(name: &str, (lo, hi): (u32, u32), n: u32) -> Option<String> {
     }
 }
 
+/// Runs this module's checks over every tree of a compile and returns the
+/// errors found (system calls with the wrong number of arguments), in tree and source order.
 pub fn check(trees: &[Tree]) -> Vec<Diag> {
     let mut out = Vec::new();
     for (tree, t) in trees.iter().enumerate() {

@@ -1,11 +1,22 @@
 # Rust front end
 
-The plan to give every DV tool one design model, with slang moving behind it
-layer by layer. R0 (the bridge) is done; R1 (shared API and tools) is under way.
+A native SystemVerilog/UVM front end in Rust and the DV tools built on it:
+lexer, preprocessor, lossless parser, semantic layer (class model,
+elaboration, compiler checks), and the linter (`dv-lint`, every uvmcheck
+rule), builder (`dv-build`), language server (`dv-lsp`), `dv-map` and
+`dv-filelist`. Slang stays reachable behind a C ABI as the reference the
+parity gates compare against.
+
+**[ARCHITECTURE.md](ARCHITECTURE.md)** is the map: what each crate does, how
+a compile flows through them, how the linter runs rules in parallel, and
+which gate checks which layer. The sections below are the build, the tools'
+usage and the record of each stage as it landed (R0 bridge, R2 parser, R3
+model and rules, N0-N6 builder phases), with what was measured then.
+
+### The slang bridge (R0)
 
 ```
-tools: dv-map, dv-filelist (later dv-lsp, dv-fmt, ...)    Python: uvmcheck.model
-  ├─ sv-source    VCS/Xcelium file lists, native Rust
+tools                                                      Python: uvmcheck.model
   └─ dv-model     safe, owned Rust snapshot of the design
        └─ sv-slang   raw FFI to libuvmcheck_model (C ABI)  <- Python uses the same ABI
             └─ uvmcheck::model  (C++ facade, include/uvmcheck/model/)
@@ -24,6 +35,7 @@ on it.
 ```sh
 cmake --preset model && cmake --build build-model   # libuvmcheck_model.so + model_capi_smoke
 cd rust && cargo test && cargo build --release
+cargo doc --workspace --no-deps --open               # API docs of every crate
 ```
 
 The `model` preset is a separate build: it compiles slang position independent

@@ -21,6 +21,8 @@ use SyntaxKind::*;
 
 use crate::names::Diag;
 
+/// Runs this module's checks over every tree of a compile and returns the
+/// errors found (user-defined primitive errors), in tree and source order.
 pub fn check(trees: &[Tree]) -> Vec<Diag> {
     let mut out = Vec::new();
     let mut udps = HashSet::new();

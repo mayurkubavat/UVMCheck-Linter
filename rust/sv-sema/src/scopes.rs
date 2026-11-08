@@ -14,35 +14,63 @@ use SyntaxKind::*;
 /// What a symbol is.
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug, PartialOrd, Ord)]
 pub enum SymKind {
+    /// `module`.
     Module,
+    /// `interface`.
     Interface,
+    /// `program`.
     Program,
+    /// `package`.
     Package,
+    /// `class` (also `interface class`).
     Class,
+    /// A value `parameter` or `localparam`.
     Parameter,
+    /// A `parameter type` / `localparam type`.
     TypeParameter,
+    /// A port of a design unit.
     Port,
+    /// A net (`wire`, `tri`, user nettypes, ...).
     Net,
+    /// A variable (`logic`, `int`, class handles, ...), class properties and
+    /// covergroup instances in a class included.
     Variable,
+    /// A `typedef` name (forward typedefs included).
     Typedef,
+    /// A member of an enum type, declared in the scope that declares the enum.
     EnumValue,
+    /// A function.
     Function,
+    /// A task.
     Task,
+    /// A formal argument of a subroutine.
     Argument,
+    /// A constraint block.
     Constraint,
+    /// A covergroup.
     Covergroup,
+    /// A modport of an interface.
     Modport,
+    /// A clocking block.
     Clocking,
+    /// A `genvar`.
     Genvar,
+    /// A named `sequence`.
     Sequence,
+    /// A named `property`.
     Property,
+    /// A `let` declaration.
     Let,
+    /// A `nettype`.
     Nettype,
+    /// A `specparam`.
     Specparam,
+    /// A module, interface or program instance.
     Instance,
 }
 
 impl SymKind {
+    /// The kind as the Slang reference dump prints it (`"type_parameter"`).
     pub fn as_str(self) -> &'static str {
         use SymKind::*;
         match self {
@@ -81,17 +109,20 @@ impl SymKind {
 pub struct Symbol {
     /// The scope that declares it.
     pub scope: usize,
+    /// What kind of declaration it is.
     pub kind: SymKind,
+    /// The declared name.
     pub name: String,
     /// Tree index and the node that declares it (its Name, or the
     /// declaration itself when the name is a bare token).
     pub tree: usize,
+    /// The declaring node, in tree `tree`.
     pub node: NodeId,
     /// For values and typedefs: the data type written (none when implicit;
-    /// for an enum value, its enum type)
-    /// and the node holding the unpacked dimensions (the Declarator, or
-    /// the TypedefDecl).
+    /// for an enum value, its enum type).
     pub dtype: Option<NodeId>,
+    /// For values and typedefs: the node holding the unpacked dimensions (the
+    /// `Declarator`, or the `TypedefDecl`).
     pub item: Option<NodeId>,
 }
 
@@ -101,18 +132,25 @@ pub struct Scope {
     /// Dotted path from the root (`m`, `p.c`, `$unit.c.f`); `$root` for the
     /// root that holds the design units.
     pub path: String,
+    /// The enclosing scope; `None` only for the root.
     pub parent: Option<usize>,
     /// The symbol that opens it (none for `$root` and `$unit`).
     pub symbol: Option<usize>,
 }
 
+/// The symbol table of a compile: every scope and every symbol, indexed by
+/// position. Built by [`build`]; scopes [`ROOT`] and [`UNIT`] always exist.
 #[derive(Clone, Debug, Default)]
 pub struct Scopes {
+    /// Every scope; index 0 is [`ROOT`], 1 is [`UNIT`].
     pub scopes: Vec<Scope>,
+    /// Every symbol, in declaration order per scope.
     pub symbols: Vec<Symbol>,
 }
 
+/// Index of `$root`, which holds the design units.
 pub const ROOT: usize = 0;
+/// Index of `$unit`, the compilation-unit scope.
 pub const UNIT: usize = 1;
 
 impl Scopes {

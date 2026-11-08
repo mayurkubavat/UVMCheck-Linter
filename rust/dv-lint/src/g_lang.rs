@@ -4,7 +4,7 @@
 //! width). Messages are verbatim.
 //!
 //! The literal rules visit slang's AST, which holds a literal once per
-//! elaborated copy of the code around it ([`copies`]) and leaves out what
+//! elaborated copy of the code around it ([`sv_sema::Elaborated::copies`]) and leaves out what
 //! elaboration folds away: dimensions, generate conditions and loop
 //! headers, and parameter defaults every instance overrides.
 

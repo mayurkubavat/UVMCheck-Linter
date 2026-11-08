@@ -13,10 +13,14 @@ use sv_preproc::Origin;
 
 use crate::SyntaxKind;
 
+/// A leaf of the tree: one preprocessed token with where it came from.
 #[derive(Clone, Debug)]
 pub struct Token {
+    /// Lexer kind.
     pub kind: Kind,
+    /// The token's text.
     pub text: Arc<str>,
+    /// Where it is (see `sv_preproc::PpToken::origin`).
     pub origin: Origin,
     /// Made by a macro expansion (or `__FILE__`/`__LINE__`).
     pub from_macro: bool,
@@ -32,36 +36,56 @@ pub struct Token {
     pub from_arg: bool,
 }
 
+/// Index of a node in [`Tree::nodes`].
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct NodeId(pub u32);
 
+/// A child of a node: a sub-node or a token (index into [`Tree::tokens`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Child {
+    /// A sub-node.
     Node(NodeId),
+    /// A token, by index into [`Tree::tokens`].
     Token(u32),
 }
 
+/// An interior node: a kind and its children in source order.
 #[derive(Clone, Debug)]
 pub struct Node {
+    /// What the node is.
     pub kind: SyntaxKind,
+    /// Tokens and sub-nodes, in source order.
     pub children: Vec<Child>,
 }
 
+/// A parse error. The parser recovers and keeps going, so a tree with errors
+/// is still complete (unplaced tokens go into [`SyntaxKind::Error`] nodes).
 #[derive(Clone, Debug)]
 pub struct SyntaxError {
     /// Index of the token where the error was found (may equal the token
     /// count for the end of input).
     pub token: u32,
+    /// What was expected or found.
     pub message: String,
 }
 
+/// A parsed input: one file with what it includes (`parse_file`,
+/// `parse_files`) or several files as one unit (`parse_unit`). Holds the
+/// tokens, nodes, the files they came from and the diagnostics found.
 pub struct Tree {
+    /// Every preprocessed token, in order; each is a leaf exactly once.
     pub tokens: Vec<Token>,
+    /// Node arena, indexed by [`NodeId`].
     pub nodes: Vec<Node>,
+    /// The [`SyntaxKind::SourceFile`] node.
     pub root: NodeId,
+    /// Every file read, indexed by `Origin::file`.
     pub files: Vec<PathBuf>,
+    /// The text of each file in `files`, as read.
     pub sources: Vec<Arc<str>>,
+    /// Parse errors, in token order.
     pub errors: Vec<SyntaxError>,
+    /// Preprocessor errors.
     pub pp_diagnostics: Vec<sv_preproc::Diagnostic>,
     /// Macros used in the source text, in order (see `sv_preproc::Output`).
     pub macro_uses: Vec<sv_preproc::MacroUse>,
@@ -78,14 +102,17 @@ pub struct Tree {
 }
 
 impl Tree {
+    /// The node `id`.
     pub fn node(&self, id: NodeId) -> &Node {
         &self.nodes[id.0 as usize]
     }
 
+    /// The kind of node `id`.
     pub fn kind(&self, id: NodeId) -> SyntaxKind {
         self.node(id).kind
     }
 
+    /// The sub-nodes of `id` (tokens skipped), in order.
     pub fn children(&self, id: NodeId) -> impl Iterator<Item = NodeId> + '_ {
         self.node(id).children.iter().filter_map(|c| match c {
             Child::Node(n) => Some(*n),
@@ -93,6 +120,7 @@ impl Tree {
         })
     }
 
+    /// The first sub-node of `id` of kind `kind`.
     pub fn child(&self, id: NodeId, kind: SyntaxKind) -> Option<NodeId> {
         self.children(id).find(|&c| self.kind(c) == kind)
     }
@@ -194,6 +222,8 @@ impl Tree {
         self.token_range(id).iter().map(|&t| &*self.tokens[t as usize].text).collect()
     }
 
+    /// The leading trivia of token `t` (whitespace, comments, directives and macro
+    /// uses written before it); empty for tokens a macro produced.
     pub fn trivia(&self, t: u32) -> &str {
         let tok = &self.tokens[t as usize];
         &self.sources[tok.origin.file as usize][tok.trivia_start as usize..tok.origin.offset as usize]

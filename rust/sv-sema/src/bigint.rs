@@ -5,6 +5,7 @@
 
 use std::cmp::Ordering;
 
+/// A signed integer of any width; see the module docs for the layout.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Int {
     /// Never empty; no redundant top word (one equal to the sign extension
@@ -167,10 +168,12 @@ impl Int {
         self
     }
 
+    /// True when the value is below zero.
     pub fn is_neg(&self) -> bool {
         self.sign_word() != 0
     }
 
+    /// True when the value is zero.
     pub fn is_zero(&self) -> bool {
         self.w.len() == 1 && self.w[0] == 0
     }
@@ -199,6 +202,7 @@ impl Int {
         0
     }
 
+    /// Bit `i` of the two's complement value (sign-extended above the top word).
     pub fn bit(&self, i: u32) -> bool {
         (self.word((i / 64) as usize) >> (i % 64)) & 1 == 1
     }
@@ -234,19 +238,24 @@ impl Int {
         Int { w: (0..n).map(|i| f(self.word(i), o.word(i))).collect() }.trim()
     }
 
+    /// Bitwise and.
     pub fn and(&self, o: &Int) -> Int {
         self.zip(o, |a, b| a & b)
     }
+    /// Bitwise or.
     pub fn or(&self, o: &Int) -> Int {
         self.zip(o, |a, b| a | b)
     }
+    /// Bitwise exclusive or.
     pub fn xor(&self, o: &Int) -> Int {
         self.zip(o, |a, b| a ^ b)
     }
+    /// Bitwise not (`-self - 1`).
     pub fn not(&self) -> Int {
         Int { w: self.w.iter().map(|a| !a).collect() }.trim()
     }
 
+    /// `self + o`, exact.
     pub fn add(&self, o: &Int) -> Int {
         let n = self.w.len().max(o.w.len()) + 1;
         let mut out = Words::new();
@@ -260,14 +269,17 @@ impl Int {
         Int { w: out.into() }.trim()
     }
 
+    /// `-self`, exact.
     pub fn neg(&self) -> Int {
         self.not().add(&Int::from(1))
     }
 
+    /// `self - o`, exact.
     pub fn sub(&self, o: &Int) -> Int {
         self.add(&o.neg())
     }
 
+    /// `self << n`, exact (no width limit).
     pub fn shl(&self, n: u32) -> Int {
         let (ws, bs) = ((n / 64) as usize, n % 64);
         let mut out: Words = std::iter::repeat_n(0u64, ws).collect();
@@ -315,6 +327,7 @@ impl Int {
         }
     }
 
+    /// `self * o`, exact.
     pub fn mul(&self, o: &Int) -> Int {
         if let (Some(a), Some(b)) = (self.to_i128(), o.to_i128()) {
             if let Some(p) = a.checked_mul(b) {
@@ -368,6 +381,7 @@ impl Int {
         Some((q, r))
     }
 
+    /// `self` to the power `e`, exact.
     pub fn pow(&self, e: u32) -> Int {
         let mut r = Int::from(1);
         let mut b = self.clone();
@@ -446,6 +460,8 @@ impl Int {
         Int::from_mag(m, false)
     }
 
+    /// Parses digits in base `radix` (2 to 36), ignoring `_`. `None` when a digit is
+    /// not valid in that base or there are no digits.
     pub fn parse_radix(digits: &str, radix: u32) -> Option<Int> {
         let mut v = Int::from(0);
         let r = Int::from(radix as i128);

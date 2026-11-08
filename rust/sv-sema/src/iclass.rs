@@ -204,6 +204,8 @@ impl Classes<'_> {
     }
 }
 
+/// Runs this module's checks over every tree of a compile and returns the
+/// errors found (interface class and class relation errors), in tree and source order.
 pub fn check(trees: &[Tree]) -> Vec<Diag> {
     let mut by_name: HashMap<String, Vec<At>> = HashMap::new();
     for (ix, t) in trees.iter().enumerate() {

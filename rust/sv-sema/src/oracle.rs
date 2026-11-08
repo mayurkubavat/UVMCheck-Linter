@@ -22,6 +22,8 @@ pub struct TypeInfo {
 }
 
 impl TypeInfo {
+    /// A type with only its printed form: not integral, not an aggregate, no
+    /// declaration to look into.
     pub fn other(text: impl Into<String>) -> TypeInfo {
         TypeInfo { text: text.into(), integral: None, src: None, aggregate: false }
     }
@@ -46,6 +48,8 @@ pub struct TypeOracle<'t> {
 }
 
 impl<'t> TypeOracle<'t> {
+    /// Builds the scopes and constant evaluation for `trees` once; every query
+    /// after that is read-only (answers are cached).
     pub fn new(trees: &'t [Tree]) -> Self {
         let mut b = Builder::new(trees);
         b.designs = true;

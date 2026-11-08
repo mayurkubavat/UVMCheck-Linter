@@ -243,7 +243,7 @@ fn property_owner<'d>(d: &'d Design, c: &'d Class, name: &str) -> Option<&'d Cla
 }
 
 /// A descendant reached from one of the class's own (or inherited)
-/// properties: agt, agt[0], this.agt, agt.drv ...
+/// properties: `agt`, `agt[0]`, `this.agt`, `agt.drv` ...
 fn reached_through_own_child(ctx: &Ctx, c: &Cst, e: NodeId) -> bool {
     let mut x = skip_selects(c, e);
     while c.kind(x) == MemberExpr {

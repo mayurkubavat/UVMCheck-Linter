@@ -121,6 +121,8 @@ fn is_virtual(t: &Tree, m: NodeId) -> bool {
     own.contains(&"virtual") || own.contains(&"pure")
 }
 
+/// Runs this module's checks over every tree of a compile and returns the
+/// errors found (class member and parameter initializer errors), in tree and source order.
 pub fn check(trees: &[Tree]) -> Vec<Diag> {
     let mut out = Vec::new();
     let mut classes: HashMap<String, Vec<Class>> = HashMap::new();

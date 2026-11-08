@@ -21,6 +21,7 @@ use std::sync::Arc;
 
 use sv_lexer::Kind;
 
+/// How to preprocess: what `+incdir+` and `+define+` would give.
 #[derive(Clone, Debug, Default)]
 pub struct Options {
     /// Searched, in order, for `include files after the including file's directory.
@@ -34,14 +35,21 @@ pub struct Options {
 /// Where a token came from: a file (index into `Output::files`) and a byte offset.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Origin {
+    /// Index into [`Output::files`].
     pub file: u32,
+    /// Byte offset in that file's text.
     pub offset: u32,
 }
 
+/// A token of the preprocessed stream: what the parser reads.
 #[derive(Clone, Debug)]
 pub struct PpToken {
+    /// Lexer kind (never trivia or a directive).
     pub kind: Kind,
+    /// The token's text (shared, so expansions copy cheaply).
     pub text: Arc<str>,
+    /// Where the token is: its own place in the file for source text, the macro
+    /// use for tokens a macro produced.
     pub origin: Origin,
     /// Made or rearranged by a macro expansion.
     pub from_macro: bool,
@@ -56,18 +64,25 @@ pub struct PpToken {
     pub from_arg: bool,
 }
 
+/// A preprocessor error (unknown macro, missing include, bad directive, ...).
 #[derive(Clone, Debug)]
 pub struct Diagnostic {
+    /// Where it was found.
     pub origin: Origin,
+    /// What went wrong.
     pub message: String,
 }
 
+/// Everything one run produces.
 #[derive(Debug, Default)]
 pub struct Output {
+    /// The expanded token stream, in order.
     pub tokens: Vec<PpToken>,
+    /// Every file read (inputs and includes), indexed by [`Origin::file`].
     pub files: Vec<PathBuf>,
     /// The text of each file in `files`, as read.
     pub sources: Vec<Arc<str>>,
+    /// Errors, in the order found.
     pub diagnostics: Vec<Diagnostic>,
     /// Uses of defined macros written in the source text (not inside
     /// another expansion), in order: Slang's top-level macro references.
@@ -86,7 +101,9 @@ pub struct Output {
 /// backtick's position.
 #[derive(Clone, Debug)]
 pub struct MacroUse {
+    /// Macro name without the backtick.
     pub name: Arc<str>,
+    /// Where the backtick is.
     pub origin: Origin,
 }
 
@@ -137,6 +154,9 @@ struct Cond {
     taken: bool,
 }
 
+/// The preprocessor. One instance is one compilation unit: macros defined by
+/// a run stay defined for the next one, which is how
+/// `sv_syntax::parse_files` shares macros across files.
 pub struct Preprocessor {
     opts: Options,
     macros: HashMap<String, Rc<Macro>>,
@@ -263,6 +283,8 @@ fn lex_to_t(src: &str, file: u32, from_macro: bool, origin_override: Option<Orig
 }
 
 impl Preprocessor {
+    /// A preprocessor with the standard macros and `opts.defines` defined.
+    /// A `max_include_depth` of 0 means 1024.
     pub fn new(opts: Options) -> Self {
         let mut pp = Preprocessor {
             opts,
@@ -303,6 +325,7 @@ impl Preprocessor {
         self.macros.insert(name.to_string(), Rc::new(Macro { params: None, body }));
     }
 
+    /// True when macro `name` is currently defined.
     pub fn is_defined(&self, name: &str) -> bool {
         self.macros.contains_key(name)
     }

@@ -25,8 +25,11 @@ use crate::scopes::{Scopes, SymKind, ROOT, UNIT};
 /// An error at a node's first token.
 #[derive(Clone, Debug)]
 pub struct Diag {
+    /// Index of the tree, among those checked, that holds the node.
     pub tree: usize,
+    /// The node the error is about; it is reported at its first token.
     pub node: NodeId,
+    /// The message, worded as slang words it where slang has the same check.
     pub message: String,
 }
 
@@ -50,6 +53,8 @@ const STD_TYPES: &[&str] = &["semaphore", "mailbox", "process", "weak_reference"
 
 const BUILTIN_METHODS: &[&str] = &["randomize", "rand_mode", "constraint_mode"];
 
+/// Runs the name checks over every tree, given the scopes built from them,
+/// and returns the errors found in tree and source order.
 pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     let mut out = Vec::new();
     redeclarations(trees, scopes, &mut out);

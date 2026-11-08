@@ -69,6 +69,8 @@ struct Decl {
     typedef: bool,
 }
 
+/// Runs this module's checks over every tree of a compile and returns the
+/// errors found (names used before they are declared), in tree and source order.
 pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     // Names some package declares.
     let mut in_package = std::collections::HashSet::new();

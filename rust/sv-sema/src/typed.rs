@@ -194,6 +194,8 @@ struct Ctx<'a> {
     members: HashMap<usize, Vec<&'a str>>,
 }
 
+/// Runs this module's checks over every tree of a compile and returns the
+/// errors found (members and arity checked against declared types), in tree and source order.
 pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     let (types, _) = crate::symbol_info(trees, scopes);
     let mut by_name: HashMap<(usize, &str), Vec<usize>> = HashMap::new();

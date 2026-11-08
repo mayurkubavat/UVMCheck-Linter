@@ -15,19 +15,27 @@
 mod keywords;
 pub use keywords::{is_keyword, is_keyword_in, KeywordVersion, KEYWORDS};
 
+/// What a [`Token`] is. Trivia kinds come first (see [`Kind::is_trivia`]).
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Kind {
     // Trivia
+    /// Spaces, tabs, vertical tabs and form feeds.
     Whitespace,
+    /// One line break: `\n`, `\r\n` or a lone `\r`.
     Newline,
+    /// `// ...` up to the end of the line.
     LineComment,
+    /// `/* ... */`.
     BlockComment,
     /// A backslash ending a line, as in a multi-line `define body.
     LineContinuation,
     // Names
+    /// A simple identifier (`[a-zA-Z_][a-zA-Z0-9_$]*`) that is not a keyword.
     Identifier,
     /// `\name` up to the next whitespace.
     EscapedIdentifier,
+    /// A reserved word of [`KEYWORDS`]; `begin_keywords may make one an identifier
+    /// again (the preprocessor decides).
     Keyword,
     /// `$display`, `$urandom`.
     SystemIdentifier,
@@ -50,9 +58,11 @@ pub enum Kind {
     VectorDigits,
     /// `'0`, `'1`, `'x`, `'z`.
     UnbasedUnsizedLiteral,
+    /// `1.5`, `2e-3`.
     RealLiteral,
     /// `10ns`, `1.5ps`.
     TimeLiteral,
+    /// `"..."`, escapes included.
     StringLiteral,
     /// `"""..."""` (1800-2023).
     TripleQuotedString,
@@ -63,6 +73,7 @@ pub enum Kind {
 }
 
 impl Kind {
+    /// Whitespace, line breaks, comments and line continuations.
     pub fn is_trivia(self) -> bool {
         matches!(
             self,
@@ -74,12 +85,16 @@ impl Kind {
 /// A token: a kind and a byte range of the source.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Token {
+    /// What the token is.
     pub kind: Kind,
+    /// Byte offset of the first byte in the source.
     pub start: u32,
+    /// Length in bytes.
     pub len: u32,
 }
 
 impl Token {
+    /// The token's text in `src`, the string it was lexed from.
     pub fn text<'a>(&self, src: &'a str) -> &'a str {
         &src[self.start as usize..(self.start + self.len) as usize]
     }

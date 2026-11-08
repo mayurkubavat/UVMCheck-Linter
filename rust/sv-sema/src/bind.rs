@@ -131,6 +131,8 @@ fn last_ident(t: &Tree, n: NodeId) -> Option<String> {
     all_idents(t, n).pop()
 }
 
+/// Runs this module's checks over every tree of a compile and returns the
+/// errors found (identifiers that name nothing), in tree and source order.
 pub fn check(trees: &[Tree]) -> Vec<Diag> {
     let mut b = Binder {
         trees,

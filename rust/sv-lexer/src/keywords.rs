@@ -1,5 +1,6 @@
 //! IEEE 1800-2023 Annex B reserved keywords.
 
+/// Every reserved keyword of IEEE 1800-2023 Annex B, sorted (for binary search).
 pub const KEYWORDS: &[&str] = &[
     "accept_on", "alias", "always", "always_comb", "always_ff", "always_latch", "and", "assert", "assign",
     "assume", "automatic", "before", "begin", "bind", "bins", "binsof", "bit", "break", "buf", "bufif0",
@@ -30,6 +31,7 @@ pub const KEYWORDS: &[&str] = &[
     "wildcard", "wire", "with", "within", "wor", "xnor", "xor",
 ];
 
+/// True when `word` is a keyword of the full 1800-2023 set.
 pub fn is_keyword(word: &str) -> bool {
     KEYWORDS.binary_search(&word).is_ok()
 }
@@ -46,14 +48,23 @@ mod tests {
 /// The keyword sets `begin_keywords can select (IEEE 1800-2023 22.14).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum KeywordVersion {
+    /// IEEE 1364-1995 (Verilog-1995).
     V1364_1995,
+    /// IEEE 1364-2001.
     V1364_2001,
+    /// IEEE 1364-2001 without the configuration keywords (`1364-2001-noconfig`).
     V1364_2001NoConfig,
+    /// IEEE 1364-2005.
     V1364_2005,
+    /// IEEE 1800-2005.
     V1800_2005,
+    /// IEEE 1800-2009.
     V1800_2009,
+    /// IEEE 1800-2012.
     V1800_2012,
+    /// IEEE 1800-2017.
     V1800_2017,
+    /// IEEE 1800-2023 (the default).
     V1800_2023,
 }
 

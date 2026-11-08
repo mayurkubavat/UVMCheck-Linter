@@ -18,7 +18,9 @@ use std::path::{Path, PathBuf};
 /// Where a token came from: a file list and line, or the command line (line 0).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Origin {
+    /// The file list, or `None` for the command line.
     pub file: Option<PathBuf>,
+    /// 1-based line in that list; 0 on the command line.
     pub line: u32,
 }
 
@@ -31,30 +33,43 @@ impl fmt::Display for Origin {
     }
 }
 
+/// A value read from a file list, with where it was read.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Item<T> {
+    /// The value.
     pub value: T,
+    /// Where it was read.
     pub origin: Origin,
 }
 
+/// Which simulator's option spellings to accept.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Dialect {
     /// Accept both simulators' spellings (the default).
     Any,
+    /// Synopsys VCS only (`-ntb_opts uvm-x.y`).
     Vcs,
+    /// Cadence Xcelium only (`-uvm`, `-uvmhome`).
     Xcelium,
 }
 
+/// How bad a [`Diagnostic`] is.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Severity {
+    /// The list cannot be used as written (a missing file, an undefined variable).
     Error,
+    /// Worth a look, but the list still reads.
     Warning,
 }
 
+/// A problem found while reading, with where it was found.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Diagnostic {
+    /// How bad it is.
     pub severity: Severity,
+    /// What is wrong.
     pub message: String,
+    /// Where it was found.
     pub origin: Origin,
 }
 
@@ -67,15 +82,21 @@ pub struct UvmRequest {
     pub home_or_version: Option<String>,
 }
 
+/// Everything a set of compile options names, sorted by what it is. Built by
+/// [`FileList::read`] or [`FileList::read_args`]; nothing is lost, so the
+/// list can be written back out.
 #[derive(Clone, Debug, Default)]
 pub struct FileList {
+    /// SystemVerilog and Verilog sources, in order.
     pub sources: Vec<Item<PathBuf>>,
     /// C, C++ and object files (`date.c`, `dpi.so`): simulators hand these
     /// to the C compiler or linker, so they are not SystemVerilog sources.
     pub foreign: Vec<Item<PathBuf>>,
+    /// `+incdir+` / `-incdir` directories, in order.
     pub include_dirs: Vec<Item<PathBuf>>,
     /// Name and optional value, in order; a later define wins.
     pub defines: Vec<Item<(String, Option<String>)>>,
+    /// `+undefine+` names.
     pub undefines: Vec<Item<String>>,
     /// `-y <dir>`: modules are looked up there by name.
     pub library_dirs: Vec<Item<PathBuf>>,
@@ -83,14 +104,18 @@ pub struct FileList {
     pub library_files: Vec<Item<PathBuf>>,
     /// `+libext+.v+.sv`, `-libext .sv`: extensions tried in library dirs.
     pub library_exts: Vec<String>,
+    /// `-top` names.
     pub top: Vec<Item<String>>,
+    /// `-timescale` value, the last one given.
     pub timescale: Option<Item<String>>,
+    /// What was asked about UVM.
     pub uvm: UvmRequest,
     /// Simulator options with no meaning to a front end (`-l run.log`,
     /// `+acc`, `-debug_access+all`), kept for reports and round trips.
     pub ignored: Vec<Item<String>>,
     /// Every file list read, in order.
     pub lists: Vec<PathBuf>,
+    /// Every problem found, in order.
     pub diagnostics: Vec<Diagnostic>,
 }
 
@@ -111,9 +136,11 @@ pub fn is_foreign(p: &Path) -> bool {
 
 /// Variables for `$VAR` expansion; the process environment by default.
 pub trait Env {
+    /// The value of variable `name`, if set.
     fn get(&self, name: &str) -> Option<String>;
 }
 
+/// The process environment ([`std::env::var`]).
 pub struct ProcessEnv;
 
 impl Env for ProcessEnv {
@@ -468,6 +495,7 @@ impl FileList {
         FileList::read_args(["-f", l.as_str()], cwd, dialect, &ProcessEnv)
     }
 
+    /// True when any diagnostic is an error.
     pub fn has_errors(&self) -> bool {
         self.diagnostics.iter().any(|d| d.severity == Severity::Error)
     }

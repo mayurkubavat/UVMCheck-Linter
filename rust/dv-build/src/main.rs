@@ -1,9 +1,9 @@
 //! dv-build: the native SystemVerilog builder. Reads compile options and
 //! VCS/Xcelium file lists, parses every source with the native front end
-//! and reports what is wrong, as a compiler would. It grows phase by phase
-//! (see the builder plan): today it checks preprocessing and syntax,
-//! builds a scope for every design unit and checks the names declared in
-//! them; types, constants, elaboration and type checking follow.
+//! and reports what is wrong, as a compiler would: file list problems,
+//! preprocessor and syntax errors, then every semantic error sv-sema finds
+//! (names, types, constant evaluation, elaboration from `-top`, class,
+//! assertion and UDP rules); see `sv_sema::semantic_diags`.
 //!
 //!     dv-build [--dialect any|vcs|xcelium] [--dump] [--cst] [--symbols] [--types] [--values] [--hier] [--quiet] <options, e.g. -f top.f FILE...>
 //!

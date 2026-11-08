@@ -1,7 +1,13 @@
 //! Runs the ported rules over a design, built natively (default) or through
 //! slang (`--slang`, model rules only), and prints findings as uvmcheck does:
 //!
-//!     dv-lint [--slang] [--time] [--history] [--rule ID]... [--list] <compile options>
+//!     dv-lint [--slang] [--time] [--history] [--rule ID]... [-top NAME]... [--list] <compile options>
+//!
+//! `--list` prints every rule (`id name model|syntax`); `-top` names the
+//! modules elaboration starts from; `--history` lets SV-EVO-001/002 read git
+//! history. For the gates: `--specs` prints how often each generic class is
+//! visited, `--exprs` every expression's type (the form of
+//! `tools/exprdump.cpp`).
 //!
 //! Rules run on one thread per core (`DV_LINT_JOBS=N` to choose; 1 runs
 //! them serially); the output does not depend on it.

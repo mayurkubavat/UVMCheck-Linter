@@ -5,6 +5,40 @@
 //! `Design` (slang or the native sv-sema) can feed them; syntax rules (see
 //! [`syntax`]) read the native syntax tree. Messages are copied verbatim so
 //! findings compare one to one with `uvmcheck` (see `tools/lint_parity.py`).
+//!
+//! # How a run works
+//!
+//! [`rules`] lists every rule as a [`Rule`]: an id, a name and a [`Check`]
+//! saying what it reads (the model, one tree, or the model and every tree).
+//! [`lint_all`] filters them, runs them and returns the findings sorted by
+//! position and rule, with inline waivers applied (`waivers`) and nothing
+//! reported in the test UVM mock.
+//!
+//! Rules run on `DV_LINT_JOBS` threads (the machine's cores by default):
+//! each thread takes the next rule, slowest first. Work several rules need
+//! (expression types, sv-sema's checks, elaboration, specialization counts)
+//! is built once per compile in `shared` and waited for by the others; with
+//! many rules those caches are warmed first. Findings are put back in the
+//! serial order (model, then syntax, then mixed rules, each as registered),
+//! so the output does not depend on the thread count. `DV_LINT_PROFILE=1`
+//! prints what each rule cost.
+//!
+//! # Where the rules are
+//!
+//! Modules follow the order rules were ported in, grouped loosely by topic,
+//! so the quickest way to a rule is to search for its id. Roughly: `uvm`,
+//! `factory`, `g_uvm*` and `g_meth*` hold UVM usage and methodology rules,
+//! `g_design*` design structure and metrics, `g_random*` randomization,
+//! `g_concurrency` and `g_sva_cov` processes, assertions and coverage,
+//! `g_style*`, `g_readability*` and `g_deprecated` style, `g_types`,
+//! `g_bug` and `g_lang` correctness and language gotchas, `g_misc`
+//! performance, error handling and dead code, `syntax*` the first
+//! syntax-only ports, and `g_port*` rules of every kind ported later.
+//! Helpers shared by rules: [`syntax::Cst`] (a tree with parents, per-kind
+//! node lists and locations), [`g_exprty`] (expression types as slang
+//! gives them), `g_c_support` (what slang's AST tells the concurrency and
+//! coverage rules), `uvm_api` (the UVM API packs) and `g_history` (git
+//! history).
 
 use dv_model::{Class, ClassId, Design, Direction, Loc, Method, PhaseKind, Property, TypeShape};
 
@@ -61,15 +95,21 @@ mod syntax5;
 mod syntax6;
 mod uvm;
 
+/// How serious a finding is, ordered from least to most.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum Severity {
+    /// Informational (metrics, suggestions).
     Info,
+    /// A style or naming convention.
     Style,
+    /// Worth fixing: a likely bug or methodology problem.
     Warning,
+    /// Should be fixed.
     Error,
 }
 
 impl Severity {
+    /// The name uvmcheck prints (`"WARNING"`).
     pub fn as_str(self) -> &'static str {
         match self {
             Severity::Info => "INFO",
@@ -80,12 +120,18 @@ impl Severity {
     }
 }
 
+/// One finding of one rule.
 #[derive(Clone, Debug)]
 pub struct Finding {
+    /// Rule id (`"SV-OOP-003"`).
     pub rule: &'static str,
+    /// Rule name (`"MissingSuperNew"`).
     pub name: &'static str,
+    /// Severity, as the C++ rule reports it.
     pub severity: Severity,
+    /// The message, word for word as uvmcheck prints it.
     pub message: String,
+    /// Where it is (see [`Finding::position`] for where it is reported).
     pub loc: Loc,
     /// Secondary locations ("non-virtual method in 'base'").
     pub related: Vec<(Loc, String)>,
@@ -111,6 +157,7 @@ impl Finding {
 /// Collects findings as rules emit them.
 #[derive(Default)]
 pub struct Sink {
+    /// Findings in the order rules emitted them.
     pub findings: Vec<Finding>,
 }
 
@@ -135,6 +182,7 @@ impl Sink {
     }
 }
 
+/// A rule that reads only the class model.
 pub type RuleFn = fn(&Design, &mut Sink);
 
 /// A rule that reads the class model and the syntax trees together (the
@@ -145,25 +193,33 @@ pub type MixedFn = fn(&Design, &[syntax::Cst], &mut Sink);
 /// What a rule reads.
 #[derive(Clone, Copy)]
 pub enum Check {
+    /// Reads only the class model: runs once per compile.
     Model(RuleFn),
+    /// Reads one syntax tree: runs once per tree.
     Syntax(syntax::SyntaxFn),
+    /// Reads the model and every tree: runs once per compile.
     Mixed(MixedFn),
 }
 
 /// A ported rule: its id, name and check.
 pub struct Rule {
+    /// Rule id (`"SV-OOP-003"`), as uvmcheck registers it.
     pub id: &'static str,
+    /// Rule name (`"MissingSuperNew"`).
     pub name: &'static str,
+    /// What the rule reads and the function that runs it.
     pub check: Check,
 }
 
 impl Rule {
+    /// True for rules that need syntax trees (syntax and mixed ones), which the
+    /// slang front end does not provide.
     pub fn is_syntax(&self) -> bool {
         matches!(self.check, Check::Syntax(_) | Check::Mixed(_))
     }
 }
 
-/// Every ported rule, in the order uvmcheck registers them (by id).
+/// Top modules from `-top` (see [`add_tops`]).
 static TOPS: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
 
 /// Adds top modules (`-top`): elaboration starts from them only.
@@ -187,6 +243,7 @@ pub fn sub_rules(id: &str) -> &'static [(&'static str, &'static str)] {
     }
 }
 
+/// Every ported rule, in the order uvmcheck registers them (by id).
 pub fn rules() -> Vec<Rule> {
     let mut v = vec![
         Rule {

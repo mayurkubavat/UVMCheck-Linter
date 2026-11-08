@@ -1,7 +1,8 @@
-//! Grammar, slice 1: design units, classes, packages and their items, and
-//! statements at block level. Expressions, types, port lists and
-//! constraint bodies are kept as balanced token runs inside their nodes;
-//! later slices parse them in place.
+//! Grammar: design units, classes, packages and their items, and
+//! statements (slice 1 of the parser). The constructs inside them are
+//! parsed in place by the later slices: expressions in `expr`, headers,
+//! constraints and covergroups in `blocks`, assertions in `assertions`
+//! and the rarer items in `misc`.
 
 use crate::expr::{arg_list, expr, expr_bp, expr_with, param_values, value_range, ASSIGNABLE, STATEMENT};
 pub(crate) use crate::blocks::{constraint_block, timing_control};

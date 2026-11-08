@@ -3,15 +3,20 @@
 
 use crate::{NodeId, SyntaxKind, Tree};
 
+/// One declaration of [`outline`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct OutlineEntry {
     /// module, interface, program, package, class, function, task,
     /// typedef, constraint, covergroup.
     pub kind: &'static str,
+    /// Declared name as written (a scoped name for an out-of-block method).
     pub name: String,
+    /// The declaration's node.
     pub node: NodeId,
 }
 
+/// Design units, classes, functions, tasks, typedefs, constraints and
+/// covergroups of `tree`, in preorder.
 pub fn outline(tree: &Tree) -> Vec<OutlineEntry> {
     let mut out = Vec::new();
     for n in tree.preorder() {

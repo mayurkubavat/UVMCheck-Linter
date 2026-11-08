@@ -99,6 +99,8 @@ struct Ctx<'a> {
     classes: HashMap<String, Vec<(usize, NodeId)>>,
 }
 
+/// Runs the type checks over every tree of a compile, resolving names in
+/// `scopes`, and returns the errors found in tree and source order.
 pub fn check(trees: &[Tree], scopes: &Scopes) -> Vec<Diag> {
     let mut values: HashMap<(usize, &str), Vec<usize>> = HashMap::new();
     for (i, s) in scopes.symbols.iter().enumerate() {

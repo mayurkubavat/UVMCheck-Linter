@@ -1,5 +1,28 @@
 //! Lossless SystemVerilog syntax tree (R2 of the Rust front end).
 //!
+//! The parser reads `sv-preproc`'s token stream and builds a [`Tree`]: a
+//! flat token array plus a node arena, where every token is a leaf exactly
+//! once and carries the source text before it as trivia, so each file can
+//! be given back byte for byte ([`Tree::file_text`]). Node kinds are in
+//! [`SyntaxKind`]. The parser recovers from errors and always returns a
+//! complete tree; problems are in [`Tree::errors`] and
+//! [`Tree::pp_diagnostics`].
+//!
+//! Entry points: [`parse_file`], [`parse_files`] (one tree per file,
+//! macros shared, as a simulator compiles a file list), [`parse_unit`]
+//! (one tree for all files, slang's `--single-unit`) and [`parse_source`].
+//! [`outline()`] and [`canonical_exprs`] print the forms the Slang parity
+//! gates (`tools/cst_parity.py`) compare.
+//!
+//! Inside: `parser` holds the event-based parser state, `grammar` the
+//! design units, items, data types, declarations and statements, `expr`
+//! expressions (precedence climbing over IEEE 1800 Table 11-2), `blocks`
+//! headers (parameter and port lists, `extends`), timing controls,
+//! constraints and covergroups, `assertions` properties, sequences,
+//! clocking blocks, DPI, modports and `bind`, `misc` the rarer items
+//! (specify, UDPs, configs, randsequence), and `checks` the errors slang's
+//! parser reports beyond the grammar.
+//!
 //! ```
 //! let tree = sv_syntax::parse_source("module m; endmodule\n", "m.sv", Default::default());
 //! assert!(tree.errors.is_empty());

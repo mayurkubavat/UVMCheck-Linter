@@ -17,6 +17,7 @@ use SyntaxKind::*;
 /// One tree, with a pre-order of its nodes and their parents, and the
 /// locator that numbers files as the design does.
 pub struct Cst<'t> {
+    /// The tree.
     pub tree: &'t Tree,
     ix: usize,
     pre: Vec<NodeId>,
@@ -35,6 +36,8 @@ pub struct Cst<'t> {
 const NO_PARENT: u32 = u32::MAX;
 
 impl<'t> Cst<'t> {
+    /// Wraps tree `tree`, index `ix` of its compile, numbering files with
+    /// `locator`. [`Self::all`] is just this tree until the caller sets it.
     pub fn new(tree: &'t Tree, ix: usize, locator: Locator) -> Self {
         let pre = tree.preorder();
         let mut parent = vec![NO_PARENT; tree.nodes.len()];
@@ -53,9 +56,6 @@ impl<'t> Cst<'t> {
         crate::shared::get("spec_counts", self.compile_key(), || sv_sema::spec_counts(self.all)).get(&(self.index(), class)).copied()
     }
 
-    /// Identifies the compile for per-compile caches: the trees' address
-    /// and their sizes (an address alone can be reused by a later compile
-    /// in the same thread).
     /// Identifies this tree within its compile, for per-tree caches whose
     /// values depend on the other trees too.
     pub fn tree_key(&self) -> (usize, usize) {
@@ -64,6 +64,9 @@ impl<'t> Cst<'t> {
         (self.tree as *const Tree as usize, a.rotate_left(17) ^ b.wrapping_mul(0x9E37_79B9) ^ t)
     }
 
+    /// Identifies the compile for per-compile caches: the trees' address
+    /// and their sizes (an address alone can be reused by a later compile
+    /// in the same thread).
     pub fn compile_key(&self) -> (usize, usize) {
         let size = self.all.iter().fold(self.all.len(), |a, t| {
             a.wrapping_mul(31).wrapping_add(t.nodes.len()).wrapping_mul(131).wrapping_add(t.tokens.len())
@@ -102,15 +105,18 @@ impl<'t> Cst<'t> {
         by.get(kind as u16 as usize).map_or(&[], Vec::as_slice)
     }
 
+    /// The kind of node `n`.
     pub fn kind(&self, n: NodeId) -> SyntaxKind {
         self.tree.kind(n)
     }
 
+    /// The parent of node `n` (`None` for the root).
     pub fn parent(&self, n: NodeId) -> Option<NodeId> {
         let p = self.parent[n.0 as usize];
         (p != NO_PARENT).then_some(NodeId(p))
     }
 
+    /// The children of node `n`, tokens and nodes, in order.
     pub fn kids(&self, n: NodeId) -> &'t [Child] {
         &self.tree.node(n).children
     }
@@ -132,6 +138,7 @@ impl<'t> Cst<'t> {
         })
     }
 
+    /// The text of token `tok`.
     pub fn text_of(&self, tok: u32) -> &'t str {
         &self.tree.tokens[tok as usize].text
     }
@@ -146,10 +153,12 @@ impl<'t> Cst<'t> {
         self.toks(n).next()
     }
 
+    /// The first token of node `n` (`None` for a node with no tokens).
     pub fn first_tok(&self, n: NodeId) -> Option<u32> {
         self.tree.token_bounds(n).map(|(a, _)| a)
     }
 
+    /// The text of node `n`'s last token (empty when it has none).
     pub fn last_text(&self, n: NodeId) -> &'t str {
         self.tree.token_bounds(n).map(|(_, b)| self.text_of(b)).unwrap_or("")
     }
@@ -182,6 +191,8 @@ impl<'t> Cst<'t> {
         Loc { file, line, column, expansion: None }
     }
 
+    /// Location of token `tok`, with the expansion site for macro-made tokens
+    /// (see `sv_sema::Locator::loc`).
     pub fn loc(&self, tok: u32) -> Loc {
         self.locator.borrow_mut().loc(self.ix, self.tree, tok)
     }
@@ -203,6 +214,7 @@ impl<'t> Cst<'t> {
     }
 }
 
+/// A rule that reads one syntax tree.
 pub type SyntaxFn = fn(&Cst, &mut Sink);
 
 pub(crate) fn rules() -> Vec<Rule> {
