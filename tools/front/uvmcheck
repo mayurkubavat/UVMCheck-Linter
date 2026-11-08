@@ -1,0 +1,45 @@
+#!/bin/sh
+# uvmcheck on the native engine (dv-lint, no Slang), with the Slang-backed
+# C++ binary as the fallback for what dv-lint does not do yet.
+#
+#     tools/front/uvmcheck [uvmcheck options] <compile options> FILE...
+#
+# Runs target/release/dv-lint when every option is one dv-lint takes, else
+# the C++ uvmcheck (build/uvmcheck, or $UVMCHECK_SLANG) with the same
+# arguments, saying so on stderr. UVMCHECK_ENGINE=slang always uses the C++
+# binary; UVMCHECK_ENGINE=native never falls back. Build the native engine
+# with `cargo build --release -p dv-lint`.
+repo=$(cd "$(dirname "$(readlink -f "$0")")/../.." && pwd)
+native=${UVMCHECK_NATIVE:-$repo/target/release/dv-lint}
+slang=${UVMCHECK_SLANG:-$repo/build/uvmcheck}
+
+engine=${UVMCHECK_ENGINE:-auto}
+if [ "$engine" = auto ]; then
+    engine=native
+    expect_value=no
+    for a in "$@"; do
+        if [ "$expect_value" = yes ]; then
+            expect_value=no
+            continue
+        fi
+        case "$a" in
+            # Options dv-lint takes, and those that take a value.
+            --rule|--preset|--json|-top|--top|-I|-D|-f|-F|-v|-y|-P|-l|-o|--timescale|-incdir|-define)
+                expect_value=yes ;;
+            --preset=*|--json=*|--experimental|--no-config|--no-cache|--history|--skip-libraries|--time|--frames|--in-context|--list|--single-unit)
+                ;;
+            +incdir+*|+define+*|+undefine+*|+libext+*|-I*|-D*)
+                ;;
+            -*) engine=slang; why=$a; break ;;
+        esac
+    done
+fi
+if [ "$engine" = native ] && [ ! -x "$native" ]; then
+    echo "uvmcheck: $native is not built (cargo build --release -p dv-lint); using the Slang engine" >&2
+    engine=slang
+fi
+if [ "$engine" = slang ]; then
+    [ -n "${why-}" ] && echo "uvmcheck: '$why' needs the Slang engine; running $slang" >&2
+    exec "$slang" "$@"
+fi
+exec "$native" "$@"
