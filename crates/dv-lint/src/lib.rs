@@ -190,6 +190,14 @@ pub fn add_tops(tops: &[String]) {
     }
 }
 
+static SKIP_LIBRARIES: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Reports nothing in library files (`-v`, `-y`): they are read only to
+/// resolve instances. Off by default, as uvmcheck reports in them.
+pub fn set_skip_libraries(on: bool) {
+    SKIP_LIBRARIES.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
 /// The tops `-top` named (empty: every module nothing instantiates).
 pub(crate) fn tops() -> Vec<String> {
     TOPS.read().map(|t| t.clone()).unwrap_or_default()
@@ -274,7 +282,18 @@ pub(crate) fn lint_from(
     };
     shared::end(gen);
     let (files, mut f) = out;
-    f.retain(|x| !x.position_in(&files).0.contains("uvm_mock.svh"));
+    // Nothing is reported in the test UVM mock, nor in library files (-v,
+    // -y) after `--skip-libraries`; uvmcheck reports in libraries.
+    let skip_libs = SKIP_LIBRARIES.load(std::sync::atomic::Ordering::Relaxed);
+    let library: std::collections::HashSet<String> = trees
+        .iter()
+        .filter(|t| skip_libs && t.library)
+        .flat_map(|t| t.files.iter().map(|p| p.display().to_string()))
+        .collect();
+    f.retain(|x| {
+        let file = x.position_in(&files).0;
+        !file.contains("uvm_mock.svh") && !library.contains(file)
+    });
     waivers::apply(&mut f, &files);
     f.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
     (built.into_inner(), (files, f))

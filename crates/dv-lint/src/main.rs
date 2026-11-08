@@ -1,11 +1,13 @@
 //! Runs the ported rules over a design, built natively (default) or through
 //! slang (`--slang`, model rules only), and prints findings as uvmcheck does:
 //!
-//!     dv-lint [--slang] [--time] [--history] [--rule ID]... [-top NAME]... [--list] <compile options>
+//!     dv-lint [--slang] [--time] [--history] [--skip-libraries] [--rule ID]... [-top NAME]... [--list] <compile options>
 //!
 //! `--list` prints every rule (`id name model|syntax`); `-top` names the
 //! modules elaboration starts from; `--history` lets SV-EVO-001/002 read git
-//! history. For the gates: `--specs` prints how often each generic class is
+//! history. Modules the sources instantiate but do not define are looked up
+//! in `-v` library files and `-y` directories (`+libext+` extensions), as
+//! VCS does; `--skip-libraries` reports nothing in those files. For the gates: `--specs` prints how often each generic class is
 //! visited, `--exprs` every expression's type (the form of
 //! `tools/oracles/exprdump.cpp`).
 //!
@@ -33,6 +35,8 @@ fn main() {
             "--rule" => only.extend(it.next()),
             // Read git history for SV-EVO-001 and SV-EVO-002.
             "--history" => dv_lint::set_history(true),
+            // Report nothing in -v/-y library files.
+            "--skip-libraries" => dv_lint::set_skip_libraries(true),
             // The design's tops, as slang's --top: modules no top reaches
             // are not elaborated.
             "-top" | "--top" => {

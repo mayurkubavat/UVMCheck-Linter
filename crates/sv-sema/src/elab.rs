@@ -239,7 +239,10 @@ impl<'b, 't> Elab<'b, 't> {
             .defs
             .iter()
             .filter(|(n, d)| {
-                !used.contains(*n) && matches!(b.kind(d.decl), ModuleDecl | ProgramDecl) && !self.needs_params(d.decl)
+                !used.contains(*n)
+                    && !b.trees[d.decl.tree].library
+                    && matches!(b.kind(d.decl), ModuleDecl | ProgramDecl)
+                    && !self.needs_params(d.decl)
             })
             .map(|(n, _)| n.clone())
             .collect();

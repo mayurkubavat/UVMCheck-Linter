@@ -95,6 +95,10 @@ pub struct Tree {
     pub timescales: Vec<(u32, i32)>,
     /// The files read as compilation inputs (not included), in order.
     pub mains: Vec<u32>,
+    /// Read from a library (`-v` file or `-y` directory) to resolve an
+    /// instance, not given as a source: its modules are never tops and
+    /// linters report nothing in it.
+    pub library: bool,
     /// Per node: its first token and token count when its tokens are one
     /// contiguous run (always, for trees the parser builds); `None` makes
     /// `token_range` walk the node instead.

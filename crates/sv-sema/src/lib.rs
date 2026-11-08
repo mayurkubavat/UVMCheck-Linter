@@ -49,6 +49,7 @@ mod elab;
 pub mod fx;
 mod packed;
 pub mod iclass;
+pub mod library;
 pub mod names;
 pub mod order;
 pub mod scopes;
@@ -109,11 +110,13 @@ pub fn parse_args<S: AsRef<str>>(args: &[S]) -> Result<(Vec<Tree>, f64), Error> 
             )));
         }
     }
-    let trees = if single {
-        vec![sv_syntax::parse_unit(&files, opts)]
+    let mut trees = if single {
+        vec![sv_syntax::parse_unit(&files, opts.clone())]
     } else {
-        sv_syntax::parse_files(&files, opts)
+        sv_syntax::parse_files(&files, opts.clone())
     };
+    // -v files and -y directories resolve what the sources instantiate.
+    library::add_library_trees(&mut trees, &list, &opts);
     let parse_ms = t0.elapsed().as_secs_f64() * 1e3;
     Ok((trees, parse_ms))
 }

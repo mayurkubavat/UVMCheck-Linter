@@ -110,7 +110,9 @@ fn main() -> ExitCode {
         }
     }
     let paths: Vec<_> = list.sources.iter().map(|s| s.value.clone()).collect();
-    let trees = sv_syntax::parse_files(&paths, opts);
+    let mut trees = sv_syntax::parse_files(&paths, opts.clone());
+    // -v files and -y directories resolve what the sources instantiate.
+    sv_sema::library::add_library_trees(&mut trees, &list, &opts);
     let mut loc = Locator::default();
     for (ix, t) in trees.iter().enumerate() {
         syntax_diagnostics(ix, t, &mut loc, &mut diags);
