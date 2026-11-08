@@ -342,6 +342,7 @@ pub(crate) fn routine_name(c: &Cst, n: NodeId) -> String {
 
 /// The end keyword of a routine or class and its label's name token. A
 /// missing end keyword is where slang puts it: right after the last token.
+#[derive(Clone, Copy)]
 pub(crate) enum End {
     Tok(u32),
     Missing(Loc),
@@ -426,4 +427,11 @@ impl<'c, 't> Buffers<'c, 't> {
         let l = self.c.loc(t);
         l.expansion.map_or(l.line, |(_, line)| line)
     }
+}
+
+/// The fix that writes the end label: `endfunction` becomes `endfunction : f`
+/// (none when the end keyword is missing or comes from a macro).
+pub(crate) fn end_label_fix(c: &Cst, e: End, label: &str) -> Option<crate::fix::Fix> {
+    let End::Tok(t) = e else { return None };
+    c.token_fix(t, t, format!("{} : {label}", c.text_of(t)), "Add matching end label")
 }

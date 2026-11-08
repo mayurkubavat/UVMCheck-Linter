@@ -2,7 +2,7 @@
 //! enforcing tab prohibitions, trailing whitespace limits, maximum line
 //! lengths, matching block end labels, and file naming.
 
-use crate::support::source_layout::{at, end_and_label, end_loc, routine_name, routines};
+use crate::support::source_layout::{at, end_and_label, end_label_fix, end_loc, routine_name, routines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind::*;
@@ -164,7 +164,9 @@ fn structural(c: &Cst, s: &mut Sink, style: &Style) {
             Severity::Warning,
             format!("Class '{name}' definition lacks matching end label (expected 'endclass : {name}')."),
             end_loc(c, end),
-        );
+        )
+        .fixes
+        .extend(end_label_fix(c, end, &name));
     }
     for (n, _) in routines(c) {
         let Some((end, None)) = end_and_label(c, n, &["endfunction", "endtask"]) else { continue };
@@ -180,7 +182,9 @@ fn structural(c: &Cst, s: &mut Sink, style: &Style) {
             Severity::Warning,
             format!("{kind} '{name}' lacks matching end label (expected '{kw} : {name}')."),
             end_loc(c, end),
-        );
+        )
+        .fixes
+        .extend(end_label_fix(c, end, &name));
     }
     for n in c.nodes(InterfaceDecl) {
         let Some((end, None)) = end_and_label(c, n, &["endinterface"]) else { continue };
@@ -194,6 +198,8 @@ fn structural(c: &Cst, s: &mut Sink, style: &Style) {
             Severity::Warning,
             format!("Interface '{name}' lacks matching end label (expected 'endinterface : {name}')."),
             end_loc(c, end),
-        );
+        )
+        .fixes
+        .extend(end_label_fix(c, end, &name));
     }
 }

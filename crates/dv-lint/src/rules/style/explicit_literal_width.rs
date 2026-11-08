@@ -52,8 +52,20 @@ pub(crate) fn explicit_literal_width(c: &Cst, s: &mut Sink) {
             )
         };
         let Some(at) = c.first_tok(n) else { continue };
+        // 'hFF and 32'hFF are the same value with the same signedness, so
+        // writing the width the literal has (in its context) is safe. Not for
+        // x/z digits: an unsized 'x fills any width it is assigned to.
+        let fix = (lit.based && !text.get(2..).is_some_and(|d| d.contains(['x', 'X', 'z', 'Z', '?'])))
+            .then(|| crate::expr_types::expr_types(c).get(&(c.index(), n)).and_then(|t| t.integral).map(|i| i.0))
+            .flatten()
+            .filter(|&w| w > 0)
+            .and_then(|w| {
+                let (a, b) = (c.first_tok(outer)?, c.tree.token_range(outer).last().copied()?);
+                c.token_fix(a, b, format!("{w}{text}"), &format!("Write the width: {w}{text}"))
+            });
         for _ in 0..k {
-            s.add("SV-STY-010", "ExplicitLiteralWidth", sev, msg.clone(), c.loc(at));
+            let f = s.add("SV-STY-010", "ExplicitLiteralWidth", sev, msg.clone(), c.loc(at));
+            f.fixes.extend(fix.clone());
         }
     }
 }

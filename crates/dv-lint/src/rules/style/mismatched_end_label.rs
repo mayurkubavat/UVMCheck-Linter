@@ -13,6 +13,9 @@ pub(crate) fn mismatched_end_label(c: &Cst, s: &mut Sink) {
         if l == name || name.ends_with(&format!("::{l}")) {
             continue;
         }
+        // The routine's own name: uvmcheck writes `cls::f` for an
+        // out-of-block method, which is not a legal end label.
+        let fix = c.token_fix(label, label, name.rsplit("::").next().unwrap_or(&name), "Fix mismatched end label");
         s.add(
             "SV-STY-006",
             "MismatchedEndLabel",
@@ -21,7 +24,9 @@ pub(crate) fn mismatched_end_label(c: &Cst, s: &mut Sink) {
                 "Mismatched end label ':{l}' does not match routine name '{name}'. Update the label to match the routine declaration."
             ),
             c.loc(label),
-        );
+        )
+        .fixes
+        .extend(fix);
     }
     for (n, name) in classes(c) {
         let Some((_, Some(label))) = end_and_label(c, n, &["endclass"]) else { continue };
@@ -29,6 +34,7 @@ pub(crate) fn mismatched_end_label(c: &Cst, s: &mut Sink) {
         if l == name {
             continue;
         }
+        let fix = c.token_fix(label, label, name.as_str(), "Fix mismatched end label");
         s.add(
             "SV-STY-006",
             "MismatchedEndLabel",
@@ -37,6 +43,8 @@ pub(crate) fn mismatched_end_label(c: &Cst, s: &mut Sink) {
                 "Mismatched end label ':{l}' does not match class name '{name}'. Update the label to match the class declaration."
             ),
             c.loc(label),
-        );
+        )
+        .fixes
+        .extend(fix);
     }
 }
