@@ -1011,3 +1011,21 @@ fn coverpoint_on_a_member_of_a_sample_argument() {
                endclass\n";
     assert_eq!(rule_count(src, "SV-COV-017"), 1);
 }
+
+#[test]
+fn macro_body_text_keeps_the_first_tokens_trivia() {
+    // slang's toString() of `create_item(...)` expanded from
+    // `$cast(X , mk(1))` keeps the space the macro body has before it.
+    let src = "class sqr; endclass\n\
+               class seq; sqr p_sequencer; sqr m_sequencer;\n\
+               `define CR(X) begin $cast(X , mk(1)); end\n\
+               function sqr mk(int i); return null; endfunction\n\
+               task body(); `CR(p_sequencer) endtask\n\
+               endclass\n";
+    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
+    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
+    let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "UVM-SEQ-011").map(|f| f.message).collect();
+    assert_eq!(msgs.len(), 1);
+    assert!(msgs[0].starts_with("Dynamic cast '$cast(p_sequencer,  mk(1))'"), "{}", msgs[0]);
+}
