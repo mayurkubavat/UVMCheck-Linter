@@ -252,18 +252,11 @@ fn build_tree_hier(c: &Cst) -> TreeHier {
     let mut ti = TreeHier::default();
     let needs_hier = c.nodes(ModuleDecl).len() + c.nodes(InterfaceDecl).len() + c.nodes(ProgramDecl).len() > 0;
     if needs_hier {
-        // A compile of this one tree with no `-top`: the shared elaboration.
-        let same = c.all.len() == 1 && std::ptr::eq(&c.all[0], c.tree) && crate::tops().is_empty();
-        let shared;
-        let own;
-        let lines: &[String] = if same {
-            shared = crate::shared::elaboration(c);
-            &shared.hierarchy
-        } else {
-            own = sv_sema::hierarchy(std::slice::from_ref(c.tree));
-            &own
-        };
-        for line in lines {
+        // The whole compile's elaboration from its `-top` modules: a module
+        // one file declares is often instantiated in another, and one no
+        // top reaches is not elaborated at all.
+        let shared = crate::shared::elaboration(c);
+        for line in &shared.hierarchy {
             let mut it = line.splitn(3, ' ');
             let (Some(parent), Some(kind), Some(rest)) = (it.next(), it.next(), it.next()) else { continue };
             let path = |name: &str| if parent == "$root" { name.to_string() } else { format!("{parent}.{name}") };
@@ -402,7 +395,22 @@ pub(crate) fn times(c: &Cst, n: NodeId) -> usize {
         match c.kind(a) {
             ModuleDecl | InterfaceDecl | ProgramDecl if paths.is_none() => {
                 let name = decl_name(c, a);
-                paths = Some(th.instances.get(&name).cloned().unwrap_or_else(|| vec![name]));
+                paths = Some(match th.instances.get(&name) {
+                    Some(p) => p.clone(),
+                    // Instantiated, but only where elaboration does not go
+                    // (an untaken generate branch, a parent the tops do not
+                    // reach): not walked. A definition nothing instantiates
+                    // still is (slang elaborates it on its own), and so is
+                    // an interface (one per `virtual` interface type).
+                    None if c.kind(a) != InterfaceDecl
+                        && crate::support::literals::instantiations(c)
+                            .get(&name)
+                            .is_some_and(|sites| !sites.is_empty()) =>
+                    {
+                        return 0
+                    }
+                    None => vec![name],
+                });
             }
             LoopGenerate => {
                 let label = chain.get(i + 1).and_then(|&b| block_label(c, b));
