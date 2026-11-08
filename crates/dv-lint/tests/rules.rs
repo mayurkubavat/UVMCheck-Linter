@@ -1047,7 +1047,7 @@ fn redundant_cast_in_a_body_that_fails_in_the_default_specialization() {
 #[test]
 fn component_new_through_a_type_parameter() {
     // `T obj; obj = new(...)`: where some specialization makes T a
-    // concrete component, named as slang prints the parameter (once).
+    // concrete component, named as the declaration writes it (once).
     let src = "class uvm_object; endclass\n\
                class uvm_component extends uvm_object; function new(string n, uvm_component p); endfunction endclass\n\
                class my_comp extends uvm_component; function new(string n, uvm_component p); super.new(n, p); endfunction endclass\n\
@@ -1061,7 +1061,7 @@ fn component_new_through_a_type_parameter() {
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "UVM-FAC-001").map(|f| f.message).collect();
     assert_eq!(msgs.len(), 1, "{msgs:?}");
-    assert!(msgs.iter().all(|m| m.contains("uvm_component 'reg_t::T'")), "{msgs:?}");
+    assert!(msgs.iter().all(|m| m.contains("uvm_component 'T'")), "{msgs:?}");
 }
 
 #[test]
