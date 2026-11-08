@@ -63,6 +63,8 @@ add_executable(uvmcheck_sym_dump tools/oracles/sym_dump.cpp)
 target_link_libraries(uvmcheck_sym_dump PRIVATE slang::slang)
 add_executable(uvmcheck_cst_exprs tools/oracles/cst_exprs.cpp)
 target_link_libraries(uvmcheck_cst_exprs PRIVATE slang::slang)
+# Reference std::regex results, for checking dv-lint's patterns (tools/gates/regex_gate.py).
+add_executable(uvmcheck_regexcheck tools/oracles/regexcheck.cpp)
 # Reference expression types, for checking dv-lint's typer (tools/gates/expr_gate.py).
 add_executable(uvmcheck_exprdump tools/oracles/exprdump.cpp)
 target_link_libraries(uvmcheck_exprdump PRIVATE slang::slang)
