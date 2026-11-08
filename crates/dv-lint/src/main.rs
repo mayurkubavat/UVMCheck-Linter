@@ -52,6 +52,7 @@ fn main() {
     let mut baseline_file: Option<String> = None;
     let mut update_baseline: Option<String> = None;
     let mut sarif: Option<String> = None;
+    let mut html: Option<String> = None;
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -65,12 +66,13 @@ fn main() {
             ("--baseline=", &mut baseline_file),
             ("--update-baseline=", &mut update_baseline),
             ("--sarif=", &mut sarif),
+            ("--html=", &mut html),
         ] {
             if let Some(v) = a.strip_prefix(flag) {
                 *slot = Some(v.to_string());
             }
         }
-        if ["--waivers=", "--baseline=", "--update-baseline=", "--sarif="].iter().any(|p| a.starts_with(p)) {
+        if ["--waivers=", "--baseline=", "--update-baseline=", "--sarif=", "--html="].iter().any(|p| a.starts_with(p)) {
             continue;
         }
         if let Some(v) = a.strip_prefix("--config=") {
@@ -106,6 +108,8 @@ fn main() {
             "--update-baseline" => update_baseline = it.next(),
             // A SARIF 2.1.0 report.
             "--sarif" => sarif = it.next(),
+            // The HTML dashboard.
+            "--html" => html = it.next(),
             // No result cache here.
             "--no-cache" => {}
             // Also write the findings as uvmcheck's JSON report.
@@ -177,6 +181,9 @@ fn main() {
     }
     if let Some(s) = sarif {
         let _ = SARIF_OUT.set(s);
+    }
+    if let Some(h) = html {
+        let _ = HTML_OUT.set(h);
     }
     let headers = if in_context { in_owner(&mut args) } else { Vec::new() };
     let selected = dv_lint::rule_selection(preset.as_deref(), experimental).unwrap_or_else(|e| fail(e));
@@ -294,6 +301,8 @@ static SUPPRESS: std::sync::OnceLock<dv_lint::suppress::Suppress> = std::sync::O
 static UPDATE_BASELINE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 /// `--sarif FILE`.
 static SARIF_OUT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+/// `--html FILE`.
+static HTML_OUT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
 /// The project configuration in use, if any.
 static CONFIG: std::sync::OnceLock<dv_lint::project::Config> = std::sync::OnceLock::new();
@@ -410,6 +419,12 @@ fn report(
             if frames {
                 print!("{}", sources.frame(nfile, loc.line, loc.column));
             }
+        }
+    }
+    if let Some(path) = HTML_OUT.get() {
+        if let Err(e) = std::fs::write(path, dv_lint::report::html(files, found)) {
+            eprintln!("error: cannot write {path}: {e}");
+            std::process::exit(2);
         }
     }
     if let Some(path) = SARIF_OUT.get() {

@@ -242,3 +242,23 @@ fn sarif_report() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn html_dashboard() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-html-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("t.sv"), "module m; reg a; endmodule\n").unwrap();
+    let out = dir.join("r.html");
+    std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .current_dir(&dir)
+        .args(["--no-config", "--html"])
+        .arg(&out)
+        .arg("t.sv")
+        .output()
+        .unwrap();
+    let text = std::fs::read_to_string(&out).unwrap();
+    assert!(text.starts_with("<!DOCTYPE html>") && text.trim_end().ends_with("</html>"), "{text}");
+    assert!(text.contains("<span class=\"rule-id\">SV-BAN-001</span>"), "{text}");
+    assert!(text.contains("module m; reg a; endmodule</div>"), "the source line: {text}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
