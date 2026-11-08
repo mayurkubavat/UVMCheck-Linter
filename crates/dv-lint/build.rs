@@ -13,5 +13,6 @@ fn main() {
         None => PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../build-model"),
     };
     let dir = dir.canonicalize().unwrap_or(dir);
-    println!("cargo:rustc-link-arg-bins=-Wl,-rpath,{}", dir.display());
+    // Every target that links: the binaries, the tests and the lib's unit tests.
+    println!("cargo:rustc-link-arg=-Wl,-rpath,{}", dir.display());
 }
