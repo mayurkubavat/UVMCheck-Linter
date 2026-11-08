@@ -16,7 +16,7 @@
 int main(int argc, char** argv) {
     CHECK(argc == 4); /* <testdata/common dir> <bad.sv> <facts.sv> */
     CHECK(uvmcheck_model_abi_version() == UVMCHECK_MODEL_ABI_VERSION);
-    /* rust/sv-slang asserts the same sizes for its copies of these structs */
+    /* crates/sv-slang asserts the same sizes for its copies of these structs */
     if (sizeof(void*) == 8) {
         CHECK(sizeof(uvmcheck_class) == 80 && sizeof(uvmcheck_property) == 48);
         CHECK(sizeof(uvmcheck_method) == 104 && sizeof(uvmcheck_argument) == 56);

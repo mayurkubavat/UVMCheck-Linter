@@ -10,7 +10,7 @@ value's and typedef's type (builder phase N2); --values each parameter's,
 specparam's and enum value's value (phase N3). --hier compares the
 elaborated design instead (`dv-build --hier`, phase N4).
 
-    cmake --build build --target uvmcheck_sym_dump && cargo build --release -p dv-build   # in rust/
+    cmake --build build --target uvmcheck_sym_dump && cargo build --release -p dv-build
     UVM_SRC=uvm-core/src tools/sym_gate.py ~/sv-tests [--types] [--values] [--hier] [--show=N] [chapter-8]
     tools/sym_gate.py --repo UVM_SRC [--show=N]      # each repo test and example alone
     tools/sym_gate.py --files [options] FILE...      # one design

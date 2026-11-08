@@ -1,9 +1,10 @@
-# The Rust side of the DV front end (plan: R0 spike). Tools depend on dv-model
+# The Rust workspace: the native SystemVerilog/UVM front end and the DV tools.
+# Crates live in crates/; see docs/architecture/rust.md. Tools depend on dv-model
 # only; sv-slang is the raw binding to libuvmcheck_model (slang behind a C ABI)
 # and is the one crate that changes when the front end does.
 [workspace]
 resolver = "2"
-members = ["sv-lexer", "sv-preproc", "sv-syntax", "sv-sema", "dv-lint", "sv-source", "sv-slang", "dv-model", "dv-map", "dv-filelist", "dv-lsp", "dv-build"]
+members = ["crates/*"]
 
 [workspace.package]
 version = "0.1.0"

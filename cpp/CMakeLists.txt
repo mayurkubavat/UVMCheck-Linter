@@ -91,7 +91,7 @@ target_link_libraries(uvmcheck PRIVATE "$<LINK_LIBRARY:WHOLE_ARCHIVE,libuvmcheck
 set_target_properties(uvmcheck PROPERTIES OUTPUT_NAME "uvmcheck")
 
 # libuvmcheck_model: the slang-free design model (uvmcheck::model) behind a C
-# ABI, for Rust (rust/), Python and other DV tools. Only the C API is exported.
+# ABI, for Rust (crates/), Python and other DV tools. Only the C API is exported.
 if(UVMCHECK_BUILD_MODEL_LIB)
     add_library(uvmcheck_model SHARED src/capi/CApi.cpp)
     target_link_libraries(uvmcheck_model PRIVATE libuvmcheck slang::slang)
@@ -273,14 +273,14 @@ if(UVMCHECK_BUILD_MODEL_LIB)
                 --lib $<TARGET_FILE:uvmcheck_model>
         WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
     )
-    # The Rust crates (rust/) against this build's library, when cargo is around.
+    # The Rust crates (crates/) against this build's library, when cargo is around.
     find_program(CARGO_PROGRAM cargo)
     if(CARGO_PROGRAM)
         add_test(
             NAME rust_model_test
             COMMAND ${CMAKE_COMMAND} -E env UVMCHECK_BUILD_DIR=${CMAKE_BINARY_DIR}
-                    ${CARGO_PROGRAM} test --quiet --manifest-path ${PROJECT_SOURCE_DIR}/rust/Cargo.toml
-            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}/rust
+                    ${CARGO_PROGRAM} test --quiet --manifest-path ${PROJECT_SOURCE_DIR}/Cargo.toml
+            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
         )
     endif()
 endif()

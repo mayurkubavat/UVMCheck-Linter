@@ -71,4 +71,4 @@ ehthumbs.db
 Thumbs.db
 
 # Rust build output
-rust/target/
+/target/

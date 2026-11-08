@@ -1,6 +1,6 @@
 /* C ABI of libuvmcheck_model: load a design, read its uvmcheck::model.
  *
- * Plain C so that Rust (rust/sv-slang), Python (ctypes) and any other tool can
+ * Plain C so that Rust (crates/sv-slang), Python (ctypes) and any other tool can
  * use it with no C++ toolchain. Every string and record stays valid until
  * uvmcheck_design_free(). Ids are 0-based; UVMCHECK_NONE marks "no class".
  * The ABI version changes whenever a struct below changes.

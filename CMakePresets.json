@@ -32,7 +32,7 @@
     {
       "name": "model",
       "displayName": "Release + shared model library (Rust/Python)",
-      "description": "Builds libuvmcheck_model.so with its C ABI for rust/ and other tools; position independent, no mimalloc",
+      "description": "Builds libuvmcheck_model.so with its C ABI for crates/ (Rust) and other tools; position independent, no mimalloc",
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build-model",
       "cacheVariables": {

@@ -1,8 +1,9 @@
 # Architecture of the Rust workspace
 
-This is the map of `rust/`: what each crate does, how a SystemVerilog
-compile flows through them, and where to start when changing something.
-[README.md](README.md) has the build commands, tool usage and the history
+This is the map of the Rust workspace (`Cargo.toml` at the repository root,
+crates in `crates/`): what each crate does, how a SystemVerilog compile flows
+through them, and where to start when changing something.
+[rust-history.md](rust-history.md) has the build commands, tool usage and the history
 of each stage with its measurements; `cargo doc --workspace --no-deps --open`
 has the API of every crate.
 

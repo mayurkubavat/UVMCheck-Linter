@@ -69,11 +69,11 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 # The C++ engine (uvmcheck, libuvmcheck_model) and its tests.
 add_subdirectory(cpp)
 
-# Reference dump of Slang's preprocessor, for checking rust/sv-preproc.
+# Reference dump of Slang's preprocessor, for checking crates/sv-preproc.
 add_executable(uvmcheck_pp_dump tools/pp_dump.cpp)
 target_link_libraries(uvmcheck_pp_dump PRIVATE slang::slang)
 
-# Reference outline from Slang's parser, for checking rust/sv-syntax.
+# Reference outline from Slang's parser, for checking crates/sv-syntax.
 add_executable(uvmcheck_cst_outline tools/cst_outline.cpp)
 target_link_libraries(uvmcheck_cst_outline PRIVATE slang::slang)
 add_executable(uvmcheck_sym_dump tools/sym_dump.cpp)

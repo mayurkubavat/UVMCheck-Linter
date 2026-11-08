@@ -13,7 +13,7 @@ import concurrent.futures, glob, os, subprocess, sys
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 SPECDUMP = os.environ.get('SPECDUMP', os.path.join(REPO, 'build', 'specdump'))
-DVLINT = os.environ.get('DV_LINT', os.path.join(REPO, 'rust', 'target', 'release', 'dv-lint'))
+DVLINT = os.environ.get('DV_LINT', os.path.join(REPO, 'target', 'release', 'dv-lint'))
 
 
 COL = 'syntax'

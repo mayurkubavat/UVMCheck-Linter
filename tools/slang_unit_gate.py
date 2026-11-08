@@ -15,7 +15,7 @@ import collections, concurrent.futures, glob, json, os, re, resource, subprocess
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 UVMCHECK = os.environ.get('UVMCHECK', os.path.join(REPO, 'build', 'uvmcheck'))
-DVBUILD = os.environ.get('DV_BUILD', os.path.join(REPO, 'rust', 'target', 'release', 'dv-build'))
+DVBUILD = os.environ.get('DV_BUILD', os.path.join(REPO, 'target', 'release', 'dv-build'))
 TESTS = os.environ.get('SLANG_TESTS', os.path.join(REPO, 'build-model', '_deps', 'slang-src', 'tests', 'unittests', 'ast'))
 
 CASE = re.compile(r'TEST_CASE\("((?:[^"\\]|\\.)*)"')

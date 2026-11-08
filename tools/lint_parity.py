@@ -8,7 +8,7 @@ rules need the native trees). Findings are compared as multisets of (file
 name, line, column, rule, message).
 
     cmake --build build && cmake --build build-model
-    cargo build --release -p dv-lint                  # in rust/
+    cargo build --release -p dv-lint               
     tools/lint_parity.py --repo UVM_SRC [--slang] [--show=N]
     tools/lint_parity.py --uvm UVM_SRC [--slang] [--show=N]
     tools/lint_parity.py --dir DIR [--show=N]     # each .sv under DIR alone (sv-tests)
@@ -19,7 +19,7 @@ import collections, glob, json, os, re, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 UVMCHECK = os.environ.get('UVMCHECK', os.path.join(REPO, 'build', 'uvmcheck'))
-DVLINT = os.environ.get('DV_LINT', os.path.join(REPO, 'rust', 'target', 'release', 'dv-lint'))
+DVLINT = os.environ.get('DV_LINT', os.path.join(REPO, 'target', 'release', 'dv-lint'))
 LINE = re.compile(r'^(.*?):(\d+):(\d+): \[(\w+)\] (\S+) \((\w+)\): (.*)$')
 
 KINDS = dict((l.split()[0], l.split()[2]) for l in

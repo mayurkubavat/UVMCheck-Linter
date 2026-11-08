@@ -7,7 +7,7 @@ rule), builder (`dv-build`), language server (`dv-lsp`), `dv-map` and
 `dv-filelist`. Slang stays reachable behind a C ABI as the reference the
 parity gates compare against.
 
-**[ARCHITECTURE.md](ARCHITECTURE.md)** is the map: what each crate does, how
+**[rust.md](rust.md)** is the map: what each crate does, how
 a compile flows through them, how the linter runs rules in parallel, and
 which gate checks which layer. The sections below are the build, the tools'
 usage and the record of each stage as it landed (R0 bridge, R2 parser, R3
@@ -34,7 +34,7 @@ on it.
 
 ```sh
 cmake --preset model && cmake --build build-model   # libuvmcheck_model.so + model_capi_smoke
-cd rust && cargo test && cargo build --release
+cargo test && cargo build --release
 cargo doc --workspace --no-deps --open               # API docs of every crate
 ```
 
@@ -46,9 +46,9 @@ another directory.
 ## dv-map
 
 ```sh
-rust/target/release/dv-map -- +incdir+testdata/common testdata/map/map_tb.sv
-rust/target/release/dv-map --json -- -f my_files.f
-rust/target/release/dv-map --bench 5 -- +incdir+$UVM/src $UVM/src/uvm_pkg.sv
+target/release/dv-map -- +incdir+testdata/common testdata/map/map_tb.sv
+target/release/dv-map --json -- -f my_files.f
+target/release/dv-map --bench 5 -- +incdir+$UVM/src $UVM/src/uvm_pkg.sv
 ```
 
 `--bench` prints the per-stage cost (parse, elaborate, model build, copy into
@@ -66,7 +66,7 @@ extension (editors/vscode) runs both.
 
 ```sh
 cargo build --release -p dv-lsp
-rust/target/release/dv-lsp --index $UVM_HOME/src   # 170 files in ~50 ms
+target/release/dv-lsp --index $UVM_HOME/src   # 170 files in ~50 ms
 ```
 
 Every `.sv/.svh/.v/.vh` file under the workspace is indexed on its own
@@ -80,10 +80,10 @@ the workspace; references are textual matches of the name.
 ## dv-filelist
 
 ```sh
-rust/target/release/dv-filelist -f top.f                # summary + every problem as file:line
-rust/target/release/dv-filelist --args -f top.f > flat.f  # normalized, flat list uvmcheck reads
-rust/target/release/dv-filelist --json --dialect xcelium -f top.f
-rust/target/release/dv-filelist --load -f top.f          # also compile it through dv-model
+target/release/dv-filelist -f top.f                # summary + every problem as file:line
+target/release/dv-filelist --args -f top.f > flat.f  # normalized, flat list uvmcheck reads
+target/release/dv-filelist --json --dialect xcelium -f top.f
+target/release/dv-filelist --load -f top.f          # also compile it through dv-model
 ```
 
 It follows `-f`/`-F` nesting (`-F` paths are relative to the list), expands

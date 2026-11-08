@@ -10,7 +10,7 @@ gate; a should_fail test only Slang rejects is a known gap, listed with
 --gaps. Runtime-only should_fail tests (`:type: simulation` alone) are
 counted apart: no front end can reject them.
 
-    cmake --build build && cargo build --release -p dv-build   # in rust/
+    cmake --build build && cargo build --release -p dv-build
     UVM_SRC=uvm-core/src tools/ieee_gate.py ~/sv-tests [--gaps] [chapter-8]
 """
 import collections, concurrent.futures, json, os, re, subprocess, sys, tempfile
@@ -18,7 +18,7 @@ import collections, concurrent.futures, json, os, re, subprocess, sys, tempfile
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.dirname(HERE)
 UVMCHECK = os.environ.get('UVMCHECK', os.path.join(REPO, 'build', 'uvmcheck'))
-DVBUILD = os.environ.get('DV_BUILD', os.path.join(REPO, 'rust', 'target', 'release', 'dv-build'))
+DVBUILD = os.environ.get('DV_BUILD', os.path.join(REPO, 'target', 'release', 'dv-build'))
 
 CLAUSES = {
     '5': 'Lexical conventions', '6': 'Data types', '7': 'Aggregate data types', '8': 'Classes',
