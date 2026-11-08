@@ -97,6 +97,13 @@ pub fn set_inline_waived(n: usize) {
     INLINE_WAIVED.store(n, std::sync::atomic::Ordering::Relaxed);
 }
 
+/// A UVM-WV-001 error for a waiver comment whose pattern does not compile:
+/// reported whatever the config, waivers and `--changed-since` keep, as
+/// uvmcheck adds these after them.
+pub fn is_bad_waiver_pattern(f: &Finding) -> bool {
+    waivers::is_bad_pattern(f)
+}
+
 /// Drops the findings inline waiver comments waive (findings made outside
 /// the rules, such as Python rules'), counting them in [`inline_waived`].
 pub fn apply_inline_waivers(found: &mut Vec<Finding>, files: &[String]) {

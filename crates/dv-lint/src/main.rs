@@ -700,6 +700,8 @@ fn report(
         }
     }
     dv_lint::fix::guard_macro_calls(&mut found);
+    let (bad_waivers, rest): (Vec<_>, Vec<_>) = found.into_iter().partition(dv_lint::is_bad_waiver_pattern);
+    found = rest;
     if let Some(c) = CONFIG.get() {
         c.apply(&mut found, files);
     }
@@ -741,6 +743,7 @@ fn report(
                 std::process::exit(2);
             });
     }
+    found.extend(bad_waivers);
     let files = &files_owned[..];
     if fix_on || fix_dry {
         let pass = dv_lint::fix::apply(&found, &fix_only, fix_unsafe, fix_dry || !fix_on, &broken);

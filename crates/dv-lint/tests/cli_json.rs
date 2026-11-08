@@ -264,28 +264,55 @@ fn html_dashboard() {
 }
 
 #[test]
-fn inline_waiver_regex_pattern_fails_closed() {
-    // "literal .9." is a regex the native engine cannot evaluate yet: it
-    // must not waive the finding about '5' (uvmcheck's std::regex agrees);
-    // the plain-text pattern on line 3 still waives.
+fn inline_waiver_patterns_are_regexes() {
+    // Line 2: "literal .9." does not match the message about '5', so it stays
+    // (as with uvmcheck's std::regex). Line 3: a regex that matches waives.
+    // Line 4: a pattern dv-lint refuses (a backreference) waives nothing and
+    // is a UVM-WV-001 error at the comment, whatever --rule selects.
     let dir = std::env::temp_dir().join(format!("dv-lint-inline-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::write(
         dir.join("t.sv"),
         "module m; integer i;\ninitial i = 5; // uvmcheck:waive SV-STY-010 \"literal .9.\"\n\
-         initial i = 6; // uvmcheck:waive SV-STY-010 \"literal '6'\"\nendmodule\n",
+         initial i = 6; // uvmcheck:waive SV-STY-010 \"literal '[0-9]'\"\n\
+         initial i = 7; // uvmcheck:waive SV-STY-010 \"(7)\\\\1\"\nendmodule\n",
     )
     .unwrap();
     let out = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
         .current_dir(&dir)
-        .args(["--no-config", "--rule", "SV-STY-010", "t.sv"])
+        .args(["--no-config", "--no-cache", "--rule", "SV-STY-010", "t.sv"])
         .output()
         .unwrap();
     let text = String::from_utf8_lossy(&out.stdout);
-    let lines: Vec<&str> = text.lines().filter(|l| l.contains("SV-STY-010")).collect();
-    assert_eq!(lines.len(), 1, "{text}");
-    assert!(lines[0].contains("t.sv:2:"), "{text}");
-    assert!(String::from_utf8_lossy(&out.stderr).contains("waives nothing"));
+    let sty: Vec<&str> = text.lines().filter(|l| l.contains("] SV-STY-010 (")).collect();
+    assert_eq!(sty.len(), 2, "{text}");
+    assert!(sty[0].contains("t.sv:2:") && sty[1].contains("t.sv:4:"), "{text}");
+    let wv: Vec<&str> = text.lines().filter(|l| l.contains("UVM-WV-001")).collect();
+    assert_eq!(wv.len(), 1, "{text}");
+    assert!(wv[0].contains("t.sv:4:1:") && wv[0].contains("invalid message regex '(7)\\1'"), "{text}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn waiver_file_with_a_bad_pattern_stops_the_run() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-waiver-re-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("t.sv"), "module m; integer i; initial i = 5; endmodule\n").unwrap();
+    std::fs::write(dir.join("w.json"), r#"[{"rule": "SV-STY-010", "message": "(?=x)", "reason": "r"}]"#).unwrap();
+    std::fs::write(dir.join("ok.json"), r#"[{"rule": "SV-STY-010", "message": "literal '[5]'", "reason": "r"}]"#)
+        .unwrap();
+    let run = |w: &str| {
+        std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+            .current_dir(&dir)
+            .args(["--no-config", "--no-cache", "--rule", "SV-STY-010", "--waivers", w, "t.sv"])
+            .output()
+            .unwrap()
+    };
+    let bad = run("w.json");
+    assert_eq!(bad.status.code(), Some(2));
+    assert!(String::from_utf8_lossy(&bad.stderr).contains("invalid message regex '(?=x)'"));
+    let ok = run("ok.json");
+    assert!(!String::from_utf8_lossy(&ok.stdout).contains("SV-STY-010"), "{}", String::from_utf8_lossy(&ok.stdout));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

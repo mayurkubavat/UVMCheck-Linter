@@ -6,9 +6,10 @@
 //!   `uvmcheck:waive-next-line`, `uvmcheck:disable-next-line`.
 //!
 //! `*` waives any rule. A quoted pattern after the rule narrows the waiver to
-//! findings whose message matches it; patterns without regex syntax match as
-//! text, and the rest (no regex engine here yet) waive nothing, with a
-//! warning: an unevaluated pattern must not hide findings.
+//! findings whose message it matches, searched for as `std::regex_search`
+//! does ([`crate::pattern`]). A pattern that does not compile, or a quote left
+//! open, waives nothing and is reported as a UVM-WV-001 error at the comment,
+//! as uvmcheck reports it.
 
 use std::collections::{HashMap, HashSet};
 
@@ -19,42 +20,33 @@ const SAME_LINE: [&str; 6] =
 const NEXT_LINE: [&str; 4] =
     ["uvmcheck-disable-next-line", "uvmcheck:waive-next-line", "uvmcheck:disable-next-line", "uvmcheck: waive"];
 
-/// The quoted pattern after a keyword, if any (`None` when unterminated).
-fn message_pattern(rest: &str) -> Option<Option<String>> {
-    let Some(q) = rest.find('"') else { return Some(None) };
+/// The quoted pattern after a keyword, if any; Err holds what an
+/// unterminated one had read (a backslash keeps the character after it).
+fn message_pattern(rest: &str) -> Result<Option<String>, String> {
+    let Some(q) = rest.find('"') else { return Ok(None) };
     let mut out = String::new();
     let mut it = rest[q + 1..].chars();
     while let Some(ch) = it.next() {
         match ch {
             '\\' => out.extend(it.next()),
-            '"' => return Some(Some(out)),
+            '"' => return Ok(Some(out)),
             _ => out.push(ch),
         }
     }
-    None
+    Err(out)
 }
 
-/// A pattern with regex syntax cannot be evaluated here (no regex engine
-/// yet): it waives nothing, so a finding the comment did not mean to waive is
-/// never hidden, and each such pattern is named once on stderr.
-fn pattern_matches(pattern: &str, message: &str) -> bool {
-    let regex_syntax = pattern.chars().any(|c| "\\.^$*+?()[]{}|".contains(c));
-    if regex_syntax {
-        static WARNED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
-        if let Ok(mut w) = WARNED.lock() {
-            if !w.iter().any(|p| p == pattern) {
-                eprintln!(
-                    "Warning: inline waiver pattern \"{pattern}\" uses regex syntax, which the native engine cannot evaluate yet; it waives nothing (uvmcheck-slang evaluates it)"
-                );
-                w.push(pattern.to_string());
-            }
-        }
-        return false;
-    }
-    message.contains(pattern)
-}
+/// The message of the UVM-WV-001 error for a waiver comment whose pattern
+/// is unusable (uvmcheck's wording).
+pub(crate) const BAD_PATTERN: &str = "invalid message regex '";
 
-fn waives(text: &str, f: &Finding, same_line: bool) -> bool {
+/// Inline patterns, compiled once each: Err holds why one does not compile.
+type Compiled = HashMap<String, Result<crate::pattern::Pattern, String>>;
+
+/// A waiver comment's unusable pattern: (comment line, pattern, why).
+type Bad = Vec<(u32, String, String)>;
+
+fn waives(text: &str, f: &Finding, at: u32, same_line: bool, compiled: &mut Compiled, bad: &mut Bad) -> bool {
     let keywords: &[&str] = if same_line { &SAME_LINE } else { &NEXT_LINE };
     for kw in keywords {
         let mut from = 0;
@@ -70,8 +62,21 @@ fn waives(text: &str, f: &Finding, same_line: bool) -> bool {
                 continue;
             }
             match message_pattern(rest) {
-                None => return false,
-                Some(Some(p)) if !pattern_matches(&p, &f.message) => continue,
+                Err(open) => {
+                    bad.push((at, open, "unterminated message regex".into()));
+                    return false;
+                }
+                Ok(Some(p)) if !p.is_empty() => {
+                    let re = compiled.entry(p.clone()).or_insert_with(|| crate::pattern::Pattern::new(&p, false));
+                    match re {
+                        Ok(re) if re.is_match_anywhere(&f.message) => return true,
+                        Ok(_) => continue,
+                        Err(e) => {
+                            bad.push((at, p, e.clone()));
+                            continue;
+                        }
+                    }
+                }
                 _ => return true,
             }
         }
@@ -97,6 +102,9 @@ pub(crate) fn apply(findings: &mut Vec<Finding>, files: &[String]) -> usize {
     let before = findings.len();
     let mut used = Used::default();
     let mut texts: HashMap<String, Option<Vec<String>>> = HashMap::new();
+    let mut compiled = Compiled::new();
+    // Unusable patterns, by file: each comment and pattern reported once.
+    let mut bad_at: Vec<(String, u32, String, String)> = Vec::new();
     findings.retain(|f| {
         let (path, line, _) = f.position_in(files);
         if path.is_empty() || line == 0 {
@@ -107,13 +115,19 @@ pub(crate) fn apply(findings: &mut Vec<Finding>, files: &[String]) -> usize {
             .or_insert_with(|| std::fs::read_to_string(path).ok().map(|t| t.lines().map(str::to_string).collect()));
         let Some(lines) = lines else { return true };
         let at = |l: u32| lines.get(l as usize - 1).map(String::as_str).unwrap_or("");
-        let by = if waives(at(line), f, true) {
+        let mut bad = Bad::new();
+        let by = if waives(at(line), f, line, true, &mut compiled, &mut bad) {
             Some(line)
-        } else if line > 1 && waives(at(line - 1), f, false) {
+        } else if line > 1 && waives(at(line - 1), f, line - 1, false, &mut compiled, &mut bad) {
             Some(line - 1)
         } else {
             None
         };
+        for (l, p, e) in bad {
+            if !bad_at.iter().any(|(bf, bl, bp, _)| bf == path && *bl == l && *bp == p) {
+                bad_at.push((path.to_string(), l, p, e));
+            }
+        }
         if let Some(l) = by {
             used.lines.insert((path.to_string(), l));
             *used.by_rule.entry(f.rule.to_string()).or_default() += 1;
@@ -121,6 +135,19 @@ pub(crate) fn apply(findings: &mut Vec<Finding>, files: &[String]) -> usize {
         }
         by.is_none()
     });
+    let waived = before - findings.len();
+    for (path, line, pattern, why) in bad_at {
+        let Some(file) = files.iter().position(|f| *f == path) else { continue };
+        findings.push(Finding {
+            rule: "UVM-WV-001",
+            name: "UnusedWaiver",
+            severity: crate::Severity::Error,
+            message: format!("{BAD_PATTERN}{pattern}': {why}"),
+            loc: dv_model::Loc { file: file as u32, line, column: 1, expansion: None },
+            related: Vec::new(),
+            fixes: Vec::new(),
+        });
+    }
     if let Ok(mut u) = USED.lock() {
         let all = u.get_or_insert_with(Used::default);
         all.lines.extend(used.lines);
@@ -129,7 +156,14 @@ pub(crate) fn apply(findings: &mut Vec<Finding>, files: &[String]) -> usize {
             *all.by_rule.entry(r).or_default() += n;
         }
     }
-    before - findings.len()
+    waived
+}
+
+/// The UVM-WV-001 errors [`apply`] added for unusable waiver patterns: kept
+/// out of the config, waivers and `--changed-since`, as uvmcheck adds them
+/// after those.
+pub(crate) fn is_bad_pattern(f: &Finding) -> bool {
+    f.rule == "UVM-WV-001" && f.message.starts_with(BAD_PATTERN)
 }
 
 /// A waiver comment that waived nothing: (file, line, comment text).

@@ -108,6 +108,7 @@ impl Suppress {
                 contains: w.contains.clone(),
                 line: w.line,
                 message: w.message.clone(),
+                message_re: w.message_re.clone(),
                 severity: w.severity,
                 label: w.label.clone(),
                 owner: w.owner.clone(),
@@ -127,6 +128,9 @@ impl Suppress {
         if let Some(w) = pick(waivers, "waivers.json") {
             match crate::project::load_waiver_file(&w) {
                 Ok(list) => s.waivers.extend(list.into_iter().map(|w| Waiver { group: first_group + w.group, ..w })),
+                // A pattern that does not compile stops the run, as in uvmcheck;
+                // a file that does not load is only a warning.
+                Err(e) if e.contains("invalid message regex") => return Err(e),
                 Err(e) => s.warnings.push(format!("Could not load waiver file: {e}")),
             }
         }

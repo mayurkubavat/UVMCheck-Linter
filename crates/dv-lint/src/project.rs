@@ -202,7 +202,9 @@ pub(crate) struct Waiver {
     pub(crate) path: Option<Pattern>,
     pub(crate) contains: Option<String>,
     pub(crate) line: u32,
+    /// The `message` pattern as written, and compiled (none when empty).
     pub(crate) message: String,
+    pub(crate) message_re: Option<crate::pattern::Pattern>,
     pub(crate) severity: Option<Severity>,
     /// What a re-graded finding's message names (`waiver #1 (SV-STY-002)`).
     pub(crate) label: String,
@@ -219,9 +221,20 @@ impl Waiver {
             && (self.line == 0 || self.line == line)
             && self.path.as_ref().is_none_or(|p| p.matches(path))
             && self.contains.as_ref().is_none_or(|s| s.is_empty() || raw_path.contains(s.as_str()))
-            // No regex engine here: a message pattern matches as text.
-            && (self.message.is_empty() || message.contains(&self.message))
+            // The message pattern is searched for, as std::regex_search.
+            && self.message_re.as_ref().is_none_or(|re| re.is_match_anywhere(message))
     }
+}
+
+/// A waiver's `message` compiled; an error names the waiver as uvmcheck
+/// does (`waiver LABEL: invalid message regex 'P': WHY`).
+fn message_regex(label: &str, message: &str) -> Result<Option<crate::pattern::Pattern>, String> {
+    if message.is_empty() {
+        return Ok(None);
+    }
+    crate::pattern::Pattern::new(message, false)
+        .map(Some)
+        .map_err(|e| format!("waiver {label}: invalid message regex '{message}': {e}"))
 }
 
 /// Reads a waiver file: a list of waivers, or an object with `waivers`;
@@ -259,12 +272,15 @@ pub(crate) fn load_waiver_file(file: &Path) -> Result<Vec<Waiver>, String> {
         );
         let contains = path.trim_matches('*').to_string();
         let group = out.len();
+        let message = w.get("message").as_str().unwrap_or("").to_string();
+        let message_re = message_regex(&label, &message).map_err(|e| format!("{}: {e}", file.display()))?;
         out.push(Waiver {
             rule,
             path: None,
             contains: Some(contains),
             line: w.get("line").as_u32().unwrap_or(0),
-            message: w.get("message").as_str().unwrap_or("").to_string(),
+            message,
+            message_re,
             severity: sev,
             label,
             owner: w.get("owner").as_str().unwrap_or("").to_string(),
@@ -575,6 +591,7 @@ impl Config {
             }
             let line = w.get("line").as_u32().unwrap_or(0);
             let message = w.get("message").as_str().unwrap_or("").to_string();
+            let message_re = message_regex(&label, &message)?;
             let sev = w.get("severity").as_str().and_then(severity);
             let globs: Vec<Option<Pattern>> =
                 if globs.is_empty() { vec![None] } else { globs.into_iter().map(Some).collect() };
@@ -589,6 +606,7 @@ impl Config {
                         contains: None,
                         line,
                         message: message.clone(),
+                        message_re: message_re.clone(),
                         severity: sev,
                         label: label.clone(),
                         owner: owner.clone(),
