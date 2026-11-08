@@ -105,7 +105,7 @@ check, so `dv-build`'s output can be compared with slang's.
 
 `lint_all` runs them on `DV_LINT_JOBS` threads (default: all cores). Each
 thread takes the next rule, with the slowest rules first. Work many rules
-share (expression types in `g_exprty`, sv-sema's checks, elaboration,
+share (expression types in `expr_types`, sv-sema's checks, elaboration,
 specialization counts) lives in `shared`: built once per compile by the
 first thread that asks, while the others wait. Findings are merged back in
 the serial order and sorted by position and rule, then inline waivers are
@@ -115,6 +115,26 @@ prints the cost of each rule.
 Every rule is a port of a C++ rule under `cpp/src/rules/` with the same id,
 name, severity and message text; `tools/gates/lint_parity.py` compares the two
 finding for finding.
+
+The source is laid out by rule family, as `cpp/src/rules/` is:
+
+```
+crates/dv-lint/src/
+  lib.rs             Rule, Check, lint_all and the parallel runner
+  rules/mod.rs       collects every family
+  rules/<family>/    one file per rule, named after it, plus mod.rs that
+                     registers the family (uvm/, methodology/, random/, ...)
+  support/           helpers several rules share, one module per topic
+                     (class_index, statements, slang_ast, ...)
+  syntax.rs          Cst: a tree with parents, per-kind node lists, locations
+  expr_types.rs      expression types as slang gives them (--exprs)
+  shared.rs          work built once per compile and shared between threads
+  uvm_api.rs, waivers.rs
+```
+
+A rule file such as `rules/uvm/blocking_in_observer.rs` opens with the
+rule's id, name and what it flags, and holds the helpers only that rule
+uses.
 
 ## The language server
 
@@ -151,8 +171,9 @@ identical.
 
 ## Where to start
 
-- A new or changed lint rule: find the rule id under `dv-lint/src`, or add
-  it to `rules()` with a `Check` of the narrowest kind that works. Reuse
+- A new or changed lint rule: open `rules/<family>/<rule_name>.rs`, or add
+  a file there and register it in that family's `mod.rs` with a `Check` of
+  the narrowest kind that works. Reuse
   `syntax::Cst` helpers and the caches in `shared` rather than rebuilding
   scopes or types in the rule.
 - A parse problem: `sv-syntax` (`grammar`, `expr`, `blocks`, `assertions`,

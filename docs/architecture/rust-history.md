@@ -7,6 +7,11 @@ rule), builder (`dv-build`), language server (`dv-lsp`), `dv-map` and
 `dv-filelist`. Slang stays reachable behind a C ABI as the reference the
 parity gates compare against.
 
+This is the build-up history. dv-lint module names below (`syntax2.rs`,
+`g_*.rs` and so on) are the ones of the time; since 2026-11-08 the rules are
+one file each under `crates/dv-lint/src/rules/<family>/`, with shared
+helpers in `support/` (see [rust.md](rust.md)).
+
 **[rust.md](rust.md)** is the map: what each crate does, how
 a compile flows through them, how the linter runs rules in parallel, and
 which gate checks which layer. The sections below are the build, the tools'

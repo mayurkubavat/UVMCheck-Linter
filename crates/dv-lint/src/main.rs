@@ -71,7 +71,7 @@ fn main() {
     };
     let (design, trees) = loaded.unwrap_or_else(|e| fail(e));
     if exprs {
-        for l in dv_lint::g_exprty::expr_dump(design.files().to_vec(), &trees) {
+        for l in dv_lint::expr_types::expr_dump(design.files().to_vec(), &trees) {
             println!("{l}");
         }
         return;
