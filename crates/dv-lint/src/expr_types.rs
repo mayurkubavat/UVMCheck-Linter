@@ -806,34 +806,40 @@ pub(crate) fn cast_canon(c: &Cst) -> Arc<HashMap<(usize, NodeId), String>> {
     facts(c).1
 }
 
-/// Whether an `if` around `n` (in its routine) compares a value that is
-/// integral here with `null`: an error in this specialization, so slang
-/// leaves the statement unbound and rules do not see it.
+/// Whether the routine body around `n` fails to bind in this
+/// specialization: it compares a value that is integral here with `null`,
+/// assigns `null` to one, or selects a member of one (`x.put(t)` with
+/// `type IMP = int`). slang then marks the whole body bad, and the AST
+/// rules do not see it (see [`crate::support::default_spec`]).
 fn null_compare_fails(c: &Cst, ty: &mut Typer, n: NodeId) -> bool {
-    for a in crate::support::slang_ast::ancestors(c, n) {
-        match c.kind(a) {
-            FunctionDecl | TaskDecl | ClassDecl => return false,
-            IfStmt => {
-                let Some(&cond) = kids(c, a).first() else { continue };
-                let mut todo = vec![cond];
-                while let Some(e) = todo.pop() {
-                    if c.kind(e) == BinaryExpr && c.keyword(e).is_some_and(|k| matches!(c.text_of(k), "==" | "!=")) {
-                        let ks = kids(c, e);
-                        if let [l, r] = ks[..] {
-                            let null = |x: NodeId| c.kind(x) == Literal && c.tree.bare_text(x) == "null";
-                            let other = if null(r) {
-                                Some(l)
-                            } else if null(l) {
-                                Some(r)
-                            } else {
-                                None
-                            };
-                            if other.and_then(|o| ty.self_type(o)).is_some_and(|t| t.integral.is_some()) {
-                                return true;
-                            }
-                        }
-                    }
-                    todo.extend(kids(c, e));
+    let Some(r) = crate::support::slang_ast::ancestors(c, n)
+        .take_while(|&a| c.kind(a) != ClassDecl)
+        .find(|&a| matches!(c.kind(a), FunctionDecl | TaskDecl))
+    else {
+        return false;
+    };
+    let Some(body) = c.tree.child(r, Body) else { return false };
+    let null = |x: NodeId| matches!(c.kind(x), Literal | NameExpr) && c.tree.bare_text(x) == "null";
+    for e in crate::support::slang_ast::subtree(c, body) {
+        match c.kind(e) {
+            BinaryExpr if c.keyword(e).is_some_and(|k| matches!(c.text_of(k), "==" | "!=" | "===" | "!==" | "=")) => {
+                let ks = kids(c, e);
+                let [l, r] = ks[..] else { continue };
+                let other = if null(r) {
+                    l
+                } else if null(l) {
+                    r
+                } else {
+                    continue;
+                };
+                if ty.self_type(other).is_some_and(|t| t.integral.is_some()) {
+                    return true;
+                }
+            }
+            MemberExpr => {
+                let Some(&b) = kids(c, e).first() else { continue };
+                if c.kind(b) == NameExpr && ty.self_type(b).is_some_and(|t| t.integral.is_some()) {
+                    return true;
                 }
             }
             _ => {}

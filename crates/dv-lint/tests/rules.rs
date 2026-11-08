@@ -1029,3 +1029,15 @@ fn macro_body_text_keeps_the_first_tokens_trivia() {
     assert_eq!(msgs.len(), 1);
     assert!(msgs[0].starts_with("Dynamic cast '$cast(p_sequencer,  mk(1))'"), "{}", msgs[0]);
 }
+
+#[test]
+fn redundant_cast_in_a_body_that_fails_in_the_default_specialization() {
+    // `x = null` with T at int makes slang drop f's whole body there, the
+    // `$cast` included; g's body binds.
+    let src = "class H; endclass\n\
+               class C #(type T=int); T x; H a, b;\n\
+               function void f(); x = null; $cast(a, b); endfunction\n\
+               function void g(); $cast(a, b); endfunction\n\
+               endclass\n";
+    assert_eq!(rule_lines(src, "SV-TYP-008"), vec![4]);
+}
