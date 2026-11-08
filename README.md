@@ -130,4 +130,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for how to add a rule and its tests.
 
 ## License
 
-MIT, see [LICENSE](LICENSE).
+Apache License 2.0, see [LICENSE](LICENSE) and [NOTICE](NOTICE). Third-party components are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
