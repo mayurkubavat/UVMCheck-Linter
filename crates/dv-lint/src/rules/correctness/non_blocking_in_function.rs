@@ -23,7 +23,12 @@ pub(crate) fn nonblocking_in_function(c: &Cst, s: &mut Sink) {
                     "Non-blocking assignment '<=' used inside function '{name}'. In SystemVerilog (IEEE 1800 § 13.4.4), functions execute in zero simulation time and must only use blocking assignments ('='). Non-blocking assignments schedule updates into the NBA region, violating function combinational execution semantics."
                 ),
                 c.loc(op),
-            );
+            )
+            .fixes
+            .extend(crate::fix::with_safety(
+                c.token_fix(op, op, "=", "Replace non-blocking assignment '<=' with blocking assignment '='"),
+                crate::fix::FixSafety::Unsafe,
+            ));
         }
     }
 }

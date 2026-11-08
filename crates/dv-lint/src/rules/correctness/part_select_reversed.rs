@@ -25,6 +25,13 @@ pub(crate) fn part_select_reversed(c: &Cst, s: &mut Sink) {
                 "Inverted part-select slicing: selection range [{lv}:{rv}] is reversed relative to declared vector endianness. In SystemVerilog (IEEE 1800 \u{a7} 7.4.3), part-select bounds must match the declared range endianness."
             ),
             c.loc_of(l),
-        );
+        )
+        .fixes
+        .extend(crate::fix::with_safety(
+            c.first_tok(l).zip(c.tree.token_bounds(r).map(|b| b.1)).and_then(|(a, b)| {
+                c.token_fix(a, b, format!("{rv}:{lv}"), &format!("Invert part-select bounds to [{rv}:{lv}]"))
+            }),
+            crate::fix::FixSafety::Unsafe,
+        ));
     }
 }

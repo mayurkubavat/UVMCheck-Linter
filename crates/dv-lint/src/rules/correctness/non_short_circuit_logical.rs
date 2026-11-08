@@ -35,7 +35,12 @@ pub(crate) fn non_short_circuit(c: &Cst, s: &mut Sink) {
                                 "Bitwise operator '{op}' used in conditional predicate where logical '{rep}' is expected. Bitwise operators do not short-circuit, unconditionally evaluating the right-hand side and risking null-pointer dereferences or index-out-of-bounds faults. Replace with '{rep}'."
                             ),
                             c.loc(t),
-                        );
+                        )
+                        .fixes
+                        .extend(crate::fix::with_safety(
+                            c.token_fix(t, t, rep, &format!("Replace non-short-circuiting bitwise '{op}' with logical '{rep}'")),
+                            crate::fix::FixSafety::Unsafe,
+                        ));
                     }
                 }
                 for x in k {

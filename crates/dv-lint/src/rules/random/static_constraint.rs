@@ -20,6 +20,11 @@ pub(crate) fn static_constraint(c: &Cst, s: &mut Sink) {
                  dynamically disabling or altering them creates cross-instance state pollution and non-deterministic test failures."
             ),
             c.loc(st),
-        );
+        )
+        .fixes
+        .extend(crate::fix::with_safety(
+            c.token_fix(st, st, "", "Remove 'static' keyword to make constraint instance-specific"),
+            crate::fix::FixSafety::Unsafe,
+        ));
     }
 }

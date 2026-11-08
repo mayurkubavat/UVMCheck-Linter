@@ -28,6 +28,8 @@ pub(crate) fn empty_randomize_with(c: &Cst, s: &mut Sink) {
              Remove the redundant 'with { }' block."
                 .into(),
             c.loc(with),
-        );
+        )
+        .fixes
+        .extend(c.tree.token_bounds(block).and_then(|(_, close)| c.token_fix(with, close, "", "Remove empty 'with { }' constraint block")));
     }
 }

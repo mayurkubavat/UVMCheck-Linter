@@ -43,6 +43,8 @@ pub(crate) fn assignment_in_condition(c: &Cst, s: &mut Sink) {
                 c.text_of(t)
             ),
             c.loc(t),
-        );
+        )
+        .fixes
+        .extend(crate::fix::with_safety(c.token_fix(t, t, "==", "Replace assignment '=' with equality operator '=='"), crate::fix::FixSafety::Unsafe));
     }
 }
