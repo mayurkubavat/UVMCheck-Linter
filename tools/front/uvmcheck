@@ -28,6 +28,12 @@ if [ "$engine" = auto ]; then
                 expect_value=yes ;;
             --preset=*|--json=*|--config=*|--waivers=*|--baseline=*|--update-baseline=*|--sarif=*|--html=*|--experimental|--no-config|--no-cache|--history|--skip-libraries|--time|--frames|--in-context|--list|--single-unit)
                 ;;
+            # --explain, --changed-since, waiver hygiene, the cache, --map,
+            # --init, --python-rules.
+            --explain|--changed-since|--cache-dir|--map|--python-rules)
+                expect_value=yes ;;
+            --explain=*|--changed-since=*|--cache-dir=*|--map=*|--python-rules=*|--strict-new-files|--waiver-report|--report-unused-waivers|--strict-waivers|--clear-cache|--init)
+                ;;
             +incdir+*|+define+*|+undefine+*|+libext+*|-I*|-D*)
                 ;;
             -*) engine=slang; why=$a; break ;;

@@ -1,0 +1,283 @@
+//! The uvmcheck options dv-lint ported last: --explain, --changed-since,
+//! the waiver-hygiene reports, the result cache, --map, --init and
+//! --python-rules (cpp/tests/test_*.py check the same against uvmcheck).
+
+use std::path::{Path, PathBuf};
+use std::process::{Command, Output};
+
+fn tmp(name: &str) -> PathBuf {
+    let d = std::env::temp_dir().join(format!("dv-lint-rest-{name}-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&d);
+    std::fs::create_dir_all(&d).unwrap();
+    d
+}
+
+fn run(cwd: &Path, args: &[&str]) -> Output {
+    Command::new(env!("CARGO_BIN_EXE_dv-lint")).args(args).current_dir(cwd).output().unwrap()
+}
+
+fn text(o: &Output) -> String {
+    String::from_utf8_lossy(&o.stdout).into_owned() + &String::from_utf8_lossy(&o.stderr)
+}
+
+fn repo() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../..").canonicalize().unwrap()
+}
+
+fn git(cwd: &Path, args: &[&str]) {
+    let st = Command::new("git")
+        .args(["-c", "user.name=t", "-c", "user.email=t@t"])
+        .args(args)
+        .current_dir(cwd)
+        .output()
+        .unwrap();
+    assert!(st.status.success(), "git {args:?}: {}", String::from_utf8_lossy(&st.stderr));
+}
+
+const TB: &str =
+    "module tb;\n  int a, b;\n  initial begin\n    if (a == a) $display(\"old\");\n  end\nendmodule : tb\n";
+
+#[test]
+fn explain_prints_a_rule() {
+    let d = tmp("explain");
+    let o = run(&d, &["--explain", "SV-DUP-002"]);
+    assert_eq!(o.status.code(), Some(0));
+    let out = text(&o);
+    assert!(out.contains("CloneFragments") && out.contains("MG-7.1") && out.contains("min_tokens = 50"), "{out}");
+    let o = run(&d, &["--explain=NO-SUCH-001"]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(text(&o).contains("unknown rule"));
+}
+
+#[test]
+fn changed_since_keeps_changed_lines_and_untracked_files() {
+    let d = tmp("changed");
+    std::fs::write(d.join("tb.sv"), TB).unwrap();
+    git(&d, &["init", "-q"]);
+    git(&d, &["add", "tb.sv"]);
+    git(&d, &["commit", "-q", "-m", "base"]);
+    std::fs::write(d.join("tb.sv"), TB.replace("(\"old\");\n", "(\"old\");\n    if (b == b) $display(\"new\");\n"))
+        .unwrap();
+    std::fs::write(d.join("extra.sv"), TB.replace("tb", "extra")).unwrap();
+    let lines = |o: &Output| -> Vec<String> {
+        String::from_utf8_lossy(&o.stdout)
+            .lines()
+            .filter(|l| l.contains("SV-COR-008"))
+            .map(|l| {
+                let mut p = l.split(':');
+                let f = Path::new(p.next().unwrap()).file_name().unwrap().to_string_lossy().into_owned();
+                format!("{f}:{}", p.next().unwrap())
+            })
+            .collect()
+    };
+    let all = run(&d, &["--no-config", "--rule", "SV-COR-008", "tb.sv", "extra.sv"]);
+    assert_eq!(lines(&all), ["extra.sv:4", "tb.sv:4", "tb.sv:5"]);
+    let o = run(&d, &["--no-config", "--rule", "SV-COR-008", "tb.sv", "extra.sv", "--changed-since", "HEAD"]);
+    assert_eq!(lines(&o), ["extra.sv:4", "tb.sv:5"]);
+    assert!(text(&o).contains("1 elsewhere not shown"), "{}", text(&o));
+    // SV-COR-008 is an ERROR: exit 1 anyway; a new file fails the strict gate
+    // only through its finding count, which the message names.
+    let o =
+        run(&d, &["--no-config", "--rule", "SV-COR-008", "extra.sv", "--changed-since", "HEAD", "--strict-new-files"]);
+    assert!(text(&o).contains("--strict-new-files: 1 finding(s)"), "{}", text(&o));
+    let o = run(&d, &["--no-config", "tb.sv", "--changed-since", "no-such-ref"]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(text(&o).contains("unknown git revision"));
+    let o = run(&d, &["--no-config", "tb.sv", "--strict-new-files"]);
+    assert_eq!(o.status.code(), Some(2));
+    assert!(text(&o).contains("requires --changed-since"));
+}
+
+#[test]
+fn waiver_hygiene_reports_and_strict_exit() {
+    let d = tmp("hygiene");
+    std::fs::create_dir_all(d.join(".uvmcheck")).unwrap();
+    // Line 4 is waived inline; the comment on line 2 names SV-COR-008 and waives nothing.
+    std::fs::write(
+        d.join("tb.sv"),
+        "module tb;\n  int a; // uvmcheck:waive SV-COR-008 -- stale\n  initial begin\n    if (a == a) $display(\"x\"); // uvmcheck:waive SV-COR-008 -- known\n  end\nendmodule : tb\n",
+    )
+    .unwrap();
+    std::fs::write(
+        d.join(".uvmcheck/waivers.json"),
+        r#"{"waivers": [{"rule": "SV-COR-001", "path": "tb.sv", "reason": "x", "owner": "dv"},
+                        {"rule": "SV-NOPE-001", "reason": "never matches"}]}"#,
+    )
+    .unwrap();
+    let o = run(&d, &["--rule", "SV-COR-008", "--rule", "SV-COR-001", "tb.sv", "--waiver-report"]);
+    let out = text(&o);
+    assert!(out.contains("=== Waiver hygiene ==="), "{out}");
+    assert!(out.contains("Waivers: 2 written, 1 matched nothing, 0 expired, 1 without an owner"), "{out}");
+    assert!(out.contains("unused:  waivers.json #2 (SV-NOPE-001)"), "{out}");
+    assert!(out.contains("Waiver comments: 2 in source, 1 waive nothing"), "{out}");
+    assert!(out.contains("tb.sv:2: // uvmcheck:waive SV-COR-008 -- stale"), "{out}");
+    assert!(out.contains("Waived findings by rule: SV-COR-001 1, SV-COR-008 1"), "{out}");
+    assert!(out.contains("Waived findings by owner: (inline comment) 1, dv 1"), "{out}");
+    assert_eq!(o.status.code(), Some(0), "the report alone does not fail");
+    let o = run(&d, &["--rule", "SV-COR-008", "--rule", "SV-COR-001", "tb.sv", "--report-unused-waivers"]);
+    let out = text(&o);
+    assert!(
+        out.contains("UVM-WV-001 (UnusedWaiver): waiver waivers.json #2 (SV-NOPE-001) matched no diagnostic"),
+        "{out}"
+    );
+    assert!(
+        out.contains("tb.sv:2:1: [WARNING] UVM-WV-001 (UnusedWaiver): waiver comment matched no diagnostic"),
+        "{out}"
+    );
+    let o = run(&d, &["--rule", "SV-COR-008", "--rule", "SV-COR-001", "tb.sv", "--strict-waivers"]);
+    assert_eq!(o.status.code(), Some(4), "{}", text(&o));
+}
+
+#[test]
+fn the_cache_replays_until_a_source_changes() {
+    let d = tmp("cache");
+    std::fs::write(d.join("tb.sv"), TB).unwrap();
+    let args = ["--no-config", "--rule", "SV-COR-008", "tb.sv", "--json"];
+    let first = run(&d, &[&args[..], &["a.json"]].concat());
+    assert!(text(&first).contains("cache: stored 1 compilation unit"), "{}", text(&first));
+    assert!(d.join(".uvmcheck_cache/native/manifest.json").is_file());
+    // Another report file: the same lint, served from the cache.
+    let second = run(&d, &[&args[..], &["b.json"]].concat());
+    assert!(text(&second).contains("served from cache"), "{}", text(&second));
+    assert_eq!(first.stdout, second.stdout);
+    assert_eq!(first.status.code(), second.status.code());
+    let strip = |f: &str| std::fs::read_to_string(d.join(f)).unwrap();
+    assert_eq!(strip("a.json"), strip("b.json"));
+    std::fs::write(d.join("tb.sv"), TB.replace("a == a", "a == b")).unwrap();
+    let edited = run(&d, &[&args[..], &["c.json"]].concat());
+    let out = text(&edited);
+    assert!(out.contains("cache miss: tb.sv changed") && !out.contains("served from cache"), "{out}");
+    assert!(!String::from_utf8_lossy(&edited.stdout).contains("SV-COR-008"));
+    // Another rule selection: another key (and the one entry is replaced).
+    let other = run(&d, &["--no-config", "--rule", "SV-COR-001", "tb.sv"]);
+    assert!(!text(&other).contains("served from cache"));
+    // --no-cache neither reads nor writes; --clear-cache starts afresh.
+    let fresh = run(&d, &[&args[..], &["d.json", "--no-cache"]].concat());
+    assert!(!text(&fresh).contains("cache"), "{}", text(&fresh));
+    std::fs::write(d.join(".uvmcheck_cache/native/manifest.json"), "{ not json").unwrap();
+    let corrupt = run(&d, &[&args[..], &["e.json"]].concat());
+    assert!(text(&corrupt).contains("cache: stored"), "a corrupt cache is a full run: {}", text(&corrupt));
+    let cleared = run(&d, &[&args[..], &["f.json", "--clear-cache", "--cache-dir", "elsewhere"]].concat());
+    assert!(text(&cleared).contains("cache: stored"));
+    assert!(d.join("elsewhere/native/manifest.json").is_file());
+}
+
+#[test]
+fn map_writes_the_testbench_as_json_and_html() {
+    let d = tmp("map");
+    let r = repo();
+    let tb = r.join("testdata/map/map_tb.sv").display().to_string();
+    let inc = r.join("testdata/common").display().to_string();
+    let o = run(&d, &["--no-config", &tb, "-I", &inc, "--map", "m.json"]);
+    assert!(text(&o).contains("Testbench map written to: m.json"), "{}", text(&o));
+    let j = std::fs::read_to_string(d.join("m.json")).unwrap();
+    assert!(j.contains("\"roots\": [\"my_test\", \"BaseDriver\", \"MyDriver\"]"), "{j}");
+    assert!(j.contains("{\"name\": \"dbg_ap\", \"type\": \"uvm_analysis_port#(pkt)\", \"connected\": false}"), "{j}");
+    assert!(j.contains("{\"in\": \"my_env\", \"from\": \"agt.mon.ap\", \"to\": \"scb.imp\"}"), "{j}");
+    run(&d, &["--no-config", &tb, "-I", &inc, "--map", "m.html"]);
+    let h = std::fs::read_to_string(d.join("m.html")).unwrap();
+    assert!(h.contains("<h1>Testbench map</h1>") && h.contains("uvm_test_top"), "{h}");
+}
+
+#[test]
+fn init_learns_naming_and_writes_config_and_baseline() {
+    if Command::new("python3").arg("--version").output().is_err() {
+        return;
+    }
+    let d = tmp("init");
+    let agents = d.join("tb/agents");
+    std::fs::create_dir_all(&agents).unwrap();
+    std::fs::copy(repo().join("testdata/common/uvm_mock.svh"), d.join("tb/uvm_mock.svh")).unwrap();
+    let mut pkg = vec!["`include \"uvm_mock.svh\"".to_string()];
+    for a in ["axi", "apb", "spi"] {
+        std::fs::write(
+            agents.join(format!("{a}_bfm.svh")),
+            format!(
+                "class {a}_bfm extends uvm_driver;\n  `uvm_component_utils({a}_bfm)\n  function new(string name, uvm_component parent); super.new(name, parent); endfunction\nendclass : {a}_bfm\n"
+            ),
+        )
+        .unwrap();
+        pkg.push(format!("`include \"agents/{a}_bfm.svh\""));
+    }
+    std::fs::write(d.join("tb/tb_classes.sv"), pkg.join("\n") + "\n").unwrap();
+    std::fs::write(d.join("tb/tb_top.sv"), "module tb_top;\n  int x;\n  initial x = x;\nendmodule : tb_top\n").unwrap();
+    let o = Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .arg("--init")
+        .current_dir(&d)
+        .env("UVMCHECK_PYTHON_SDK", repo().join("python"))
+        .env_remove("UVM_HOME")
+        .output()
+        .unwrap();
+    assert_eq!(o.status.code(), Some(0), "{}", text(&o));
+    let cfg = std::fs::read_to_string(d.join(".uvmcheck/config.py")).unwrap();
+    assert!(cfg.contains("\"tb/tb_classes.sv\"") && cfg.contains("\"tb/tb_top.sv\""), "{cfg}");
+    assert!(cfg.contains("\"UvmDriver\": {\"pattern\": r\"^[A-Za-z0-9_]*(_bfm)$\""), "{cfg}");
+    assert!(d.join(".uvmcheck/baseline.json").is_file(), "{}", text(&o));
+    let base = std::fs::read_to_string(d.join(".uvmcheck/baseline.json")).unwrap();
+    assert!(!base.contains("UVM-NAM-101"), "the learnt naming applies: {base}");
+    // A plain run now reports nothing new.
+    let o = Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .current_dir(&d)
+        .env("UVMCHECK_PYTHON_SDK", repo().join("python"))
+        .output()
+        .unwrap();
+    assert!(String::from_utf8_lossy(&o.stdout).trim().is_empty(), "{}", text(&o));
+    let again = run(&d, &["--init"]);
+    assert_eq!(again.status.code(), Some(2));
+    assert!(text(&again).contains("already exists"));
+}
+
+#[test]
+fn python_rules_report_findings() {
+    if Command::new("python3").arg("--version").output().is_err() {
+        return;
+    }
+    let d = tmp("python");
+    std::fs::write(
+        d.join("rules.py"),
+        "from uvmcheck.rule import Rule, Severity\n\
+         class NoDrv(Rule):\n    id = 'PY-DRV-001'\n    name = 'NoDrv'\n    default_severity = Severity.Error\n\
+         \x20   def analyze(self, ctx):\n        for c in ctx.classes:\n            if c.role == 'driver':\n                self.report(ctx, f'driver {c.name} in {c.uvm_base}', at=c)\n",
+    )
+    .unwrap();
+    let r = repo();
+    let tb = r.join("testdata/map/map_tb.sv").display().to_string();
+    let inc = r.join("testdata/common").display().to_string();
+    let o = Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .args(["--no-config", "--no-cache", "--python-rules", "rules.py", "--rule", "PY-DRV-001", &tb, "-I", &inc])
+        .current_dir(&d)
+        .env("UVMCHECK_PYTHON_SDK", r.join("python"))
+        .output()
+        .unwrap();
+    let out = String::from_utf8_lossy(&o.stdout);
+    assert!(out.contains("[ERROR] PY-DRV-001 (NoDrv): driver my_drv in uvm_driver"), "{}", text(&o));
+    assert_eq!(o.status.code(), Some(1));
+}
+
+#[test]
+fn the_uvmcheck_front_runs_these_options_natively() {
+    let d = tmp("front");
+    std::fs::write(d.join("tb.sv"), TB).unwrap();
+    let front = repo().join("tools/front/uvmcheck");
+    let go = |args: &[&str]| {
+        Command::new("sh")
+            .arg(&front)
+            .args(args)
+            .current_dir(&d)
+            .env("UVMCHECK_NATIVE", env!("CARGO_BIN_EXE_dv-lint"))
+            .env("UVMCHECK_SLANG", "/nonexistent/uvmcheck-slang")
+            .env_remove("UVMCHECK_ENGINE")
+            .output()
+            .unwrap()
+    };
+    for args in [
+        &["--explain", "SV-DUP-002"][..],
+        &["--explain=SV-DUP-002"],
+        &["--no-config", "--waiver-report", "--report-unused-waivers", "--strict-waivers", "tb.sv"],
+        &["--no-config", "--cache-dir", "c", "--clear-cache", "--map", "m.json", "tb.sv"],
+        &["--no-config", "--python-rules", "none.py", "--no-cache", "tb.sv"],
+    ] {
+        let o = go(args);
+        assert!(!text(&o).contains("needs the Slang engine"), "{args:?}: {}", text(&o));
+    }
+}

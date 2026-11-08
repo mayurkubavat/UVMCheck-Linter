@@ -42,7 +42,7 @@ mod sequence_priority_range;
 mod sequence_start_on_null_sequencer;
 mod super_build_phase_order;
 mod time_in_non_time_phase;
-mod tlm_topology_checker;
+pub(crate) mod tlm_topology_checker;
 mod unchecked_get_response;
 mod unchecked_p_sequencer_cast;
 mod unused_sequence;

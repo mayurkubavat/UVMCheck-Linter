@@ -111,6 +111,8 @@ pub(crate) struct CfgCall {
     pub(crate) ty: String,
     pub(crate) class: String,
     pub(crate) field: String,
+    /// The instance-name argument, as [`field_arg`] reads it.
+    pub(crate) inst: String,
     pub(crate) loc: dv_model::Loc,
     pub(crate) visits: usize,
     /// The field name is a string literal (not a variable a wrapper
@@ -171,6 +173,7 @@ pub(crate) fn config_db_calls(csts: &[Cst]) -> Vec<CfgCall> {
                     ty,
                     class: class.clone(),
                     field: field.clone(),
+                    inst: args.get(1).map(|&a| field_arg(c, a)).unwrap_or_default(),
                     loc: c.loc(t),
                     visits,
                     literal,

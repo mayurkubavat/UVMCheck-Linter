@@ -71,16 +71,35 @@ pub fn naming_pattern_supported(target: &str, pattern: &str) -> bool {
 pub fn header_pattern_supported(p: &str) -> bool {
     options::header_alternatives(p).is_some()
 }
+pub mod cache;
+pub mod changed;
+pub mod cli;
+pub mod explain;
 pub mod fix;
+pub mod init;
+pub mod plugins;
 pub mod project;
 pub mod report;
 pub mod suppress;
+pub mod tbgraph;
+pub mod tbmap;
 
 static INLINE_WAIVED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 /// How many findings inline waiver comments have dropped so far.
 pub fn inline_waived() -> usize {
     INLINE_WAIVED.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+/// Sets the count [`inline_waived`] reports (a run replayed from the cache).
+pub fn set_inline_waived(n: usize) {
+    INLINE_WAIVED.store(n, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// Drops the findings inline waiver comments waive (findings made outside
+/// the rules, such as Python rules'), counting them in [`inline_waived`].
+pub fn apply_inline_waivers(found: &mut Vec<Finding>, files: &[String]) {
+    INLINE_WAIVED.fetch_add(waivers::apply(found, files), std::sync::atomic::Ordering::Relaxed);
 }
 
 /// Which rules run without `--rule`, as uvmcheck selects them: `preset`

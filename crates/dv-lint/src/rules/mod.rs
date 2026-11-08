@@ -25,10 +25,10 @@ mod random;
 mod readability;
 mod security;
 mod smells;
-mod style;
+pub(crate) mod style;
 mod sva;
 mod types;
-mod uvm;
+pub(crate) mod uvm;
 
 /// Every rule of every category, unsorted.
 pub(crate) fn all() -> Vec<Rule> {

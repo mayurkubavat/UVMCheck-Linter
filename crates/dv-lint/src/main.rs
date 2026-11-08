@@ -30,6 +30,14 @@
 //! visited, `--exprs` every expression's type (the form of
 //! `tools/oracles/exprdump.cpp`).
 //!
+//! uvmcheck's remaining options (see `dv_lint::cli`): `--explain RULE`;
+//! `--changed-since REF` (with `--strict-new-files`); `--waiver-report`,
+//! `--report-unused-waivers` and `--strict-waivers` (exit 4); the result
+//! cache in `.uvmcheck_cache/native/` (`--no-cache`, `--cache-dir DIR`,
+//! `--clear-cache`; a run is replayed only when nothing it read changed);
+//! `--map FILE` (the testbench map, HTML or JSON); `--init`; and
+//! `--python-rules PATH` (rules written against the Python SDK).
+//!
 //! Rules run on one thread per core (`DV_LINT_JOBS=N` to choose; 1 runs
 //! them serially); the output does not depend on it.
 //!
@@ -56,9 +64,20 @@ fn main() {
     let mut sarif: Option<String> = None;
     let mut html: Option<String> = None;
     let mut fix_rules: Vec<String> = Vec::new();
+    // --explain, --changed-since, waiver hygiene, the cache, --map, --init,
+    // --python-rules (dv_lint::cli).
+    let mut extra = dv_lint::cli::Extra::default();
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
+        match extra.take(&a, &mut it) {
+            Ok(true) => continue,
+            Ok(false) => {}
+            Err(e) => {
+                eprintln!("error: {e}");
+                std::process::exit(2);
+            }
+        }
         // `--name=value`, as uvmcheck also takes them.
         if let Some(v) = a.strip_prefix("--preset=") {
             preset = Some(v.to_string());
@@ -100,8 +119,6 @@ fn main() {
             // Rule selection as uvmcheck's (default: every profile but advisory).
             "--preset" => preset = it.next(),
             "--experimental" => experimental = true,
-            // uvmcheck options with nothing to do here: no project config
-            // or result cache yet.
             // The project configuration (docs/guide/project_config.md).
             "--no-config" => no_config = true,
             "--config" => config_file = it.next(),
@@ -122,8 +139,6 @@ fn main() {
             "--fix-rule" => fix_rules.extend(
                 it.next().unwrap_or_default().split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
             ),
-            // No result cache here.
-            "--no-cache" => {}
             // Also write the findings as uvmcheck's JSON report.
             "--json" => {
                 let path = it.next().unwrap_or_else(|| {
@@ -160,6 +175,15 @@ fn main() {
         eprintln!("error: {e}");
         std::process::exit(2);
     };
+    extra.validate().unwrap_or_else(|e| fail(e));
+    if let Some(q) = &extra.explain {
+        use std::io::IsTerminal;
+        print!("{}", dv_lint::explain::explain(q, std::io::stdout().is_terminal()).unwrap_or_else(|e| fail(e)));
+        return;
+    }
+    if extra.init {
+        init_project(&args);
+    }
     if !no_config {
         let first = args.iter().find(|a| !a.starts_with(['-', '+'])).map(String::as_str);
         if let Some(file) = dv_lint::project::find(config_file.as_deref(), first) {
@@ -188,6 +212,50 @@ fn main() {
         eprintln!("Warning: {w}");
     }
     let _ = SUPPRESS.set(sup);
+    let root = CONFIG
+        .get()
+        .map(|c| c.root.clone())
+        .filter(|r| !r.as_os_str().is_empty())
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+    if extra.clear_cache {
+        dv_lint::cache::clear(&extra.cache_folder(&root));
+    }
+    let cache_wanted = !extra.no_cache
+        && !extra.hygiene()
+        && extra.changed_since.is_none()
+        && extra.map.is_none()
+        && update_baseline.is_none()
+        && !time
+        && !std::env::args().any(|a| a == "--history")
+        && !FIX.read().is_ok_and(|f| f.on || f.dry_run);
+    let cache = cache_wanted.then(|| {
+        let mut inputs: Vec<std::path::PathBuf> = Vec::new();
+        if let Some(c) = CONFIG.get() {
+            inputs.push(c.file.clone());
+            inputs.extend(c.layers.iter().map(std::path::PathBuf::from));
+        }
+        let dot = root.join(".uvmcheck");
+        match &waivers_file {
+            Some(w) => inputs.push(w.into()),
+            None if !no_config => inputs.push(dot.join("waivers.json")),
+            None => {}
+        }
+        match &baseline_file {
+            Some(b) => inputs.push(b.into()),
+            None if !no_config => inputs.push(dot.join("baseline.json")),
+            None => {}
+        }
+        inputs.extend(extra.python_rules.iter().map(std::path::PathBuf::from));
+        let cwd = std::env::current_dir().unwrap_or_default();
+        let lists = sv_source::FileList::read_args(&args, &cwd, sv_source::Dialect::Any, &sv_source::ProcessEnv);
+        inputs.extend(lists.lists);
+        let mut key: Vec<String> = vec![cwd.display().to_string()];
+        key.extend(lint_args());
+        key.push("|".into());
+        key.extend(args.iter().cloned());
+        dv_lint::cache::Cache::new(&extra.cache_folder(&root), &key, &inputs)
+    });
+    let _ = ROOT.set(root);
     if let Some(u) = update_baseline {
         let _ = UPDATE_BASELINE.set(u);
     }
@@ -209,12 +277,57 @@ fn main() {
     // A fix never touches a file with compile errors: find them whatever the
     // selection (the findings are dropped again when not selected).
     let keep = |id: &str| user_keep(id) || (fixing && id == "SV-CMP-001");
+    let _ = ACTIVE.set(dv_lint::rules().into_iter().map(|r| r.id).filter(|id| user_keep(id)).collect());
+    let _ = EXTRA.set(extra.clone());
     if !slang && !exprs && !specs {
+        let looked = cache.as_ref().map(dv_lint::cache::Cache::lookup);
+        if let Some(Err(changed)) = &looked {
+            if !changed.is_empty() {
+                // A full run: only a complete hit is replayed.
+                eprintln!("[dv-lint] cache miss: {} changed", changed.join(", "));
+            }
+        }
+        if let Some(Ok(hit)) = looked {
+            eprintln!(
+                "[dv-lint] cache: {} compilation unit{} served from cache",
+                hit.units,
+                if hit.units == 1 { "" } else { "s" }
+            );
+            dv_lint::set_inline_waived(hit.inline_waived);
+            let _ = USER_FILES.set(user_files(&hit.files));
+            let t = std::time::Instant::now();
+            report(None, time, frames, t, &hit.files, only_in(&headers, &hit.files, &hit.found));
+        }
         // The design is built while the rules' shared caches start.
         let (trees, parse_ms) = sv_sema::parse_args(&args).unwrap_or_else(|e| fail(e.to_string()));
         let t = std::time::Instant::now();
-        let (design, (files, found)) = dv_lint::lint_built(|| sv_sema::design_of(&trees, parse_ms), &trees, keep);
-        report(&design, time, frames, t, &files, only_in(&headers, &files, &found));
+        let (design, (mut files, mut found)) =
+            dv_lint::lint_built(|| sv_sema::design_of(&trees, parse_ms), &trees, keep);
+        if let Some(rules) = &extra.python_rules {
+            eprintln!("[dv-lint] Executing custom Python rules from: {rules}");
+            let options = CONFIG.get().map_or(&[][..], |c| &c.rule_options[..]);
+            let mut py = dv_lint::plugins::run(rules, &design, &trees, &mut files, options);
+            dv_lint::apply_inline_waivers(&mut py, &files);
+            found.extend(py);
+            found.sort_by(|a, b| (a.position_in(&files), a.rule).cmp(&(b.position_in(&files), b.rule)));
+        }
+        if extra.map.is_some() {
+            let _ = MAP.set(dv_lint::tbmap::Map::new(&design, &trees, &files));
+        }
+        let _ = USER_FILES.set(user_files(&files));
+        if let Some(c) = &cache {
+            let mut deps: Vec<std::path::PathBuf> = trees.iter().flat_map(|t| t.files.iter().cloned()).collect();
+            deps.extend(files.iter().filter(|f| !f.is_empty()).map(std::path::PathBuf::from));
+            deps.retain(|d| d.is_file());
+            if c.store(&deps, trees.len(), &files, &found, dv_lint::inline_waived()) {
+                eprintln!(
+                    "[dv-lint] cache: stored {} compilation unit{}",
+                    trees.len(),
+                    if trees.len() == 1 { "" } else { "s" }
+                );
+            }
+        }
+        report(Some(&design), time, frames, t, &files, only_in(&headers, &files, &found));
     }
     let loaded = if slang {
         load_slang(&args).map(|d| (d, Vec::new()))
@@ -237,7 +350,8 @@ fn main() {
     }
     let t = std::time::Instant::now();
     let (files, found) = dv_lint::lint_all(&design, &trees, keep);
-    report(&design, time, frames, t, &files, only_in(&headers, &files, &found));
+    let _ = USER_FILES.set(user_files(&files));
+    report(Some(&design), time, frames, t, &files, only_in(&headers, &files, &found));
 }
 
 /// `--in-context`: each header source (`.svh`, `.vh`, ...) is replaced by
@@ -346,6 +460,139 @@ static SARIF_OUT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 /// `--html FILE`.
 static HTML_OUT: std::sync::OnceLock<String> = std::sync::OnceLock::new();
 
+/// The options of dv_lint::cli, the rules that run, the project root, the
+/// files whose waiver comments count, and the --map model.
+static EXTRA: std::sync::OnceLock<dv_lint::cli::Extra> = std::sync::OnceLock::new();
+static ACTIVE: std::sync::OnceLock<Vec<&'static str>> = std::sync::OnceLock::new();
+static ROOT: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+static USER_FILES: std::sync::OnceLock<Vec<String>> = std::sync::OnceLock::new();
+static MAP: std::sync::OnceLock<dv_lint::tbmap::Map> = std::sync::OnceLock::new();
+
+/// The command line without the options that only say where reports go
+/// (or how the cache is used), for the cache key: a run that writes its JSON
+/// to another file replays the same findings.
+fn lint_args() -> Vec<String> {
+    const VALUED: [&str; 6] = ["--json", "--sarif", "--html", "--map", "--update-baseline", "--cache-dir"];
+    const FLAGS: [&str; 3] = ["--frames", "--clear-cache", "--no-cache"];
+    let mut out = Vec::new();
+    let mut it = std::env::args().skip(1);
+    while let Some(a) = it.next() {
+        if VALUED.contains(&a.as_str()) {
+            it.next();
+        } else if !FLAGS.contains(&a.as_str()) && !VALUED.iter().any(|v| a.starts_with(&format!("{v}="))) {
+            out.push(a);
+        }
+    }
+    out
+}
+
+/// Files whose waiver comments the hygiene report reads: not library or
+/// excluded, not the UVM test stub.
+fn user_files(files: &[String]) -> Vec<String> {
+    files
+        .iter()
+        .filter(|f| !f.is_empty() && !f.contains("uvm_mock.svh"))
+        .filter(|f| CONFIG.get().is_none_or(|c| !c.hides_file(f)))
+        .cloned()
+        .collect()
+}
+
+/// `--init`: discovers the project, learns its naming, writes
+/// `.uvmcheck/config.py`, then lints with it to write the first baseline
+/// (`.uvmcheck/baseline.json`, or `--update-baseline FILE`).
+fn init_project(args: &[String]) -> ! {
+    let fail = |e: String| -> ! {
+        eprintln!("error: {e}");
+        std::process::exit(2);
+    };
+    for existing in [".uvmcheck/config.py", ".uvmcheck/config.json", "uvmcheck_config.py"] {
+        if std::path::Path::new(existing).exists() {
+            fail(format!("{existing} already exists; remove it to run --init again"));
+        }
+    }
+    // Sources given on the command line are the sources; other options stay.
+    let mut cli_files = Vec::new();
+    let mut prev = String::new();
+    for a in args {
+        let takes_value = matches!(prev.as_str(), "-f" | "-F" | "-v" | "-y" | "-top" | "--top" | "--rule" | "--preset");
+        if !takes_value && !a.starts_with(['-', '+']) && std::path::Path::new(a).is_file() {
+            cli_files.push(std::path::PathBuf::from(a));
+        }
+        prev = a.clone();
+    }
+    let d = dv_lint::init::discover(std::path::Path::new("."), &cli_files);
+    if cli_files.is_empty() && d.sources_rel.is_empty() && d.filelists_rel.is_empty() {
+        fail(format!("no SystemVerilog sources found under {}", d.root.display()));
+    }
+    println!(
+        "[dv-lint] init: {} SystemVerilog files; {}; {}",
+        d.sv_files,
+        if d.filelists_rel.is_empty() {
+            format!("{} top-level sources", d.sources_rel.len())
+        } else {
+            format!("{} file list(s)", d.filelists_rel.len())
+        },
+        d.uvm_note
+    );
+    let (design, _trees) = sv_sema::load_with_trees(&d.compile_args()).unwrap_or_else(|e| fail(e.to_string()));
+    let library = d.library_rel.first().map(|l| {
+        let e = match l.strip_prefix("$UVM_HOME") {
+            Some(rest) => format!("{}{rest}", std::env::var("UVM_HOME").unwrap_or_default()),
+            None => l.clone(),
+        };
+        let p = d.root.join(e);
+        p.canonicalize().unwrap_or(p)
+    });
+    let naming = dv_lint::init::infer_naming(&design, library.as_deref());
+    if let Err(e) = std::fs::create_dir_all(".uvmcheck")
+        .and_then(|()| std::fs::write(".uvmcheck/config.py", dv_lint::init::render_config(&d, &naming)))
+    {
+        fail(format!("cannot write .uvmcheck/config.py: {e}"));
+    }
+    // Lint with the new config (which names the sources) for the baseline.
+    let given: Vec<String> = std::env::args().skip(1).collect();
+    let mut rerun: Vec<String> = Vec::new();
+    let mut baseline = ".uvmcheck/baseline.json".to_string();
+    let mut it = given.iter();
+    while let Some(a) = it.next() {
+        if a == "--init" || cli_files.iter().any(|f| f.as_os_str() == a.as_str()) {
+            continue;
+        }
+        if a == "--update-baseline" {
+            baseline = it.next().cloned().unwrap_or(baseline);
+            continue;
+        }
+        if let Some(b) = a.strip_prefix("--update-baseline=") {
+            baseline = b.to_string();
+            continue;
+        }
+        rerun.push(a.clone());
+    }
+    rerun.extend(["--no-cache".to_string(), "--update-baseline".to_string(), baseline.clone()]);
+    let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("dv-lint"));
+    let out = std::process::Command::new(exe)
+        .args(&rerun)
+        .stderr(std::process::Stdio::inherit())
+        .output()
+        .unwrap_or_else(|e| fail(format!("cannot lint with the new config: {e}")));
+    if out.status.code() == Some(2) {
+        std::process::exit(2);
+    }
+    print!("\n[dv-lint] Wrote .uvmcheck/config.py");
+    if naming.is_empty() {
+        print!(" (the default naming conventions already fit this code)");
+    }
+    println!();
+    for n in &naming {
+        let what = if n.disable { "disabled".to_string() } else { format!("pattern {}", n.pattern) };
+        println!("  naming {}: {what} ({})", n.target, n.evidence);
+    }
+    println!(
+        "[dv-lint] Existing findings are in the baseline {baseline}; from now on only new findings are reported.\nReview the config, then run `uvmcheck` from this folder."
+    );
+    std::process::exit(0);
+}
+
 /// The project configuration in use, if any.
 static CONFIG: std::sync::OnceLock<dv_lint::project::Config> = std::sync::OnceLock::new();
 
@@ -434,7 +681,7 @@ fn json_report(files: &[String], found: &[dv_lint::Finding], waived: usize) -> S
 }
 
 fn report(
-    design: &Design,
+    design: Option<&Design>,
     time: bool,
     frames: bool,
     t: std::time::Instant,
@@ -466,6 +713,35 @@ fn report(
         }
     }
     let waived = dv_lint::inline_waived() + SUPPRESS.get().map_or(0, |s| s.apply(&mut found, files));
+    if let Some(s) = SUPPRESS.get() {
+        let regraded = s.regraded();
+        if regraded > 0 {
+            eprintln!("[dv-lint] {regraded} finding(s) re-graded by waivers with a severity");
+        }
+        let stale = s.stale_baseline();
+        if stale > 0 && UPDATE_BASELINE.get().is_none() {
+            eprintln!(
+                "[dv-lint] {stale} baseline entr{} matched no finding (fixed, or the flagged line changed); run with --update-baseline to drop them",
+                if stale == 1 { "y" } else { "ies" }
+            );
+        }
+    }
+    // --changed-since and the waiver hygiene reports.
+    let mut files_owned = files.to_vec();
+    let mut outcome = dv_lint::cli::Outcome::default();
+    if let Some(x) = EXTRA.get() {
+        let active: std::collections::HashSet<&str> =
+            ACTIVE.get().map(|a| a.iter().copied().collect()).unwrap_or_default();
+        let user = USER_FILES.get().map_or(&[][..], |u| &u[..]);
+        let root = ROOT.get().cloned().unwrap_or_default();
+        outcome = x
+            .after_suppress(&mut found, &mut files_owned, &root, SUPPRESS.get(), CONFIG.get(), user, &active)
+            .unwrap_or_else(|e| {
+                eprintln!("error: {e}");
+                std::process::exit(2);
+            });
+    }
+    let files = &files_owned[..];
     if fix_on || fix_dry {
         let pass = dv_lint::fix::apply(&found, &fix_only, fix_unsafe, fix_dry || !fix_on, &broken);
         if fix_dry || !fix_on {
@@ -478,7 +754,7 @@ fn report(
     }
     let found = &found[..];
     let mut sources = dv_lint::frames::Sources::default();
-    if time {
+    if let (true, Some(design)) = (time, design) {
         let tm = design.timings();
         eprintln!(
             "parse {:.0} ms, elaborate {:.0} ms, model {:.0} ms, copy {:.0} ms, rules {:.0} ms",
@@ -521,8 +797,19 @@ fn report(
             std::process::exit(2);
         }
     }
-    // As uvmcheck: warnings and infos alone do not fail the run.
-    std::process::exit(if found.iter().any(|f| f.severity == dv_lint::Severity::Error) { 1 } else { 0 });
+    if let (Some(path), Some(m)) = (EXTRA.get().and_then(|x| x.map.as_ref()), MAP.get()) {
+        match m.write(path, files, found) {
+            Ok(()) => eprintln!("[dv-lint] Testbench map written to: {path}"),
+            Err(e) => {
+                eprintln!("error: cannot write {path}: {e}");
+                std::process::exit(2);
+            }
+        }
+    }
+    // As uvmcheck: warnings and infos alone do not fail the run (but a
+    // failed --strict-new-files does; a failed --strict-waivers exits 4).
+    let strict = EXTRA.get().is_some_and(|x| x.strict_waivers);
+    std::process::exit(dv_lint::cli::exit_status(found, outcome, strict));
 }
 
 #[cfg(feature = "slang")]

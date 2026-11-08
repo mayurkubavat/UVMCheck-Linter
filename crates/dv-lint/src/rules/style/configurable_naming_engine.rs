@@ -19,11 +19,14 @@ enum Casing {
 
 /// A `^...$` pattern of the default rules: an optional fixed start, a body
 /// of identifier characters, and one of some fixed ends.
+#[derive(Clone, Copy)]
 struct Pattern {
     text: &'static str,
     lower_only: bool,
     starts: &'static [&'static str],
     ends: &'static [&'static str],
+    /// The body may be empty (`[A-Za-z0-9_]*`, as `--init` writes them).
+    empty_body: bool,
 }
 
 impl Pattern {
@@ -31,7 +34,7 @@ impl Pattern {
     /// body of at least one identifier character.
     fn matches(&self, name: &str) -> bool {
         let ok = |s: &str| {
-            !s.is_empty()
+            (self.empty_body || !s.is_empty())
                 && s.bytes().all(|b| {
                     b == b'_'
                         || b.is_ascii_digit()
@@ -66,7 +69,40 @@ const fn pat(
     starts: &'static [&'static str],
     ends: &'static [&'static str],
 ) -> Option<Pattern> {
-    Some(Pattern { text, lower_only, starts, ends })
+    Some(Pattern { text, lower_only, starts, ends, empty_body: false })
+}
+
+/// A pattern of the shape `--init` writes, `^[A-Za-z0-9_]*(_drv|_driver)$`:
+/// any identifier ending in one of the alternatives (which are themselves
+/// identifier text). None for any other regex.
+fn learnt_pattern(p: &str) -> Option<Pattern> {
+    static MADE: std::sync::Mutex<Vec<(String, Option<Pattern>)>> = std::sync::Mutex::new(Vec::new());
+    let mut made = MADE.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((_, m)) = made.iter().find(|(k, _)| k == p) {
+        return *m;
+    }
+    let m = parse_learnt(p);
+    made.push((p.to_string(), m));
+    m
+}
+
+fn parse_learnt(p: &str) -> Option<Pattern> {
+    let alts = p.strip_prefix("^[A-Za-z0-9_]*(")?.strip_suffix(")$")?;
+    let ends: Vec<&'static str> = alts
+        .split('|')
+        .map(|e| (!e.is_empty() && e.bytes().all(|b| b == b'_' || b.is_ascii_alphanumeric())).then_some(e))
+        .collect::<Option<Vec<_>>>()?
+        .into_iter()
+        .map(|e| &*Box::leak(e.to_string().into_boxed_str()))
+        .collect();
+    // Made once per pattern (see learnt_pattern).
+    Some(Pattern {
+        text: Box::leak(p.to_string().into_boxed_str()),
+        lower_only: false,
+        starts: &[],
+        ends: Box::leak(ends.into_boxed_slice()),
+        empty_body: true,
+    })
 }
 
 /// The spec of `kind` under the project config; None when there is none or
@@ -85,7 +121,7 @@ fn spec(kind: &str) -> Option<Spec> {
         if p.is_empty() {
             sp.pattern = Option::None;
         } else if sp.pattern.as_ref().is_none_or(|d| d.text != p) {
-            return Option::None;
+            sp.pattern = Some(learnt_pattern(&p)?);
         }
     }
     match o.casing.as_deref() {
@@ -116,7 +152,7 @@ pub(crate) fn target_supported(kind: &str, pattern: &str) -> bool {
         return true;
     }
     let Some(d) = default_spec(kind) else { return false };
-    pattern.is_empty() || d.pattern.is_some_and(|p| p.text == pattern)
+    pattern.is_empty() || d.pattern.is_some_and(|p| p.text == pattern) || learnt_pattern(pattern).is_some()
 }
 
 fn default_spec(kind: &str) -> Option<Spec> {
@@ -377,7 +413,7 @@ fn report(out: &mut Sink, kind: &str, rule_name: &'static str, name: &str, loc: 
 }
 
 /// `NamingEngine::classTargetKind` (the UVM kinds; plain classes are off).
-fn class_kind(d: &Design, id: dv_model::ClassId) -> Option<&'static str> {
+pub(crate) fn class_kind(d: &Design, id: dv_model::ClassId) -> Option<&'static str> {
     let derived = |n: &str| d.class(id).name == n || d.ancestors(id).any(|a| a.name == n);
     Some(if derived("uvm_driver") {
         "UvmDriver"
@@ -484,4 +520,11 @@ pub(crate) fn naming_engine(d: &Design, csts: &[Cst], out: &mut Sink) {
             report(out, "Interface", "InterfaceNamingConvention", c.text_of(t), c.loc(t));
         }
     }
+}
+
+/// For `--init`: whether `kind` has an enabled convention, its pattern text
+/// ("" for none), and whether `name` follows it.
+pub(crate) fn convention(kind: &str, name: &str) -> Option<(&'static str, bool)> {
+    let sp = spec(kind)?;
+    sp.enabled.then(|| (sp.pattern.map_or("", |p| p.text), validate(kind, name).is_none()))
 }

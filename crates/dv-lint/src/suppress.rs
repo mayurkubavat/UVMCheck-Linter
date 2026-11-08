@@ -28,6 +28,37 @@ pub struct Suppress {
     root: PathBuf,
     /// Notes for stderr (a file that could not be read ...).
     pub warnings: Vec<String>,
+    /// What [`Suppress::apply`] matched, for [`Suppress::hygiene`].
+    stats: std::sync::Mutex<Stats>,
+}
+
+#[derive(Default)]
+struct Stats {
+    group_matches: HashMap<usize, usize>,
+    matched_fingerprints: HashSet<String>,
+    by_rule: HashMap<String, usize>,
+    by_owner: HashMap<String, usize>,
+    regraded: usize,
+}
+
+/// Waiver and baseline hygiene (`--waiver-report`), as uvmcheck's
+/// WaiverHygiene.
+#[derive(Default, Debug)]
+pub struct Hygiene {
+    /// Waivers written (config entries and waiver file entries).
+    pub written: usize,
+    pub without_owner: usize,
+    /// Labels of waivers that matched nothing.
+    pub unused: Vec<String>,
+    /// Waiver comments in the sources.
+    pub inline_comments: usize,
+    /// Waiver comments that waived nothing: (file, line, text).
+    pub unused_inline: Vec<crate::waivers::Unused>,
+    pub baseline_entries: usize,
+    pub stale_baseline: usize,
+    /// Waived findings per rule and per owner, most first.
+    pub by_rule: Vec<(String, usize)>,
+    pub by_owner: Vec<(String, usize)>,
 }
 
 fn collapse(s: &str) -> String {
@@ -79,8 +110,12 @@ impl Suppress {
                 message: w.message.clone(),
                 severity: w.severity,
                 label: w.label.clone(),
+                owner: w.owner.clone(),
+                group: w.group,
             }));
         }
+        // Waiver file entries are groups of their own, after the config's.
+        let first_group = s.waivers.iter().map(|w| w.group + 1).max().unwrap_or(0);
         let dot = root.join(".uvmcheck");
         let pick = |given: Option<&str>, name: &str| -> Option<PathBuf> {
             match given {
@@ -91,7 +126,7 @@ impl Suppress {
         };
         if let Some(w) = pick(waivers, "waivers.json") {
             match crate::project::load_waiver_file(&w) {
-                Ok(list) => s.waivers.extend(list),
+                Ok(list) => s.waivers.extend(list.into_iter().map(|w| Waiver { group: first_group + w.group, ..w })),
                 Err(e) => s.warnings.push(format!("Could not load waiver file: {e}")),
             }
         }
@@ -155,6 +190,17 @@ impl Suppress {
     /// Drops waived and baselined findings and re-grades those a waiver with
     /// a severity names; returns how many were dropped.
     pub fn apply(&self, found: &mut Vec<Finding>, files: &[String]) -> usize {
+        let mut stats = self.stats.lock().unwrap_or_else(|e| e.into_inner());
+        // Findings an inline comment waived: a waiver that matches one too is
+        // used, as uvmcheck evaluates both.
+        let inline = crate::waivers::USED.lock().ok().and_then(|u| u.as_ref().map(|u| u.waived.clone()));
+        for (file, line, rule, message) in inline.unwrap_or_default() {
+            let path = crate::project::normalized(&file);
+            if let Some(w) = self.waivers.iter().find(|w| w.matches(rule, &path, &file, line, &message)) {
+                *stats.group_matches.entry(w.group).or_default() += 1;
+            }
+            *stats.by_owner.entry("(inline comment)".into()).or_default() += 1;
+        }
         let use_baseline = !self.baseline.is_empty() || !self.legacy.is_empty();
         let fps = if use_baseline { self.fingerprints(found, files) } else { Vec::new() };
         let mut norm: HashMap<String, String> = HashMap::new();
@@ -165,17 +211,33 @@ impl Suppress {
             let path = norm.entry(file.to_string()).or_insert_with(|| crate::project::normalized(file)).clone();
             let ext = self.waivers.iter().find(|w| w.matches(f.rule, &path, file, line, &f.message));
             let mut dropped = false;
+            if let Some(w) = ext {
+                *stats.group_matches.entry(w.group).or_default() += 1;
+            }
             match ext {
                 Some(w) if w.severity.is_some() => {
                     f.severity = w.severity.unwrap_or(f.severity);
                     f.message.push_str(&format!(" [re-graded by {}]", w.label));
+                    stats.regraded += 1;
                 }
-                Some(_) => dropped = true,
+                Some(w) => {
+                    dropped = true;
+                    *stats.by_rule.entry(f.rule.to_string()).or_default() += 1;
+                    let owner = if w.owner.is_empty() { "(no owner)" } else { w.owner.as_str() };
+                    *stats.by_owner.entry(owner.to_string()).or_default() += 1;
+                }
                 None => {}
             }
             if !dropped && use_baseline {
                 let base = file.rsplit(['/', '\\']).next().unwrap_or(file);
-                dropped = self.baseline.contains(&fps[i]) || self.legacy.contains(&format!("{}@{base}:{line}", f.rule));
+                let legacy = format!("{}@{base}:{line}", f.rule);
+                if self.baseline.contains(&fps[i]) {
+                    stats.matched_fingerprints.insert(fps[i].clone());
+                    dropped = true;
+                } else if self.legacy.contains(&legacy) {
+                    stats.matched_fingerprints.insert(legacy);
+                    dropped = true;
+                }
             }
             if dropped {
                 waived += 1;
@@ -185,6 +247,56 @@ impl Suppress {
         }
         *found = keep;
         waived
+    }
+
+    /// How many findings waivers with a severity re-graded.
+    pub fn regraded(&self) -> usize {
+        self.stats.lock().map_or(0, |s| s.regraded)
+    }
+
+    /// Baseline entries no finding matched (after [`Suppress::apply`]).
+    pub fn stale_baseline(&self) -> usize {
+        let total = self.baseline.len() + self.legacy.len();
+        total.saturating_sub(self.stats.lock().map_or(0, |s| s.matched_fingerprints.len()))
+    }
+
+    /// Waiver and baseline hygiene after [`Suppress::apply`]: waivers and
+    /// waiver comments in `files` (user files) that matched nothing, where
+    /// the comment names a rule in `active` or `*`.
+    pub fn hygiene(&self, files: &[String], active: &HashSet<&str>) -> Hygiene {
+        let stats = self.stats.lock().unwrap_or_else(|e| e.into_inner());
+        let mut h = Hygiene::default();
+        let mut seen = HashSet::new();
+        for w in &self.waivers {
+            if !seen.insert(w.group) {
+                continue;
+            }
+            h.written += 1;
+            if w.owner.is_empty() {
+                h.without_owner += 1;
+            }
+            if stats.group_matches.get(&w.group).copied().unwrap_or(0) == 0 {
+                h.unused.push(w.label.clone());
+            }
+        }
+        let mut by_rule: HashMap<String, usize> = stats.by_rule.clone();
+        if let Ok(u) = crate::waivers::USED.lock() {
+            for (r, n) in u.as_ref().map(|u| u.by_rule.clone()).unwrap_or_default() {
+                *by_rule.entry(r).or_default() += n;
+            }
+        }
+        let most_first = |m: HashMap<String, usize>| {
+            let mut v: Vec<(String, usize)> = m.into_iter().collect();
+            v.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
+            v
+        };
+        h.by_rule = most_first(by_rule);
+        h.by_owner = most_first(stats.by_owner.clone());
+        drop(stats);
+        (h.inline_comments, h.unused_inline) = crate::waivers::unused_comments(files, active);
+        h.baseline_entries = self.baseline.len() + self.legacy.len();
+        h.stale_baseline = self.stale_baseline();
+        h
     }
 
     /// Writes `found` as a version 2.0 baseline.

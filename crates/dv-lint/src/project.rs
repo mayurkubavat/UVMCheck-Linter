@@ -206,6 +206,11 @@ pub(crate) struct Waiver {
     pub(crate) severity: Option<Severity>,
     /// What a re-graded finding's message names (`waiver #1 (SV-STY-002)`).
     pub(crate) label: String,
+    /// Who owns it (`owner`), for the waiver report.
+    pub(crate) owner: String,
+    /// The waiver as written: one config entry expands to a waiver per rule
+    /// and path, all in one group (the waiver report counts groups).
+    pub(crate) group: usize,
 }
 
 impl Waiver {
@@ -253,6 +258,7 @@ pub(crate) fn load_waiver_file(file: &Path) -> Result<Vec<Waiver>, String> {
             if path.is_empty() { String::new() } else { format!(" in {path}") }
         );
         let contains = path.trim_matches('*').to_string();
+        let group = out.len();
         out.push(Waiver {
             rule,
             path: None,
@@ -261,6 +267,8 @@ pub(crate) fn load_waiver_file(file: &Path) -> Result<Vec<Waiver>, String> {
             message: w.get("message").as_str().unwrap_or("").to_string(),
             severity: sev,
             label,
+            owner: w.get("owner").as_str().unwrap_or("").to_string(),
+            group,
         });
     }
     Ok(out)
@@ -291,6 +299,14 @@ pub struct Config {
     pub naming: Vec<(String, crate::options::NamingOverride)>,
     /// The project root: the folder holding `.uvmcheck/` (or the config).
     pub root: PathBuf,
+    /// Waivers past their `expires` date (`label expired DATE`), for the
+    /// waiver report.
+    pub expired: Vec<String>,
+    /// Layered Python configs: this file and the parents it builds on.
+    pub layers: Vec<String>,
+    /// Each rule's `options` object as written (rule key, JSON text), for
+    /// Python rules.
+    pub rule_options: Vec<(String, String)>,
 }
 
 fn severity(s: &str) -> Option<Severity> {
@@ -340,7 +356,7 @@ pub fn find(explicit: Option<&str>, first_source: Option<&str>) -> Option<PathBu
 
 /// The uvmcheck Python SDK next to this binary (`<repo>/python` from
 /// `<repo>/target/release`), else `$UVMCHECK_PYTHON_SDK`.
-fn python_sdk() -> Option<PathBuf> {
+pub(crate) fn python_sdk() -> Option<PathBuf> {
     if let Some(p) = std::env::var_os("UVMCHECK_PYTHON_SDK") {
         return Some(PathBuf::from(p));
     }
@@ -422,6 +438,9 @@ impl Config {
                         rs.severity = entry.get("severity").as_str().and_then(severity);
                         rs.exclude = pats(&mut c, entry.get("exclude_paths"), &format!("rules.{key}.exclude_paths"));
                         rs.only = pats(&mut c, entry.get("only_paths"), &format!("rules.{key}.only_paths"));
+                        if let Json::Obj(_) = entry.get("options") {
+                            c.rule_options.push((key.clone(), entry.get("options").to_string()));
+                        }
                         if let Json::Obj(opts) = entry.get("options") {
                             for (k, v) in opts {
                                 match v {
@@ -499,10 +518,17 @@ impl Config {
             }
         }
         c.add_waivers(root.get("waivers"), &base)?;
+        // From the Python config loader: waivers it dropped as expired, its
+        // warnings, and the layers it read.
+        c.expired.extend(strings(root.get("expired_waivers")));
+        c.warnings.extend(strings(root.get("warnings")));
+        c.layers.extend(strings(root.get("layers")));
         c.root = project;
         // Compile settings.
         for s in strings(root.get("filelists")) {
-            c.compile_args.extend(["-f".to_string(), anchor(&s, &base)]);
+            // Paths in the list are relative to it, as uvmcheck reads config file
+            // lists (slang `processCommandFiles(makeRelative = true)`, i.e. -F).
+            c.compile_args.extend(["-F".to_string(), anchor(&s, &base)]);
         }
         for s in strings(root.get("include_dirs")) {
             c.compile_args.push(format!("+incdir+{}", anchor(&s, &base)));
@@ -532,9 +558,11 @@ impl Config {
             if let Some(e) = w.get("expires").as_str() {
                 if e < today.as_str() {
                     self.warnings.push(format!("waiver for {} expired on {e}; it no longer applies", rules[0]));
+                    self.expired.push(format!("{label} expired {e}"));
                     continue;
                 }
             }
+            let owner = w.get("owner").as_str().unwrap_or("").to_string();
             let mut paths = strings(w.get("paths"));
             paths.extend(strings(w.get("path")));
             if paths.is_empty() {
@@ -563,6 +591,8 @@ impl Config {
                         message: message.clone(),
                         severity: sev,
                         label: label.clone(),
+                        owner: owner.clone(),
+                        group: i,
                     });
                 }
             }
@@ -625,6 +655,12 @@ impl Config {
             }
             true
         });
+    }
+
+    /// Nothing is reported in `file`: a library or excluded path.
+    pub fn hides_file(&self, file: &str) -> bool {
+        let path = normalized(file);
+        self.library.iter().any(|p| p.matches(&path)) || self.exclude.iter().any(|p| p.matches(&path))
     }
 
     /// The config's waivers, in order.

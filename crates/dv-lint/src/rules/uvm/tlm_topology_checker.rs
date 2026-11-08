@@ -52,25 +52,7 @@ pub(crate) fn tlm_topology(d: &Design, csts: &[Cst], s: &mut Sink) {
     if ports.is_empty() {
         return;
     }
-    let mut conns: Vec<(String, String)> = Vec::new();
-    for c in csts {
-        for n in c.nodes(CallExpr) {
-            if callee(c, n) != "connect" || in_library_class(c, n) {
-                continue;
-            }
-            let text = normalized(c, n);
-            let (mut src, mut dst) = (text.clone(), String::new());
-            if let Some(at) = text.rfind(".connect") {
-                src = text[..at].to_string();
-                if let (Some(open), Some(close)) = (text[at..].find('(').map(|i| i + at), text.rfind(')')) {
-                    if close > open {
-                        dst = text[open + 1..close].to_string();
-                    }
-                }
-            }
-            conns.push((src.trim_matches(' ').to_string(), dst.trim_matches(' ').to_string()));
-        }
-    }
+    let conns: Vec<(String, String)> = connections(csts).into_iter().map(|k| (k.source, k.target)).collect();
     for p in ports {
         if conns.iter().any(|(a, b)| a.contains(p.name) || b.contains(p.name)) {
             continue;
@@ -88,6 +70,48 @@ pub(crate) fn tlm_topology(d: &Design, csts: &[Cst], s: &mut Sink) {
             p.loc,
         );
     }
+}
+
+/// A `connect()` call outside the UVM library: `a.b.port.connect(c.imp)`
+/// is source `a.b.port`, target `c.imp`, as uvmcheck's TlmTopologyGraph.
+pub(crate) struct Connection {
+    /// The class the call is in ("" outside a class).
+    pub(crate) class: String,
+    pub(crate) source: String,
+    pub(crate) target: String,
+    pub(crate) loc: Loc,
+}
+
+pub(crate) fn connections(csts: &[Cst]) -> Vec<Connection> {
+    let mut out = Vec::new();
+    for c in csts {
+        for n in c.nodes(CallExpr) {
+            if callee(c, n) != "connect" || in_library_class(c, n) {
+                continue;
+            }
+            let text = normalized(c, n);
+            let (mut src, mut dst) = (text.clone(), String::new());
+            if let Some(at) = text.rfind(".connect") {
+                src = text[..at].to_string();
+                if let (Some(open), Some(close)) = (text[at..].find('(').map(|i| i + at), text.rfind(')')) {
+                    if close > open {
+                        dst = text[open + 1..close].to_string();
+                    }
+                }
+            }
+            let class = crate::support::slang_ast::enclosing_class(c, n)
+                .map(|k| crate::support::slang_ast::decl_name(c, k))
+                .unwrap_or_default();
+            let loc = c.first_tok(n).map(|t| c.loc(t)).unwrap_or_default();
+            out.push(Connection {
+                class,
+                source: src.trim_matches(' ').to_string(),
+                target: dst.trim_matches(' ').to_string(),
+                loc,
+            });
+        }
+    }
+    out
 }
 
 /// Inside a class of the UVM library (or the test stub): `isLibrarySymbol`
