@@ -7,6 +7,7 @@
 
 #include "slang/ast/Compilation.h"
 #include "slang/diagnostics/DiagnosticEngine.h"
+#include "uvmcheck/engine/RuleEngine.h"
 #include "slang/driver/Driver.h"
 #include "slang/util/OS.h"
 #include "uvmcheck/compat/Overlay.h"
@@ -80,6 +81,7 @@ std::unique_ptr<Session> Session::load(const std::vector<std::string>& args) {
         auto t1 = Clock::now();
         s->impl_->compilation = d.createCompilation();
         overlay.configureCompilation(*s->impl_->compilation);
+        engine::specializeInOrder(*s->impl_->compilation);
         for (const auto& diag : s->impl_->compilation->getAllDiagnostics()) {
             if (diag.isError()) ++s->errorCount_;
         }

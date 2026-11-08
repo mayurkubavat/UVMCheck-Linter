@@ -546,6 +546,7 @@ int LinterDriver::run() {
     // Fully elaborate up front. Rules then only read the AST, which is what
     // makes it safe to run them in parallel (same protocol as slang's own
     // analysis passes), and every rule sees the same, complete design.
+    engine::specializeInOrder(*compilation);
     (void)compilation->getAllDiagnostics();
 
     // Construct UVM knowledge model

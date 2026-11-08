@@ -22,6 +22,14 @@ struct EngineOptions {
     bool profile = false;
 };
 
+/// Creates the specializations the design uses, in an order that is the
+/// same on every run, and elaborates them. Call it before the compilation's
+/// first getAllDiagnostics(): slang names a specialization after the context
+/// that creates it first (`T` or the type it stands for), and its own
+/// diagnostic pass goes in hash-map order, so type names in messages would
+/// otherwise change from run to run.
+void specializeInOrder(slang::ast::Compilation& compilation);
+
 /// Runs a set of rules against one elaborated compilation.
 ///
 /// Execution model (SinglePass):

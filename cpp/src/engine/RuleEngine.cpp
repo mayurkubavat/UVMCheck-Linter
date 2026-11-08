@@ -12,6 +12,8 @@
 #include <unordered_set>
 
 #include "uvmcheck/rules/Rule.h"
+#include "slang/ast/symbols/ClassSymbols.h"
+#include "slang/ast/symbols/ParameterSymbols.h"
 
 namespace uvmcheck::engine {
 
@@ -150,9 +152,11 @@ private:
 class DefaultSpecializer
     : public slang::ast::ASTVisitor<DefaultSpecializer, slang::ast::VisitFlags::AllGood> {
 public:
+    explicit DefaultSpecializer(bool defaults = true) : defaults(defaults) {}
+
     void handle(const slang::ast::GenericClassDefSymbol& gen) {
         if (knownGenerics.insert(&gen).second) generics.push_back(&gen);
-        (void)gen.getDefaultSpecialization(*gen.getParentScope());
+        if (defaults) (void)gen.getDefaultSpecialization(*gen.getParentScope());
         visitSpecializations(gen);
     }
 
@@ -167,17 +171,63 @@ public:
 
 private:
     void visitSpecializations(const slang::ast::GenericClassDefSymbol& gen) {
-        std::vector<const slang::ast::Type*> toVisit;
+        std::vector<std::pair<std::string, const slang::ast::Type*>> toVisit;
         for (const auto& spec : gen.specializations()) {
-            if (seen.insert(&spec).second) toVisit.push_back(&spec);
+            if (seen.insert(&spec).second) toVisit.emplace_back(specKey(spec), &spec);
         }
-        for (const auto* spec : toVisit) spec->visit(*this);
+        // slang keeps specializations in a hash map keyed by pointers, so
+        // its order changes from run to run. Visiting creates the nested
+        // specializations, and slang names one after the context that
+        // created it first: visit in a fixed order so names are stable.
+        std::stable_sort(toVisit.begin(), toVisit.end(),
+                         [](const auto& a, const auto& b) { return a.first < b.first; });
+        for (const auto& [key, spec] : toVisit) spec->visit(*this);
     }
 
+    /// The specialization's parameters, resolved: the same for every run.
+    static std::string specKey(const slang::ast::Type& spec) {
+        using namespace slang::ast;
+        std::string key;
+        if (spec.isClass()) {
+            for (const auto& m : spec.getCanonicalType().as<ClassType>().members()) {
+                if (m.kind == SymbolKind::TypeParameter) {
+                    key += m.as<TypeParameterSymbol>().targetType.getType().getCanonicalType().toString();
+                }
+                else if (m.kind == SymbolKind::Parameter) {
+                    key += m.as<ParameterSymbol>().getValue().toString();
+                }
+                else {
+                    continue;
+                }
+                key += '\x1f';
+            }
+        }
+        return key + spec.toString();
+    }
+
+    bool defaults;
     std::vector<const slang::ast::GenericClassDefSymbol*> generics;
     std::unordered_set<const slang::ast::GenericClassDefSymbol*> knownGenerics;
     std::unordered_set<const slang::ast::Type*> seen;
 };
+
+} // namespace
+
+void specializeInOrder(slang::ast::Compilation& compilation) {
+    // Default specializations are left to slang: it reports nothing inside
+    // one it makes itself, and would if it found one already made.
+    DefaultSpecializer specializer(false);
+    compilation.getRoot().visit(specializer);
+    specializer.finish();
+}
+
+static void specializeAll(slang::ast::Compilation& compilation) {
+    DefaultSpecializer specializer;
+    compilation.getRoot().visit(specializer);
+    specializer.finish();
+}
+
+namespace {
 
 /// One shared walk over the elaborated AST (VisitFlags::AllGood order) for a
 /// group of subscribers.
@@ -265,9 +315,7 @@ void RuleEngine::run(std::span<rules::Rule* const> rules, core::DiagnosticEngine
     // own multithreaded analysis uses.
     // Both modes specialize up front so they see the same AST.
     (void)compilation.getAllDiagnostics();
-    DefaultSpecializer specializer;
-    compilation.getRoot().visit(specializer);
-    specializer.finish();
+    specializeAll(compilation);
     if (parallel) compilation.freeze();
     struct Unfreeze {
         slang::ast::Compilation& c;

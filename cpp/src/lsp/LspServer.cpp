@@ -314,6 +314,7 @@ std::map<std::string, std::vector<LspDiagnostic>> LspServer::lintOpenDocuments()
 
     auto compilation = driver.createCompilation();
     rules::CompilerDiagnosticEngineScope compilerEngineScope(driver.diagEngine);
+    engine::specializeInOrder(*compilation);
     (void)compilation->getAllDiagnostics();
     uvm::UvmModel uvmModel(*compilation);
 
