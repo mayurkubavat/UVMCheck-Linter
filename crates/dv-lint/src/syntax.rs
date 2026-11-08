@@ -216,6 +216,43 @@ impl<'t> Cst<'t> {
         s
     }
 
+    /// A fix replacing bytes `start..end` of the tree's file `file`.
+    pub fn file_fix(
+        &self,
+        file: u32,
+        start: usize,
+        end: usize,
+        text: impl Into<String>,
+        description: &str,
+    ) -> crate::fix::Fix {
+        crate::fix::Fix {
+            path: self.tree.files.get(file as usize).map(|p| p.display().to_string()).unwrap_or_default(),
+            start: start as u32,
+            end: end as u32,
+            text: text.into(),
+            description: description.to_string(),
+            safety: crate::fix::FixSafety::Safe,
+        }
+    }
+
+    /// A fix replacing the written text of tokens `first..=last`; None when
+    /// either comes from a macro expansion or they are in different files
+    /// (no single place in a file to rewrite).
+    pub fn token_fix(
+        &self,
+        first: u32,
+        last: u32,
+        text: impl Into<String>,
+        description: &str,
+    ) -> Option<crate::fix::Fix> {
+        let (a, b) = (self.tree.tokens.get(first as usize)?, self.tree.tokens.get(last as usize)?);
+        if a.from_macro || b.from_macro || a.origin.file != b.origin.file {
+            return None;
+        }
+        let end = b.origin.offset as usize + b.text.len();
+        Some(self.file_fix(a.origin.file, a.origin.offset as usize, end, text, description))
+    }
+
     /// [`Self::text`] with surrounding whitespace trimmed.
     pub fn trimmed(&self, n: NodeId) -> String {
         self.text(n).trim_matches([' ', '\t', '\n', '\r']).to_string()

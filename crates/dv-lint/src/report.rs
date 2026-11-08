@@ -1,7 +1,7 @@
 //! Report formats besides the text listing: SARIF 2.1.0, as uvmcheck's
 //! SarifReporter writes it (the rule table, then one result per finding
-//! with its level, message, remediation estimate, location and related
-//! locations).
+//! with its level, message, remediation estimate, location, related
+//! locations and fixes), and the HTML dashboard.
 
 use crate::json::Json;
 use crate::{Finding, Severity};
@@ -58,6 +58,7 @@ pub fn sarif(files: &[String], found: &[Finding]) -> String {
         ));
     }
     o.push_str("          ]\n        }\n      },\n      \"results\": [\n");
+    let mut pos = crate::fix::Positions::default();
     for (i, f) in found.iter().enumerate() {
         let (file, line, column) = f.position_in(files);
         o.push_str(&format!(
@@ -79,6 +80,22 @@ pub fn sarif(files: &[String], found: &[Finding]) -> String {
                     s(nfile),
                     loc.line,
                     loc.column
+                ));
+            }
+            o.push_str("\n          ]");
+        }
+        if !f.fixes.is_empty() {
+            o.push_str(",\n          \"fixes\": [");
+            for (k, x) in f.fixes.iter().enumerate() {
+                let (l1, c1) = pos.at(&x.path, x.start);
+                let (l2, c2) = pos.at(&x.path, x.end);
+                o.push_str(&format!(
+                    "{}\n            {{\n              \"description\": {{ \"text\": {} }},\n              \"properties\": {{ \"safety\": \"{}\" }},\n              \"artifactChanges\": [{{\n                \"artifactLocation\": {{ \"uri\": {} }},\n                \"replacements\": [{{\n                  \"deletedRegion\": {{ \"startLine\": {l1}, \"startColumn\": {c1}, \"endLine\": {l2}, \"endColumn\": {c2} }},\n                  \"insertedContent\": {{ \"text\": {} }}\n                }}]\n              }}]\n            }}",
+                    if k > 0 { "," } else { "" },
+                    s(&x.description),
+                    x.safety.as_str(),
+                    s(file),
+                    s(&x.text)
                 ));
             }
             o.push_str("\n          ]");
@@ -124,7 +141,8 @@ fn now_utc() -> String {
 /// it: KPI cards (findings, maintainability grade from the remediation
 /// estimate, technical debt, errors and warnings, files), findings by
 /// category and the top rules, then a filterable table with each finding's
-/// source line. The most-complex-routines table is not computed here.
+/// source line and fix hints. The most-complex-routines table is not
+/// computed here.
 pub fn html(files: &[String], found: &[Finding]) -> String {
     use std::collections::{HashMap, HashSet};
     let category = |id: &str| -> &'static str {
@@ -238,6 +256,14 @@ pub fn html(files: &[String], found: &[Finding]) -> String {
             html_escape(file),
             html_escape(&f.message)
         ));
+        for x in &f.fixes {
+            let what = if x.description.is_empty() { &x.text } else { &x.description };
+            o.push_str(&format!(
+                "            <div class=\"fix-hint\" data-safety=\"{0}\">Fix ({0}): {1}</div>\n",
+                x.safety.as_str(),
+                html_escape(what)
+            ));
+        }
         let lines = texts.entry(file).or_insert_with(|| {
             std::fs::read_to_string(file).map(|t| t.lines().map(str::to_string).collect()).unwrap_or_default()
         });

@@ -53,6 +53,7 @@ fn main() {
     let mut update_baseline: Option<String> = None;
     let mut sarif: Option<String> = None;
     let mut html: Option<String> = None;
+    let mut fix_rules: Vec<String> = Vec::new();
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -110,6 +111,15 @@ fn main() {
             "--sarif" => sarif = it.next(),
             // The HTML dashboard.
             "--html" => html = it.next(),
+            // Apply fix-its: --fix rewrites files, --fix-dry-run prints the
+            // diff; --unsafe-fixes admits fixes that can change behaviour;
+            // --fix-rule limits them to rules (comma-separated IDs or names).
+            "--fix" => FIX.write().map(|mut f| f.on = true).unwrap_or(()),
+            "--fix-dry-run" => FIX.write().map(|mut f| f.dry_run = true).unwrap_or(()),
+            "--unsafe-fixes" => FIX.write().map(|mut f| f.unsafe_ok = true).unwrap_or(()),
+            "--fix-rule" => fix_rules.extend(
+                it.next().unwrap_or_default().split(',').map(|s| s.trim().to_string()).filter(|s| !s.is_empty()),
+            ),
             // No result cache here.
             "--no-cache" => {}
             // Also write the findings as uvmcheck's JSON report.
@@ -188,7 +198,15 @@ fn main() {
     let headers = if in_context { in_owner(&mut args) } else { Vec::new() };
     let selected = dv_lint::rule_selection(preset.as_deref(), experimental).unwrap_or_else(|e| fail(e));
     // A rule named with --rule runs whatever its profile.
-    let keep = |id: &str| if only.is_empty() { selected(id) } else { only.iter().any(|o| o == id) };
+    let user_keep = |id: &str| if only.is_empty() { selected(id) } else { only.iter().any(|o| o == id) };
+    let fixing = FIX.read().is_ok_and(|f| f.on || f.dry_run);
+    if let Ok(mut f) = FIX.write() {
+        f.only = fix_rules.clone();
+        f.compile_errors_selected = user_keep("SV-CMP-001");
+    }
+    // A fix never touches a file with compile errors: find them whatever the
+    // selection (the findings are dropped again when not selected).
+    let keep = |id: &str| user_keep(id) || (fixing && id == "SV-CMP-001");
     if !slang && !exprs && !specs {
         // The design is built while the rules' shared caches start.
         let (trees, parse_ms) = sv_sema::parse_args(&args).unwrap_or_else(|e| fail(e.to_string()));
@@ -296,6 +314,28 @@ fn only_in(headers: &[std::path::PathBuf], files: &[String], found: &[dv_lint::F
 }
 
 /// Prints the findings (and with `--time` the stage times) and exits.
+/// `--fix` and its options.
+#[derive(Default)]
+struct FixOpts {
+    on: bool,
+    dry_run: bool,
+    unsafe_ok: bool,
+    only: Vec<String>,
+    compile_errors_selected: bool,
+}
+static FIX: std::sync::RwLock<FixOpts> = std::sync::RwLock::new(FixOpts {
+    on: false,
+    dry_run: false,
+    unsafe_ok: false,
+    only: Vec::new(),
+    compile_errors_selected: false,
+});
+
+/// --fix runs pass after pass until nothing more changes (a fix can uncover
+/// another finding; overlapping fixes wait for the rewritten text); each pass
+/// is a fresh process, as uvmcheck's.
+const MAX_FIX_PASSES: u32 = 10;
+
 /// The waivers and baseline in use, and where `--update-baseline` writes.
 static SUPPRESS: std::sync::OnceLock<dv_lint::suppress::Suppress> = std::sync::OnceLock::new();
 static UPDATE_BASELINE: std::sync::OnceLock<String> = std::sync::OnceLock::new();
@@ -339,6 +379,7 @@ fn json_report(files: &[String], found: &[dv_lint::Finding], waived: usize) -> S
         "  \"tool\": \"dv-lint\",\n  \"version\": {},\n  \"compileErrors\": {compile},\n  \"waived\": {waived},\n  \"violations\": [",
         json_str(env!("CARGO_PKG_VERSION"))
     ));
+    let mut pos = dv_lint::fix::Positions::default();
     for (i, f) in found.iter().enumerate() {
         let (file, line, column) = f.position_in(files);
         out.push_str(if i == 0 { "\n" } else { ",\n" });
@@ -350,6 +391,23 @@ fn json_report(files: &[String], found: &[dv_lint::Finding], waived: usize) -> S
             json_str(file),
             json_str(&f.message)
         ));
+        if !f.fixes.is_empty() {
+            let fixes: Vec<String> = f
+                .fixes
+                .iter()
+                .map(|x| {
+                    let (l1, c1) = pos.at(&x.path, x.start);
+                    let (l2, c2) = pos.at(&x.path, x.end);
+                    format!(
+                        "{{\"description\": {}, \"replacement\": {}, \"safety\": \"{}\", \"line\": {l1}, \"column\": {c1}, \"endLine\": {l2}, \"endColumn\": {c2}}}",
+                        json_str(&x.description),
+                        json_str(&x.text),
+                        x.safety.as_str()
+                    )
+                })
+                .collect();
+            out.push_str(&format!(", \"fixes\": [{}]", fixes.join(", ")));
+        }
         if !f.related.is_empty() {
             let notes: Vec<String> = f
                 .related
@@ -381,6 +439,18 @@ fn report(
     files: &[String],
     mut found: Vec<dv_lint::Finding>,
 ) -> ! {
+    let fix = FIX.read().map(|f| (f.on, f.dry_run, f.unsafe_ok, f.only.clone(), f.compile_errors_selected)).ok();
+    let (fix_on, fix_dry, fix_unsafe, fix_only, cmp_selected) = fix.unwrap_or((false, false, false, Vec::new(), true));
+    let mut broken = std::collections::HashSet::new();
+    if fix_on || fix_dry {
+        for f in found.iter().filter(|f| f.rule == "SV-CMP-001") {
+            broken.insert(f.position_in(files).0.to_string());
+        }
+        if !cmp_selected {
+            found.retain(|f| f.rule != "SV-CMP-001");
+        }
+    }
+    dv_lint::fix::guard_macro_calls(&mut found);
     if let Some(c) = CONFIG.get() {
         c.apply(&mut found, files);
     }
@@ -394,6 +464,16 @@ fn report(
         }
     }
     let waived = dv_lint::inline_waived() + SUPPRESS.get().map_or(0, |s| s.apply(&mut found, files));
+    if fix_on || fix_dry {
+        let pass = dv_lint::fix::apply(&found, &fix_only, fix_unsafe, fix_dry || !fix_on, &broken);
+        if fix_dry || !fix_on {
+            print!("{}{}", pass.diffs, pass.summary);
+        } else if !pass.written.is_empty() {
+            rerun_fix_pass(&pass);
+        } else {
+            print!("{}", pass.summary);
+        }
+    }
     let found = &found[..];
     let mut sources = dv_lint::frames::Sources::default();
     if time {
@@ -450,4 +530,43 @@ fn load_slang(args: &[String]) -> Result<Design, String> {
 #[cfg(not(feature = "slang"))]
 fn load_slang(_: &[String]) -> Result<Design, String> {
     Err("built without the slang feature".into())
+}
+
+/// After a --fix pass that rewrote files: unless the fixes undo each other or
+/// the pass limit is reached, print the pass summary and run the next pass
+/// (this binary again, with the pass number and the file states seen so far
+/// in the environment); it reports on the fixed text.
+fn rerun_fix_pass(pass: &dv_lint::fix::PassResult) {
+    let n: u32 = std::env::var("DV_LINT_FIX_PASS").ok().and_then(|v| v.parse().ok()).unwrap_or(1).max(1);
+    let mut seen: std::collections::BTreeSet<String> = std::env::var("DV_LINT_FIX_STATES")
+        .unwrap_or_default()
+        .split(',')
+        .filter(|s| !s.is_empty())
+        .map(str::to_string)
+        .collect();
+    let keys: Vec<String> = pass.written.iter().map(|(p, h)| format!("{p}#{h:016x}")).collect();
+    let cycled = keys.iter().all(|k| seen.contains(k));
+    if cycled || n >= MAX_FIX_PASSES {
+        eprintln!(
+            "Warning: --fix: {} after {n} pass(es); stopped. Review the remaining findings by hand.",
+            if cycled { "fixes undo each other" } else { "fixes still changing files" }
+        );
+        print!("{}", pass.summary);
+        return;
+    }
+    print!("{}", pass.summary);
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    seen.extend(keys);
+    let states: Vec<String> = seen.into_iter().collect();
+    let exe = std::env::current_exe().unwrap_or_else(|_| std::path::PathBuf::from("dv-lint"));
+    let status = std::process::Command::new(exe)
+        .args(std::env::args_os().skip(1))
+        .env("DV_LINT_FIX_PASS", (n + 1).to_string())
+        .env("DV_LINT_FIX_STATES", states.join(","))
+        .status();
+    match status {
+        Ok(s) => std::process::exit(s.code().unwrap_or(2)),
+        Err(e) => eprintln!("Warning: --fix: could not start pass {}: {e}; run --fix again to continue.", n + 1),
+    }
 }

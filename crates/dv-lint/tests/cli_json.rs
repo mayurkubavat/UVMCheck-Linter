@@ -288,3 +288,34 @@ fn inline_waiver_regex_pattern_fails_closed() {
     assert!(String::from_utf8_lossy(&out.stderr).contains("waives nothing"));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn fix_rewrites_and_dry_run_shows_the_diff() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-fix-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = dir.join("a.sv");
+    std::fs::write(&src, "module m;   \n  logic a;\t\nendmodule  \n").unwrap();
+    let run = |extra: &[&str]| {
+        let o = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+            .current_dir(&dir)
+            .args(["--no-config", "--fix-rule", "SV-STY-015"])
+            .args(extra)
+            .arg("a.sv")
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&o.stdout).into_owned()
+    };
+    let dry = run(&["--fix-dry-run"]);
+    assert!(dry.starts_with("--- a/a.sv\n+++ b/a.sv\n@@ -1,3 +1,3 @@\n-module m;   \n+module m;\n"), "{dry}");
+    assert!(dry.contains("[uvmcheck] Would apply 3 fix-it(s) in 1 file(s)."), "{dry}");
+    assert_eq!(
+        std::fs::read_to_string(&src).unwrap(),
+        "module m;   \n  logic a;\t\nendmodule  \n",
+        "dry run writes nothing"
+    );
+    let fixed = run(&["--fix"]);
+    assert!(fixed.contains("[uvmcheck] Applied 3 fix-it(s) in 1 file(s)."), "{fixed}");
+    assert_eq!(std::fs::read_to_string(&src).unwrap(), "module m;\n  logic a;\nendmodule\n");
+    assert!(!fixed.contains("SV-STY-015"), "the next pass reports on the fixed text: {fixed}");
+    let _ = std::fs::remove_dir_all(&dir);
+}

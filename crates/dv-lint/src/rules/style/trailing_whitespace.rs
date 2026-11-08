@@ -17,6 +17,7 @@ pub(crate) fn trailing_whitespace(c: &Cst, s: &mut Sink) {
                 ws -= 1;
             }
             if ws < end {
+                let fix = c.file_fix(f, ws, end, "", "Remove trailing whitespace");
                 s.add(
                     "SV-STY-015",
                     "TrailingWhitespace",
@@ -26,7 +27,9 @@ pub(crate) fn trailing_whitespace(c: &Cst, s: &mut Sink) {
                         end - ws
                     ),
                     at(c, f, ws),
-                );
+                )
+                .fixes
+                .push(fix);
             }
         }
     }

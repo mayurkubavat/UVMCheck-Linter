@@ -71,6 +71,7 @@ pub fn naming_pattern_supported(target: &str, pattern: &str) -> bool {
 pub fn header_pattern_supported(p: &str) -> bool {
     options::header_alternatives(p).is_some()
 }
+pub mod fix;
 pub mod project;
 pub mod report;
 pub mod suppress;
@@ -171,6 +172,8 @@ pub struct Finding {
     pub loc: Loc,
     /// Secondary locations ("non-virtual method in 'base'").
     pub related: Vec<(Loc, String)>,
+    /// Rewrites that fix it (see [`fix`]).
+    pub fixes: Vec<fix::Fix>,
 }
 
 impl Finding {
@@ -206,7 +209,7 @@ impl Sink {
         message: String,
         loc: Loc,
     ) -> &mut Finding {
-        self.findings.push(Finding { rule, name, severity, message, loc, related: Vec::new() });
+        self.findings.push(Finding { rule, name, severity, message, loc, related: Vec::new(), fixes: Vec::new() });
         self.findings.last_mut().unwrap()
     }
 }
