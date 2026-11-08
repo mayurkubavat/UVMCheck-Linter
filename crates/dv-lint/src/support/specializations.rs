@@ -38,7 +38,7 @@ struct Ref {
 struct Engine<'a, 't> {
     c: &'a Cst<'t>,
     generics: Vec<Generic>,
-    by_name: HashMap<String, usize>,
+    by_name: sv_sema::fx::FxMap<String, usize>,
     typedefs: HashMap<String, NodeId>,
 }
 
@@ -176,7 +176,7 @@ fn generic_params(c: &Cst, cls: NodeId) -> Option<Vec<(String, Option<NodeId>)>>
 /// declaration node).
 pub(crate) fn spec_counts(c: &Cst) -> HashMap<u32, usize> {
     let mut generics = Vec::new();
-    let mut by_name = HashMap::new();
+    let mut by_name = sv_sema::fx::FxMap::default();
     for n in c.nodes(ClassDecl) {
         let Some(params) = generic_params(c, n) else { continue };
         let name = c.tree.child(n, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();

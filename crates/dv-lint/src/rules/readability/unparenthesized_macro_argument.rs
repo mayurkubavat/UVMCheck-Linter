@@ -32,7 +32,7 @@ fn defines(c: &Cst) -> Vec<Define> {
             continue;
         }
         let src = &t.sources[f as usize];
-        let toks = sv_lexer::lex(src);
+        let toks = crate::shared::raw_lex(src);
         let skipped = |p: u32| t.skipped.iter().any(|&(sf, a, e)| sf == f && a <= p && p < e);
         let mut i = 0;
         while i < toks.len() {

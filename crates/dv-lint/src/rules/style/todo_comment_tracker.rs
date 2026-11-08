@@ -53,26 +53,6 @@ fn comments(text: &str, base: u32) -> Vec<(u32, u32, bool)> {
     out
 }
 
-/// Each token's leading comments, by token offset, from lexing `src`.
-fn comments_before(src: &str) -> HashMap<u32, Vec<(u32, u32)>> {
-    let mut map = HashMap::new();
-    let mut pending = Vec::new();
-    for tk in sv_lexer::lex(src) {
-        match tk.kind {
-            sv_lexer::Kind::LineComment | sv_lexer::Kind::BlockComment => pending.push((tk.start, tk.start + tk.len)),
-            k if k.is_trivia() => {}
-            // Comments before a macro use are dropped.
-            sv_lexer::Kind::Directive => pending.clear(),
-            _ => {
-                if !pending.is_empty() {
-                    map.insert(tk.start, std::mem::take(&mut pending));
-                }
-            }
-        }
-    }
-    map
-}
-
 const TAGS: [&str; 5] = ["TODO", "FIXME", "ICEBOX", "HACK", "XXX"];
 
 /// SV-STY-003 reads the comments slang keeps as token trivia: not those in
@@ -107,7 +87,7 @@ pub(crate) fn todo_comments(c: &Cst, s: &mut Sink) {
             loc,
         );
     };
-    let mut lexed: HashMap<u32, HashMap<u32, Vec<(u32, u32)>>> = HashMap::new();
+    let mut lexed: HashMap<u32, std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>>> = HashMap::new();
     // The last token written in each file, and its end.
     let mut last: HashMap<u32, (usize, u32)> = HashMap::new();
     for (i, tok) in t.tokens.iter().enumerate() {
@@ -119,7 +99,7 @@ pub(crate) fn todo_comments(c: &Cst, s: &mut Sink) {
                 continue;
             }
             let w = tok.written;
-            let map = lexed.entry(w.file).or_insert_with(|| comments_before(&t.sources[w.file as usize]));
+            let map = lexed.entry(w.file).or_insert_with(|| crate::support::source_layout::comments_before(&t.sources[w.file as usize]));
             for &(a, e) in map.get(&w.offset).map_or(&[][..], Vec::as_slice) {
                 report(s, w.file, a, e, c.loc(i as u32));
             }

@@ -353,19 +353,24 @@ impl<'a> Lexer<'a> {
     }
 
     fn punct(&mut self) -> Kind {
+        // Only the operators that start with this byte (the same order).
+        let c = self.peek(0);
         for p in PUNCT4 {
-            if self.starts_with(p) {
+            if p[0] == c && self.starts_with(p) {
                 self.pos += 4;
                 return Kind::Punct;
             }
         }
         for p in PUNCT3 {
-            if self.starts_with(p) {
+            if p[0] == c && self.starts_with(p) {
                 self.pos += 3;
                 return Kind::Punct;
             }
         }
         for p in PUNCT2 {
+            if p[0] != c {
+                continue;
+            }
             // `:/` followed by `/` or `*` is a colon and a comment (slang).
             if *p == b":/" && matches!(self.peek(2), b'/' | b'*') {
                 continue;

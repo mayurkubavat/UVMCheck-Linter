@@ -148,9 +148,9 @@ pub fn design_of(trees: &[Tree], parse_ms: f64) -> Design {
 /// locator seeded with a design's files numbers them as that design does.
 pub struct Locator {
     files: Vec<String>,
-    file_ids: HashMap<(usize, u32), u32>,
+    file_ids: crate::fx::FxMap<(usize, u32), u32>,
     /// Byte offset of each line start, per (tree, preprocessor file).
-    line_starts: HashMap<(usize, u32), Vec<u32>>,
+    line_starts: crate::fx::FxMap<(usize, u32), Vec<u32>>,
 }
 
 impl Default for Locator {
@@ -165,8 +165,8 @@ impl Locator {
     pub fn new(files: Vec<String>) -> Self {
         Locator {
             files,
-            file_ids: HashMap::new(),
-            line_starts: HashMap::new(),
+            file_ids: Default::default(),
+            line_starts: Default::default(),
         }
     }
 
@@ -786,7 +786,7 @@ struct Builder<'t> {
     /// diagnostics in default ones and in what they elaborate).
     named_sets: SpecSets,
     /// Scope of each class and package node.
-    node_scope: HashMap<NodeRef, usize>,
+    node_scope: crate::fx::FxMap<NodeRef, usize>,
     locator: Locator,
     /// `base_env` of each class with no bindings, as lookups ask it often.
     base_cache: std::cell::RefCell<HashMap<usize, Option<(usize, Env)>>>,
@@ -847,7 +847,7 @@ impl<'t> Builder<'t> {
             spec_counts: HashMap::new(),
             spec_sets: HashMap::new(),
             named_sets: HashMap::new(),
-            node_scope: HashMap::new(),
+            node_scope: Default::default(),
             locator: Locator::default(),
             base_cache: Default::default(),
             chain_cache: Default::default(),

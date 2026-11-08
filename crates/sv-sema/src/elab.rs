@@ -39,18 +39,21 @@ struct Scope {
     /// `None`: removed here (hides a parent's value).
     own: crate::fx::FxMap<String, Option<Option<CVal>>>,
     parent: Option<Vals>,
+    /// Lookups found here (a loop checks whether its body read the genvar).
+    hits: std::cell::Cell<u32>,
 }
 
 impl Vals {
     /// A new scope below this one.
     fn child(&self) -> Vals {
-        Vals(Rc::new(Scope { own: Default::default(), parent: Some(self.clone()) }))
+        Vals(Rc::new(Scope { own: Default::default(), parent: Some(self.clone()), hits: Default::default() }))
     }
 
     pub(crate) fn get(&self, k: &str) -> Option<&Option<CVal>> {
         let mut s = &*self.0;
         loop {
             if let Some(v) = s.own.get(k) {
+                s.hits.set(s.hits.get().wrapping_add(1));
                 return v.as_ref();
             }
             s = &*s.parent.as_ref()?.0;
@@ -118,6 +121,10 @@ pub(crate) struct Elab<'b, 't> {
     /// Depth of uninstantiated blocks and of bound instances being walked.
     uninst: usize,
     bound: usize,
+    /// While above zero, `copy` also logs what it counts, so that a loop
+    /// can repeat one iteration's copies instead of walking them again.
+    recording: usize,
+    rec: Vec<(NodeRef, usize)>,
 }
 
 impl<'b, 't> Elab<'b, 't> {
@@ -174,6 +181,8 @@ impl<'b, 't> Elab<'b, 't> {
             copies: HashMap::new(),
             uninst: 0,
             bound: 0,
+            recording: 0,
+            rec: Vec::new(),
         }
     }
 
@@ -186,6 +195,22 @@ impl<'b, 't> Elab<'b, 't> {
         e.0 += 1;
         if self.uninst == 0 {
             e.1 += 1;
+        }
+        if self.recording > 0 {
+            self.rec.push((n, 1));
+        }
+    }
+
+    /// Counts `times` more of copies an uninstantiated walk logged.
+    fn repeat(&mut self, log: &[(NodeRef, usize)], times: usize) {
+        if times == 0 {
+            return;
+        }
+        for &(n, c) in log {
+            self.copies.entry(n).or_default().0 += c * times;
+            if self.recording > 0 {
+                self.rec.push((n, c * times));
+            }
         }
     }
 
@@ -760,6 +785,8 @@ impl<'b, 't> Elab<'b, 't> {
             }
             return;
         };
+        let mut same: Option<Vec<(NodeRef, usize)>> = None;
+        let mut skipped = 0;
         for k in 0..MAX_ITER {
             *self.b.inst.borrow_mut() = Vals::default();
             v.insert(var.clone(), Some(i.clone()));
@@ -775,24 +802,45 @@ impl<'b, 't> Elab<'b, 't> {
                     self.uninst += 1;
                     self.block(body, None, path, scope, &v, depth, construct);
                     self.uninst -= 1;
-                    return;
+                    break;
                 }
-                _ => return,
+                _ => break,
             }
             // The genvar is a parameter of each block.
             let before = self.out.len();
-            self.block(body, Some(i.i()), path, scope, &v, depth, construct);
+            if same.is_some() {
+                // Uninstantiated, and the body does not read the genvar:
+                // every iteration builds the same copies.
+                skipped += 1;
+            } else if self.uninst > 0 {
+                let start = self.rec.len();
+                let h0 = v.0.hits.get();
+                self.recording += 1;
+                self.block(body, Some(i.i()), path, scope, &v, depth, construct);
+                self.recording -= 1;
+                if v.0.hits.get() == h0 {
+                    same = Some(self.rec[start..].to_vec());
+                }
+                if self.recording == 0 {
+                    self.rec.truncate(start);
+                }
+            } else {
+                self.block(body, Some(i.i()), path, scope, &v, depth, construct);
+            }
             if self.uninst == 0 && self.out.len() > before {
                 let head = self.out[before].clone();
                 if let Some(name) = head.strip_prefix(&format!("{path} generate ")) {
                     self.out.push(format!("{path}.{name} parameter {var} = {}", i.show()));
                 }
             }
-            let Some(n) = self.step(step, &var, scope, &v) else { return };
+            let Some(n) = self.step(step, &var, scope, &v) else { break };
             if n.v == i.v {
-                return;
+                break;
             }
             i = n;
+        }
+        if let Some(log) = same {
+            self.repeat(&log, skipped);
         }
     }
 

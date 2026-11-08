@@ -175,10 +175,18 @@ pub(crate) fn comments(text: &str, base: u32) -> Vec<(u32, u32, bool)> {
 }
 
 /// Each token's leading comments, by token offset, from lexing `src`.
-pub(crate) fn comments_before(src: &str) -> HashMap<u32, Vec<(u32, u32)>> {
+/// Shared: the same files are read by several rules.
+pub(crate) fn comments_before(src: &str) -> std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>> {
+    if crate::shared::current() == 0 {
+        return std::sync::Arc::new(build_comments_before(src));
+    }
+    crate::shared::get("comments_before", (src.as_ptr() as usize, src.len()), || build_comments_before(src))
+}
+
+fn build_comments_before(src: &str) -> HashMap<u32, Vec<(u32, u32)>> {
     let mut map = HashMap::new();
     let mut pending = Vec::new();
-    for tk in sv_lexer::lex(src) {
+    for &tk in crate::shared::raw_lex(src).iter() {
         match tk.kind {
             sv_lexer::Kind::LineComment | sv_lexer::Kind::BlockComment => pending.push((tk.start, tk.start + tk.len)),
             k if k.is_trivia() => {}
@@ -196,6 +204,10 @@ pub(crate) fn comments_before(src: &str) -> HashMap<u32, Vec<(u32, u32)>> {
 /// Start of the last directive in trivia `text` (at byte `base`), or 0:
 /// slang keeps the comments before a directive inside the directive.
 pub(crate) fn last_directive(text: &str, base: u32) -> u32 {
+    // A directive starts with a backtick.
+    if !text.as_bytes().contains(&b'`') {
+        return 0;
+    }
     sv_lexer::lex(text)
         .iter()
         .filter(|t| t.kind == sv_lexer::Kind::Directive)
@@ -220,7 +232,7 @@ pub(crate) fn build_trivia_comments(c: &Cst) -> Vec<(u32, u32, u32, Loc)> {
         uses.entry(u.origin.file).or_default().push(u.origin.offset);
     }
     let skipped = |f: u32, p: u32| t.skipped.iter().any(|&(sf, a, e)| sf == f && a <= p && p < e);
-    let mut lexed: HashMap<u32, HashMap<u32, Vec<(u32, u32)>>> = HashMap::new();
+    let mut lexed: HashMap<u32, std::sync::Arc<HashMap<u32, Vec<(u32, u32)>>>> = HashMap::new();
     let mut last: HashMap<u32, (usize, u32)> = HashMap::new();
     for (i, tok) in t.tokens.iter().enumerate() {
         if tok.from_macro {

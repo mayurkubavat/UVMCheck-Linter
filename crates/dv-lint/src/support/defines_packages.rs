@@ -37,7 +37,7 @@ impl<'s> Lexed<'s> {
         let mut toks = Vec::new();
         let mut nl = true;
         let mut cont = false;
-        for t in sv_lexer::lex(src) {
+        for &t in crate::shared::raw_lex(src).iter() {
             match t.kind {
                 Kind::LineContinuation => cont = true,
                 Kind::Newline => {

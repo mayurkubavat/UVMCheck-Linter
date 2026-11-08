@@ -81,6 +81,16 @@ pub(crate) fn get<T: Any + Send + Sync>(name: &'static str, key: (usize, usize),
     v.downcast::<T>().unwrap_or_else(|_| panic!("shared cache {name}: wrong type"))
 }
 
+/// `src` lexed with its trivia, once per source text (several rules and
+/// shared builds read the same files).
+pub(crate) fn raw_lex(src: &str) -> Arc<Vec<sv_lexer::Token>> {
+    // Keyed by the text's address: only within a lint run, whose end drops it.
+    if current() == 0 {
+        return Arc::new(sv_lexer::lex(src));
+    }
+    get("raw_lex", (src.as_ptr() as usize, src.len()), || sv_lexer::lex(src))
+}
+
 /// sv-sema's semantic checks of the compile.
 pub(crate) fn sema_checks(c: &crate::syntax::Cst) -> Arc<sv_sema::SemaChecks> {
     get("sema_checks", c.compile_key(), || sv_sema::SemaChecks::new(c.all))
