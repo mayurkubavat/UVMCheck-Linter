@@ -89,6 +89,10 @@ pub(crate) fn equality_with_xz(c: &Cst, s: &mut Sink) {
         let times = ast_times(c, n);
         let (o, case) = if c.text_of(op) == "==" { ("==", "===") } else { ("!=", "!==") };
         let Some(at) = c.first_tok(n) else { continue };
+        let fix = crate::fix::with_safety(
+            c.token_fix(op, op, case, &format!("Replace '{o}' with case equality '{case}'")),
+            crate::fix::FixSafety::Unsafe,
+        );
         for _ in 0..times {
             s.add(
                 "SV-LANG-001",
@@ -98,7 +102,9 @@ pub(crate) fn equality_with_xz(c: &Cst, s: &mut Sink) {
                     "Dangerous 4-state equality check '{o}' against unknown literal (x/z). In SystemVerilog (IEEE 1800 § 11.4.5), logical equality ('==', '!=') against 'x' or 'z' evaluates to 'x' (which evaluates to false in conditionals), silently masking verification failures. Use case equality ('{case}') or wildcard equality ('==?', '!=?')."
                 ),
                 c.loc(at),
-            );
+            )
+            .fixes
+            .extend(fix.clone());
         }
     }
 }

@@ -24,7 +24,19 @@ pub(crate) fn blocking_to_interface(c: &Cst, s: &mut Sink) {
                     "Blocking assignment '=' used to drive clocking block or interface signal '{lhs}'. In SystemVerilog (IEEE 1800 § 14.16), clocking block and interface signals must be driven using non-blocking clocking drive ('<=') to avoid simulation race conditions with DUT Active-region logic."
                 ),
                 c.loc(op),
-            );
+            )
+            .fixes
+            .extend({
+                // A function may not hold '<=' cleanly either (SV-LANG-005
+                // would undo the fix), so there the rewrite is only shown.
+                let in_function = crate::support::slang_ast::ancestors(c, b).any(|a| c.kind(a) == FunctionDecl);
+                let (desc, safety) = if in_function {
+                    ("Move the drive into a task and use non-blocking '<='", crate::fix::FixSafety::DisplayOnly)
+                } else {
+                    ("Replace blocking assignment '=' with non-blocking clocking drive '<='", crate::fix::FixSafety::Unsafe)
+                };
+                crate::fix::with_safety(c.token_fix(op, op, "<=", desc), safety)
+            });
         }
     }
 }

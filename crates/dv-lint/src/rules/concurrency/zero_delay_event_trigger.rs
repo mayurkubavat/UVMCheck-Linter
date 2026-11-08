@@ -21,6 +21,11 @@ pub(crate) fn zero_delay_event_trigger(c: &Cst, s: &mut Sink) {
                  Use non-blocking event trigger '->> {ev}' to schedule the event in the NBA region, or use persistent event checking 'wait({ev}.triggered)' per IEEE 1800 § 15.5."
             ),
             c.loc(trigger),
-        );
+        )
+        .fixes
+        .extend(crate::fix::with_safety(
+            c.token_fix(trigger, trigger, "->>", "Replace blocking event trigger '->' with non-blocking event trigger '->>'"),
+            crate::fix::FixSafety::Unsafe,
+        ));
     }
 }

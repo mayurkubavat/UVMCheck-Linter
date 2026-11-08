@@ -457,3 +457,11 @@ impl Positions {
         (line, o - starts[line - 1] + 1)
     }
 }
+
+/// `f` with the given safety.
+pub(crate) fn with_safety(f: Option<Fix>, safety: FixSafety) -> Option<Fix> {
+    f.map(|mut x| {
+        x.safety = safety;
+        x
+    })
+}

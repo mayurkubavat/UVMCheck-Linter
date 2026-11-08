@@ -25,6 +25,8 @@ pub(crate) fn empty_fork_join(c: &Cst, s: &mut Sink) {
                 c.text_of(join)
             ),
             c.loc(fork),
-        );
+        )
+        .fixes
+        .extend(c.token_fix(fork, join, "", &format!("Remove empty fork...{} block", c.text_of(join))));
     }
 }

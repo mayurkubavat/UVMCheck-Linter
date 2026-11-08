@@ -18,7 +18,9 @@ pub(crate) fn casex_prohibited(c: &Cst, s: &mut Sink) {
                  masking critical testbench and DUT failures. Replace 'casex' with 'casez' or 'case inside'."
                     .into(),
                 c.loc(kw),
-            );
+            )
+            .fixes
+            .extend(crate::fix::with_safety(c.token_fix(kw, kw, "casez", "Replace 'casex' with 'casez'"), crate::fix::FixSafety::Unsafe));
         }
     }
 }

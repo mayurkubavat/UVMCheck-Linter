@@ -72,6 +72,17 @@ pub(crate) fn unsized_in_concat(c: &Cst, s: &mut Sink) {
                 _ => format!("32'd{text}"),
             };
             let Some(at) = c.first_tok(e) else { continue };
+            let fix = crate::fix::with_safety(
+                c.tree.token_bounds(k).and_then(|(a, b)| {
+                    c.token_fix(
+                        a,
+                        b,
+                        replacement.clone(),
+                        &format!("Replace unsized literal with explicitly sized '{replacement}'"),
+                    )
+                }),
+                crate::fix::FixSafety::Unsafe,
+            );
             for _ in 0..times {
                 s.add(
                     "SV-LANG-003",
@@ -81,7 +92,9 @@ pub(crate) fn unsized_in_concat(c: &Cst, s: &mut Sink) {
                         "Unsized literal '{text}' inside concatenation expands to 32 bits per IEEE 1800 § 11.4.12. If a single bit was intended, specify explicit width (e.g. '{replacement}') to prevent unintended 32-bit vector inflation and truncation."
                     ),
                     c.loc(at),
-                );
+                )
+                .fixes
+                .extend(fix.clone());
             }
         }
     }
