@@ -262,3 +262,29 @@ fn html_dashboard() {
     assert!(text.contains("module m; reg a; endmodule</div>"), "the source line: {text}");
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn inline_waiver_regex_pattern_fails_closed() {
+    // "literal .9." is a regex the native engine cannot evaluate yet: it
+    // must not waive the finding about '5' (uvmcheck's std::regex agrees);
+    // the plain-text pattern on line 3 still waives.
+    let dir = std::env::temp_dir().join(format!("dv-lint-inline-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("t.sv"),
+        "module m; integer i;\ninitial i = 5; // uvmcheck:waive SV-STY-010 \"literal .9.\"\n\
+         initial i = 6; // uvmcheck:waive SV-STY-010 \"literal '6'\"\nendmodule\n",
+    )
+    .unwrap();
+    let out = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .current_dir(&dir)
+        .args(["--no-config", "--rule", "SV-STY-010", "t.sv"])
+        .output()
+        .unwrap();
+    let text = String::from_utf8_lossy(&out.stdout);
+    let lines: Vec<&str> = text.lines().filter(|l| l.contains("SV-STY-010")).collect();
+    assert_eq!(lines.len(), 1, "{text}");
+    assert!(lines[0].contains("t.sv:2:"), "{text}");
+    assert!(String::from_utf8_lossy(&out.stderr).contains("waives nothing"));
+    let _ = std::fs::remove_dir_all(&dir);
+}

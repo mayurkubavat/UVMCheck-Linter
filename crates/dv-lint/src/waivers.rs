@@ -7,7 +7,8 @@
 //!
 //! `*` waives any rule. A quoted pattern after the rule narrows the waiver to
 //! findings whose message matches it; patterns without regex syntax match as
-//! text, and the rest (no regex engine here) waive like no pattern.
+//! text, and the rest (no regex engine here yet) waive nothing, with a
+//! warning: an unevaluated pattern must not hide findings.
 
 use std::collections::HashMap;
 
@@ -33,9 +34,24 @@ fn message_pattern(rest: &str) -> Option<Option<String>> {
     None
 }
 
+/// A pattern with regex syntax cannot be evaluated here (no regex engine
+/// yet): it waives nothing, so a finding the comment did not mean to waive is
+/// never hidden, and each such pattern is named once on stderr.
 fn pattern_matches(pattern: &str, message: &str) -> bool {
     let regex_syntax = pattern.chars().any(|c| "\\.^$*+?()[]{}|".contains(c));
-    regex_syntax || message.contains(pattern)
+    if regex_syntax {
+        static WARNED: std::sync::Mutex<Vec<String>> = std::sync::Mutex::new(Vec::new());
+        if let Ok(mut w) = WARNED.lock() {
+            if !w.iter().any(|p| p == pattern) {
+                eprintln!(
+                    "Warning: inline waiver pattern \"{pattern}\" uses regex syntax, which the native engine cannot evaluate yet; it waives nothing (uvmcheck-slang evaluates it)"
+                );
+                w.push(pattern.to_string());
+            }
+        }
+        return false;
+    }
+    message.contains(pattern)
 }
 
 fn waives(text: &str, f: &Finding, same_line: bool) -> bool {
