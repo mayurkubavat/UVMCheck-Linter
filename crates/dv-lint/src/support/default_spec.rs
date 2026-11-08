@@ -102,12 +102,37 @@ pub(crate) fn default_bad_bodies(c: &Cst) -> HashSet<u32> {
         if builtin.is_empty() {
             continue;
         }
-        // slang builds no default specialization when a built-in default is
-        // used as a scope (`T::type_id`); nothing to subtract then.
-        let toks = c.tree.token_range(cls);
-        if toks.windows(2).any(|w| builtin.contains_key(c.text_of(w[0])) && c.text_of(w[1]) == "::") {
-            continue;
-        }
+        // A built-in default used as a scope (`T::type_id`) fails to bind
+        // too; slang still builds the default specialization and drops only
+        // the body around it.
+        let scoped = |body: NodeId| {
+            let toks = c.tree.token_range(body);
+            toks.windows(2).any(|w| builtin.contains_key(c.text_of(w[0])) && c.text_of(w[1]) == "::")
+        };
+        // Names the class itself uses as a scope elsewhere (`T::type_id`):
+        // meant to be classes. Passing a value of one to a routine fails to
+        // bind in the default specialization too (the formal is a class).
+        let ctoks = c.tree.token_range(cls);
+        let class_meant: std::collections::HashSet<&str> = ctoks
+            .windows(2)
+            .filter(|w| builtin.contains_key(c.text_of(w[0])) && c.text_of(w[1]) == "::")
+            .map(|w| c.text_of(w[0]))
+            .collect();
+        let meant_vars = |owner: NodeId| -> Vec<String> {
+            let mut v = Vec::new();
+            for d in c.tree.children(owner).filter(|&x| matches!(c.kind(x), DataDecl | Port)) {
+                let Some(ty) = c.tree.child(d, DataType).and_then(|t| single_name(c, t)) else { continue };
+                if !class_meant.contains(ty.as_str()) {
+                    continue;
+                }
+                for dcl in c.tree.children(d).filter(|&x| c.kind(x) == Declarator && c.tree.child(x, Dim).is_none()) {
+                    if let Some(nm) = c.tree.child(dcl, Name) {
+                        v.push(c.tree.bare_text(nm));
+                    }
+                }
+            }
+            v
+        };
         // Variables declared in `owner` with such a type, with the built-in.
         let typed_vars = |owner: NodeId| -> std::collections::HashMap<String, String> {
             let mut v = std::collections::HashMap::new();
@@ -142,6 +167,10 @@ pub(crate) fn default_bad_bodies(c: &Cst) -> HashSet<u32> {
         }
         for r in routines {
             let Some(body) = c.tree.child(r, Body) else { continue };
+            if scoped(body) {
+                out.insert(r.0);
+                continue;
+            }
             let mut vars = members.clone();
             if let Some(ports) = c.tree.child(r, PortList) {
                 vars.extend(typed_vars(ports));
@@ -154,6 +183,23 @@ pub(crate) fn default_bad_bodies(c: &Cst) -> HashSet<u32> {
             if vars.is_empty() {
                 continue;
             }
+            let mut meant: Vec<String> = meant_vars(cls);
+            if let Some(ports) = c.tree.child(r, PortList) {
+                meant.extend(meant_vars(ports));
+            }
+            for n in crate::support::slang_ast::subtree(c, body) {
+                if matches!(c.kind(n), Body | SeqBlock) {
+                    meant.extend(meant_vars(n));
+                }
+            }
+            let passed = |n: NodeId| {
+                c.kind(n) == NameExpr
+                    && meant.contains(&c.tree.bare_text(n))
+                    && c.parent(n)
+                        .filter(|&a| c.kind(a) == Arg)
+                        .and_then(|a| c.parent(a))
+                        .is_some_and(|l| c.kind(l) == ArgList && c.parent(l).is_some_and(|k| c.kind(k) == CallExpr))
+            };
             let var_type = |n: NodeId| {
                 if c.kind(n) == NameExpr {
                     vars.get(&c.tree.bare_text(n)).map(String::as_str)
@@ -170,6 +216,7 @@ pub(crate) fn default_bad_bodies(c: &Cst) -> HashSet<u32> {
                     let k: Vec<NodeId> = c.tree.children(n).collect();
                     op && k.len() == 2 && ((is_var(k[0]) && is_null(k[1])) || (is_null(k[0]) && is_var(k[1])))
                 }
+                NameExpr => passed(n),
                 // `x.f` on a value of a built-in type (strings have methods).
                 MemberExpr => c.tree.children(n).next().and_then(var_type).is_some_and(|t| t != "string"),
                 _ => false,

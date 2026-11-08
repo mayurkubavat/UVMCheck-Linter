@@ -20,8 +20,7 @@ pub(crate) fn explicit_literal_width(c: &Cst, s: &mut Sink) {
         if lit.sized || (!lit.based && !above_one(&lit.digits)) {
             continue;
         }
-        let k = ast_times(c, n);
-        if k == 0 {
+        if ast_times(c, n) == 0 {
             continue;
         }
         let outer = outer_paren(c, n);
@@ -33,6 +32,13 @@ pub(crate) fn explicit_literal_width(c: &Cst, s: &mut Sink) {
                 && c.tok(p, "(").is_some()
                 && c.tok(p, ":").is_none()
                 && c.tok(p, ",").is_none()
+        }) {
+            text = format!("({text})");
+        }
+        // `unsigned'(2)`: the operand of a cast is its parenthesized
+        // expression in slang's syntax.
+        if c.parent(outer).is_some_and(|p| {
+            c.kind(p) == CastExpr && c.tree.children(p).next() != Some(outer) && c.tok(p, "(").is_some()
         }) {
             text = format!("({text})");
         }
@@ -63,10 +69,8 @@ pub(crate) fn explicit_literal_width(c: &Cst, s: &mut Sink) {
                 let (a, b) = (c.first_tok(outer)?, c.tree.token_range(outer).last().copied()?);
                 c.token_fix(a, b, format!("{w}{text}"), &format!("Write the width: {w}{text}"))
             });
-        for _ in 0..k {
-            let f = s.add("SV-STY-010", "ExplicitLiteralWidth", sev, msg.clone(), c.loc(at));
-            f.fixes.extend(fix.clone());
-        }
+        let f = s.add("SV-STY-010", "ExplicitLiteralWidth", sev, msg, c.loc(at));
+        f.fixes.extend(fix);
     }
 }
 

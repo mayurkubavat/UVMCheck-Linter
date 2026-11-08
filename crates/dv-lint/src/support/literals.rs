@@ -158,6 +158,9 @@ pub(crate) fn ast_times(c: &Cst, n: NodeId) -> usize {
             // gate and specify delays, defparam values, or randsequence
             // productions.
             Dim | Repetition | ClockingDecl | GateInst | SpecifyBlock | RsCodeBlock => return 0,
+            // The width or type of a cast (`22'(x)`, `(W+1)'(x)`): slang
+            // folds it into the conversion's type.
+            CastExpr if c.tree.children(p).next() == Some(x) => return 0,
             // `extends base(args)` arguments are not bound as written.
             ArgList if c.parent(p).is_some_and(|q| c.kind(q) == Extends) => return 0,
             // The parameters of a base that does not resolve.

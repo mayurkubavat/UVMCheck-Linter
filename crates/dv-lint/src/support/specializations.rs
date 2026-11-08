@@ -19,9 +19,6 @@ use SyntaxKind::*;
 struct Generic {
     node: NodeId,
     params: Vec<(String, Option<NodeId>)>,
-    /// slang cannot build the default specialization (a type parameter
-    /// whose default is not a class is used as a scope, `T::type_id`).
-    default_invalid: bool,
     /// Typedefs declared directly in the class body.
     locals: HashMap<String, NodeId>,
 }
@@ -192,24 +189,6 @@ fn compute(c: &Cst) -> HashMap<u32, ClassSpecs> {
     for n in c.nodes(ClassDecl) {
         let Some(params) = generic_params(c, n) else { continue };
         let name = c.tree.child(n, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();
-        // `T::x` with a type parameter T whose default is a built-in type.
-        let builtin_default: Vec<&str> = params
-            .iter()
-            .filter(|(_, d)| {
-                d.is_some_and(|d| {
-                    c.first_tok(d).is_some_and(|t| {
-                        matches!(
-                            c.text_of(t),
-                            "int" | "bit" | "logic" | "byte" | "shortint" | "longint" | "integer" | "string" | "real"
-                        )
-                    })
-                })
-            })
-            .map(|(n, _)| n.as_str())
-            .collect();
-        let toks = c.tree.token_range(n);
-        let default_invalid =
-            toks.windows(2).any(|w| builtin_default.contains(&c.text_of(w[0])) && c.text_of(w[1]) == "::");
         let mut locals = HashMap::default();
         for t in c.tree.children(n).filter(|&x| c.kind(x) == TypedefDecl) {
             if let (Some(nm), Some(ty)) = (c.tree.child(t, Name), c.tree.child(t, DataType)) {
@@ -217,7 +196,7 @@ fn compute(c: &Cst) -> HashMap<u32, ClassSpecs> {
             }
         }
         by_name.entry(name).or_insert(generics.len());
-        generics.push(Generic { node: n, params, default_invalid, locals });
+        generics.push(Generic { node: n, params, locals });
     }
     if generics.is_empty() {
         return HashMap::default();
@@ -281,9 +260,9 @@ fn compute(c: &Cst) -> HashMap<u32, ClassSpecs> {
         };
     let empty = HashMap::default();
     for g in 0..engine.generics.len() {
-        if engine.generics[g].default_invalid {
-            continue;
-        }
+        // The default specialization, always built: a body that uses a
+        // built-in default as a scope (`T::type_id`) is dropped from it
+        // alone (crate::support::default_spec).
         if let Some(t) = engine.tuple(g, &[], &empty, None, 0) {
             add(g, t, &mut specs, &mut queue);
         }
