@@ -7,7 +7,7 @@ use crate::Rule;
 
 mod analysis;
 mod compiler;
-mod concurrency;
+pub(crate) mod concurrency;
 mod correctness;
 mod coverage;
 mod deadcode;

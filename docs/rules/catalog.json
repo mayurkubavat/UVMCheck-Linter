@@ -274,7 +274,7 @@
     {"id": "SV-LANG-004", "name": "PartSelectReversed", "category": "Correctness", "severity": "ERROR", "profiles": ["soundness"], "guidelines": [],
      "description": "Detects reversed or inverted part-select slicing on vectors (e.g. vec[0:7] on logic [7:0] vec). Part-select slicing bounds must match the declared vector endianness."},
     {"id": "SV-LANG-005", "name": "NonBlockingInFunction", "category": "Correctness", "severity": "ERROR", "profiles": ["soundness"], "guidelines": [],
-     "description": "Prohibits non-blocking assignments ('<=') inside functions. Functions execute in zero simulation time and must only use blocking assignments ('=') per IEEE 1800 § 13.4.4."},
+     "description": "Prohibits non-blocking assignments ('<=') to variables inside functions: the update lands after the caller has moved on. Interface and clocking block drives are exempt (IEEE 1800 § 13.4.4 allows non-blocking assignments in functions)."},
     {"id": "SV-LOC-001", "name": "ArrayLocatorEmptyQueueDeref", "category": "Performance", "severity": "ERROR", "profiles": ["performance"], "guidelines": [],
      "description": "Disallows immediate element dereferencing on array locator methods (e.g., q.find()[0]). Locator methods return an unpacked queue that may be empty, causing out-of-bounds runtime errors (IEEE 1800 § 7.12.1)."},
     {"id": "SV-LSP-001", "name": "LspConstraintContradiction", "category": "OOP", "severity": "ERROR", "profiles": ["methodology"], "guidelines": ["MG-5.2"],

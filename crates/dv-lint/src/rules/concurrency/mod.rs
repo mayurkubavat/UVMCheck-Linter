@@ -3,7 +3,7 @@
 
 use crate::{Check, Rule};
 
-mod blocking_assignment_to_interface;
+pub(crate) mod blocking_assignment_to_interface;
 mod blocking_event_trigger_in_clocked_block;
 mod circular_thread_wait_deadlock;
 mod clocking_block_output_read_skew;

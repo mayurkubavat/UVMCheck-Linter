@@ -1040,10 +1040,16 @@
     "SV-STY-104@13"
   ],
   "correctness/SV-LANG-005/good.sv": [
+    "SV-DED-006@19",
     "SV-STY-005@8",
     "SV-STY-005@9",
+    "SV-STY-005@23",
+    "SV-STY-005@24",
     "SV-STY-104@8",
     "SV-STY-104@9",
+    "SV-STY-104@16",
+    "SV-STY-104@23",
+    "SV-STY-104@24",
     "UVM-FAC-003@5"
   ],
   "correctness/SV-LOC-001/bad.sv": [
@@ -2542,7 +2548,6 @@
   "errors/SV-ERR-002/bad.sv": [
     "SV-DED-006@18",
     "SV-DED-006@19",
-    "SV-INT-001@29",
     "SV-RDB-010@16",
     "SV-STY-001@18",
     "SV-STY-001@19",
@@ -2563,7 +2568,6 @@
   "errors/SV-ERR-002/good.sv": [
     "SV-DED-006@18",
     "SV-DED-006@57",
-    "SV-INT-001@29",
     "SV-RDB-010@16",
     "SV-RDB-010@55",
     "SV-STY-001@18",
@@ -2672,6 +2676,7 @@
   ],
   "errors/UVM-TST-001/good.sv": [
     "SV-DED-006@23",
+    "SV-DED-011@50",
     "SV-DED-013@27",
     "SV-RDB-010@11",
     "SV-RDB-010@21",
@@ -2688,6 +2693,9 @@
     "SV-STY-005@36",
     "SV-STY-005@39",
     "SV-STY-005@40",
+    "SV-STY-005@49",
+    "SV-STY-005@51",
+    "SV-STY-005@52",
     "SV-STY-104@8",
     "SV-STY-104@9",
     "SV-STY-104@15",
@@ -2699,6 +2707,9 @@
     "SV-STY-104@36",
     "SV-STY-104@39",
     "SV-STY-104@40",
+    "SV-STY-104@49",
+    "SV-STY-104@51",
+    "SV-STY-104@52",
     "SVA-ACT-001@38",
     "SVA-LBL-001@38",
     "UVM-SCB-002@23"
@@ -6904,11 +6915,24 @@
     "SV-STY-104@21"
   ],
   "rtl_tb_bridge/SV-INT-001/good.sv": [
+    "SV-DED-006@32",
+    "SV-RDB-010@30",
+    "SV-STY-001@31",
+    "SV-STY-001@32",
     "SV-STY-005@8",
     "SV-STY-005@9",
+    "SV-STY-005@35",
+    "SV-STY-005@38",
+    "SV-STY-005@39",
     "SV-STY-104@8",
     "SV-STY-104@9",
-    "UVM-FAC-003@5"
+    "SV-STY-104@28",
+    "SV-STY-104@35",
+    "SV-STY-104@38",
+    "SV-STY-104@39",
+    "UVM-FAC-003@5",
+    "UVM-FAC-003@30",
+    "UVM-PHS-001@36"
   ],
   "safety/SV-RND-001/bad.sv": [
     "SV-RDB-010@11",
@@ -7772,11 +7796,35 @@
     "UVM-CFG-005@19"
   ],
   "uvm/UVM-CFG-001/good.sv": [
+    "SV-DED-006@14",
+    "SV-DED-006@30",
+    "SV-RDB-010@29",
+    "SV-STY-001@30",
     "SV-STY-005@8",
     "SV-STY-005@9",
+    "SV-STY-005@17",
+    "SV-STY-005@20",
+    "SV-STY-005@21",
+    "SV-STY-005@26",
+    "SV-STY-005@27",
+    "SV-STY-005@33",
+    "SV-STY-005@36",
+    "SV-STY-005@37",
     "SV-STY-104@8",
     "SV-STY-104@9",
-    "UVM-FAC-003@5"
+    "SV-STY-104@17",
+    "SV-STY-104@20",
+    "SV-STY-104@21",
+    "SV-STY-104@26",
+    "SV-STY-104@27",
+    "SV-STY-104@33",
+    "SV-STY-104@36",
+    "SV-STY-104@37",
+    "UVM-DAG-001@35",
+    "UVM-FAC-003@5",
+    "UVM-FAC-003@23",
+    "UVM-FAC-003@29",
+    "UVM-PHS-001@34"
   ],
   "uvm/UVM-CFG-002/bad.sv": [
     "COMPILE:TimingInFuncNotAllowed@15",

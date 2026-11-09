@@ -38,3 +38,15 @@ class len_checker extends uvm_subscriber #(bus_item);
     assert (t != null);
   endfunction
 endclass
+
+// A parameterized base scoreboard (OpenTitan's dv_base_scoreboard shape):
+// the subclasses of its specializations do the checking.
+class param_scoreboard #(type CFG_T = uvm_object) extends uvm_scoreboard;
+  uvm_analysis_imp #(bus_item, param_scoreboard #(CFG_T)) item_imp;
+  CFG_T cfg;
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+  function void write(bus_item t);
+  endfunction
+endclass

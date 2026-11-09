@@ -122,7 +122,9 @@ public:
             }
         }
         for (const auto* cls : classes) {
-            if (cls->isAbstract || cls->isInterface || !looksLikeChecker(*cls)) continue;
+            // A parameterized checker (dv_base_scoreboard #(RAL_T, CFG_T, COV_T)) is a base its
+            // specializations' subclasses fill in. The native rule skips it too.
+            if (cls->isAbstract || cls->isInterface || cls->genericClass || !looksLikeChecker(*cls)) continue;
             if (extended.count(cls) || (cls->genericClass && extended.count(cls->genericClass))) continue;
             if (analyzer.classCanFail(*cls)) continue;
             diags.addViolation(

@@ -155,11 +155,18 @@ fn class_can_fail(d: &Design, ix: &Index, cls: &Class, memo: &mut HashMap<(usize
 pub(crate) fn checker_cannot_fail(d: &Design, csts: &[Cst], out: &mut Sink) {
     let ix = Index::new(csts);
     let classes: Vec<&Class> = crate::support::class_roles::user_classes(d).collect();
-    // Base classes are judged through the classes that extend them.
+    // Base classes are judged through the classes that extend them, and a
+    // parameterized checker (OpenTitan's dv_base_scoreboard #(RAL_T, CFG_T,
+    // COV_T)) is a base its specializations' subclasses fill in.
     let extended: HashSet<String> = classes.iter().filter_map(|k| k.base.map(|b| d.class(b).name.clone())).collect();
     let mut memo = HashMap::new();
     for cls in classes {
-        if cls.is_virtual || cls.is_interface || !looks_like_checker(d, cls) || extended.contains(&cls.name) {
+        if cls.is_virtual
+            || cls.is_interface
+            || cls.is_parameterized
+            || !looks_like_checker(d, cls)
+            || extended.contains(&cls.name)
+        {
             continue;
         }
         if class_can_fail(d, &ix, cls, &mut memo) {

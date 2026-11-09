@@ -19,3 +19,21 @@ module blk_top;
     logic rst_n;
     assign vif.r = ~rst_n;
 endmodule
+
+// Configuration bits of an interface written in build_phase, before
+// simulation time starts: nothing races with them.
+interface cfg_bus_if;
+  bit is_push_agent;
+  logic valid;
+endinterface
+
+class cfg_bus_agent extends uvm_component;
+  virtual cfg_bus_if vif;
+  bit push;
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+  function void build_phase(uvm_phase phase);
+    vif.is_push_agent = push;
+  endfunction
+endclass

@@ -1,6 +1,35 @@
 //! SV-INT-001 (BlockingAssignmentToInterface): Disallows blocking assignments
 //! ('=') when driving virtual interface or clocking block signals from
 //! procedural code.
+//!
+//! Not in the UVM phases that run before simulation time starts
+//! (build, connect, end_of_elaboration, start_of_simulation): writing a
+//! configuration bit of an interface there (`cfg.vif.if_mode = ...`, as
+//! OpenTitan's agents do) races with nothing. The C++ rule is the same.
+
+/// The text of an assignment target that is a clocking block or virtual
+/// interface signal (shared with SV-LANG-005).
+pub(crate) fn interface_signal(lhs: &str) -> bool {
+    lhs.contains(".cb.") || lhs.starts_with("cb.") || lhs.contains("vif.") || lhs.contains("_vif.")
+}
+
+/// A function phase that runs before time 0 ends: `build_phase`, also as
+/// `cls::build_phase` out of its class.
+pub(crate) fn in_setup_phase(c: &Cst, n: sv_syntax::NodeId) -> bool {
+    crate::support::slang_ast::ancestors(c, n).find(|&a| matches!(c.kind(a), FunctionDecl | TaskDecl)).is_some_and(
+        |f| {
+            c.kind(f) == FunctionDecl
+                && c.tree.child(f, Name).is_some_and(|nm| {
+                    let name = c.tree.bare_text(nm);
+                    let name = name.rsplit("::").next().unwrap_or(&name).trim().to_string();
+                    matches!(
+                        name.as_str(),
+                        "build_phase" | "connect_phase" | "end_of_elaboration_phase" | "start_of_simulation_phase"
+                    )
+                })
+        },
+    )
+}
 
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
@@ -22,7 +51,7 @@ pub(crate) fn blocking_to_interface(c: &Cst, s: &mut Sink) {
         }
         let Some(&l) = kids(c, b).first() else { continue };
         let lhs = slang_trimmed(c, l);
-        if lhs.contains(".cb.") || lhs.starts_with("cb.") || lhs.contains("vif.") || lhs.contains("_vif.") {
+        if interface_signal(&lhs) && !in_setup_phase(c, b) {
             s.add(
                 "SV-INT-001",
                 "BlockingAssignmentToInterface",

@@ -4,6 +4,8 @@
 #include "slang/syntax/SyntaxTree.h"
 #include "slang/syntax/SyntaxVisitor.h"
 
+#include <string>
+
 namespace uvmcheck::rules::concurrency {
 
 class BlockingIntfDriveVisitor : public engine::SyntaxVisitor<BlockingIntfDriveVisitor> {
@@ -18,6 +20,24 @@ public:
         return false;
     }
 
+    // A function phase that runs before simulation time starts: writing an interface's
+    // configuration bit there (`cfg.vif.if_mode = ...`) races with nothing.
+    static bool insideSetupPhase(const slang::syntax::SyntaxNode& node) {
+        for (const auto* p = node.parent.get(); p; p = p->parent.get()) {
+            if (p->kind == slang::syntax::SyntaxKind::TaskDeclaration) return false;
+            if (p->kind != slang::syntax::SyntaxKind::FunctionDeclaration) continue;
+            const auto& f = p->as<slang::syntax::FunctionDeclarationSyntax>();
+            if (!f.prototype || !f.prototype->name) return false;
+            std::string name = f.prototype->name->toString();
+            name.erase(0, name.find_first_not_of(" \t\n\r"));
+            if (auto at = name.rfind("::"); at != std::string::npos) name = name.substr(at + 2);
+            name.erase(name.find_last_not_of(" \t\n\r") + 1);
+            return name == "build_phase" || name == "connect_phase" || name == "end_of_elaboration_phase" ||
+                   name == "start_of_simulation_phase";
+        }
+        return false;
+    }
+
     static bool insideContinuousAssign(const slang::syntax::SyntaxNode& node) {
         for (const auto* p = node.parent.get(); p; p = p->parent.get()) {
             if (p->kind == slang::syntax::SyntaxKind::ContinuousAssign) return true;
@@ -28,7 +48,7 @@ public:
     void handle(const slang::syntax::BinaryExpressionSyntax& expr) {
         // A continuous assignment drives the signal outside any process, so there is no
         // Active-region race to avoid, and 'assign x <= y' is not legal SystemVerilog.
-        if (insideContinuousAssign(expr)) {
+        if (insideContinuousAssign(expr) || insideSetupPhase(expr)) {
             visitDefault(expr);
             return;
         }

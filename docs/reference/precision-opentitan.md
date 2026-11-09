@@ -21,7 +21,8 @@ give the same counts for the rules below (corpus gate, `lint`).
 | | Findings | ERROR |
 |---|---|---|
 | Before | 5,428 | 170 |
-| After the fixes below | 5,263 | 15 |
+| After the first five fixes | 5,263 | 15 |
+| After the last four | 5,248 | 0 |
 
 Over all of `ibex-dv`, ERROR findings went from 586 to 226.
 
@@ -35,19 +36,16 @@ Over all of `ibex-dv`, ERROR findings went from 586 to 226.
 | SV-ERR-002 UseAfterFailedNullCheck | 13 | `` `downcast `` / `` `dv_fatal `` guard the fatal with `uvm_report_enabled(..., ID_)` where `ID_` is `$sformatf("%m")` or `` `gfn `` (`get_full_name()`): not recognized as a report guard, so the path was thought to continue | Calls that build the message id do not stop a condition being the report guard |
 | UVM-CFG-005 ConfigDbCrossComponentResolver | 8 | `dv_base_agent::CFG_T`, a type parameter, compared as text with the concrete `*_agent_cfg` types set elsewhere | A type declared in the calling class (type parameter, class typedef) is not compared |
 
-### Still reported as ERROR (15)
+### The last 15, fixed next (2026-11-09)
 
-- SV-LANG-005 (8): nonblocking assignments to interface signals inside a
-  `reset_signals()` function of `push_pull_driver_lib.sv`. Simulators accept
-  this; whether the rule should be an ERROR needs an LRM check of 13.4.
-- SV-INT-001 (4): `cfg.vif.if_mode = ...` in `build_phase`. These are
-  configuration bits of the interface written once at time 0, not driven
-  signals; a candidate for exempting interface variables nothing samples on
-  a clock.
-- UVM-CFG-001 (2): `cfg` set as `core_ibex_env_cfg`, read through a type
-  parameter. The same type-parameter cause as UVM-CFG-005.
-- UVM-TST-001 (1): `dv_base_scoreboard` reports nothing itself; it is a base
-  class that subclasses extend. Abstract bases are a candidate exemption.
+| Rule | OT findings | Cause | Fix (both engines) |
+|---|---|---|---|
+| SV-LANG-005 NonBlockingInFunction | 8 | `reset_signals()` drives interface signals with `<=`. IEEE 1800 13.4.4 allows nonblocking assignments in functions, and this is the drive SV-INT-001 asks for | Clocking block and virtual interface targets are not reported; the message no longer says the LRM forbids `<=` |
+| SV-INT-001 BlockingAssignmentToInterface | 4 | `cfg.vif.if_mode = ...` in `build_phase`: configuration bits written before simulation time starts | Not reported in build, connect, end_of_elaboration and start_of_simulation phases |
+| UVM-CFG-001 UvmConfigDbTypeMismatch | 2 | `get` through the type parameter `CFG_T` | A type parameter on either side is not compared (as UVM-CFG-005) |
+| UVM-TST-001 CheckerCannotFail | 1 | `dv_base_scoreboard #(RAL_T, CFG_T, COV_T)`, a parameterized base | Parameterized checkers are bases their subclasses fill in |
+
+OpenTitan DV ERROR findings are now 0 (from 170); over all of ibex-dv, 586 -> 207.
 
 ### Volume
 

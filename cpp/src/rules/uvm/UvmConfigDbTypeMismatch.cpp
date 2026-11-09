@@ -13,7 +13,17 @@ namespace uvmcheck::rules::uvm {
 struct ConfigCallInfo {
     std::string typeName;
     slang::SourceLocation location;
+    // A type parameter (`dv_base_agent::CFG_T`, `uvm_config_db::T`): whatever the
+    // specialization makes it, so not compared. The native rule skips the same pairs.
+    bool typeParam = false;
 };
+
+// A type that is a type parameter's alias (not a typedef's).
+static bool isTypeParam(const slang::ast::Type& t) {
+    if (!t.isAlias()) return false;
+    const auto* syn = t.getSyntax();
+    return !syn || syn->kind != slang::syntax::SyntaxKind::TypedefDeclaration;
+}
 
 class ConfigDbVisitor : public engine::AstVisitor<ConfigDbVisitor> {
 public:
@@ -60,11 +70,12 @@ public:
 
                     if (!fieldName.empty()) {
                         std::string valType = std::string(args[3]->type->toString());
+                        const bool param = isTypeParam(*args[3]->type);
 
                         if (subName == "set") {
-                            setCalls[fieldName] = ConfigCallInfo{valType, expr.sourceRange.start()};
+                            setCalls[fieldName] = ConfigCallInfo{valType, expr.sourceRange.start(), param};
                         } else if (subName == "get") {
-                            getCalls.push_back({fieldName, ConfigCallInfo{valType, expr.sourceRange.start()}});
+                            getCalls.push_back({fieldName, ConfigCallInfo{valType, expr.sourceRange.start(), param}});
                         }
                     }
                 }
@@ -97,7 +108,7 @@ public:
             auto it = visitor.setCalls.find(fieldName);
             if (it != visitor.setCalls.end()) {
                 const auto& setInfo = it->second;
-                if (setInfo.typeName != getInfo.typeName) {
+                if (setInfo.typeName != getInfo.typeName && !setInfo.typeParam && !getInfo.typeParam) {
                     diags.addViolation(
                         "UVM-CFG-001",
                         "UvmConfigDbTypeMismatch",
