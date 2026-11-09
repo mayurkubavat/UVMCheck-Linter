@@ -1,5 +1,13 @@
-//! SV-THR-002 (StaticRoutineVariableLifetime): Non-class tasks and functions
-//! default to static lifetime in SystemVerilog.
+//! SV-THR-002 (StaticRoutineVariableLifetime): a task outside a class has
+//! static lifetime by default, so its locals are shared by every call that
+//! is running. Two calls that overlap in time overwrite each other's values.
+//!
+//! Only tasks are reported, as a warning. A function returns in zero time,
+//! so its calls cannot overlap and a static local is harmless there (it was
+//! 34 of the 36 findings in Accellera's UVM library, every one a false
+//! alarm). A task's static local is a hazard, not a certain bug: a counter
+//! kept across calls on purpose looks the same, which is why this is not an
+//! error.
 
 use crate::support::procedural::{add_n, routine_name};
 use crate::support::slang_ast::*;
@@ -9,7 +17,7 @@ use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn static_routine_variable(c: &Cst, s: &mut Sink) {
-    for k in [FunctionDecl, TaskDecl] {
+    for k in [TaskDecl] {
         for r in c.nodes(k) {
             if enclosing_class(c, r).is_some() {
                 continue;
@@ -49,11 +57,11 @@ pub(crate) fn static_routine_variable(c: &Cst, s: &mut Sink) {
                         n,
                         "SV-THR-002",
                         "StaticRoutineVariableLifetime",
-                        Severity::Error,
+                        Severity::Warning,
                         format!(
-                            "Local variable '{vname}' in routine '{rname}' has implicit static lifetime. In non-class scopes, \
-                             tasks and functions default to static lifetime, causing local variables to be shared \
-                             across concurrent invocations and inducing race conditions. Declare routine as 'automatic'."
+                            "Local variable '{vname}' in task '{rname}' is static: a task outside a class has static \
+                             lifetime by default, so calls that overlap in time share '{vname}'. Declare the task \
+                             'automatic'."
                         ),
                         c.loc(t),
                     );

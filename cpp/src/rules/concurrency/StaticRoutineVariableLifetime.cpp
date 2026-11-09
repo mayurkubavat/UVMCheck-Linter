@@ -11,8 +11,14 @@ public:
     explicit StaticRoutineVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
     void handle(const slang::ast::SubroutineSymbol& sub) {
-        // Only inspect routines with static default lifetime outside of classes
-        if (sub.defaultLifetime == slang::ast::VariableLifetime::Static) {
+        // Only tasks with static default lifetime outside of classes. A
+        // function returns in zero time, so its calls cannot overlap and a
+        // static local is harmless there (34 of the 36 findings in
+        // Accellera's UVM library were such functions). In a task it is a
+        // hazard, not a certain bug: a counter kept across calls on purpose
+        // looks the same, so this is a warning.
+        if (sub.subroutineKind == slang::ast::SubroutineKind::Task &&
+            sub.defaultLifetime == slang::ast::VariableLifetime::Static) {
             const auto* parentScope = sub.getParentScope();
             if (parentScope && parentScope->asSymbol().kind != slang::ast::SymbolKind::ClassType) {
                 for (const auto& member : sub.members()) {
@@ -24,11 +30,11 @@ public:
                             diags.addViolation(
                                 "SV-THR-002",
                                 "StaticRoutineVariableLifetime",
-                                "Local variable '" + std::string(var.name) + "' in routine '" +
-                                std::string(sub.name) + "' has implicit static lifetime. In non-class scopes, "
-                                "tasks and functions default to static lifetime, causing local variables to be shared "
-                                "across concurrent invocations and inducing race conditions. Declare routine as 'automatic'.",
-                                core::Severity::Error,
+                                "Local variable '" + std::string(var.name) + "' in task '" +
+                                std::string(sub.name) + "' is static: a task outside a class has static "
+                                "lifetime by default, so calls that overlap in time share '" + std::string(var.name) +
+                                "'. Declare the task 'automatic'.",
+                                core::Severity::Warning,
                                 var.location
                             );
                         }
@@ -48,11 +54,12 @@ public:
     std::string_view getId() const override { return "SV-THR-002"; }
     std::string_view getName() const override { return "StaticRoutineVariableLifetime"; }
     std::string_view getDescription() const override {
-        return "Non-class tasks and functions default to static lifetime in SystemVerilog. Local variables "
-               "in static routines share memory addresses across concurrent calls, leading to intermittent corruption.";
+        return "A task outside a class has static lifetime by default: its local variables are shared by "
+               "every call that is running, so calls that overlap in time overwrite each other's values. "
+               "Functions return in zero time and are not reported.";
     }
     std::string_view getCategory() const override { return "Concurrency"; }
-    core::Severity getDefaultSeverity() const override { return core::Severity::Error; }
+    core::Severity getDefaultSeverity() const override { return core::Severity::Warning; }
 
     engine::RuleTask check(engine::RuleContext& ctx) override {
         auto& diags = ctx.diags();
