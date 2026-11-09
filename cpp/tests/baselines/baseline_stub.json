@@ -1386,8 +1386,12 @@
   "deadcode/SV-DED-003/good.sv": [
     "SV-STY-005@8",
     "SV-STY-005@9",
+    "SV-STY-005@16",
+    "SV-STY-005@17",
     "SV-STY-104@8",
     "SV-STY-104@9",
+    "SV-STY-104@16",
+    "SV-STY-104@17",
     "UVM-FAC-003@5"
   ],
   "deadcode/SV-DED-004/bad.sv": [
@@ -2558,11 +2562,15 @@
   ],
   "errors/SV-ERR-002/good.sv": [
     "SV-DED-006@18",
+    "SV-DED-006@57",
     "SV-INT-001@29",
     "SV-RDB-010@16",
+    "SV-RDB-010@55",
     "SV-STY-001@18",
     "SV-STY-001@19",
     "SV-STY-001@20",
+    "SV-STY-001@57",
+    "SV-STY-001@58",
     "SV-STY-005@13",
     "SV-STY-005@14",
     "SV-STY-005@23",
@@ -2570,8 +2578,12 @@
     "SV-STY-005@37",
     "SV-STY-005@45",
     "SV-STY-005@46",
+    "SV-STY-005@61",
+    "SV-STY-005@70",
+    "SV-STY-005@71",
     "SV-STY-009@25",
     "SV-STY-009@39",
+    "SV-STY-009@63",
     "SV-STY-104@6",
     "SV-STY-104@13",
     "SV-STY-104@14",
@@ -2579,7 +2591,10 @@
     "SV-STY-104@32",
     "SV-STY-104@37",
     "SV-STY-104@45",
-    "SV-STY-104@46"
+    "SV-STY-104@46",
+    "SV-STY-104@61",
+    "SV-STY-104@70",
+    "SV-STY-104@71"
   ],
   "errors/SV-ERR-003/bad.sv": [
     "SV-RDB-002@13",
@@ -3123,8 +3138,7 @@
     "SVA-LBL-001@9",
     "SVA-LBL-001@24",
     "SVA-RST-001@9",
-    "SVA-RST-001@24",
-    "SVA-VAC-001@9"
+    "SVA-RST-001@24"
   ],
   "methodology/SV-DSN-011/bad.sv": [
     "SV-DED-005@4",
@@ -5611,10 +5625,21 @@
     "SV-STY-104@20"
   ],
   "oop/SV-OOP-011/good.sv": [
+    "SV-CNS-006@13",
+    "SV-DED-001@16",
+    "SV-DED-013@15",
+    "SV-MOD-001@12",
+    "SV-MOD-001@13",
+    "SV-NAM-110@13",
+    "SV-STY-004@13",
     "SV-STY-005@8",
     "SV-STY-005@9",
+    "SV-STY-005@18",
+    "SV-STY-005@19",
     "SV-STY-104@8",
     "SV-STY-104@9",
+    "SV-STY-104@18",
+    "SV-STY-104@19",
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-012/bad.sv": [
@@ -7389,15 +7414,25 @@
   ],
   "sva/SVA-VAC-001/bad.sv": [
     "SVA-ACT-001@12",
+    "SVA-ACT-001@17",
     "SVA-LBL-001@12",
+    "SVA-LBL-001@17",
     "SVA-RST-001@9",
-    "SVA-RST-001@12"
+    "SVA-RST-001@12",
+    "SVA-RST-001@17"
   ],
   "sva/SVA-VAC-001/good.sv": [
     "SV-STY-005@8",
     "SV-STY-005@9",
     "SV-STY-104@8",
     "SV-STY-104@9",
+    "SVA-ACT-001@17",
+    "SVA-ACT-001@18",
+    "SVA-LBL-001@17",
+    "SVA-LBL-001@18",
+    "SVA-RST-001@14",
+    "SVA-RST-001@17",
+    "SVA-RST-001@18",
     "UVM-FAC-003@5"
   ],
   "types/SV-TYP-001/bad.sv": [

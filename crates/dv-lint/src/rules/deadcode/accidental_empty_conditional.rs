@@ -1,5 +1,9 @@
 //! SV-DED-003 (AccidentalEmptyConditional): Detects accidental semicolons
 //! immediately following if() or while() headers.
+//!
+//! `if (c) ; else ...` is not reported: with an else the empty branch is a
+//! deliberate idiom (an X or Z condition takes the else, as in OpenTitan's
+//! `DV_CHECK`), and nothing runs unconditionally. The C++ rule is the same.
 
 use crate::support::statements::{body_of, if_parts, in_bad_body, report, start, stmt, St, Units};
 use crate::syntax::Cst;
@@ -13,8 +17,8 @@ pub(crate) fn empty_conditional(c: &Cst, s: &mut Sink) {
         if in_bad_body(c, n) {
             continue;
         }
-        let (_, then, _) = if_parts(c, n);
-        if then.is_some_and(|t| c.kind(t) == EmptyStmt) {
+        let (_, then, els) = if_parts(c, n);
+        if els.is_none() && then.is_some_and(|t| c.kind(t) == EmptyStmt) {
             report(
                 s,
                 units.times(c, n),

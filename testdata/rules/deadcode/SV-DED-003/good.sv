@@ -7,3 +7,11 @@ class compliant_accidentalemptyconditional extends uvm_object;
         super.new(name);
     endfunction
 endclass
+
+// `if (c) ; else ...` on purpose: an X or Z condition takes the else branch
+// (the shape of OpenTitan's `DV_CHECK).
+class checker_idiom;
+    function void check(logic ok);
+        if (ok) ; else $error("check failed");
+    endfunction
+endclass

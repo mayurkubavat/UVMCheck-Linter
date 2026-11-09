@@ -766,7 +766,12 @@ bool isReportGuard(const ConditionalStatement& c) {
     struct Calls : public ASTVisitor<Calls, VisitFlags::AllGood> {
         bool report = false, other = false;
         void handle(const CallExpression& call) {
-            (isReportQuery(call.getSubroutineName()) ? report : other) = true;
+            const std::string_view n = call.getSubroutineName();
+            // The message id may be built in the guard (`ID_ = $sformatf("%m")` or
+            // get_full_name(), as OpenTitan's dv_fatal and `gfn): still the guard.
+            const bool idPart = n == "$sformatf" || n == "$psprintf" || n == "get_full_name" ||
+                                n == "get_name" || n == "get_type_name";
+            if (!idPart) (isReportQuery(n) ? report : other) = true;
             visitDefault(call);
         }
     } calls;

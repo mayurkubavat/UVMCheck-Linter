@@ -11,7 +11,9 @@ public:
     explicit EmptyConditionalVisitor(core::DiagnosticEngine& diags) : diags(diags) {}
 
     void handle(const slang::ast::ConditionalStatement& stmt) {
-        if (stmt.ifTrue.kind == slang::ast::StatementKind::Empty) {
+        // `if (c) ; else ...`: a deliberate idiom (an X condition takes the
+        // else, as in OpenTitan's DV_CHECK); nothing runs unconditionally.
+        if (stmt.ifTrue.kind == slang::ast::StatementKind::Empty && !stmt.ifFalse) {
             diags.addViolation(
                 "SV-DED-003",
                 "AccidentalEmptyConditional",

@@ -3,6 +3,10 @@
     {
       "rule": "SVA-VAC-001",
       "line": 10
+    },
+    {
+      "rule": "SVA-VAC-001",
+      "line": 17
     }
   ]
 }

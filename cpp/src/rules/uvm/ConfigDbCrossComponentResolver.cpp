@@ -2,6 +2,8 @@
 #include "uvmcheck/rules/RuleRegistry.h"
 #include "uvmcheck/uvm/ConfigDbGraph.h"
 
+#include <string>
+
 namespace uvmcheck::rules::uvm {
 
 class ConfigDbCrossComponentResolver : public Rule {
@@ -21,7 +23,14 @@ public:
         uvmcheck::uvm::ConfigDbGraph graph(compilation);
         auto mismatches = graph.findMismatches();
 
+        // A type declared in the calling class (`CFG_T`, a type parameter of
+        // dv_base_agent) depends on the specialization: the pair cannot be told
+        // apart. The native rule skips the same pairs.
+        auto classScoped = [](const std::string& ty, const std::string& cls) {
+            return !cls.empty() && (ty.rfind(cls + "::", 0) == 0 || ty.find("::" + cls + "::") != std::string::npos);
+        };
         for (const auto& m : mismatches) {
+            if (classScoped(m.getType, m.getClass) || classScoped(m.setType, m.setClass)) continue;
             diags.addViolation(
                 "UVM-CFG-005",
                 "ConfigDbCrossComponentResolver",

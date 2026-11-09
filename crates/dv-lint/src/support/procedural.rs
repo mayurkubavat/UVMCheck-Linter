@@ -431,7 +431,7 @@ pub(crate) fn is_report_guard(c: &Cst, cond: NodeId) -> bool {
             "uvm_report_enabled" | "get_report_verbosity_level" | "get_report_action" | "uvm_get_report_object"
         ) {
             report = true;
-        } else {
+        } else if !crate::support::class_index::is_report_id_part(&n) {
             return false;
         }
     }

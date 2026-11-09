@@ -612,11 +612,18 @@ pub(crate) fn is_report_guard(c: &Cst, n: NodeId) -> bool {
         };
         if is_report_query(name) {
             report = true;
-        } else {
+        } else if !is_report_id_part(name) {
             other = true;
         }
     }
     report && !other
+}
+
+/// Calls that build a report's message id inside its guard (`ID_ =
+/// $sformatf("%m")` or `gfn = get_full_name()`, as OpenTitan's dv_fatal):
+/// the condition is still the guard (`swe::isReportGuard`).
+pub(crate) fn is_report_id_part(name: &str) -> bool {
+    matches!(name, "$sformatf" | "$psprintf" | "get_full_name" | "get_name" | "get_type_name")
 }
 
 pub(crate) fn is_report_local(name: &str) -> bool {

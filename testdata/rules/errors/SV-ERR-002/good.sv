@@ -44,3 +44,28 @@ class bus_driver extends uvm_component;
     depth = cfg.depth;
   endfunction
 endclass
+
+// A fatal whose message id is built in the guard (OpenTitan's `downcast and
+// dv_fatal: ID_ = `gfn = get_full_name()) still ends the path.
+`define id_fatal(MSG_, ID_ = get_full_name()) \
+  if (uvm_report_enabled(UVM_NONE, UVM_FATAL, ID_)) begin \
+    uvm_report_fatal(ID_, MSG_, UVM_NONE, `__FILE__, `__LINE__); \
+  end
+
+class cfg_user extends uvm_component;
+  `uvm_component_utils(cfg_user)
+  bus_cfg cfg;
+  int unsigned depth;
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+
+  function void take(uvm_object o);
+    begin
+      if (!$cast(cfg, o)) begin
+        `id_fatal($sformatf("not a bus_cfg: %s", o.get_name()))
+      end
+    end
+    depth = cfg.depth;
+  endfunction
+endclass

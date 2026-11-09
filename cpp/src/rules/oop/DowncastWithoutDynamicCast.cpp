@@ -5,6 +5,8 @@
 #include "slang/syntax/SyntaxVisitor.h"
 #include <unordered_set>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace uvmcheck::rules::oop {
 
@@ -17,6 +19,11 @@ public:
                 knownClasses.insert(std::string(cls->name));
             }
         }
+    }
+
+    void handle(const slang::syntax::TypedefDeclarationSyntax& td) {
+        typedefs.insert(std::string(td.name.valueText()));
+        visitDefault(td);
     }
 
     void handle(const slang::syntax::ClassDeclarationSyntax& clsNode) {
@@ -49,8 +56,17 @@ public:
                 isClassType = true;
             }
 
-            if (isClassType) {
-                diags.addViolation(
+            if (isClassType) pending.push_back({typeName, node.sourceRange().start()});
+        }
+        visitDefault(node);
+    }
+
+    // After the walk: a name only the hints matched that a typedef declares
+    // (`uvm_reg_data_t`, `uvm_radix_enum`) is a vector or enum type, not a class.
+    void report() {
+        for (const auto& [typeName, loc] : pending) {
+            if (!knownClasses.count(typeName) && typedefs.count(typeName)) continue;
+            diags.addViolation(
                     "SV-OOP-011",
                     "DowncastWithoutDynamicCast",
                     "Explicit static cast '" + typeName + "'(...)' used on class handle. "
@@ -58,16 +74,16 @@ public:
                     "'$cast(target, source)' to verify polymorphic type compatibility at runtime. "
                     "Static class casting bypasses runtime type safety and causes simulator aborts. Replace with '$cast()'.",
                     core::Severity::Error,
-                    node.sourceRange().start()
+                    loc
                 );
-            }
         }
-        visitDefault(node);
     }
 
 private:
     core::DiagnosticEngine& diags;
     std::unordered_set<std::string> knownClasses;
+    std::unordered_set<std::string> typedefs;
+    std::vector<std::pair<std::string, slang::SourceLocation>> pending;
 };
 
 class DowncastWithoutDynamicCast : public Rule {
@@ -86,6 +102,7 @@ public:
         auto& diags = ctx.diags();
         DowncastVisitor visitor(diags, uvmModel);
         co_await ctx.visitSyntax(visitor);
+        visitor.report();
     }
 };
 
