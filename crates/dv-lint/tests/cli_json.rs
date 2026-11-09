@@ -7,8 +7,12 @@ fn json_report_has_uvmchecks_fields() {
     let src = dir.join("t.sv");
     std::fs::write(&src, "module m; logic [7:0] a; initial a = 255; // TODO: \"quoted\"\nendmodule\n").unwrap();
     let out = dir.join("r.json");
-    let st =
-        std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint")).arg("--json").arg(&out).arg(&src).status().unwrap();
+    let st = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .args(["--preset", "style", "--json"])
+        .arg(&out)
+        .arg(&src)
+        .status()
+        .unwrap();
     assert_eq!(st.code(), Some(0), "only infos and warnings: exit 0, as uvmcheck");
     let text = std::fs::read_to_string(&out).unwrap();
     for key in ["\"tool\": \"dv-lint\"", "\"compileErrors\": 0", "\"violations\": [", "\"ruleId\": \"SV-STY-003\""] {
@@ -30,7 +34,10 @@ fn presets_select_rules_as_uvmcheck() {
         let o = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint")).args(extra).arg(&src).output().unwrap();
         String::from_utf8_lossy(&o.stdout).contains("SV-STY-003")
     };
-    assert!(run(&[]), "the default selection has style rules");
+    assert!(!run(&[]), "the default selection has no style rules");
+    assert!(!run(&["--preset", "default"]));
+    assert!(run(&["--preset", "style"]));
+    assert!(run(&["--preset", "all"]));
     assert!(!run(&["--preset", "soundness"]));
     assert!(!run(&["--preset=soundness"]));
     assert!(run(&["--preset", "soundness", "--rule", "SV-STY-003"]), "--rule wins");
@@ -51,7 +58,7 @@ fn project_config_paths_rules_and_waivers() {
     }
     std::fs::write(
         dir.join(".uvmcheck/config.json"),
-        r#"{"library_paths": ["vip/**"], "rules": {"SV-STY-003": "off", "SV-BAN-001": {"severity": "ERROR"}},
+        r#"{"preset": "all", "library_paths": ["vip/**"], "rules": {"SV-STY-003": "off", "SV-BAN-001": {"severity": "ERROR"}},
             "waivers": [{"rule": "SV-STY-010", "path": "tb/top.sv", "line": 3, "reason": "known"}]}"#,
     )
     .unwrap();
@@ -87,8 +94,11 @@ fn project_config_paths_rules_and_waivers() {
         with.contains("\"line\": 4, \"column\": 13, \"message\": \"Unsized decimal literal '6'"),
         "not waived: {with}"
     );
-    let without = run(&["--no-config"]);
+    let without = run(&["--no-config", "--preset", "all"]);
     assert!(without.contains("SV-STY-003") && without.contains("v.sv"), "{without}");
+    // Without the config's preset the default rule set runs: no style rules.
+    let default = run(&["--no-config"]);
+    assert!(!default.contains("SV-STY-003") && default.contains("SV-BAN-001"), "{default}");
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -184,7 +194,7 @@ fn waiver_files_regrades_and_baselines() {
     std::fs::create_dir_all(dir.join(".uvmcheck")).unwrap();
     std::fs::write(
         dir.join(".uvmcheck/config.json"),
-        r#"{"waivers": [{"rule": "SV-BAN-001", "severity": "error", "reason": "regrade"}]}"#,
+        r#"{"preset": "all", "waivers": [{"rule": "SV-BAN-001", "severity": "error", "reason": "regrade"}]}"#,
     )
     .unwrap();
     std::fs::write(
@@ -483,5 +493,44 @@ fn exit_status_follows_errors_only() {
     };
     assert_eq!(code("w.sv"), Some(0));
     assert_eq!(code("e.sv"), Some(1));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A rule the project config configures runs although the default rule set
+/// leaves its profile out; `--preset` on the command line narrows the run
+/// again, and `enabled: false` is not a request for the rule.
+#[test]
+fn a_configured_rule_runs_outside_the_default_set() {
+    let dir = std::env::temp_dir().join(format!("dv-lint-configured-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    std::fs::create_dir_all(dir.join(".uvmcheck")).unwrap();
+    // SV-STY-003 (a TODO comment) and SV-STY-015 (trailing whitespace) are style rules.
+    std::fs::write(dir.join("t.sv"), "module m; // TODO: later  \nendmodule\n").unwrap();
+    let run = |config: &str, extra: &[&str]| {
+        std::fs::write(dir.join(".uvmcheck/config.json"), config).unwrap();
+        let o = std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+            .current_dir(&dir)
+            .args(["--no-cache"])
+            .args(extra)
+            .arg("t.sv")
+            .output()
+            .unwrap();
+        String::from_utf8_lossy(&o.stdout).into_owned() + &String::from_utf8_lossy(&o.stderr)
+    };
+    let plain = run("{}", &[]);
+    assert!(!plain.contains("SV-STY-003") && !plain.contains("SV-STY-015"), "{plain}");
+    let configured = run(r#"{"rules": {"SV-STY-003": {"severity": "ERROR"}, "TrailingWhitespace": false}}"#, &[]);
+    assert!(configured.contains("[ERROR] SV-STY-003"), "{configured}");
+    assert!(!configured.contains("SV-STY-015"), "turned off is not asked for: {configured}");
+    let narrowed = run(r#"{"rules": {"SV-STY-003": {"severity": "ERROR"}}}"#, &["--preset", "soundness"]);
+    assert!(!narrowed.contains("SV-STY-003"), "{narrowed}");
+    // A style block asks for the style engine (SV-STY-100, reporting as SV-STY-102).
+    let block = run(r#"{"style": {"allow_trailing_whitespace": false}}"#, &[]);
+    assert!(block.contains("SV-STY-102"), "{block}");
+    // The project's preset stands in for --preset.
+    let preset = run(r#"{"preset": "style"}"#, &[]);
+    assert!(preset.contains("SV-STY-003") && preset.contains("SV-STY-015"), "{preset}");
+    let bad = run(r#"{"preset": "nope"}"#, &[]);
+    assert!(bad.contains("preset: unknown preset 'nope'"), "{bad}");
     let _ = std::fs::remove_dir_all(&dir);
 }

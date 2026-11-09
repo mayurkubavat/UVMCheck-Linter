@@ -210,8 +210,21 @@ def main():
           [s for _, r, s in found if r == "SV-COR-008"] == ["INFO"], out)
     check("rule disabled by ID", files_with(found, "SV-COR-001") == [], out)
 
+    # The default rule set has no style rules; a rule the config configures,
+    # or the project's preset, brings them in.
+    t, rc, found, out, err = case(binary, "Default rule set", ".uvmcheck.json", "{}")
+    check("style rules are not in the default set", files_with(found, "SV-STY-016") == [], out)
+    check("bug rules are", files_with(found, "SV-COR-008") == ["user_tb.sv", "vendor_vip.sv"], out)
+    t, rc, found, out, err = case(binary, "A configured rule runs", ".uvmcheck.json",
+                                  '{ "rules": { "SV-STY-016": { "severity": "warning" } } }')
+    check("a configured style rule runs", files_with(found, "SV-STY-016") == ["user_tb.sv", "vendor_vip.sv"], out)
+    t, rc, found, out, err = case(binary, "Project preset", ".uvmcheck.json", '{ "preset": "style" }')
+    check("the project's preset selects the rules",
+          files_with(found, "SV-STY-016") == ["user_tb.sv", "vendor_vip.sv"] and files_with(found, "SV-COR-008") == [],
+          out)
+
     t, rc, found, out, err = case(binary, "Rule disabled by name, JSON shorthand", ".uvmcheck.json",
-                                  '{ "rules": { "TautologicalCheckCompare": "off", "SV-COR-008": "error" } }')
+                                  '{ "preset": "all", "rules": { "TautologicalCheckCompare": "off", "SV-COR-008": "error" } }')
     check("control: other rules still fire", files_with(found, "SV-STY-016") == ["user_tb.sv", "vendor_vip.sv"], out)
     check("\"off\" disables by name", files_with(found, "SV-COR-001") == [], out)
     check("severity shorthand", {s for _, r, s in found if r == "SV-COR-008"} == {"ERROR"}, out)
@@ -244,6 +257,7 @@ def main():
             reason = "temporary"
             expires = "2001-01-01"
         class Project(ProjectConfig):
+            preset = "all"
             waivers = [VendorNoise, Stale]
         """)
     check("class waiver by rule name and glob", files_with(found, "SV-COR-008") == ["user_tb.sv"] and

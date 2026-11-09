@@ -117,14 +117,25 @@ pub fn apply_inline_waivers(found: &mut Vec<Finding>, files: &[String]) {
     INLINE_WAIVED.fetch_add(waivers::apply(found, files), std::sync::atomic::Ordering::Relaxed);
 }
 
-/// Which rules run without `--rule`, as uvmcheck selects them: `preset`
-/// (`--preset`: soundness, methodology, performance, style, security,
-/// smells, advisory, reuse, guide, uvm-1800.2, all; none: every profile but
-/// advisory) and `experimental` (`--experimental`). Rules dv-lint has with no
-/// uvmcheck twin always run. Err for an unknown preset.
+/// The profiles that run when no preset is named (RuleProfile bits):
+/// soundness, methodology, performance and security. A first run on an
+/// existing testbench should show bugs and methodology problems, not
+/// thousands of layout findings; style, smells and advisory are opt-in.
+pub const DEFAULT_PROFILES: u32 = 1 | (1 << 1) | (1 << 2) | (1 << 4);
+
+/// Which rules run without `--rule`: `preset` (`--preset`: default,
+/// soundness, methodology, performance, style, security, smells, advisory,
+/// reuse, guide, uvm-1800.2, all) and `experimental` (`--experimental`).
+/// With no preset, or `default`, the rules that find bugs and methodology
+/// problems run ([`DEFAULT_PROFILES`]): soundness, methodology, performance
+/// and security. Style, smells and advisory rules are asked for by name, or
+/// with `all`. Rules dv-lint has with no uvmcheck twin always run. Err for
+/// an unknown preset.
 pub fn rule_selection(preset: Option<&str>, experimental: bool) -> Result<impl Fn(&str) -> bool, String> {
     const ALL: u32 = u32::MAX;
     const ADVISORY: u32 = 1 << 6;
+    // Soundness, methodology, performance, security.
+    const DEFAULT: u32 = DEFAULT_PROFILES;
     enum Sel {
         Profiles(u32),
         Category(&'static str),
@@ -132,7 +143,7 @@ pub fn rule_selection(preset: Option<&str>, experimental: bool) -> Result<impl F
         AnyGuideline,
     }
     let sel = match preset.map(str::to_ascii_lowercase).as_deref() {
-        None => Sel::Profiles(ALL & !ADVISORY),
+        None | Some("default") => Sel::Profiles(DEFAULT),
         Some("all") => Sel::Profiles(ALL),
         Some("soundness") => Sel::Profiles(1),
         Some("methodology") => Sel::Profiles(1 << 1),

@@ -287,9 +287,34 @@ pub fn run() {
         let _ = HTML_OUT.set(h);
     }
     let headers = if in_context { in_owner(&mut args) } else { Vec::new() };
-    let selected = dv_lint::rule_selection(preset.as_deref(), experimental).unwrap_or_else(|e| fail(e));
+    // --preset, else the project's `preset`, else the default profiles.
+    let config_preset = CONFIG.get().and_then(|c| c.preset.clone());
+    let selected = dv_lint::rule_selection(preset.as_deref().or(config_preset.as_deref()), experimental)
+        .unwrap_or_else(|e| fail(e));
+    // Rules the project config configures run too, unless --preset narrows
+    // the run from the command line.
+    let configured: std::collections::HashSet<&'static str> = match (CONFIG.get(), &preset) {
+        (Some(c), None) => dv_lint::rules().into_iter().filter(|r| c.selects(r.id, r.name)).map(|r| r.id).collect(),
+        _ => Default::default(),
+    };
+    // So do the rules --fix-rule names: asking for a rule's fixes asks for
+    // the rule.
+    let fix_named: std::collections::HashSet<&'static str> = dv_lint::rules()
+        .into_iter()
+        .filter(|r| {
+            let named = |id: &str, name: &str| fix_rules.iter().any(|f| f == id || f == name);
+            named(r.id, r.name) || dv_lint::sub_rules(r.id).iter().any(|(id, name)| named(id, name))
+        })
+        .map(|r| r.id)
+        .collect();
     // A rule named with --rule runs whatever its profile.
-    let user_keep = |id: &str| if only.is_empty() { selected(id) } else { only.iter().any(|o| o == id) };
+    let user_keep = |id: &str| {
+        if only.is_empty() {
+            selected(id) || configured.contains(id) || fix_named.contains(id)
+        } else {
+            only.iter().any(|o| o == id)
+        }
+    };
     let fixing = FIX.read().is_ok_and(|f| f.on || f.dry_run);
     if let Ok(mut f) = FIX.write() {
         f.only = fix_rules.clone();

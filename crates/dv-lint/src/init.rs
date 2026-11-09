@@ -359,6 +359,11 @@ class Project(ProjectConfig):
     }
     o.push_str(
         r#"
+    # The rule set: "default" finds bugs and methodology problems; "all" adds
+    # style, maintainability and advisory rules. A rule configured below
+    # runs whatever the preset.
+    # preset = "all"
+
     # Per-rule settings, e.g.:
     # class MaxLineLength(RuleConfig):
     #     max_columns = 120

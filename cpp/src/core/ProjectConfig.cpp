@@ -191,6 +191,24 @@ const RuleSettings* ProjectConfig::findRule(std::string_view ruleId, std::string
     return nullptr;
 }
 
+bool ProjectConfig::selectsRule(std::string_view ruleId, std::string_view ruleName) const {
+    auto on = [](const RuleSettings& rs) { return !(rs.enabled.has_value() && !*rs.enabled); };
+    if (const auto* rs = findRule(ruleId, ruleName); rs && on(*rs)) return true;
+    // The style and naming engines report under sub-rule IDs (SV-STY-101...,
+    // SV-NAM-101...): a setting for one of those asks for its engine.
+    const bool styleEngine = ruleId == "SV-STY-100";
+    const bool namingEngine = ruleId == "SV-NAM-100";
+    if (!styleEngine && !namingEngine) return false;
+    if (styleEngine ? hasStyleBlock : hasNamingBlock) return true;
+    const std::string_view family = styleEngine ? "SV-STY-1" : "SV-NAM-1";
+    for (const auto& [key, rs] : rules) {
+        if (key.size() == 10 && key != ruleId && std::string_view(key).substr(0, family.size()) == family && on(rs)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 bool ProjectConfig::isRuleEnabled(std::string_view ruleId, std::string_view ruleName) const {
     const auto* rs = findRule(ruleId, ruleName);
     return !(rs && rs->enabled.has_value() && !*rs->enabled);

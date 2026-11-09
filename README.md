@@ -60,7 +60,7 @@ uvmcheck tb/*.sv -I tb --preset methodology
 target/release/dv-lint +incdir+tb tb/top.sv --preset methodology
 target/release/dv-lint -f tb.f --json findings.json --sarif findings.sarif
 
-# Every rule, including experimental ones
+# Every rule: style, smells, advisory and experimental ones too
 target/release/dv-lint -f tb.f --preset all --experimental
 ```
 
@@ -82,7 +82,11 @@ baselines. The Rust tools reach Slang only for the parity gates, behind the
 | Randomization, coverage, SVA (56) | unchecked `randomize()`, constraint conflicts, coverage that cannot close, vacuous assertions |
 | OOP, architecture (33) | missing `virtual`, unsafe casts, layer violations, coupling and reach-through |
 
-Profiles (`--preset`) pick a set for a purpose, such as `methodology`. The
+By default the rules that find bugs and methodology problems run
+(soundness, methodology, performance, security); style, maintainability
+and advisory rules are opt-in with `--preset style`, `smells`, `advisory`
+or `all`, or by configuring them in the project config. Profiles
+(`--preset`) pick a set for a purpose, such as `methodology`. The
 generated [rule catalog](docs/rules/README.md) lists every rule with its
 severity, profiles and `bad.sv`/`good.sv` examples, and the
 [UVM Methodology Guide](docs/methodology/README.md) explains the reasoning

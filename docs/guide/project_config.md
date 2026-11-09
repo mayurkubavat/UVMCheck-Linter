@@ -135,11 +135,12 @@ Running from `blocks/dma/` prints the layers that were loaded.
 | `library_paths` | Globs for third-party code (UVM, VIP). Files are still compiled; violations in them are dropped. |
 | `exclude_paths` | Globs for your own files whose violations should be dropped. |
 | `report_library_macro_expansions` | Default `False`: code produced by a library macro (`` `uvm_object_utils `` etc.) inside your file counts as library code. |
+| `preset` | The rule set when `--preset` is not given: `"default"` (soundness, methodology, performance and security), `"all"`, `"style"` and the other preset names. `--preset` on the command line wins. |
 | `waivers` | `Waiver(...)` objects or `Waiver` subclasses with `rules`, `paths`, `line`, `reason` (mandatory), `owner`, `expires` (YYYY-MM-DD), and optional `message`. Empty `rules` / `paths` mean every rule / file. `message` is a regular expression searched against the diagnostic text; the waiver applies only when rule, path, line, and that expression all match. An invalid expression is an error that names the config file and the waiver. With `severity` (`Severity.Error` / `Warning` / `Info`, or the name as a string; `"severity"` in a waivers JSON file) the waiver does not hide the finding but reports it at that severity, with `[re-graded by ...]` after its message, for example to keep known issues visible at Info while a fix is tracked. |
 | `style`, `naming` | Same dicts as the legacy JSON `style` / `naming` blocks. |
 | `compat` | Opt-in slang overlay: `profile` (`questa`, `xcelium`, `vcs`, `none`), `overrides` (`"id"` on, `"-id"` off) and `uvm_home`. See [compat.md](../reference/compat.md). |
 | `RuleConfig.rule` | Rule ID (`"SV-STY-016"`) or name (`"MaxLineLength"`); defaults to the class name. |
-| `RuleConfig.enabled` | `False` skips the rule entirely (also for Python plugin rules). |
+| `RuleConfig.enabled` | `False` skips the rule entirely (also for Python plugin rules). A rule you configure in any other way runs even when the preset leaves it out: a `RuleConfig` for a style rule, or a `style` / `naming` block, turns those checks on without `preset = "all"`. `--preset` on the command line narrows the run to that preset. |
 | `RuleConfig.severity` | `Severity.Error`, `Severity.Warning` or `Severity.Info`. |
 | `RuleConfig.exclude_paths` | Globs where only this rule is silenced. |
 | `RuleConfig.only_paths` | Globs where this rule reports; elsewhere it is silent. For example strict naming only under `env/**`, or a rule kept out of generated code without listing every other folder. `exclude_paths` still applies inside them. |

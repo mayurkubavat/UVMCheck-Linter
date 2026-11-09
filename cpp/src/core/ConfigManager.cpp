@@ -415,7 +415,7 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
     static const std::unordered_set<std::string_view> knownKeys = {
         "version", "source", "warnings", "library_paths", "exclude_paths",
         "report_library_macro_expansions", "rules", "waivers", "style", "naming",
-        "sources", "filelists", "include_dirs", "defines", "expired_waivers", "layers", "compat"};
+        "sources", "filelists", "include_dirs", "defines", "expired_waivers", "layers", "compat", "preset"};
     for (const auto& [key, _] : root.asObject()) {
         if (!knownKeys.count(key)) warn("unknown top-level key '" + key + "' ignored");
     }
@@ -446,6 +446,10 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
         if (!v->isBool()) return error("report_library_macro_expansions must be true or false");
         projectConfig.setReportLibraryMacroExpansions(v->asBool());
     }
+    if (const auto* v = root.find("preset")) {
+        if (!v->isString()) return error("preset must be a preset name");
+        projectConfig.setPreset(v->asString());
+    }
     if (const auto* v = root.find("rules")) {
         if (!applyRules(*v, baseDir)) return false;
     }
@@ -470,8 +474,14 @@ bool ConfigManager::applyConfig(const json::Value& root, const fs::path& baseDir
             if (w.isString()) warn(w.asString());
         }
     }
-    if (const auto* v = root.find("style"); v && v->isObject()) applyStyle(*v);
-    if (const auto* v = root.find("naming"); v && v->isObject()) applyNaming(*v);
+    if (const auto* v = root.find("style"); v && v->isObject()) {
+        if (!v->asObject().empty()) projectConfig.noteStyleBlock();
+        applyStyle(*v);
+    }
+    if (const auto* v = root.find("naming"); v && v->isObject()) {
+        if (!v->asObject().empty()) projectConfig.noteNamingBlock();
+        applyNaming(*v);
+    }
     return true;
 }
 
@@ -603,6 +613,11 @@ class Project(ProjectConfig):
         # "ip_stubs": ["vip/stubs"],    # opaque-ip: stubs for encrypted VIP
         # "system_tasks": ["$my_dump"], # vendor-systasks: more simulator tasks
     }
+
+    # The rule set: "default" finds bugs and methodology problems; "all" adds
+    # style, maintainability and advisory rules. A rule configured below
+    # runs whatever the preset.
+    # preset = "all"
 
     # Per-rule settings. Name the class after the rule (ID via `rule = ...`).
     # Any extra attribute is passed to the rule as an option.

@@ -121,6 +121,19 @@ public:
     /// Returns false only if the config explicitly disables the rule.
     bool isRuleEnabled(std::string_view ruleId, std::string_view ruleName) const;
 
+    /// True when the config asks for the rule: it gives it settings without
+    /// turning it off, or has the block its engine reads (`style` for
+    /// SV-STY-100, `naming` for SV-NAM-100). Such a rule runs even when the
+    /// default preset leaves its profile out.
+    bool selectsRule(std::string_view ruleId, std::string_view ruleName) const;
+
+    /// `preset`: the project's rule set, used when --preset is not given.
+    const std::string& preset() const { return presetName; }
+    void setPreset(std::string v) { presetName = std::move(v); }
+
+    void noteStyleBlock() { hasStyleBlock = true; }
+    void noteNamingBlock() { hasNamingBlock = true; }
+
     std::optional<Severity> severityOverride(std::string_view ruleId) const;
 
     /// Path classification that does not depend on the rule.
@@ -160,6 +173,9 @@ private:
     std::unordered_map<std::string, RuleSettings> rules;
     bool anyRuleExcludes = false;
     bool reportLibraryMacros = false;
+    bool hasStyleBlock = false;
+    bool hasNamingBlock = false;
+    std::string presetName;
     BuildSettings buildSettings;
     CompatSettings compatSettings;
 

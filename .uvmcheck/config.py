@@ -23,6 +23,11 @@ class Project(ProjectConfig):
         # "**/generated/**",
     ]
 
+    # The rule set: "default" finds bugs and methodology problems; "all" adds
+    # style, maintainability and advisory rules. A rule configured below
+    # runs whatever the preset.
+    # preset = "all"
+
     # Per-rule settings. Name the class after the rule (ID via `rule = ...`).
     # Any extra attribute is passed to the rule as an option.
     class MaxLineLength(RuleConfig):

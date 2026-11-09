@@ -53,7 +53,7 @@ LinterDriver::LinterDriver() {
     slangDriver.cmdLine.add("-h,--help", showHelp, "Display available options");
     slangDriver.cmdLine.add("--version", showVersion, "Display version information and exit");
     slangDriver.cmdLine.add("--list-rules", listRules, "List all available linter rules and exit; with --json, write the rule catalog as JSON");
-    slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: soundness, methodology, performance, style, security, smells, advisory, reuse, guide, uvm-1800.2, all", "<name>");
+    slangDriver.cmdLine.add("--preset", presetName, "Select rule preset: default (soundness, methodology, performance, security), soundness, methodology, performance, style, security, smells, advisory, reuse, guide, uvm-1800.2, all", "<name>");
     slangDriver.cmdLine.add("--guideline", guidelineSelector, "Run only the rules that enforce these methodology guidelines or chapters (comma-separated, e.g. MG-4,MG-3.1)", "<ids>");
     slangDriver.cmdLine.add("--list-guidelines", listGuidelines, "List the methodology guide (guidelines and the rules that enforce them) and exit; with --json, write it as JSON");
     slangDriver.cmdLine.add("--conformance", showConformance, "Report pass/fail per methodology guideline (implied by --guideline and the reuse and guide presets)");
@@ -583,9 +583,18 @@ int LinterDriver::run() {
     } // !replayed (parse and elaborate)
 
     // Resolve active rule preset profile
-    // Advisory rules only run when asked for by preset or by --rule.
-    uint32_t activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::All) &
-                                 ~static_cast<uint32_t>(rules::RuleProfile::Advisory);
+    // With no preset, the rules that find bugs and methodology problems run:
+    // soundness, methodology, performance and security. A first run on an
+    // existing testbench should not open with thousands of layout findings,
+    // so style, smells and advisory rules are asked for by preset, by --rule,
+    // or by configuring them in the project config.
+    const uint32_t defaultProfileMask =
+        static_cast<uint32_t>(rules::RuleProfile::Soundness) | static_cast<uint32_t>(rules::RuleProfile::Methodology) |
+        static_cast<uint32_t>(rules::RuleProfile::Performance) | static_cast<uint32_t>(rules::RuleProfile::Security);
+    uint32_t activeProfileMask = defaultProfileMask;
+    // --preset, else the project's `preset`.
+    const bool presetOnCommandLine = presetName.has_value();
+    if (!presetOnCommandLine && !projectConfig.preset().empty()) presetName = projectConfig.preset();
     // Guideline selection (--guideline, or the reuse and guide presets) picks rules by the
     // guidelines they enforce, whatever their profile.
     std::vector<std::string> guidelineSelectors;
@@ -620,6 +629,8 @@ int LinterDriver::run() {
             guidelineSelectors.insert(guidelineSelectors.end(), {"MG-1", "MG-2", "MG-3", "MG-4", "MG-5"});
         } else if (p == "guide") {
             for (const auto& g : rules::methodologyGuidelines()) guidelineSelectors.emplace_back(g.id);
+        } else if (p == "default") {
+            activeProfileMask = defaultProfileMask;
         } else if (p == "soundness") {
             activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::Soundness);
         } else if (p == "methodology") {
@@ -637,7 +648,7 @@ int LinterDriver::run() {
         } else if (p == "all") {
             activeProfileMask = static_cast<uint32_t>(rules::RuleProfile::All);
         } else {
-            std::cerr << "Warning: Unknown preset '" << *presetName << "', using 'all'.\n";
+            std::cerr << "Warning: Unknown preset '" << *presetName << "', using the default.\n";
         }
     }
 
@@ -651,6 +662,22 @@ int LinterDriver::run() {
         } else if (*engineMode != "single-pass") {
             std::cerr << "Error: Unknown --engine '" << *engineMode << "' (expected single-pass or isolated)\n";
             return 2;
+        }
+    }
+
+    // The rules --fix-rule names run whatever the preset: asking for a rule's
+    // fixes asks for the rule. A sub-rule ID of the style or naming engine
+    // (SV-STY-102, SV-NAM-111) names its engine.
+    std::vector<std::string> fixNamedRules;
+    if (autoFixRules.has_value()) {
+        std::stringstream list(*autoFixRules);
+        for (std::string item; std::getline(list, item, ',');) {
+            item.erase(0, item.find_first_not_of(" \t"));
+            item.erase(item.find_last_not_of(" \t") + 1);
+            if (item.empty()) continue;
+            if (item.size() == 10 && item.rfind("SV-STY-1", 0) == 0) fixNamedRules.emplace_back("SV-STY-100");
+            if (item.size() == 10 && item.rfind("SV-NAM-1", 0) == 0) fixNamedRules.emplace_back("SV-NAM-100");
+            fixNamedRules.push_back(std::move(item));
         }
     }
 
@@ -680,6 +707,14 @@ int LinterDriver::run() {
             }
         } else if (!selected) {
             selected = (rule->getProfiles() & activeProfileMask) != 0;
+        }
+        // Rules the project config configures run too, unless the command
+        // line narrows the run (--rule, --preset, --guideline).
+        if (!selected && !ruleFilter.has_value() && !presetOnCommandLine && !guidelineSelector.has_value()) {
+            selected = projectConfig.selectsRule(rule->getId(), rule->getName());
+        }
+        if (!selected && !ruleFilter.has_value()) {
+            for (const auto& named : fixNamedRules) selected |= named == rule->getId() || named == rule->getName();
         }
         if (selected) activeRules.push_back(rule.get());
     }

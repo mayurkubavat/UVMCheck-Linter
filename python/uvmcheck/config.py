@@ -258,6 +258,10 @@ class ProjectConfig:
     report_library_macro_expansions
                    False (default): code expanded from a library macro, such as
                    `uvm_object_utils in your class, counts as library code.
+    preset         The rule set when --preset is not given: "default"
+                   (soundness, methodology, performance, security), "all",
+                   "style", ... A rule you configure below runs whatever
+                   the preset.
     waivers        List of Waiver objects or Waiver subclasses.
     style, naming  Optional dicts with the same keys as the JSON config.
     compat         Opt-in slang overlay (docs/reference/compat.md), e.g.
@@ -277,6 +281,7 @@ class ProjectConfig:
     library_paths: List[str] = []
     exclude_paths: List[str] = []
     report_library_macro_expansions: bool = False
+    preset: str = ""
     waivers: List[Waiver] = []
     style: Dict[str, Any] = {}
     naming: Dict[str, Any] = {}
@@ -303,6 +308,10 @@ class ProjectConfig:
             values = _path_list(name, key, getattr(self, key))
             if values:
                 out[key] = values
+        if self.preset:
+            if not isinstance(self.preset, str):
+                raise ConfigError(f"{name}.preset must be a preset name, got {self.preset!r}")
+            out["preset"] = self.preset
         out["waivers"] = []
         warnings: List[str] = []
         for w in self.waivers:

@@ -309,6 +309,8 @@ pub struct Config {
     pub unapplied: Vec<String>,
     /// Integer rule options: (rule ID or name, key, value).
     pub options: Vec<(String, String, i64)>,
+    /// `preset`: the project's rule set, used when `--preset` is not given.
+    pub preset: Option<String>,
     /// The `style` block.
     pub style: Vec<(String, crate::options::StyleValue)>,
     /// The `naming` block.
@@ -440,6 +442,16 @@ impl Config {
         c.library = pats(&mut c, root.get("library_paths"), "library_paths");
         c.exclude = pats(&mut c, root.get("exclude_paths"), "exclude_paths");
         c.report_library_macros = root.get("report_library_macro_expansions").as_bool().unwrap_or(false);
+        match root.get("preset") {
+            Json::Null => {}
+            Json::Str(p) if p.is_empty() => {}
+            Json::Str(p) => {
+                // Checked here so the error names the config, not --preset.
+                crate::rule_selection(Some(p), false).map(|_| ()).map_err(|e| format!("preset: {e}"))?;
+                c.preset = Some(p.clone());
+            }
+            _ => return Err("preset: expected a preset name".into()),
+        }
         if let Json::Obj(rules) = root.get("rules") {
             for (key, entry) in rules {
                 let mut rs = RuleSettings::default();
@@ -619,6 +631,20 @@ impl Config {
 
     fn rule(&self, id: &str, name: &str) -> Option<&RuleSettings> {
         self.rules.iter().find(|(k, _)| k == id || (!name.is_empty() && k == name)).map(|(_, r)| r)
+    }
+
+    /// The config asks for this rule: it gives it settings without turning
+    /// it off, or has the block its engine reads (`style` for SV-STY-100,
+    /// `naming` for SV-NAM-100). Such a rule runs even when the default
+    /// preset leaves its profile out; nobody configures a rule they do not
+    /// want.
+    pub fn selects(&self, id: &str, name: &str) -> bool {
+        let on = |key: &str| self.rules.iter().any(|(k, r)| k == key && r.enabled != Some(false));
+        on(id)
+            || (!name.is_empty() && on(name))
+            || crate::sub_rules(id).iter().any(|(sub, sub_name)| on(sub) || on(sub_name))
+            || (id == "SV-STY-100" && !self.style.is_empty())
+            || (id == "SV-NAM-100" && !self.naming.is_empty())
     }
 
     /// The rule runs under this config (`enabled` not false).

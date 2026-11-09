@@ -47,9 +47,11 @@ Compile options (as a simulator takes them):
   --in-context             Lint a header inside the file that includes it
 
 Rules:
-  --preset NAME            soundness, methodology, performance, style,
-                           security, smells, advisory, reuse, guide,
-                           uvm-1800.2 or all (default: all but advisory)
+  --preset NAME            default, soundness, methodology, performance,
+                           security, style, smells, advisory, reuse, guide,
+                           uvm-1800.2 or all. The default is soundness,
+                           methodology, performance and security, plus any
+                           rule the project config configures
   --rule ID                Run only this rule (repeatable)
   --experimental           Also run experimental rules
   --python-rules PATH      Also run rules written with the Python SDK

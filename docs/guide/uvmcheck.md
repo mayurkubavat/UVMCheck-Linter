@@ -85,6 +85,16 @@ The compiled binary will be located at `build/uvmcheck`.
 
 ### Rule Profiles & Presets
 Filter rule execution using curated verification profiles:
+With no preset, the rules that find bugs and methodology problems run:
+the `soundness`, `methodology`, `performance` and `security` profiles
+(`--preset default` says the same). Style, naming and layout rules
+(`style`), maintainability metrics (`smells`) and the opinionated
+`advisory` rules are opt-in: name the preset, use `--preset all`, set
+`preset` in the project config, or configure the rules you want there (a
+configured rule runs whatever the preset). On Accellera's uvm-core the
+default reports about 1,900 findings; `--preset all` reports about 15,900,
+of which 13,900 are style.
+
 ```bash
 # Run only soundness checks (concurrency, SVA, correctness, types)
 ./build/uvmcheck tb/top.sv --preset soundness
@@ -107,7 +117,7 @@ Filter rule execution using curated verification profiles:
 # Moving to IEEE 1800.2 UVM: deprecated and banned API checks only
 ./build/uvmcheck tb/top.sv --preset uvm-1800.2
 
-# Run everything, advisory rules included
+# Run everything: style, smells and advisory rules included
 ./build/uvmcheck tb/top.sv --preset all
 ```
 
