@@ -98,6 +98,7 @@ Cache:
   --clear-cache            Delete the cache, then run
 
   -h, --help               Print this help and exit
+  --lsp                    Serve an editor: run the language server (dv-lsp)
   --version                Print the version and exit
 
 Exit status: 0 no ERROR finding remains, 1 an ERROR finding remains,

@@ -104,6 +104,16 @@ impl Client {
         }
     }
 
+    /// The next `publishDiagnostics` for `file`.
+    fn diagnostics(&mut self, file: &Path) -> String {
+        loop {
+            let m = self.read();
+            if m.contains("textDocument/publishDiagnostics") && m.contains(&format!("file://{}", file.display())) {
+                return m;
+            }
+        }
+    }
+
     fn at(&mut self, method: &str, file: &Path, line: u32, col: u32) -> String {
         self.request(
             method,
@@ -240,6 +250,89 @@ fn navigation_and_completion() {
     c.notify("exit", "null");
     let status = c.child.wait().unwrap();
     assert!(status.success());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+const DRIVE: &str = "interface bus_if;
+  logic clk;
+  logic [7:0] data;
+  clocking cb @(posedge clk);
+    output data;
+  endclocking
+endinterface
+class drv;
+  virtual bus_if vif;
+  task drive();
+    vif.cb.data = 8'hFF;
+  endtask
+endclass
+";
+
+#[test]
+fn diagnostics_and_quick_fixes() {
+    let dir = std::env::temp_dir().join(format!("dv-lsp-lint-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let dir = dir.canonicalize().unwrap();
+    let file = dir.join("drv.sv");
+    // The file on disk is clean: what is reported is the editor's text.
+    std::fs::write(&file, DRIVE.replace("data = 8", "data <= 8")).unwrap();
+    let mut c = Client::start(&dir);
+    let open = |text: &str| {
+        format!(
+            r#"{{"textDocument":{{"uri":"file://{}","languageId":"systemverilog","version":1,"text":{}}}}}"#,
+            file.display(),
+            json_str(text)
+        )
+    };
+    c.notify("textDocument/didOpen", &open(DRIVE));
+    let d = c.diagnostics(&file);
+    // The blocking drive of a clocking block signal, on the `=` of line 11.
+    assert!(d.contains(r#""code":"SV-INT-001""#), "{d}");
+    assert!(d.contains(r#""source":"uvmcheck""#) && d.contains(r#""severity":1"#), "{d}");
+    let (line, col) = pos(DRIVE, "= 8'hFF", 0, 0);
+    assert!(d.contains(&format!(r#""start":{{"line":{line},"character":{col}}}"#)), "{d}");
+
+    // Its quick fix rewrites the operator.
+    let r = c.request(
+        "textDocument/codeAction",
+        &format!(
+            r#"{{"textDocument":{{"uri":"file://{}"}},"range":{{"start":{{"line":{line},"character":0}},"end":{{"line":{line},"character":40}}}},"context":{{"diagnostics":[]}}}}"#,
+            file.display()
+        ),
+    );
+    assert!(r.contains(r#""kind":"quickfix""#) && r.contains(r#""newText":"<=""#), "{r}");
+    assert!(r.contains(&format!(r#""end":{{"line":{line},"character":{}}}"#, col + 1)), "{r}");
+    // And the finding can be waived with a comment on the line above.
+    assert!(r.contains(r#""title":"Waive SV-INT-001 on this line""#), "{r}");
+    assert!(r.contains(r#""newText":"    // uvmcheck-disable-next-line SV-INT-001\n""#), "{r}");
+
+    // Typing the fix clears it, without a save.
+    let change = format!(
+        r#"{{"textDocument":{{"uri":"file://{}","version":2}},"contentChanges":[{{"text":{}}}]}}"#,
+        file.display(),
+        json_str(&DRIVE.replace("data = 8", "data <= 8"))
+    );
+    c.notify("textDocument/didChange", &change);
+    let d = c.diagnostics(&file);
+    assert!(!d.contains(r#""code":"SV-INT-001""#), "{d}");
+
+    // So does the waiver comment.
+    let waived = DRIVE.replace("    vif.cb", "    // uvmcheck-disable-next-line SV-INT-001\n    vif.cb");
+    let change = format!(
+        r#"{{"textDocument":{{"uri":"file://{}","version":3}},"contentChanges":[{{"text":{}}}]}}"#,
+        file.display(),
+        json_str(&waived)
+    );
+    c.notify("textDocument/didChange", &change);
+    let d = c.diagnostics(&file);
+    assert!(!d.contains(r#""code":"SV-INT-001""#), "{d}");
+
+    // Closing the file takes its diagnostics away.
+    c.notify("textDocument/didClose", &format!(r#"{{"textDocument":{{"uri":"file://{}"}}}}"#, file.display()));
+    let d = c.diagnostics(&file);
+    assert!(d.contains(r#""diagnostics":[]"#), "{d}");
+    let r = c.request("shutdown", "null");
+    assert!(r.contains(r#""result":null"#));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

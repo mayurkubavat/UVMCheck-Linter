@@ -328,7 +328,8 @@ fn every_option_in_help_is_accepted() {
             let Some(flag) = words.next() else { continue };
             let takes_value = words.next().is_some();
             // Options that end the run on their own, or change files.
-            if ["-h", "--help", "--version", "--list", "--init", "--explain", "--fix", "--clear-cache"].contains(&flag)
+            if ["-h", "--help", "--version", "--lsp", "--list", "--init", "--explain", "--fix", "--clear-cache"]
+                .contains(&flag)
             {
                 continue;
             }
@@ -386,4 +387,31 @@ fn a_report_to_standard_output_replaces_the_text() {
     let out = String::from_utf8_lossy(&o.stdout).into_owned();
     assert!(out.trim_start().starts_with('{') && out.contains("\"version\": \"2.1.0\""), "{out}");
     assert!(!out.contains("[ERROR]"), "{out}");
+}
+
+/// `uvmcheck --lsp` hands the editor to the language server next to it.
+#[test]
+fn lsp_starts_the_language_server() {
+    use std::io::{Read, Write};
+    let exe = std::path::Path::new(env!("CARGO_BIN_EXE_uvmcheck"));
+    // Built with the workspace; a run of this package alone may not have it.
+    if !exe.with_file_name("dv-lsp").is_file() {
+        return;
+    }
+    let mut child = std::process::Command::new(exe)
+        .arg("--lsp")
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null())
+        .spawn()
+        .unwrap();
+    let body = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"capabilities":{}}}"#;
+    let exit = r#"{"jsonrpc":"2.0","method":"exit"}"#;
+    let mut stdin = child.stdin.take().unwrap();
+    write!(stdin, "Content-Length: {}\r\n\r\n{body}Content-Length: {}\r\n\r\n{exit}", body.len(), exit.len()).unwrap();
+    drop(stdin);
+    let mut out = String::new();
+    child.stdout.take().unwrap().read_to_string(&mut out).unwrap();
+    let _ = child.wait();
+    assert!(out.contains(r#""name":"dv-lsp""#) && out.contains("codeActionProvider"), "{out}");
 }

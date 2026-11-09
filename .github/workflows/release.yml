@@ -3,9 +3,9 @@ name: Release
 # On a version tag: build the native tools (uvmcheck, dv-lsp, dv-build,
 # dv-map, dv-filelist) for Linux x64/arm64 and macOS arm64/x64 and attach
 # them to the GitHub release as uvmcheck-<target>.tar.gz. The C++ engine on
-# Slang is built too, as uvmcheck-slang-<target>.tar.gz: the VS Code
-# extension still gets its lint diagnostics from `uvmcheck-slang --lsp`, and
-# is packaged once per platform with both engines and dv-lsp inside.
+# Slang is built too, as uvmcheck-slang-<target>.tar.gz. The VS Code
+# extension is packaged once per platform with dv-lsp inside: one native
+# server for lint diagnostics, quick fixes and code browsing.
 on:
   push:
     tags: ["v*"]
@@ -141,12 +141,9 @@ jobs:
           for target in linux-x64 darwin-arm64; do
             rm -rf bin stage && mkdir -p "bin/$target" stage
             tar -C stage -xzf "../../artifacts/uvmcheck-$target.tar.gz"
-            tar -C stage -xzf "../../artifacts/uvmcheck-slang-$target.tar.gz"
-            # Lint diagnostics: the Slang engine's --lsp, under the name
-            # the extension starts. Navigation: dv-lsp.
-            cp "stage/uvmcheck-slang-$target/bin/uvmcheck-slang" "bin/$target/uvmcheck"
+            # The one server the extension starts.
             cp "stage/uvmcheck-$target/bin/dv-lsp" "bin/$target/dv-lsp"
-            chmod +x "bin/$target/uvmcheck" "bin/$target/dv-lsp"
+            chmod +x "bin/$target/dv-lsp"
             npx vsce package --target "$target" -o "../../artifacts/uvmcheck-vscode-$target.vsix"
           done
           rm -rf stage

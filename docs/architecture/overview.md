@@ -24,7 +24,7 @@ workspace.
 
 - **uvmcheck** (`cpp/`) is the Slang-based CLI. It owns reporting (text, JSON,
   SARIF, HTML), fixes, baselines, waivers, project config and the Python rule
-  SDK, and serves lint diagnostics over LSP (`uvmcheck --lsp`).
+  SDK. Its own `--lsp` server remains for linting an editor with Slang.
 - **dv-lint** (`crates/dv-lint`) runs every uvmcheck rule on the native Rust
   front end, in parallel. Built with the `slang` Cargo feature (off by
   default), `--slang` builds the design through Slang instead, so the two
@@ -32,8 +32,8 @@ workspace.
 - **libuvmcheck_model** (built by the `model` CMake preset) puts Slang's view
   of a design behind a C ABI. `sv-slang` binds it, `dv-model` wraps it in safe
   Rust, and `python/uvmcheck/model.py` reads the same ABI from Python.
-- The other Rust tools: `dv-lsp` (code browsing and completion for the
-  editor), `dv-build` (the native builder: parses, elaborates and reports errors as a
+- The other Rust tools: `dv-lsp` (the editor's language server: lint
+  diagnostics and quick fixes from dv-lint, code browsing and completion), `dv-build` (the native builder: parses, elaborates and reports errors as a
   compiler would), `dv-map`
   (the component tree of a UVM testbench) and `dv-filelist` (checks and
   normalizes VCS/Xcelium file lists).

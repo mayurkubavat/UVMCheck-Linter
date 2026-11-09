@@ -33,36 +33,22 @@
         "uvmcheck.enable": {
           "type": "boolean",
           "default": true,
-          "description": "Run the UVMCheck linter (`uvmcheck --lsp`): live diagnostics and quick fixes."
+          "description": "Lint as you type: diagnostics and quick fixes from the UVMCheck language server (`dv-lsp`), under the project's `.uvmcheck` config, waivers and baseline."
         },
         "uvmcheck.executablePath": {
           "type": "string",
-          "default": "uvmcheck",
-          "description": "Path to the `uvmcheck` executable. Left as `uvmcheck`, the binary bundled with the extension is used, else the one on PATH."
-        },
-        "uvmcheck.preset": {
-          "type": "string",
-          "default": "all",
-          "enum": [
-            "all",
-            "soundness",
-            "methodology",
-            "performance",
-            "style",
-            "security",
-            "smells"
-          ],
-          "description": "Active rule profile preset."
+          "default": "",
+          "description": "Only to lint with the Slang reference engine instead: the path of a `uvmcheck-slang` binary, run with `--lsp` next to `dv-lsp`. Leave empty for the native engine."
         },
         "uvmcheck.navigation.enable": {
           "type": "boolean",
           "default": true,
-          "description": "Run the UVMCheck navigation server (`dv-lsp`): outline, go to definition, references, hover and completion."
+          "description": "Code browsing from the language server: outline, go to definition, references, hover and completion."
         },
         "uvmcheck.navigation.serverPath": {
           "type": "string",
           "default": "dv-lsp",
-          "description": "Path to the `dv-lsp` executable. Left as `dv-lsp`, the binary bundled with the extension is used, else the one on PATH."
+          "description": "Path to the `dv-lsp` executable (lint and code browsing). Left as `dv-lsp`, the binary bundled with the extension is used, else the one on PATH."
         },
         "uvmcheck.navigation.libraryPaths": {
           "type": "array",

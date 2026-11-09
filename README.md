@@ -38,7 +38,7 @@ cargo build --release            # -> target/release/uvmcheck (also as dv-lint),
 
 The C++ reference engine on Slang is optional: the parity gates compare
 against it, and it still serves the options the native engine does not take
-yet (`--lsp` for the editor's diagnostics among them). It needs a C++20
+yet. It needs a C++20
 compiler (clang 15+, AppleClang 15+ or gcc 12+), CMake 3.28+, Ninja and
 Python 3.9+, and fetches Slang at configure time; `ccache` is recommended.
 

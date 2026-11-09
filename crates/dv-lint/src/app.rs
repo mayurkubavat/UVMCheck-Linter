@@ -122,6 +122,7 @@ pub fn run() {
                 println!("{}", dv_lint::help::version());
                 return;
             }
+            "--lsp" => serve_editor(),
             "--slang" => slang = true,
             "--time" => time = true,
             // Under each finding and note, its source line with a caret.
@@ -398,6 +399,21 @@ pub fn run() {
     let (files, found) = dv_lint::lint_all(&design, &trees, keep);
     let _ = USER_FILES.set(user_files(&files));
     report(Some(&design), time, frames, t, &files, only_in(&headers, &files, &found));
+}
+
+/// `--lsp`: the language server is `dv-lsp`, installed next to this binary
+/// (else on PATH). It takes over standard input and output.
+fn serve_editor() -> ! {
+    let name = if cfg!(windows) { "dv-lsp.exe" } else { "dv-lsp" };
+    let beside = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).map(|e| e.with_file_name(name));
+    let server = beside.filter(|p| p.is_file()).unwrap_or_else(|| name.into());
+    match std::process::Command::new(&server).status() {
+        Ok(s) => std::process::exit(s.code().unwrap_or(1)),
+        Err(e) => {
+            eprintln!("error: cannot start the language server {}: {e}", server.display());
+            std::process::exit(2);
+        }
+    }
 }
 
 /// `--in-context`: each header source (`.svh`, `.vh`, ...) is replaced by

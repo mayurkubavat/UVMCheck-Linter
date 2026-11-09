@@ -18,7 +18,9 @@ pub struct Server {
     exclude: Vec<String>,
     open: HashSet<PathBuf>,
     shutdown: bool,
-    out: Box<dyn Write>,
+    out: crate::lint::Out,
+    /// Diagnostics and quick fixes; None when the editor turned them off.
+    linter: Option<crate::lint::Linter>,
 }
 
 /// Reads one `Content-Length` framed message; None at end of input.
@@ -46,7 +48,7 @@ pub fn read_message(r: &mut impl BufRead) -> Option<String> {
 }
 
 impl Server {
-    pub fn new(out: Box<dyn Write>) -> Self {
+    pub fn new(out: Box<dyn Write + Send>) -> Self {
         Server {
             ws: Workspace::default(),
             roots: Vec::new(),
@@ -54,14 +56,13 @@ impl Server {
             exclude: Vec::new(),
             open: HashSet::new(),
             shutdown: false,
-            out,
+            out: std::sync::Arc::new(std::sync::Mutex::new(out)),
+            linter: None,
         }
     }
 
     fn send(&mut self, msg: Json) {
-        let body = msg.to_string();
-        let _ = write!(self.out, "Content-Length: {}\r\n\r\n{}", body.len(), body);
-        let _ = self.out.flush();
+        crate::lint::send(&self.out, &msg);
     }
 
     fn reply(&mut self, id: &Json, result: Json) {
@@ -133,22 +134,34 @@ impl Server {
                 Some(Json::Null)
             }
             "textDocument/didOpen" => {
-                let path = uri_to_path(p.at(&["textDocument", "uri"]).as_str()?);
+                let uri = p.at(&["textDocument", "uri"]).as_str()?;
+                let path = uri_to_path(uri);
                 let text = p.at(&["textDocument", "text"]).as_str()?.to_string();
                 self.open.insert(path.clone());
+                if let Some(l) = &self.linter {
+                    l.changed(&path, uri, &text);
+                }
                 self.ws.update(&path, text);
                 None
             }
             "textDocument/didChange" => {
-                let path = uri_to_path(p.at(&["textDocument", "uri"]).as_str()?);
+                let uri = p.at(&["textDocument", "uri"]).as_str()?;
+                let path = uri_to_path(uri);
                 // Full sync: the last change holds the whole text.
                 let text = p.get("contentChanges").as_arr().last()?.get("text").as_str()?.to_string();
+                if let Some(l) = &self.linter {
+                    l.changed(&path, uri, &text);
+                }
                 self.ws.update(&path, text);
                 None
             }
             "textDocument/didClose" => {
-                let path = uri_to_path(p.at(&["textDocument", "uri"]).as_str()?);
+                let uri = p.at(&["textDocument", "uri"]).as_str()?;
+                let path = uri_to_path(uri);
                 self.open.remove(&path);
+                if let Some(l) = &self.linter {
+                    l.closed(&path, uri);
+                }
                 match std::fs::read_to_string(&path) {
                     Ok(t) if self.in_scope(&path) => {
                         self.ws.update(&path, t);
@@ -157,7 +170,27 @@ impl Server {
                 }
                 None
             }
+            "textDocument/didSave" => {
+                // A saved file may be one other open files include.
+                if let Some(l) = &self.linter {
+                    l.request();
+                }
+                None
+            }
+            "textDocument/codeAction" => {
+                let uri = p.at(&["textDocument", "uri"]).as_str()?;
+                let first = p.at(&["range", "start", "line"]).as_u32()?;
+                let last = p.at(&["range", "end", "line"]).as_u32().unwrap_or(first);
+                Some(match &self.linter {
+                    Some(l) => l.code_actions(&uri_to_path(uri), uri, first, last),
+                    None => Json::Arr(Vec::new()),
+                })
+            }
             "workspace/didChangeWatchedFiles" => {
+                // A source, a config or a waiver file changed on disk.
+                if let Some(l) = &self.linter {
+                    l.request();
+                }
                 for ch in p.get("changes").as_arr() {
                     let Some(uri) = ch.get("uri").as_str() else {
                         continue;
@@ -226,29 +259,42 @@ impl Server {
                 self.exclude.push(s.trim_matches('/').trim_start_matches("**/").trim_end_matches("/**").to_string());
             }
         }
-        let sync = obj(vec![("openClose", true.into()), ("change", 1u32.into())]);
+        // Diagnostics and quick fixes, unless the editor asks for navigation
+        // only (`"lint": false`).
+        let lint = opts.get("lint").as_bool() != Some(false);
+        if lint {
+            let root = self.roots.first().cloned().or_else(|| std::env::current_dir().ok()).unwrap_or_default();
+            self.linter = Some(crate::lint::Linter::start(root, self.out.clone()));
+        }
+        let sync = obj(vec![("openClose", true.into()), ("change", 1u32.into()), ("save", true.into())]);
+        // Code browsing, unless the editor asks for lint only
+        // (`"navigation": false`).
+        let nav = opts.get("navigation").as_bool() != Some(false);
+        let completion = obj(vec![
+            ("triggerCharacters", Json::Arr(vec![".".into(), ":".into(), "`".into(), "$".into()])),
+            ("resolveProvider", false.into()),
+        ]);
+        let mut caps = vec![("textDocumentSync", sync)];
+        if nav {
+            for c in [
+                "documentSymbolProvider",
+                "workspaceSymbolProvider",
+                "definitionProvider",
+                "declarationProvider",
+                "typeDefinitionProvider",
+                "referencesProvider",
+                "documentHighlightProvider",
+                "hoverProvider",
+            ] {
+                caps.push((c, true.into()));
+            }
+            caps.push(("completionProvider", completion));
+        }
+        if lint {
+            caps.push(("codeActionProvider", obj(vec![("codeActionKinds", Json::Arr(vec!["quickfix".into()]))])));
+        }
         obj(vec![
-            (
-                "capabilities",
-                obj(vec![
-                    ("textDocumentSync", sync),
-                    ("documentSymbolProvider", true.into()),
-                    ("workspaceSymbolProvider", true.into()),
-                    ("definitionProvider", true.into()),
-                    ("declarationProvider", true.into()),
-                    ("typeDefinitionProvider", true.into()),
-                    ("referencesProvider", true.into()),
-                    ("documentHighlightProvider", true.into()),
-                    ("hoverProvider", true.into()),
-                    (
-                        "completionProvider",
-                        obj(vec![
-                            ("triggerCharacters", Json::Arr(vec![".".into(), ":".into(), "`".into(), "$".into()])),
-                            ("resolveProvider", false.into()),
-                        ]),
-                    ),
-                ]),
-            ),
+            ("capabilities", obj(caps)),
             ("serverInfo", obj(vec![("name", "dv-lsp".into()), ("version", env!("CARGO_PKG_VERSION").into())])),
         ])
     }

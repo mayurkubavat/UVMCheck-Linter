@@ -242,11 +242,16 @@ set and sets nobody reads marked. Findings are attached to the component class t
 in. Use a `.json` path for the same data in machine-readable form.
 
 ### Language Server Protocol (LSP) & IDE Integration
-Run UVMCheck as an in-editor daemon for live, incremental linting in VS Code and Cursor:
+Run UVMCheck as an in-editor daemon for live linting and code browsing in VS Code, Cursor or any LSP client:
 ```bash
-# Launch LSP JSON-RPC daemon over stdin/stdout
-./build/uvmcheck --lsp
+# The language server, over stdin/stdout (uvmcheck --lsp starts the same one)
+dv-lsp
 ```
+One server gives lint diagnostics and quick fixes (a rule's fix, or a waiver
+comment on the line above), outline, go to definition, references, hover and
+completion. It lints on a thread of its own once typing pauses, so browsing
+answers while a check runs. Initialization options: `lint` and `navigation`
+(both `true` by default), `libraryPaths`, `exclude`, `useUvmHome`.
 The server finds the project config from the workspace root and compiles the
 project the way the CLI does, with your unsaved buffers in place of the files on
 disk. Give the config `sources` (or `filelists`), `include_dirs` and `defines`

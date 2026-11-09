@@ -56,13 +56,13 @@ with `--features slang`; see `third_party/slang/README.md`.
 | `sv-slang` | lib | Raw FFI to `libuvmcheck_model` (`cpp/include/uvmcheck/model/CApi.h`). Only `dv-model` uses it, and only with the `slang` feature. |
 | `dv-lint` | lib + bins | The linter: every uvmcheck rule ported to Rust, run in parallel over the model and the syntax trees. Its command line (`dv_lint::app`) is built under two names: `uvmcheck`, the product's command, and `dv-lint`, the name the gates call. |
 | `dv-build` | bin | The native builder: reports file list, preprocessor, syntax and semantic errors like a compiler; dumps symbols, types, values and hierarchy for the gates. |
-| `dv-lsp` | bin | Language server for code browsing (symbols, definition, references, hover, completion) on `sv-syntax`. Lint diagnostics come from `uvmcheck --lsp`. |
+| `dv-lsp` | bin | The language server: code browsing (symbols, definition, references, hover, completion) on `sv-syntax`, and lint diagnostics with quick fixes from `dv-lint`. |
 | `dv-map` | bin | Prints the static UVM component tree of a testbench (text or JSON). |
 | `dv-filelist` | bin | Checks a file list, prints it normalized or as JSON. |
 
 Dependencies point one way: `sv-lexer` ← `sv-preproc` ← `sv-syntax` ←
 `sv-sema` ← tools. `dv-model` sits beside them; `sv-sema` depends on it to
-fill a `Design`, and `dv-lsp` needs only `sv-syntax`.
+fill a `Design`; `dv-lsp` browses on `sv-syntax` alone and links `dv-lint` for diagnostics.
 
 ## The front end in more detail
 
@@ -156,6 +156,16 @@ answers requests over stdio (`server`). Includes are not followed, so
 positions always stay in the file that wrote them. `json` and `text` are
 its small JSON and position/URI helpers; it needs no crates outside the
 workspace.
+
+Diagnostics come from `dv-lint` (`lint`). The editor's text of each open
+file is set as an overlay (`sv_preproc::overlay`), which the preprocessor
+and the waiver code read in place of the file. Every edit asks for a check;
+a thread of its own waits for typing to pause, checks the project through
+`dv_lint::Workspace` (the project's config, waivers and baseline, the rule
+selection of the command line) and publishes each open file's diagnostics.
+What it published is kept, and code actions (a rule's fix, a waiver comment)
+are answered from it. The project is reloaded when its config or waiver
+files change.
 
 ## How correctness is checked
 

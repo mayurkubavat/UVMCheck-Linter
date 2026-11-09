@@ -1,14 +1,15 @@
 //! dv-lsp: a SystemVerilog/UVM language server for code browsing on the
 //! native front end (sv-syntax). It answers document and workspace symbols,
 //! go to definition/declaration/type definition, references, highlights,
-//! hover and completion. Lint diagnostics and quick fixes stay with
-//! `uvmcheck --lsp`; editors run both side by side.
+//! hover and completion, and publishes the linter's diagnostics and quick
+//! fixes (dv-lint) for the open files: one server for an editor.
 //!
 //!     dv-lsp            # LSP over stdio
 //!     dv-lsp --index DIR...   # index and print a summary (for testing)
 
 mod index;
 mod json;
+mod lint;
 mod server;
 mod text;
 mod workspace;
