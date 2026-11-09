@@ -11,8 +11,7 @@ endclass
 // Two equal literals are a constant test, not a variable compared to itself.
 // A macro argument's default expands to one (UVM's own compare macros).
 `define cmp_named(VALUE, NAME="") \
-  if (NAME == "") $display("%s", `"VALUE`"); \
-  else $display("%s", NAME);
+  if (NAME == "") $display("%s", `"VALUE`");
 
 module self_cmp_literals;
   int v;
