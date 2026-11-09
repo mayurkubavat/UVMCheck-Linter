@@ -4,8 +4,9 @@
 //! `soft_constraint_never_holds`, `dead_dist_item`), covergroup bins are
 //! never counted (`cross_bin_count`), processes are never scheduled
 //! (`clocked_blocking_race`), the C side of DPI is never seen
-//! (`conflicting_dpi_prototypes`), and where transactions go for coverage is
-//! a testbench-wide question (`uncovered_analysis_port`). None has a uvmcheck twin: each is in
+//! (`conflicting_dpi_prototypes`), and whether coverage is ever collected
+//! is a testbench-wide question (`uncovered_analysis_port`,
+//! `covergroup_never_sampled`). None has a uvmcheck twin: each is in
 //! [`crate::NATIVE_ONLY`].
 
 use crate::{Check, Rule};
@@ -14,6 +15,7 @@ mod clocked_blocking_race;
 mod conflicting_dpi_prototypes;
 mod constraint_sets;
 mod contradictory_constraints;
+mod covergroup_never_sampled;
 mod cross_bin_count;
 mod dead_dist_item;
 mod soft_constraint_never_holds;
@@ -42,6 +44,11 @@ pub(crate) fn rules() -> Vec<Rule> {
             id: "SV-RCE-002",
             name: "ClockedBlockingRace",
             check: Check::Syntax(clocked_blocking_race::clocked_blocking_race),
+        },
+        Rule {
+            id: "SV-COV-019",
+            name: "CovergroupNeverSampled",
+            check: Check::Mixed(covergroup_never_sampled::covergroup_never_sampled),
         },
         Rule {
             id: "UVM-TLM-007",

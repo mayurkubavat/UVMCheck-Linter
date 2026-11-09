@@ -2,7 +2,7 @@
 //! races, DPI prototypes and analysis ports without coverage.
 
 const IDS: &[&str] =
-    &["SV-RND-030", "SV-RND-031", "SV-RND-032", "SV-COV-018", "SV-RCE-002", "DPI-PRT-001", "UVM-TLM-007"];
+    &["SV-RND-030", "SV-RND-031", "SV-RND-032", "SV-COV-018", "SV-RCE-002", "DPI-PRT-001", "UVM-TLM-007", "SV-COV-019"];
 
 fn run(src: &str) -> Vec<(u32, &'static str, String)> {
     run_with(src, &[])
@@ -110,4 +110,32 @@ fn analysis_port_without_coverage() {
     let none =
         tb.replace("covergroup cg; coverpoint a; endgroup", "").replace("cg = new;", "").replace("cg.sample();", "");
     assert!(lines(&run_uvm(&none), "UVM-TLM-007").is_empty());
+}
+
+#[test]
+fn covergroup_never_sampled() {
+    let src = "interface bus_if(input logic clk);\n\
+               logic [3:0] v;\n\
+               covergroup ev_cg @(posedge clk); coverpoint v; endgroup\n\
+               covergroup man_cg; coverpoint v; endgroup\n\
+               covergroup lost_cg; coverpoint v; endgroup\n\
+               covergroup orphan_cg; coverpoint v; endgroup\n\
+               covergroup arg_cg with function sample(logic [3:0] x); coverpoint x; endgroup\n\
+               ev_cg e = new;\n\
+               man_cg mc = new;\n\
+               lost_cg lc = new;\n\
+               arg_cg ac[2];\n\
+               initial begin ac[0] = new; ac[1] = new; end\n\
+               endinterface\n\
+               module tb;\n\
+               logic clk;\n\
+               bus_if bus(clk);\n\
+               always @(posedge clk) begin bus.mc.sample(); bus.ac[0].sample(bus.v); end\n\
+               endmodule\n";
+    let got = run(src);
+    // lost_cg: instantiated, never sampled; orphan_cg: never instantiated. The
+    // others have an event or are sampled from the module.
+    assert_eq!(lines(&got, "SV-COV-019"), [5, 6], "{got:?}");
+    let msgs: Vec<_> = got.iter().filter(|g| g.1 == "SV-COV-019").map(|g| g.2.as_str()).collect();
+    assert!(msgs[0].contains("instance(s) lc are never sampled") && msgs[1].contains("never instantiated"), "{msgs:?}");
 }
