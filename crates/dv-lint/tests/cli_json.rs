@@ -401,6 +401,71 @@ fn inputs_that_cannot_be_read_exit_2() {
 }
 
 #[test]
+fn redundant_boolean_fix_keeps_x_and_z_behaviour() {
+    // SV-RDB-005: `b == 1'b0` -> `!b` everywhere (both X for X and Z);
+    // `b == 1'b1` -> `b` only in a condition or on a 2-state `b`.
+    let dir = std::env::temp_dir().join(format!("dv-lint-fix-rdb-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    let src = "module m(input logic a, input bit b, output logic y, output logic z, output bit q);\n\
+               always_comb begin\n\
+               if (a == 1'b1) y = 1'b0;\n\
+               z = (a == 1'b0);\n\
+               z = (a == 1'b1);\n\
+               q = (b == 1'b1);\n\
+               end\n\
+               endmodule\n";
+    let run = |extra: &[&str]| {
+        std::fs::write(dir.join("a.sv"), src).unwrap();
+        std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+            .current_dir(&dir)
+            .args([
+                "--no-config",
+                "--no-cache",
+                "--preset",
+                "all",
+                "--experimental",
+                "--fix",
+                "--fix-rule",
+                "SV-RDB-005",
+            ])
+            .args(extra)
+            .arg("a.sv")
+            .output()
+            .unwrap();
+        std::fs::read_to_string(dir.join("a.sv")).unwrap()
+    };
+    let safe = run(&[]);
+    assert!(safe.contains("if (a) y = 1'b0;"), "{safe}");
+    assert!(safe.contains("z = (!a);"), "{safe}");
+    assert!(safe.contains("z = (a == 1'b1);"), "a 4-state value outside a condition is left: {safe}");
+    assert!(safe.contains("q = (b);"), "{safe}");
+    let all = run(&["--unsafe-fixes"]);
+    assert!(all.contains("z = (a);"), "{all}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn banner_fix_makes_78_columns() {
+    // SV-STY-007 / SV-STY-008: a ragged separator comment becomes 78 characters.
+    let dir = std::env::temp_dir().join(format!("dv-lint-fix-banner-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("a.sv"),
+        "class c;\n  //----------\n  function void f(); endfunction\n  //======\nendclass\n",
+    )
+    .unwrap();
+    std::process::Command::new(env!("CARGO_BIN_EXE_dv-lint"))
+        .current_dir(&dir)
+        .args(["--no-config", "--no-cache", "--fix", "--fix-rule", "SV-STY-007,SV-STY-008", "a.sv"])
+        .output()
+        .unwrap();
+    let text = std::fs::read_to_string(dir.join("a.sv")).unwrap();
+    assert!(text.contains(&format!("  //{}\n", "-".repeat(76))), "{text}");
+    assert!(text.contains(&format!("  //{}\n", "=".repeat(76))), "{text}");
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn exit_status_follows_errors_only() {
     let dir = std::env::temp_dir().join(format!("dv-lint-exit-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();

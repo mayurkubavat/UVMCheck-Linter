@@ -40,7 +40,7 @@ pub(crate) fn redundant_boolean(c: &Cst, out: &mut Sink) {
     let types = expr_types(c);
     let ix = c.index();
     let text = crate::support::type_text::expr_text;
-    let mut found: Vec<(NodeId, String)> = Vec::new();
+    let mut found: Vec<(NodeId, String, Option<crate::fix::Fix>)> = Vec::new();
     for e in c.nodes(BinaryExpr) {
         let op = c.keyword(e).map_or("", |k| c.text_of(k));
         if !matches!(op, "==" | "!=") {
@@ -58,7 +58,8 @@ pub(crate) fn redundant_boolean(c: &Cst, out: &mut Sink) {
             continue;
         }
         let o = strip(c, other);
-        if !types.get(&(ix, o)).and_then(|t| t.integral).is_some_and(|(w, ..)| w == 1) {
+        let Some((w, _, four)) = types.get(&(ix, o)).and_then(|t| t.integral) else { continue };
+        if w != 1 {
             continue;
         }
         // One bit only for some parameter values (`logic [W-1:0] cnt`).
@@ -76,6 +77,7 @@ pub(crate) fn redundant_boolean(c: &Cst, out: &mut Sink) {
                 text(c, with_parens(c, e)),
                 text(c, with_parens(c, o))
             ),
+            simplify_fix(c, e, other, bang, four),
         ));
     }
     for n in c.nodes(IfStmt) {
@@ -96,16 +98,50 @@ pub(crate) fn redundant_boolean(c: &Cst, out: &mut Sink) {
                 if t == 1 { "" } else { "!" },
                 text(c, cond)
             ),
+            // `return c;` truncates a wider `c` to the return type: no fix.
+            None,
         ));
     }
-    for (n, msg) in found {
+    for (n, msg, fix) in found {
         let times = user_visits(c, n);
         if times == 0 || crate::support::statements::in_bad_body(c, n) {
             continue;
         }
         let Some(t) = c.first_tok(n) else { continue };
         for _ in 0..times {
-            out.add("SV-RDB-005", "RedundantBoolean", Severity::Info, msg.clone(), c.loc(t));
+            let f = out.add("SV-RDB-005", "RedundantBoolean", Severity::Info, msg.clone(), c.loc(t));
+            f.fixes.extend(fix.clone());
         }
     }
+}
+
+/// `b == 1'b1` -> `b`, `b == 1'b0` -> `!b` (and the `!=` forms). `!b` and
+/// `b == 1'b0` agree for every value of a 1-bit `b`, X and Z included (both
+/// give X). `b` is Z where `b == 1'b1` is X, which only an `if`, loop or `?:`
+/// condition treats the same (false), so outside a condition that form is
+/// safe only on a 2-state `b`.
+fn simplify_fix(c: &Cst, e: NodeId, other: NodeId, bang: &str, four_state: bool) -> Option<crate::fix::Fix> {
+    let outer = with_parens(c, e);
+    let operand = c.trimmed(other);
+    let primary =
+        matches!(c.kind(other), NameExpr | MemberExpr | SelectExpr | CallExpr | ParenExpr | ScopedExpr | Literal);
+    let text = match (bang, primary) {
+        ("", _) => operand,
+        (_, true) => format!("!{operand}"),
+        (_, false) => format!("!({operand})"),
+    };
+    let condition = c.parent(outer).is_some_and(|p| match c.kind(p) {
+        IfStmt => crate::support::statements::if_parts(c, p).0 == Some(outer),
+        LoopStmt => matches!(
+            crate::support::statements::stmt(c, p),
+            Some(crate::support::statements::St::While | crate::support::statements::St::DoWhile)
+        ),
+        CondExpr => kids(c, p).first() == Some(&outer),
+        _ => false,
+    });
+    let (a, b) = (c.first_tok(e)?, c.tree.token_range(e).last().copied()?);
+    let fix = c.token_fix(a, b, text.clone(), &format!("Write '{text}'"))?;
+    let safe = !bang.is_empty() || condition || !four_state;
+    let safety = if safe { crate::fix::FixSafety::Safe } else { crate::fix::FixSafety::Unsafe };
+    crate::fix::with_safety(Some(fix), safety)
 }

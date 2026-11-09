@@ -298,8 +298,15 @@ pub(crate) fn banners(c: &Cst, s: &mut Sink, dashes: bool) {
         let text = text.trim_end_matches(['\r', '\n', ' ']);
         let n = text.len();
         let only = |ch: u8| text.as_bytes()[2..].iter().all(|&b| b == ch);
+        // A comment only: rewriting it to the standard 78 columns changes nothing else.
+        let fix = |ch: char| {
+            let line: String =
+                std::iter::once("//".to_string()).chain(std::iter::repeat_n(ch.to_string(), 76)).collect();
+            c.file_fix(f, a as usize, a as usize + n, line, "Make the banner 78 characters wide")
+        };
         if text.starts_with("//==") {
             if !dashes && only(b'=') && !(70..=85).contains(&n) {
+                let fx = fix('=');
                 s.add(
                     "SV-STY-008",
                     "SectionHeaderBanner",
@@ -308,9 +315,12 @@ pub(crate) fn banners(c: &Cst, s: &mut Sink, dashes: bool) {
                         "Non-standard section header banner width ({n} characters). Major section divider banners must standardize to 70–80 columns (e.g. 78 characters: //===...)."
                     ),
                     loc,
-                );
+                )
+                .fixes
+                .push(fx);
             }
         } else if dashes && text.starts_with("//--") && only(b'-') && !(70..=85).contains(&n) {
+            let fx = fix('-');
             s.add(
                 "SV-STY-007",
                 "MethodBannerStyle",
@@ -319,7 +329,9 @@ pub(crate) fn banners(c: &Cst, s: &mut Sink, dashes: bool) {
                     "Ragged or non-standard method/separator banner ({n} characters). In standard style guidelines, method separators must span 70–80 columns (e.g. 78 hyphens: //---...)."
                 ),
                 loc,
-            );
+            )
+            .fixes
+            .push(fx);
         }
     }
 }
