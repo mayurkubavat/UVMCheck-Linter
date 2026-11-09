@@ -427,8 +427,9 @@ pub fn guard_macro_calls(found: &mut [crate::Finding]) {
             if x.safety == FixSafety::DisplayOnly {
                 continue;
             }
-            let text =
-                texts.entry(x.path.clone()).or_insert_with(|| std::fs::read_to_string(&x.path).unwrap_or_default());
+            let text = texts
+                .entry(x.path.clone())
+                .or_insert_with(|| sv_syntax::overlay::read(std::path::Path::new(&x.path)).unwrap_or_default());
             if drops_macro_call(text, x.start as usize, x.end as usize, &x.text) {
                 x.safety = FixSafety::DisplayOnly;
                 x.description.push_str(" (not applied: it would remove a macro call)");
@@ -447,7 +448,7 @@ impl Positions {
     /// (line, column) of `offset` in `path`.
     pub fn at(&mut self, path: &str, offset: u32) -> (usize, usize) {
         let starts = self.starts.entry(path.to_string()).or_insert_with(|| {
-            let text = std::fs::read_to_string(path).unwrap_or_default();
+            let text = sv_syntax::overlay::read(std::path::Path::new(path)).unwrap_or_default();
             let mut s = vec![0];
             s.extend(text.bytes().enumerate().filter(|(_, b)| *b == b'\n').map(|(i, _)| i + 1));
             s

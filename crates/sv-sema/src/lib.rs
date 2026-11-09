@@ -123,6 +123,10 @@ pub fn parse_args<S: AsRef<str>>(args: &[S]) -> Result<(Vec<Tree>, f64), Error> 
     // A source that is missing or cannot be read stops the run (exit 2 in
     // dv-lint, as in uvmcheck), rather than becoming a finding.
     for f in &files {
+        // An editor buffer stands in for its file, saved yet or not.
+        if sv_syntax::overlay::get(f).is_some() {
+            continue;
+        }
         let regular = std::fs::metadata(f).is_ok_and(|m| m.is_file());
         if !regular || std::fs::File::open(f).is_err() {
             return Err(Error(format!("could not read the sources: {}", f.display())));

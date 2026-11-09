@@ -100,6 +100,19 @@ impl Suppress {
             .map(|c| c.root.clone())
             .filter(|r| !r.as_os_str().is_empty())
             .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
+        Self::load_in(&root, config, waivers, baseline, no_config)
+    }
+
+    /// [`Suppress::load`] with the project folder given (a workspace that is
+    /// not the working folder).
+    pub fn load_in(
+        root: &Path,
+        config: Option<&crate::project::Config>,
+        waivers: Option<&str>,
+        baseline: Option<&str>,
+        no_config: bool,
+    ) -> Result<Suppress, String> {
+        let root = root.to_path_buf();
         let mut s = Suppress { root: root.clone(), ..Suppress::default() };
         if let Some(c) = config {
             s.waivers.extend(c.waivers().iter().map(|w| Waiver {
@@ -180,7 +193,9 @@ impl Suppress {
         for i in order {
             let (file, line, _) = found[i].position_in(files);
             let lines = texts.entry(file.to_string()).or_insert_with(|| {
-                std::fs::read_to_string(file).map(|t| t.lines().map(str::to_string).collect()).unwrap_or_default()
+                sv_syntax::overlay::read(std::path::Path::new(file))
+                    .map(|t| t.lines().map(str::to_string).collect())
+                    .unwrap_or_default()
             });
             let text = if line == 0 { "" } else { lines.get(line as usize - 1).map_or("", String::as_str) };
             let key = format!("{}\n{}\n{}", found[i].rule, self.baseline_path(file), collapse(text));

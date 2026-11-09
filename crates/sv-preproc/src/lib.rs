@@ -14,6 +14,8 @@
 //! assert_eq!(text, ["logic", "[", "8", "-", "1", ":", "0", "]", "x", ";"]);
 //! ```
 
+pub mod overlay;
+
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
@@ -335,11 +337,8 @@ impl Preprocessor {
 
     /// Preprocesses one file (and what it includes).
     pub fn run_file(&mut self, path: &Path) -> Output {
-        match std::fs::read(path) {
-            Ok(bytes) => {
-                let src = String::from_utf8_lossy(&bytes).into_owned();
-                self.run_source(&src, &path.to_string_lossy())
-            }
+        match overlay::read(path) {
+            Ok(src) => self.run_source(&src, &path.to_string_lossy()),
             Err(e) => {
                 // The file goes in the file table, empty, so the
                 // diagnostic has a place to point at.
@@ -902,9 +901,8 @@ impl Preprocessor {
             return;
         }
         match self.resolve_include(&name, angle) {
-            Some(path) => match std::fs::read(&path) {
-                Ok(bytes) => {
-                    let src = String::from_utf8_lossy(&bytes).into_owned();
+            Some(path) => match overlay::read(&path) {
+                Ok(src) => {
                     let id = self.add_file(path, &src);
                     self.push_file(id);
                 }

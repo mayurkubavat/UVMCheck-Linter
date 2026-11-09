@@ -93,6 +93,8 @@ pub use session::Session;
 pub mod suppress;
 pub mod tbgraph;
 pub mod tbmap;
+mod workspace;
+pub use workspace::{Checked, Workspace};
 
 static INLINE_WAIVED: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 

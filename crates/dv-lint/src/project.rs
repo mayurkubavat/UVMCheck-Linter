@@ -19,7 +19,7 @@ use crate::json::Json;
 use crate::{Finding, Severity};
 
 /// Config file names, in the order uvmcheck looks for them in each folder.
-const NAMES: [&str; 6] = [
+pub(crate) const NAMES: [&str; 6] = [
     ".uvmcheck/config.py",
     ".uvmcheck/config.json",
     "uvmcheck_config.py",

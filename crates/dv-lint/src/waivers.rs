@@ -110,9 +110,9 @@ pub(crate) fn apply(findings: &mut Vec<Finding>, files: &[String]) -> usize {
         if path.is_empty() || line == 0 {
             return true;
         }
-        let lines = texts
-            .entry(path.to_string())
-            .or_insert_with(|| std::fs::read_to_string(path).ok().map(|t| t.lines().map(str::to_string).collect()));
+        let lines = texts.entry(path.to_string()).or_insert_with(|| {
+            sv_syntax::overlay::read(std::path::Path::new(path)).ok().map(|t| t.lines().map(str::to_string).collect())
+        });
         let Some(lines) = lines else { return true };
         let at = |l: u32| lines.get(l as usize - 1).map(String::as_str).unwrap_or("");
         let mut bad = Bad::new();
@@ -187,7 +187,7 @@ pub(crate) fn unused_comments(files: &[String], active: &HashSet<&str>) -> (usiz
     let mut count = 0;
     let mut unused = Vec::new();
     for file in files {
-        let Ok(text) = std::fs::read_to_string(file) else { continue };
+        let Ok(text) = sv_syntax::overlay::read(std::path::Path::new(file)) else { continue };
         for (i, l) in text.lines().enumerate() {
             let Some(at) = KEYWORDS.iter().filter_map(|k| l.find(k)).min() else { continue };
             let comment = l[..at].rfind("//");
