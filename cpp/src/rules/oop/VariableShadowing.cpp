@@ -2,6 +2,9 @@
 #include "uvmcheck/rules/RuleRegistry.h"
 #include "uvmcheck/model/SlangModel.h"
 
+#include <string>
+#include <utility>
+
 namespace uvmcheck::rules::oop {
 
 class VariableShadowing : public Rule {
@@ -44,7 +47,29 @@ public:
                 }
             }
 
-            // 2. Check method argument or local variable shadowing class property
+            // 2. Check method argument or local variable shadowing class property: its own,
+            // or the nearest visible (not `local`) one it inherits. A static method sees no
+            // instance property. The native rule looks up the same way.
+            auto member = [&](const std::string& name, bool staticMethod)
+                -> std::pair<const model::Property*, const model::Class*> {
+                const model::Property* p = cls.findProperty(name);
+                const model::Class* owner = &cls;
+                if (!p) {
+                    for (model::ClassId b : chain) {
+                        const model::Class& base = design.cls(b);
+                        if ((p = base.findProperty(name))) {
+                            if (p->visibility == model::Visibility::Local) p = nullptr;
+                            owner = &base;
+                            break;
+                        }
+                    }
+                }
+                if (p && staticMethod && !p->isStatic) p = nullptr;
+                return {p, owner};
+            };
+            auto which = [&](const model::Property& p, const model::Class& owner) {
+                return &owner == &cls ? "'" + p.name + "'" : "'" + p.name + "' inherited from '" + owner.name + "'";
+            };
             for (const model::Method& sub : cls.methods) {
                 if (sub.isExtern) continue; // as before the port: in-class bodies only
                 if (sub.isBuiltIn) continue;
@@ -52,14 +77,14 @@ public:
                 // Arguments (skip constructor arguments where names like name/parent are conventional)
                 if (sub.name != "new") {
                     for (const model::Argument& arg : sub.arguments) {
-                        const model::Property* classProp = cls.findProperty(arg.name);
+                        const auto [classProp, owner] = member(arg.name, sub.isStatic);
                         if (!classProp) continue;
                         auto* v = diags.addViolation(
                             "SV-OOP-004",
                             "VariableShadowing",
                             "Method argument '" + arg.name + "' in method '" +
-                            sub.name + "' shadows class property '" +
-                            classProp->name + "'. Use 'this." + classProp->name +
+                            sub.name + "' shadows class property " +
+                            which(*classProp, *owner) + ". Use 'this." + classProp->name +
                             "' or rename the argument to prevent silent assignment bugs.",
                             core::Severity::Warning,
                             model::toSlang(arg.loc)
@@ -70,14 +95,14 @@ public:
 
                 // Local variables inside method
                 for (const model::Local& var : sub.locals) {
-                    const model::Property* classProp = cls.findProperty(var.name);
+                    const auto [classProp, owner] = member(var.name, sub.isStatic);
                     if (!classProp) continue;
                     diags.addViolation(
                         "SV-OOP-004",
                         "VariableShadowing",
                         "Local variable '" + var.name + "' in method '" +
-                        sub.name + "' shadows class property '" +
-                        classProp->name + "'. Rename the local variable to avoid confusion.",
+                        sub.name + "' shadows class property " +
+                        which(*classProp, *owner) + ". Rename the local variable to avoid confusion.",
                         core::Severity::Warning,
                         model::toSlang(var.loc)
                     );

@@ -26,3 +26,15 @@ class ShadowDerived extends ShadowBase;
         this.m_count = m_count;
     endfunction
 endclass
+
+// A local hides a member the class inherits.
+class oop004_base;
+    int count;
+endclass
+class oop004_child extends oop004_base;
+    function void tally();
+        // VIOLATION SV-OOP-004: 'count' hides the inherited oop004_base::count.
+        int count = 0;
+        count++;
+    endfunction
+endclass

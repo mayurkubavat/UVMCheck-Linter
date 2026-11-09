@@ -7,6 +7,10 @@
     {
       "rule": "SV-OOP-004",
       "line": 25
+    },
+    {
+      "rule": "SV-OOP-004",
+      "line": 37
     }
   ]
 }

@@ -4039,6 +4039,7 @@
     "SV-OOP-001@5",
     "SV-OOP-001@15",
     "SV-OOP-001@15",
+    "SV-OOP-004@22",
     "SV-RDB-002@24",
     "SV-RDB-002@24",
     "SV-RDB-002@24",
@@ -4109,6 +4110,7 @@
     "SV-OOP-001@7",
     "SV-OOP-001@17",
     "SV-OOP-001@17",
+    "SV-OOP-004@31",
     "SV-RDB-002@25",
     "SV-RDB-002@25",
     "SV-RDB-002@25",
@@ -5663,6 +5665,7 @@
     "SV-OOP-001@12",
     "SV-OOP-001@19",
     "SV-OOP-001@19",
+    "SV-OOP-004@25",
     "SV-RDB-010@11",
     "SV-RDB-010@18",
     "SV-RND-015@5",
@@ -7375,6 +7378,9 @@
     "SV-STY-005@22",
     "SV-STY-005@27",
     "SV-STY-005@28",
+    "SV-STY-005@33",
+    "SV-STY-005@39",
+    "SV-STY-005@40",
     "SV-STY-011@8",
     "SV-STY-011@16",
     "SV-STY-104@8",
@@ -7387,13 +7393,24 @@
     "SV-STY-104@16",
     "SV-STY-104@22",
     "SV-STY-104@27",
-    "SV-STY-104@28"
+    "SV-STY-104@28",
+    "SV-STY-104@33",
+    "SV-STY-104@39",
+    "SV-STY-104@40"
   ],
   "oop/SV-OOP-004/good.sv": [
     "SV-STY-005@8",
     "SV-STY-005@9",
+    "SV-STY-005@16",
+    "SV-STY-005@21",
+    "SV-STY-005@24",
+    "SV-STY-005@25",
     "SV-STY-104@8",
     "SV-STY-104@9",
+    "SV-STY-104@16",
+    "SV-STY-104@21",
+    "SV-STY-104@24",
+    "SV-STY-104@25",
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-005/bad.sv": [
@@ -8351,6 +8368,7 @@
     "UVM-STY-002@17"
   ],
   "random/SV-RND-024/bad.sv": [
+    "SV-OOP-004@18",
     "SV-RDB-002@21",
     "SV-RDB-010@12",
     "SV-RND-015@5",
@@ -8376,6 +8394,7 @@
     "UVM-SEQ-010@18"
   ],
   "random/SV-RND-024/good.sv": [
+    "SV-OOP-004@17",
     "SV-RDB-002@22",
     "SV-RDB-010@11",
     "SV-RND-015@5",
@@ -8467,6 +8486,7 @@
   ],
   "random/SV-RND-027/bad.sv": [
     "SV-NAM-005@4",
+    "SV-OOP-004@27",
     "SV-RDB-002@28",
     "SV-RDB-010@22",
     "SV-RND-015@6",
@@ -8498,6 +8518,7 @@
   ],
   "random/SV-RND-027/good.sv": [
     "SV-NAM-005@4",
+    "SV-OOP-004@26",
     "SV-RDB-002@27",
     "SV-RDB-010@21",
     "SV-STY-005@11",
@@ -11454,6 +11475,7 @@
   "uvm/UVM-SEQ-006/bad.sv": [
     "SV-OOP-001@8",
     "SV-OOP-001@8",
+    "SV-OOP-004@13",
     "SV-RDB-010@7",
     "SV-STY-005@8",
     "SV-STY-005@8",
@@ -11566,6 +11588,7 @@
     "SV-DED-001@10",
     "SV-OOP-001@8",
     "SV-OOP-001@8",
+    "SV-OOP-004@10",
     "SV-RDB-010@7",
     "SV-STY-005@8",
     "SV-STY-005@8",

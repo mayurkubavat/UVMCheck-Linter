@@ -5523,17 +5523,31 @@
     "SV-STY-005@22",
     "SV-STY-005@27",
     "SV-STY-005@28",
+    "SV-STY-005@33",
+    "SV-STY-005@39",
+    "SV-STY-005@40",
     "SV-STY-104@12",
     "SV-STY-104@13",
     "SV-STY-104@22",
     "SV-STY-104@27",
-    "SV-STY-104@28"
+    "SV-STY-104@28",
+    "SV-STY-104@33",
+    "SV-STY-104@39",
+    "SV-STY-104@40"
   ],
   "oop/SV-OOP-004/good.sv": [
     "SV-STY-005@8",
     "SV-STY-005@9",
+    "SV-STY-005@16",
+    "SV-STY-005@21",
+    "SV-STY-005@24",
+    "SV-STY-005@25",
     "SV-STY-104@8",
     "SV-STY-104@9",
+    "SV-STY-104@16",
+    "SV-STY-104@21",
+    "SV-STY-104@24",
+    "SV-STY-104@25",
     "UVM-FAC-003@5"
   ],
   "oop/SV-OOP-005/bad.sv": [
