@@ -23,7 +23,8 @@
 //! the file that includes it, found by indexing the repository's includes
 //! (`sv_source::owners`), and reports only the header's findings.
 //! `--frames` prints, under each finding and note, its source line with a
-//! caret under the flagged token (as uvmcheck's text report does).
+//! caret under the flagged token (as uvmcheck's text report does); a
+//! terminal gets them without asking, and `--no-frames` turns them off.
 //! `--list` prints every rule (`id name model|syntax`, then `native` for a
 //! rule with no uvmcheck twin); `-top` names the
 //! modules elaboration starts from; `--history` lets SV-EVO-001/002 read git
@@ -54,7 +55,9 @@ pub fn run() {
     sv_source::exit_on_closed_pipe();
     let mut slang = false;
     let mut time = false;
-    let mut frames = false;
+    // The source line under each finding: on a terminal unless --no-frames,
+    // elsewhere only with --frames (a log or a script gets one line each).
+    let mut frames = std::io::IsTerminal::is_terminal(&std::io::stdout());
     let mut in_context = false;
     let mut specs = false;
     let mut exprs = false;
@@ -111,10 +114,19 @@ pub fn run() {
             continue;
         }
         match a.as_str() {
+            "-h" | "--help" => {
+                print!("{}", dv_lint::help::help());
+                return;
+            }
+            "--version" => {
+                println!("{}", dv_lint::help::version());
+                return;
+            }
             "--slang" => slang = true,
             "--time" => time = true,
             // Under each finding and note, its source line with a caret.
             "--frames" => frames = true,
+            "--no-frames" => frames = false,
             // A header given as a source is linted inside the file that includes it.
             "--in-context" => in_context = true,
             "--specs" => specs = true,
@@ -178,6 +190,10 @@ pub fn run() {
     }
     let fail = |e: String| -> ! {
         eprintln!("error: {e}");
+        // A mistyped command line: say where the options are listed.
+        if e == "no sources given" || e.starts_with("unknown command line argument") {
+            eprintln!("{}", dv_lint::help::hint());
+        }
         std::process::exit(2);
     };
     extra.validate().unwrap_or_else(|e| fail(e));
@@ -478,7 +494,7 @@ static MAP: std::sync::OnceLock<dv_lint::tbmap::Map> = std::sync::OnceLock::new(
 /// to another file replays the same findings.
 fn lint_args() -> Vec<String> {
     const VALUED: [&str; 6] = ["--json", "--sarif", "--html", "--map", "--update-baseline", "--cache-dir"];
-    const FLAGS: [&str; 3] = ["--frames", "--clear-cache", "--no-cache"];
+    const FLAGS: [&str; 4] = ["--frames", "--no-frames", "--clear-cache", "--no-cache"];
     let mut out = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -773,7 +789,11 @@ fn report(
             t.elapsed().as_secs_f64() * 1e3
         );
     }
-    for f in found {
+    // A report written to standard output (`--json -`, `--sarif -`) takes
+    // the place of the text report, so the output parses as that report.
+    let to_stdout = |o: Option<&String>| o.is_some_and(|p| p == "-");
+    let text_report = !to_stdout(JSON_OUT.get()) && !to_stdout(SARIF_OUT.get());
+    for f in found.iter().filter(|_| text_report) {
         let (file, line, column) = f.position_in(files);
         println!("{}:{}:{}: [{}] {} ({}): {}", file, line, column, f.severity.as_str(), f.rule, f.name, f.message);
         if frames {
@@ -794,13 +814,17 @@ fn report(
         }
     }
     if let Some(path) = SARIF_OUT.get() {
-        if let Err(e) = std::fs::write(path, dv_lint::report::sarif(files, found)) {
+        if path == "-" {
+            print!("{}", dv_lint::report::sarif(files, found));
+        } else if let Err(e) = std::fs::write(path, dv_lint::report::sarif(files, found)) {
             eprintln!("error: cannot write {path}: {e}");
             std::process::exit(2);
         }
     }
     if let Some(path) = JSON_OUT.get() {
-        if let Err(e) = std::fs::write(path, json_report(files, found, waived)) {
+        if path == "-" {
+            print!("{}", json_report(files, found, waived));
+        } else if let Err(e) = std::fs::write(path, json_report(files, found, waived)) {
             eprintln!("error: cannot write {path}: {e}");
             std::process::exit(2);
         }

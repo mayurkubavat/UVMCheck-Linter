@@ -281,3 +281,109 @@ fn the_uvmcheck_front_runs_these_options_natively() {
         assert!(!text(&o).contains("needs the Slang engine"), "{args:?}: {}", text(&o));
     }
 }
+
+#[test]
+fn help_and_version_need_no_sources() {
+    let d = tmp("help");
+    let o = run(&d, &["--help"]);
+    assert!(o.status.success(), "{}", text(&o));
+    let help = String::from_utf8_lossy(&o.stdout).into_owned();
+    assert!(help.contains("Usage: dv-lint [options]"), "{help}");
+    assert!(help.contains("--preset NAME"), "{help}");
+    assert_eq!(String::from_utf8_lossy(&run(&d, &["-h"]).stdout), help);
+    let o = run(&d, &["--version"]);
+    assert!(o.status.success());
+    assert_eq!(String::from_utf8_lossy(&o.stdout), format!("dv-lint {}\n", env!("CARGO_PKG_VERSION")));
+}
+
+#[test]
+fn a_mistyped_command_line_points_at_help() {
+    let d = tmp("hint");
+    for args in [&["--no-config"][..], &["--no-config", "--no-such-option", "x.sv"][..]] {
+        let o = run(&d, args);
+        assert_eq!(o.status.code(), Some(2), "{}", text(&o));
+        assert!(text(&o).contains("run 'dv-lint --help' for the options"), "{}", text(&o));
+    }
+}
+
+/// Every option `--help` lists is one the program takes: with it (and a
+/// value where it wants one) the run must not end in "unknown command line
+/// argument".
+#[test]
+fn every_option_in_help_is_accepted() {
+    let d = tmp("help-options");
+    std::fs::write(d.join("tb.sv"), TB).unwrap();
+    std::fs::write(d.join("l.f"), "").unwrap();
+    let mut seen = 0;
+    for line in dv_lint::help::OPTIONS.lines() {
+        // Option lines are indented by two spaces: `  --flag VALUE  text`,
+        // `  -f FILE, -F FILE  text`.
+        let Some(rest) = line.strip_prefix("  ") else { continue };
+        if !rest.starts_with('-') && !rest.starts_with('+') {
+            continue;
+        }
+        let spec = rest.split("  ").next().unwrap_or("");
+        for form in spec.split(", ") {
+            let mut words = form.split_whitespace();
+            let Some(flag) = words.next() else { continue };
+            let takes_value = words.next().is_some();
+            // Options that end the run on their own, or change files.
+            if ["-h", "--help", "--version", "--list", "--init", "--explain", "--fix", "--clear-cache"].contains(&flag)
+            {
+                continue;
+            }
+            let flag = flag.split('[').next().unwrap_or(flag);
+            let mut args: Vec<String> = vec!["--no-cache".into()];
+            if flag.starts_with('+') {
+                args.push(match flag {
+                    "+incdir+DIR" => "+incdir+.".into(),
+                    _ => "+define+A".into(),
+                });
+            } else {
+                args.push(flag.to_string());
+                if takes_value {
+                    args.push(
+                        match flag {
+                            "-f" | "-F" => "l.f",
+                            "-I" | "-y" | "--cache-dir" => ".",
+                            "-v" => "tb.sv",
+                            "-D" => "A",
+                            "-top" => "tb",
+                            "--preset" => "all",
+                            "--rule" | "--fix-rule" => "SV-COR-008",
+                            "--changed-since" => "HEAD",
+                            "--python-rules" => "norules",
+                            _ => "out.tmp",
+                        }
+                        .into(),
+                    );
+                }
+            }
+            args.push("tb.sv".into());
+            let refs: Vec<&str> = args.iter().map(String::as_str).collect();
+            let o = run(&d, &refs);
+            assert!(!text(&o).contains("unknown command line argument"), "{flag}: {}", text(&o));
+            seen += 1;
+        }
+    }
+    assert!(seen > 30, "only {seen} options were found in the help text");
+}
+
+/// `--json -` and `--sarif -` write the report to standard output in place
+/// of the text report, so a script can parse what the program prints.
+#[test]
+fn a_report_to_standard_output_replaces_the_text() {
+    let d = tmp("stdout-report");
+    std::fs::write(d.join("tb.sv"), TB).unwrap();
+    let o = run(&d, &["--no-config", "--no-cache", "tb.sv", "--json", "-"]);
+    assert_eq!(o.status.code(), Some(1), "{}", text(&o));
+    let out = String::from_utf8_lossy(&o.stdout).into_owned();
+    assert!(out.trim_start().starts_with('{') && out.trim_end().ends_with('}'), "{out}");
+    assert!(out.contains("\"ruleId\": \"SV-COR-008\""), "{out}");
+    assert!(!out.contains("[ERROR]"), "{out}");
+    assert!(!d.join("-").exists(), "a file named '-' was written");
+    let o = run(&d, &["--no-config", "--no-cache", "tb.sv", "--sarif=-"]);
+    let out = String::from_utf8_lossy(&o.stdout).into_owned();
+    assert!(out.trim_start().starts_with('{') && out.contains("\"version\": \"2.1.0\""), "{out}");
+    assert!(!out.contains("[ERROR]"), "{out}");
+}

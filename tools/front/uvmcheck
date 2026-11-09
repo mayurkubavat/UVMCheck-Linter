@@ -27,7 +27,7 @@ if [ "$engine" = auto ]; then
             # Options dv-lint takes, and those that take a value.
             --rule|--preset|--json|--config|--waivers|--baseline|--update-baseline|--sarif|--html|-top|--top|-I|-D|-f|-F|-v|-y|-P|-l|-o|--timescale|-incdir|-define)
                 expect_value=yes ;;
-            --preset=*|--json=*|--config=*|--waivers=*|--baseline=*|--update-baseline=*|--sarif=*|--html=*|--experimental|--no-config|--no-cache|--history|--skip-libraries|--time|--frames|--in-context|--list|--single-unit)
+            --preset=*|--json=*|--config=*|--waivers=*|--baseline=*|--update-baseline=*|--sarif=*|--html=*|--experimental|--no-config|--no-cache|--history|--skip-libraries|--time|--frames|--no-frames|--in-context|--list|--single-unit)
                 ;;
             # --explain, --changed-since, waiver hygiene, the cache, --map,
             # --init, --python-rules.

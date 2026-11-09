@@ -83,6 +83,7 @@ pub mod changed;
 pub mod cli;
 pub mod explain;
 pub mod fix;
+pub mod help;
 pub mod init;
 pub mod plugins;
 pub mod project;
