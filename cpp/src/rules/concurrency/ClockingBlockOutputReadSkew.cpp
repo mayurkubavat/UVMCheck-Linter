@@ -37,8 +37,11 @@ public:
         : outputSignals(outputs), diags(diags) {}
 
     void handle(const slang::syntax::BinaryExpressionSyntax& expr) {
-        // Reads in relational comparisons or arithmetic
-        checkRead(expr.left);
+        // Reads in relational comparisons or arithmetic. The target of a drive
+        // ('vif.cb.data <= x', 'cb.data = x') is written, not read.
+        const bool drive = expr.kind == slang::syntax::SyntaxKind::AssignmentExpression ||
+                           expr.kind == slang::syntax::SyntaxKind::NonblockingAssignmentExpression;
+        if (!drive) checkRead(expr.left);
         checkRead(expr.right);
         visitDefault(expr);
     }

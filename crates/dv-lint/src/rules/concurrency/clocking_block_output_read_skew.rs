@@ -1,5 +1,6 @@
 //! SV-CB-001 (ClockingBlockOutputReadSkew): Disallows reading output signals of
-//! a clocking block.
+//! a clocking block. The target of a drive is not a read. The C++ rule is the
+//! same.
 
 use crate::support::procedural::start;
 use crate::support::slang_ast::kids;
@@ -81,7 +82,11 @@ pub(crate) fn clocking_output_read(c: &Cst, out: &mut Sink) {
         );
     };
     for n in c.nodes(BinaryExpr) {
-        for k in kids(c, n).into_iter().take(2) {
+        // The target of a drive (`vif.cb.data <= x`, `cb.data = x`) is
+        // written, not read.
+        let op = c.keyword(n).map(|t| c.text_of(t)).unwrap_or("");
+        let drive = op == "=" || (op == "<=" && c.parent(n).is_some_and(|p| c.kind(p) == ExprStmt));
+        for k in kids(c, n).into_iter().take(2).skip(usize::from(drive)) {
             check(k);
         }
     }
