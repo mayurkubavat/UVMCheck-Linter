@@ -1,16 +1,29 @@
 //! The S4 analyzers (rules/analysis): constraints, cross bins, clocked
-//! races and DPI prototypes.
+//! races, DPI prototypes and analysis ports without coverage.
 
-const IDS: &[&str] = &["SV-RND-030", "SV-RND-031", "SV-RND-032", "SV-COV-018", "SV-RCE-002", "DPI-PRT-001"];
+const IDS: &[&str] =
+    &["SV-RND-030", "SV-RND-031", "SV-RND-032", "SV-COV-018", "SV-RCE-002", "DPI-PRT-001", "UVM-TLM-007"];
 
 fn run(src: &str) -> Vec<(u32, &'static str, String)> {
+    run_with(src, &[])
+}
+
+/// `src` with the UVM stub (testdata/common/uvm_mock.svh) on the include path.
+fn run_uvm(src: &str) -> Vec<(u32, &'static str, String)> {
+    let common = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../testdata/common");
+    run_with(&format!("`include \"uvm_mock.svh\"\n{src}"), &["-I".to_string(), common.display().to_string()])
+}
+
+fn run_with(src: &str, opts: &[String]) -> Vec<(u32, &'static str, String)> {
     static N: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let n = N.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     let d = std::env::temp_dir().join(format!("dv-lint-analysis-{}-{n}", std::process::id()));
     std::fs::create_dir_all(&d).unwrap();
     let f = d.join("t.sv");
     std::fs::write(&f, src).unwrap();
-    let (design, trees) = sv_sema::load_with_trees(&[f.display().to_string()]).unwrap();
+    let mut args = opts.to_vec();
+    args.push(f.display().to_string());
+    let (design, trees) = sv_sema::load_with_trees(&args).unwrap();
     let (files, found) = dv_lint::lint_all(&design, &trees, |r| IDS.contains(&r));
     std::fs::remove_dir_all(&d).ok();
     found.iter().map(|x| (x.position_in(&files).1, x.rule, x.message.clone())).collect()
@@ -57,4 +70,44 @@ fn race_cross_and_dpi() {
                    option.auto_bin_max = 256;\n    cp: coverpoint v;\n    cx: cross cp, w;\n  endgroup\nendmodule\n");
     let x: Vec<_> = big.iter().filter(|g| g.1 == "SV-COV-018").collect();
     assert!(x.len() == 1 && x[0].0 == 6 && x[0].2.contains("65536 bins"), "{big:?}");
+}
+
+#[test]
+fn analysis_port_without_coverage() {
+    // `item` reaches `cov` (a covergroup and an analysis imp); `pkt` reaches
+    // only a scoreboard FIFO; the driver's copy of `item` is not a monitor's.
+    let tb = "class item extends uvm_sequence_item; int a; endclass\n\
+              class pkt extends uvm_sequence_item; int b; endclass\n\
+              class mon extends uvm_monitor;\n\
+                uvm_analysis_port #(item) item_ap;\n\
+                uvm_analysis_port #(pkt) pkt_ap;\n\
+                function new(string name, uvm_component parent); super.new(name, parent); endfunction\n\
+              endclass\n\
+              class cov extends uvm_component;\n\
+                uvm_analysis_imp #(item, cov) item_imp;\n\
+                int a;\n\
+                covergroup cg; coverpoint a; endgroup\n\
+                function new(string name, uvm_component parent); super.new(name, parent); cg = new; endfunction\n\
+                function void write(item t); a = t.a; cg.sample(); endfunction\n\
+              endclass\n\
+              class sb extends uvm_component;\n\
+                uvm_tlm_analysis_fifo #(pkt) pkt_fifo;\n\
+                function new(string name, uvm_component parent); super.new(name, parent); endfunction\n\
+              endclass\n";
+    let got = run_uvm(tb);
+    let f: Vec<_> = got.iter().filter(|g| g.1 == "UVM-TLM-007").collect();
+    // Line 6 of the file: the `include is line 1.
+    assert!(f.len() == 1 && f[0].0 == 6 && f[0].2.contains("'pkt'") && f[0].2.contains("mon.pkt_ap"), "{got:?}");
+    // A subscriber with a covergroup covers its type.
+    let sub = tb.replace(
+        "class sb extends uvm_component;",
+        "class pkt_cov extends uvm_subscriber #(pkt);\n  int b;\n  covergroup cg; coverpoint b; endgroup\n\
+         function new(string name, uvm_component parent); super.new(name, parent); cg = new; endfunction\n\
+         function void write(pkt t); b = t.b; cg.sample(); endfunction\nendclass\nclass sb extends uvm_component;",
+    );
+    assert!(lines(&run_uvm(&sub), "UVM-TLM-007").is_empty());
+    // No covergroup anywhere: a testbench without coverage is a different finding.
+    let none =
+        tb.replace("covergroup cg; coverpoint a; endgroup", "").replace("cg = new;", "").replace("cg.sample();", "");
+    assert!(lines(&run_uvm(&none), "UVM-TLM-007").is_empty());
 }
