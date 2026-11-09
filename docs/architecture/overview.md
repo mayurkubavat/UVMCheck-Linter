@@ -75,7 +75,8 @@ our own code, in the overlay under `cpp/src/compat/`
 
 | Command | Output |
 |---|---|
-| `cargo build --release` (repository root) | `target/release/dv-lint`, `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist`: the tools |
+| `cargo build --release` (repository root) | `target/release/uvmcheck` (the linter, also built as `dv-lint`), `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist`: the tools |
+| `cargo build --profile dist` and `tools/release/package.sh` | `uvmcheck-<platform>.tar.gz`, what a release ships (stripped, no debug info, with the Python SDK) |
 | `cmake --preset reference && cmake --build build` | `build/uvmcheck` (the C++ reference engine on Slang) and the oracles, for the parity gates |
 | `cmake --preset model && cmake --build build-model` | the same plus `build-model/libuvmcheck_model.so` (position independent, no mimalloc) |
 

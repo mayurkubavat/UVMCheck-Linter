@@ -54,7 +54,7 @@ with `--features slang`; see `third_party/slang/README.md`.
 | `sv-sema` | lib | Everything slang did above syntax: scopes and name resolution, constant evaluation (arbitrary width, four-state), type strings, the class model, elaboration and the semantic checks a compiler makes. |
 | `dv-model` | lib | The design model tools read: classes, UVM roles, properties, methods and body facts, all owned. Filled by `sv-sema` (native) or by slang through `sv-slang`. |
 | `sv-slang` | lib | Raw FFI to `libuvmcheck_model` (`cpp/include/uvmcheck/model/CApi.h`). Only `dv-model` uses it, and only with the `slang` feature. |
-| `dv-lint` | lib + bin | The linter: every uvmcheck rule ported to Rust, run in parallel over the model and the syntax trees. |
+| `dv-lint` | lib + bins | The linter: every uvmcheck rule ported to Rust, run in parallel over the model and the syntax trees. Its command line (`dv_lint::app`) is built under two names: `uvmcheck`, the product's command, and `dv-lint`, the name the gates call. |
 | `dv-build` | bin | The native builder: reports file list, preprocessor, syntax and semantic errors like a compiler; dumps symbols, types, values and hierarchy for the gates. |
 | `dv-lsp` | bin | Language server for code browsing (symbols, definition, references, hover, completion) on `sv-syntax`. Lint diagnostics come from `uvmcheck --lsp`. |
 | `dv-map` | bin | Prints the static UVM component tree of a testbench (text or JSON). |

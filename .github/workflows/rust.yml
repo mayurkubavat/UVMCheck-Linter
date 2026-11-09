@@ -68,3 +68,25 @@ jobs:
 
       - name: cargo test
         run: cargo test --locked
+
+  package:
+    # What the Release workflow ships, built and checked on every change:
+    # the dist profile, the archive layout and a lint run from the unpacked
+    # archive (tools/release/).
+    name: release archive
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - name: Build
+        run: cargo build --locked --profile dist
+
+      - name: Package and smoke test
+        run: |
+          tools/release/package.sh target/dist linux-x64 dist
+          tools/release/smoke.sh dist/uvmcheck-linux-x64.tar.gz

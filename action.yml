@@ -9,6 +9,10 @@ inputs:
     description: Extra uvmcheck arguments (sources, -f file lists, --preset ...). Empty uses .uvmcheck/config.py.
     required: false
     default: ""
+  version:
+    description: A released version to download (for example v0.2.0). Empty builds uvmcheck from the action's own source.
+    required: false
+    default: ""
   working-directory:
     description: Folder to run in (the project root).
     required: false
@@ -38,30 +42,57 @@ outputs:
 runs:
   using: composite
   steps:
-    - name: Install build tools
+    # A released build when `version` names one; otherwise the native engine
+    # is built from this checkout of the action (about two minutes the first
+    # time, then cached). Neither needs a C++ toolchain.
+    - name: Download uvmcheck
+      if: inputs.version != ''
       shell: bash
+      env:
+        VERSION: ${{ inputs.version }}
+        DEST: ${{ runner.temp }}/uvmcheck-release
       run: |
-        if ! command -v ninja >/dev/null; then sudo apt-get update && sudo apt-get install -y ninja-build; fi
+        case "$RUNNER_OS-$RUNNER_ARCH" in
+          Linux-X64) target=linux-x64 ;;
+          Linux-ARM64) target=linux-arm64 ;;
+          macOS-ARM64) target=darwin-arm64 ;;
+          macOS-X64) target=darwin-x64 ;;
+          *) echo "uvmcheck has no release build for $RUNNER_OS-$RUNNER_ARCH; leave 'version' empty to build it" >&2; exit 2 ;;
+        esac
+        mkdir -p "$DEST"
+        curl -fsSL "https://github.com/mayurkubavat/UVMCheck-Linter/releases/download/$VERSION/uvmcheck-$target.tar.gz" \
+          | tar -xz -C "$DEST" --strip-components=1
+        echo "UVMCHECK=$DEST/bin/uvmcheck" >> "$GITHUB_ENV"
 
     - name: Restore uvmcheck build
+      if: inputs.version == ''
       id: cache
       uses: actions/cache@v4
       with:
-        path: ${{ github.action_path }}/build/uvmcheck
-        key: uvmcheck-${{ runner.os }}-${{ hashFiles(format('{0}/cpp/**', github.action_path), format('{0}/CMakeLists.txt', github.action_path)) }}
+        path: ${{ github.action_path }}/target/release/uvmcheck
+        key: uvmcheck-native-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles(format('{0}/crates/**', github.action_path), format('{0}/Cargo.lock', github.action_path), format('{0}/testdata/rules/**', github.action_path)) }}
 
     - name: Build uvmcheck
-      if: steps.cache.outputs.cache-hit != 'true'
+      if: inputs.version == '' && steps.cache.outputs.cache-hit != 'true'
       shell: bash
       working-directory: ${{ github.action_path }}
-      run: cmake --preset reference && cmake --build build -j 4 --target uvmcheck
+      run: |
+        if ! command -v cargo >/dev/null; then
+          echo "uvmcheck: no Rust toolchain on this runner; install one (1.82 or later) or set the action's 'version' input to a release" >&2
+          exit 2
+        fi
+        cargo build --release --locked -p dv-lint --bin uvmcheck
+
+    - name: Use the built uvmcheck
+      if: inputs.version == ''
+      shell: bash
+      run: echo "UVMCHECK=${{ github.action_path }}/target/release/uvmcheck" >> "$GITHUB_ENV"
 
     - name: Lint
       id: lint
       shell: bash
       working-directory: ${{ inputs.working-directory }}
       env:
-        UVMCHECK: ${{ github.action_path }}/build/uvmcheck
         ARGS: ${{ inputs.args }}
         CHANGED: ${{ inputs.changed-since }}
         SARIF: ${{ inputs.sarif-file }}

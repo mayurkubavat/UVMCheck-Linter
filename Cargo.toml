@@ -22,3 +22,12 @@ rust-version = "1.82"
 
 [profile.release]
 debug = 1
+
+# Release binaries people download (the Release workflow): no debug info,
+# stripped, optimized across crates.
+[profile.dist]
+inherits = "release"
+debug = 0
+strip = true
+lto = "thin"
+codegen-units = 1

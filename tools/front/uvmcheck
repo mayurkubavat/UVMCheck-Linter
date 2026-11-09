@@ -4,7 +4,8 @@
 #
 #     tools/front/uvmcheck [uvmcheck options] <compile options> FILE...
 #
-# Runs target/release/dv-lint when every option is one dv-lint takes, else
+# Runs target/release/dv-lint (the same program releases ship as `uvmcheck`)
+# when every option is one it takes, else
 # the C++ uvmcheck (build/uvmcheck, or $UVMCHECK_SLANG) with the same
 # arguments, saying so on stderr. UVMCHECK_ENGINE=slang always uses the C++
 # binary; UVMCHECK_ENGINE=native never falls back. Build the native engine

@@ -12,7 +12,7 @@ There are two engines that share one rule set and one test suite:
 | Engine | Where | Front end | Binary |
 |---|---|---|---|
 | **uvmcheck** (C++20) | [`cpp/`](cpp/) | [Slang](https://github.com/MikePopoloski/slang) | `build/uvmcheck` |
-| **dv-lint** and the DV tools (Rust) | [`crates/`](crates/) | native lexer, preprocessor, parser and elaborator (Slang only as an opt-in reference) | `target/release/dv-lint`, `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist` |
+| **dv-lint** and the DV tools (Rust): what releases ship | [`crates/`](crates/) | native lexer, preprocessor, parser and elaborator (Slang only as an opt-in reference) | `target/release/uvmcheck` (also built as `dv-lint`), `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist` |
 
 Every rule has a `bad.sv` / `good.sv` pair under [`testdata/rules/`](testdata/rules/)
 that both engines are tested against, and parity gates check that their
@@ -21,29 +21,34 @@ findings match on real code. The rule catalog is in
 
 ## Install
 
-Build from source. The Rust tools need only a Rust toolchain (1.82+); the C++
-engine needs a C++20 compiler (clang 15+, AppleClang 15+ or gcc 12+), CMake
-3.28+, Ninja and Python 3.9+, and fetches Slang at configure time. `ccache`
-is recommended.
+**A release build.** Tagged
+[releases](https://github.com/mayurkubavat/UVMCheck-Linter/releases) attach
+`uvmcheck-<platform>.tar.gz` for Linux x64 and arm64 (glibc 2.28 or later)
+and macOS arm64 and x64: `uvmcheck` (the native engine), `dv-lsp`,
+`dv-build`, `dv-map`, `dv-filelist` and the Python SDK. Unpack it and put
+its `bin/` on your `PATH`. The VS Code extension is attached too.
+
+**From source.** The native tools need only a Rust toolchain (1.82+):
 
 ```sh
 git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
 cd UVMCheck-Linter
+cargo build --release            # -> target/release/uvmcheck (also as dv-lint), dv-lsp, dv-build, dv-map, dv-filelist
+```
 
-# dv-lint and the other Rust tools (native front end, no C++ build)
-cargo build --release            # -> target/release/dv-lint, dv-lsp, dv-build, dv-map, dv-filelist
+The C++ reference engine on Slang is optional: the parity gates compare
+against it, and it still serves the options the native engine does not take
+yet (`--lsp` for the editor's diagnostics among them). It needs a C++20
+compiler (clang 15+, AppleClang 15+ or gcc 12+), CMake 3.28+, Ninja and
+Python 3.9+, and fetches Slang at configure time; `ccache` is recommended.
 
-# uvmcheck, the C++ reference engine on Slang (optional: the parity
-# gates, and the fallback for options dv-lint does not take)
+```sh
 cmake --preset reference
 cmake --build build -j 4         # -> build/uvmcheck
 ```
 
-[`tools/front/uvmcheck`](tools/front/uvmcheck) is a `uvmcheck` command that
-runs dv-lint and falls back to the C++ binary for options dv-lint does not
-take yet; put it (or a link to it) on your `PATH`. Release builds of
-`uvmcheck` and the VS Code extension are attached to tagged
-[releases](https://github.com/mayurkubavat/UVMCheck-Linter/releases).
+In a checkout with both built, [`tools/front/uvmcheck`](tools/front/uvmcheck)
+runs the native engine and falls back to the C++ binary for those options.
 
 ## Quick start
 

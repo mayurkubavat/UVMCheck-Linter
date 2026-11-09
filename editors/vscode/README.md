@@ -20,7 +20,7 @@ Real-time, zero-latency SystemVerilog and UVM static analysis in your editor pow
 
 The extension runs two servers: `uvmcheck --lsp` (lint diagnostics and quick fixes) and `dv-lsp` (code browsing and completion). Either works without the other; a missing one is reported once with a link to its setting. Build `dv-lsp` with `cargo build --release -p dv-lsp` (from the repository root) and put `target/release` on `PATH`, or run `npm run bundle:local` before `npm run package` to ship both binaries inside the `.vsix`.
 
-Release builds of the extension (`.vsix` per platform, attached to each GitHub release) bundle the `uvmcheck` binary for Linux x64 and macOS arm64; nothing else is needed. On other platforms, or to use your own build, put `uvmcheck` on `PATH` or set `uvmcheck.executablePath`:
+Release builds of the extension (`.vsix` per platform, attached to each GitHub release) bundle both servers for Linux x64 and macOS arm64 (the lint server is the Slang engine, `uvmcheck-slang` in the release archives, until the native engine serves diagnostics); nothing else is needed. On other platforms, or to use your own build, put `uvmcheck` on `PATH` or set `uvmcheck.executablePath`:
 
 ```bash
 git clone https://github.com/mayurkubavat/UVMCheck-Linter.git

@@ -257,7 +257,7 @@ See [`editors/vscode/`](../../editors/vscode/) for the ready-to-use VS Code / Cu
 ---
 
 ### CI, pre-commit and editor
-**GitHub Action.** The repository is a composite action: it builds uvmcheck (cached), lints, and uploads SARIF to code scanning.
+**GitHub Action.** The repository is a composite action: it gets the native `uvmcheck` (a release when `version` names one, else built from the action's source with cargo and cached; no C++ toolchain either way), lints, and uploads SARIF to code scanning.
 ```yaml
 permissions: { contents: read, security-events: write }
 steps:
@@ -267,6 +267,7 @@ steps:
     with:
       changed-since: origin/main         # optional: only findings on changed lines
       args: ""                           # optional: sources/-f lists; empty uses .uvmcheck/config.py
+      version: ""                        # optional: a release to download, such as v0.2.0
 ```
 
 **pre-commit.** Add to `.pre-commit-config.yaml` (uvmcheck on `PATH`); `uvmcheck` checks lines changed since `HEAD`, `uvmcheck-full` lints the whole project on push:
@@ -276,7 +277,9 @@ steps:
   hooks: [{ id: uvmcheck }, { id: uvmcheck-full }]
 ```
 
-**VS Code.** Tagged releases attach a `.vsix` per platform (Linux x64, macOS arm64) with the binary inside; see [editors/vscode](../../editors/vscode/README.md).
+**Release builds.** Tagged releases attach `uvmcheck-<platform>.tar.gz` (Linux x64 and arm64 on glibc 2.28 or later, macOS arm64 and x64) with the native `uvmcheck`, `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist` and the Python SDK; unpack and put `bin/` on `PATH`. `tools/release/package.sh` and `smoke.sh` build and check the same archive locally.
+
+**VS Code.** Tagged releases attach a `.vsix` per platform (Linux x64, macOS arm64) with the binaries inside; see [editors/vscode](../../editors/vscode/README.md).
 
 ## Project Configuration
 
