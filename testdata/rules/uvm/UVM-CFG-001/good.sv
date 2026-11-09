@@ -35,3 +35,17 @@ class cfg001_env extends uvm_component;
     uvm_config_db#(cfg001_agent_cfg)::set(this, "agent", "agent_cfg", acfg);
   endfunction
 endclass
+
+// A field name held in a variable: two unrelated wrappers that both call
+// their argument 'field_name' do not read each other's values.
+class cfg001_wrappers extends uvm_component;
+  function new(string name, uvm_component parent);
+    super.new(name, parent);
+  endfunction
+  function void put_object(string field_name, uvm_object value);
+    uvm_config_db#(uvm_object)::set(this, "*", field_name, value);
+  endfunction
+  function bit get_string(string field_name, inout string value);
+    return uvm_config_db#(string)::get(this, "", field_name, value);
+  endfunction
+endclass

@@ -2,14 +2,11 @@
   "uvm-core": {
     "SV-CON-004": 3,
     "SV-CON-010": 1,
-    "SV-CON-012": 1,
     "SV-OOP-007": 7,
     "SV-RND-001": 3,
-    "UVM-CFG-001": 3,
     "UVM-FAC-001": 10,
     "UVM-OBJ-001": 2,
     "UVM-OBJ-003": 2,
-    "UVM-PHS-006": 4,
-    "UVM-SEQ-004": 1
+    "UVM-PHS-006": 4
   }
 }

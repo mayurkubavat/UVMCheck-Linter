@@ -1,6 +1,7 @@
 //! SV-CON-012 (ForkLoopVariableCapture): Disallows referencing loop variables
 //! directly inside 'fork ... join_none' or 'join_any' blocks without an
-//! automatic local variable copy.
+//! automatic local variable copy. The copy may sit in the fork's own
+//! declarations, which the parent thread initializes. The C++ rule is the same.
 
 use crate::support::for_loops::{for_parts, for_vars, is_ident_name, keyword_is, kids, subtree};
 use crate::syntax::Cst;
@@ -86,7 +87,22 @@ pub(crate) fn fork_loop_capture(c: &Cst, s: &mut Sink) {
                 continue;
             }
             let mut ids = HashSet::new();
-            ident_names(c, b, &mut HashSet::new(), &mut ids);
+            let mut locals = HashSet::new();
+            for item in kids(c, b) {
+                // The fork's own declarations are initialized by the parent
+                // thread on entry, before any process is spawned (IEEE 1800
+                // § 9.3.2): `automatic int k = i;` there is the copy the rule
+                // asks for, not a read from a child thread.
+                if c.kind(item) == DataDecl {
+                    for d in kids(c, item).into_iter().filter(|&d| c.kind(d) == Declarator) {
+                        if let Some(nm) = c.tree.child(d, Name) {
+                            locals.insert(c.tree.bare_text(nm));
+                        }
+                    }
+                    continue;
+                }
+                ident_names(c, item, &mut locals, &mut ids);
+            }
             // The C++ rule walks a std::unordered_set, which for a few names in
             // distinct buckets yields the last inserted first.
             let Some(var) = vars.iter().rev().find(|v| ids.contains(*v)) else { continue };

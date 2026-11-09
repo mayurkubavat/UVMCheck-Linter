@@ -45,8 +45,20 @@ public:
             return;
         }
 
+        // The fork's own declarations are initialized by the parent thread on entry,
+        // before any process is spawned (IEEE 1800 § 9.3.2): 'automatic int k = i;' there
+        // is the copy the rule asks for, not a read from a child thread.
         IdentifierFinder idFinder;
-        block.visit(idFinder);
+        for (const auto* item : block.items) {
+            if (!item) continue;
+            if (item->kind == slang::syntax::SyntaxKind::DataDeclaration) {
+                for (const auto* declarator : item->as<slang::syntax::DataDeclarationSyntax>().declarators) {
+                    if (declarator) idFinder.localDeclarations.insert(std::string(declarator->name.valueText()));
+                }
+                continue;
+            }
+            item->visit(idFinder);
+        }
 
         for (const auto& varName : loopVars) {
             if (idFinder.ids.count(varName) > 0) {

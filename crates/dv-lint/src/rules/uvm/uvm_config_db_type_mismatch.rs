@@ -48,10 +48,12 @@ pub(crate) fn config_db_type_mismatch(_: &dv_model::Design, csts: &[Cst], out: &
     };
     // The set the AST walk meets last for each field.
     let mut sets: std::collections::HashMap<&str, &CfgCall> = std::collections::HashMap::new();
-    for k in calls.iter().filter(|k| k.set && k.visits > 0) {
+    // Only names written as string literals: a variable (`field_name` in two
+    // unrelated wrappers) says nothing about which set a get reads.
+    for k in calls.iter().filter(|k| k.set && k.literal && k.visits > 0) {
         sets.insert(&k.field, k);
     }
-    for g in calls.iter().filter(|k| !k.set) {
+    for g in calls.iter().filter(|k| !k.set && k.literal) {
         let Some(s) = sets.get(g.field.as_str()) else { continue };
         if s.ty == g.ty || is_param(&s.ty) || is_param(&g.ty) {
             continue;

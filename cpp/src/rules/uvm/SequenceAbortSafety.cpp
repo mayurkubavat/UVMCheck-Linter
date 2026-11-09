@@ -28,6 +28,12 @@ public:
                     routine = &member->as<slang::syntax::FunctionDeclarationSyntax>();
                 }
 
+                // Not the handshake's own definition (uvm_sequence_base::start_item).
+                if (routine && routine->prototype && routine->prototype->name) {
+                    if (auto own = routine->prototype->name->getFirstToken().valueText();
+                        own == "start_item" || own == "finish_item")
+                        continue;
+                }
                 if (routine && routine->prototype) {
                     std::string routineText = stripComments(std::string(routine->toString()));
                     size_t startPos = 0;

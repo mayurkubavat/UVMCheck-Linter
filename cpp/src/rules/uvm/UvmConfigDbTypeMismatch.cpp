@@ -56,15 +56,17 @@ public:
                         arg2 = &arg2->as<slang::ast::ConversionExpression>().operand();
                     }
 
+                    // Only names written as string literals: a variable ('field_name' in two
+                    // unrelated wrappers) says nothing about which set a get reads.
                     std::string fieldName;
                     if (arg2 && arg2->kind == slang::ast::ExpressionKind::StringLiteral) {
                         fieldName = std::string(arg2->as<slang::ast::StringLiteral>().getValue());
                     } else if (arg2 && arg2->syntax) {
-                        fieldName = std::string(arg2->syntax->toString());
-                        while (!fieldName.empty() && (fieldName.front() == ' ' || fieldName.front() == '\t')) fieldName.erase(0, 1);
-                        while (!fieldName.empty() && (fieldName.back() == ' ' || fieldName.back() == '\t')) fieldName.pop_back();
-                        if (fieldName.size() >= 2 && fieldName.front() == '"' && fieldName.back() == '"') {
-                            fieldName = fieldName.substr(1, fieldName.size() - 2);
+                        std::string text = std::string(arg2->syntax->toString());
+                        while (!text.empty() && (text.front() == ' ' || text.front() == '\t')) text.erase(0, 1);
+                        while (!text.empty() && (text.back() == ' ' || text.back() == '\t')) text.pop_back();
+                        if (text.size() >= 2 && text.front() == '"' && text.back() == '"') {
+                            fieldName = text.substr(1, text.size() - 2);
                         }
                     }
 

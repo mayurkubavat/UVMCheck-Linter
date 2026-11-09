@@ -18,7 +18,8 @@ pub(crate) fn sequence_abort_safety(c: &Cst, s: &mut Sink) {
             continue;
         }
         for f in class_routines(c, cls) {
-            if name_node(c, f).is_none() {
+            // Not the handshake's own definition (uvm_sequence_base::start_item).
+            if name_node(c, f).is_none() || matches!(routine_first_name(c, f).as_str(), "start_item" | "finish_item") {
                 continue;
             }
             let text = strip_line_comments(&routine_text(c, f));
