@@ -57,6 +57,7 @@ dependencies = [
  "dv-model",
  "sv-sema",
  "sv-slang",
+ "sv-source",
 ]
 
 [[package]]

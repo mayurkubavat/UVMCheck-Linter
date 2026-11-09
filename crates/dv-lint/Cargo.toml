@@ -1,11 +1,21 @@
 [package]
 name = "dv-lint"
-description = "UVMCheck's model-based rules in Rust, over dv-model, with no Slang needed"
+description = "UVMCheck: the SystemVerilog/UVM linter on the native front end (binaries uvmcheck and dv-lint)"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
 build = "build.rs"
+
+# One program under two names: `uvmcheck` is the product's command, `dv-lint`
+# the name the gates and scripts call. Both run `dv_lint::app::run`.
+[[bin]]
+name = "dv-lint"
+path = "src/main.rs"
+
+[[bin]]
+name = "uvmcheck"
+path = "src/uvmcheck.rs"
 
 [features]
 default = []

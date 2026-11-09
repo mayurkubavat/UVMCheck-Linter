@@ -100,6 +100,7 @@ fn tree_json(d: &Design, c: &Class, inst: &str, seen: &mut HashSet<u32>) -> Stri
 }
 
 fn main() -> ExitCode {
+    sv_source::exit_on_closed_pipe();
     let o = match parse() {
         Ok(o) => o,
         Err(e) => {

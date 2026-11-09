@@ -95,6 +95,7 @@ fn to_json(fl: &FileList) -> String {
 }
 
 fn main() -> ExitCode {
+    sv_source::exit_on_closed_pipe();
     let mut dialect = Dialect::Any;
     let (mut json, mut args_out, mut load, mut slang) = (false, false, false, false);
     let mut rest = Vec::new();

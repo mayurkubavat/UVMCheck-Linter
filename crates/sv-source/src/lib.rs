@@ -584,6 +584,23 @@ impl FileList {
     }
 }
 
+/// Ends the program quietly when its reader closes the pipe (`tool | head`),
+/// as command line tools do, where `println!` would panic with "failed
+/// printing to stdout: Broken pipe". Call first in `main`. The exit status
+/// is 141, what a shell reports for a program the closed pipe stopped.
+pub fn exit_on_closed_pipe() {
+    let default = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let payload = info.payload();
+        let message =
+            payload.downcast_ref::<String>().map(String::as_str).or_else(|| payload.downcast_ref::<&str>().copied());
+        if message.is_some_and(|m| m.starts_with("failed printing to std") && m.contains("Broken pipe")) {
+            std::process::exit(141);
+        }
+        default(info);
+    }));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -33,6 +33,7 @@ struct Diag {
 }
 
 fn main() -> ExitCode {
+    sv_source::exit_on_closed_pipe();
     let mut dialect = Dialect::Any;
     let (mut dump, mut quiet, mut symbols, mut types, mut values) = (false, false, false, false, false);
     let mut cst = false;

@@ -42,6 +42,11 @@
 
 use dv_model::{Class, ClassId, Design, Loc, Method, PhaseKind, Property};
 
+// `app` (the command line) names this crate as its users do.
+extern crate self as dv_lint;
+
+pub mod app;
+
 pub mod expr_types;
 pub mod frames;
 mod rules;
