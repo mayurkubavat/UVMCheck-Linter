@@ -90,3 +90,40 @@ jobs:
         run: |
           tools/release/package.sh target/dist linux-x64 dist
           tools/release/smoke.sh dist/uvmcheck-linux-x64.tar.gz
+
+  error-budget:
+    # ERROR findings on reviewed, simulator-clean code (Accellera uvm-core)
+    # are false positives until shown otherwise. Each rule has a budget
+    # (tools/quality/error_budget.json) that can only go down; see
+    # tools/quality/error_budget.py.
+    name: ERROR budget (uvm-core)
+    runs-on: ubuntu-24.04
+    env:
+      UVM_CORE_REF: 2020.3.1
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          rustup toolchain install stable --profile minimal
+          rustup default stable
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: cargo-${{ runner.os }}-budget-${{ hashFiles('Cargo.lock') }}
+          restore-keys: cargo-${{ runner.os }}-budget-
+
+      - name: Build
+        run: cargo build --locked --release -p dv-lint --bin uvmcheck
+
+      - name: Fetch uvm-core
+        run: git clone --depth 1 --branch "$UVM_CORE_REF" https://github.com/accellera-official/uvm-core.git uvm-core
+
+      - name: ERROR budget
+        env:
+          UVM_HOME: ${{ github.workspace }}/uvm-core
+        run: python3 tools/quality/error_budget.py --binary target/release/uvmcheck

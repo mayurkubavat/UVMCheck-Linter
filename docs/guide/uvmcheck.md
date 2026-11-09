@@ -408,6 +408,8 @@ unused, expired or stale entry remains:
 ---
 
 ### Rule precision on real code
+`tools/quality/error_budget.py` holds ERROR to a higher standard: on reviewed, simulator-clean code (uvm-core 2020.3.1) an ERROR finding is a false positive until shown otherwise, so each rule has a budget of them in `tools/quality/error_budget.json` that CI checks on every change and that can only go down. The aim is an empty budget.
+
 `tools/quality/precision.py` lints a fixed corpus (`tools/quality/precision_corpus.json`, uvm-core by default) with every rule and records findings per rule per kLOC. Given the previous result it flags rules whose count jumped (+50% and at least +5), dropped to zero, or that are new and report 2 or more per kLOC. The nightly `Precision` workflow runs it and shows the table in the job summary.
 
 New rules can declare `getMaturity()` as `RuleMaturity::Experimental`: they stay off unless `--experimental` or `--rule` names them (and in the editor), are marked in the catalog and in `--explain`, and are listed separately in the precision summary until they are promoted.
