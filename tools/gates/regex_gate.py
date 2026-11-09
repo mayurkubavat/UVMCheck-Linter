@@ -25,6 +25,17 @@ set from a small grammar (--fuzz N, seeded, default 20000).
 --write-vectors stores the agreed cases in testdata/regex/vectors.tsv, which
 `cargo test` checks with no C++ build. std::regex differs between libc++ and
 libstdc++ at the edges; the vectors record the platform that wrote them.
+
+A libstdc++ oracle on macOS, with Homebrew's GCC (its own libstdc++):
+
+    g++-14 -std=c++17 -O2 -isysroot "$(xcrun --show-sdk-path)" -mmacosx-version-min=15.0 \
+        -o /tmp/regexcheck_libstdcxx tools/oracles/regexcheck.cpp
+    UVMCHECK_REGEXCHECK=/tmp/regexcheck_libstdcxx tools/gates/regex_gate.py
+
+(otool -L shows libstdc++.6.dylib.) On Linux, g++ builds it as is. Runs of the
+default size agree in full (2026-11-08, GCC 14.2, seeds 1 and 7); with
+--fuzz 100000 libstdc++'s backtracking matcher can spin on one fuzzed pattern
+for half an hour, so keep fuzz runs against it at the default size.
 """
 import argparse, os, random, re, subprocess, sys
 
