@@ -37,3 +37,30 @@ class cfg_bus_agent extends uvm_component;
     vif.is_push_agent = push;
   endfunction
 endclass
+
+// A handle that happens to be called 'cb' (a callback object, as in UVM's
+// own register layer) is not a clocking block: a class cannot declare one.
+class note_cb;
+  string fname;
+  int lineno;
+endclass
+
+class note_user;
+  note_cb cbs[$];
+  extern task mark(string fname, int lineno);
+  task clear();
+    foreach (cbs[i]) begin
+      note_cb cb = cbs[i];
+      cb.fname = "";
+      cb.lineno = 0;
+    end
+  endtask
+endclass
+
+task note_user::mark(string fname, int lineno);
+  foreach (cbs[i]) begin
+    note_cb cb = cbs[i];
+    cb.fname = fname;
+    cb.lineno = lineno;
+  end
+endtask

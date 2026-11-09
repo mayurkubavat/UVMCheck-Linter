@@ -38,6 +38,27 @@ public:
         return false;
     }
 
+    // A bare 'cb.x' in a class method: a clocking block cannot be declared in a class, so
+    // there 'cb' is a handle or a variable (UVM's own 'for (uvm_vreg_cbs cb = ...) cb.fname
+    // = ...'). A clocking block reached from a class goes through the interface.
+    static bool handleNamedCb(const slang::syntax::SyntaxNode& node, const std::string& lhs) {
+        if (!lhs.starts_with("cb.") || lhs.find(".cb.") != std::string::npos ||
+            lhs.find("vif.") != std::string::npos)
+            return false;
+        for (const auto* p = node.parent.get(); p; p = p->parent.get()) {
+            if (p->kind == slang::syntax::SyntaxKind::ClassDeclaration) return true;
+            // The body of an out-of-block method ('task c::f()').
+            if (p->kind == slang::syntax::SyntaxKind::FunctionDeclaration ||
+                p->kind == slang::syntax::SyntaxKind::TaskDeclaration) {
+                const auto& f = p->as<slang::syntax::FunctionDeclarationSyntax>();
+                if (f.prototype && f.prototype->name &&
+                    f.prototype->name->toString().find("::") != std::string::npos)
+                    return true;
+            }
+        }
+        return false;
+    }
+
     static bool insideContinuousAssign(const slang::syntax::SyntaxNode& node) {
         for (const auto* p = node.parent.get(); p; p = p->parent.get()) {
             if (p->kind == slang::syntax::SyntaxKind::ContinuousAssign) return true;
@@ -60,8 +81,9 @@ public:
                 lhs.erase(end + 1);
             }
 
-            if (lhs.find(".cb.") != std::string::npos || lhs.starts_with("cb.") ||
-                lhs.find("vif.") != std::string::npos || lhs.find("_vif.") != std::string::npos) {
+            if ((lhs.find(".cb.") != std::string::npos || lhs.starts_with("cb.") ||
+                 lhs.find("vif.") != std::string::npos || lhs.find("_vif.") != std::string::npos) &&
+                !handleNamedCb(expr, lhs)) {
                 std::vector<core::FixItHint> fixIts;
                 if (expr.operatorToken.range().start().valid()) {
                     // A function may not hold '<=' cleanly either (SV-LANG-005 would undo the

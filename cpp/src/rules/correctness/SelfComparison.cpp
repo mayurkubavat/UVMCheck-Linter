@@ -3,6 +3,7 @@
 #include "slang/syntax/AllSyntax.h"
 #include "slang/syntax/SyntaxTree.h"
 #include "slang/syntax/SyntaxVisitor.h"
+#include <cctype>
 #include <string>
 
 namespace uvmcheck::rules::correctness {
@@ -27,7 +28,7 @@ public:
                     std::string leftStr = cleanExpr(expr.left);
                     std::string rightStr = cleanExpr(expr.right);
 
-                    if (!leftStr.empty() && leftStr == rightStr) {
+                    if (!leftStr.empty() && leftStr == rightStr && !loneLiteral(leftStr)) {
                         std::string opStr = std::string(expr.operatorToken.valueText());
                         diags.addViolation(
                             "SV-COR-008",
@@ -49,6 +50,26 @@ public:
     }
 
 private:
+    // A lone literal: a quoted string, or a number (0, 8'hFF, '1, 1.5). Two equal literals
+    // are a constant test, not a variable compared to itself: it is what a macro argument's
+    // default leaves behind ('if (NAME == "")' with NAME="", as UVM's compare macros do).
+    static bool loneLiteral(const std::string& text) {
+        if (text.size() >= 2 && text.front() == '"' && text.back() == '"') {
+            for (size_t i = 1; i + 1 < text.size(); ++i) {
+                if (text[i] == '\\') ++i;
+                else if (text[i] == '"') return false;
+            }
+            return true;
+        }
+        if (text.empty() || !(std::isdigit(static_cast<unsigned char>(text[0])) || text[0] == '\''))
+            return false;
+        for (char ch : text) {
+            if (!(std::isalnum(static_cast<unsigned char>(ch)) || ch == '_' || ch == '\'' || ch == '.'))
+                return false;
+        }
+        return true;
+    }
+
     static std::string cleanExpr(const slang::syntax::ExpressionSyntax* expr) {
         if (!expr) return "";
         std::string s = std::string(expr->toString());

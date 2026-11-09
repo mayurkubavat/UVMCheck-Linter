@@ -5,12 +5,24 @@
 //! Not in the UVM phases that run before simulation time starts
 //! (build, connect, end_of_elaboration, start_of_simulation): writing a
 //! configuration bit of an interface there (`cfg.vif.if_mode = ...`, as
-//! OpenTitan's agents do) races with nothing. The C++ rule is the same.
+//! OpenTitan's agents do) races with nothing. Nor for a bare `cb.x` in a
+//! class, where `cb` cannot be a clocking block. The C++ rule is the same.
 
 /// The text of an assignment target that is a clocking block or virtual
 /// interface signal (shared with SV-LANG-005).
 pub(crate) fn interface_signal(lhs: &str) -> bool {
     lhs.contains(".cb.") || lhs.starts_with("cb.") || lhs.contains("vif.") || lhs.contains("_vif.")
+}
+
+/// A bare `cb.x` in a class method: a clocking block cannot be declared in
+/// a class, so there `cb` is a handle or a variable (UVM's own
+/// `for (uvm_vreg_cbs cb = cbs.first(); ...) cb.fname = ...`). A clocking
+/// block reached from a class goes through the interface (`vif.cb.x`).
+pub(crate) fn handle_named_cb(c: &Cst, n: sv_syntax::NodeId, lhs: &str) -> bool {
+    lhs.starts_with("cb.")
+        && !lhs.contains(".cb.")
+        && !lhs.contains("vif.")
+        && crate::support::slang_ast::enclosing_class(c, n).is_some()
 }
 
 /// A function phase that runs before time 0 ends: `build_phase`, also as
@@ -51,7 +63,7 @@ pub(crate) fn blocking_to_interface(c: &Cst, s: &mut Sink) {
         }
         let Some(&l) = kids(c, b).first() else { continue };
         let lhs = slang_trimmed(c, l);
-        if interface_signal(&lhs) && !in_setup_phase(c, b) {
+        if interface_signal(&lhs) && !handle_named_cb(c, b, &lhs) && !in_setup_phase(c, b) {
             s.add(
                 "SV-INT-001",
                 "BlockingAssignmentToInterface",

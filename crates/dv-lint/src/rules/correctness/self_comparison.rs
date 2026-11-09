@@ -1,11 +1,24 @@
 //! SV-COR-008 (SelfComparison): Disallows self-comparisons where an operand is
 //! compared to itself (e.g. a == a), which tautologically evaluates to constant
-//! true or false.
+//! true or false. Not two equal literals (`"" == ""`), which is what a macro
+//! argument's default expands to. The C++ rule is the same.
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
+
+/// A lone literal: a quoted string, or a number (`0`, `8'hFF`, `'1`, `1.5`).
+/// Two equal literals are a constant test, not a variable compared to
+/// itself: it is what a macro argument's default leaves behind
+/// (`if (NAME == "")` with `NAME=""`, as UVM's compare macros do).
+pub(crate) fn lone_literal(text: &str) -> bool {
+    if let Some(inner) = text.strip_prefix('"').and_then(|t| t.strip_suffix('"')) {
+        return !inner.replace("\\\\", "").replace("\\\"", "").contains('"');
+    }
+    text.starts_with(|ch: char| ch.is_ascii_digit() || ch == '\'')
+        && text.chars().all(|ch| ch.is_ascii_alphanumeric() || matches!(ch, '_' | '\'' | '.'))
+}
 
 /// slang's binary operator kinds the rule checks; `<=` directly under an
 /// expression statement is a nonblocking assignment there instead.
@@ -22,7 +35,7 @@ pub(crate) fn self_comparison(c: &Cst, s: &mut Sink) {
         let mut sides = c.tree.children(n);
         let (Some(l), Some(r)) = (sides.next(), sides.next()) else { continue };
         let (ls, rs) = (c.trimmed(l), c.trimmed(r));
-        if !ls.is_empty() && ls == rs {
+        if !ls.is_empty() && ls == rs && !lone_literal(&ls) {
             s.add(
                 "SV-COR-008",
                 "SelfComparison",
