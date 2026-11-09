@@ -30,16 +30,27 @@ thread_local! {
     static LOCAL: std::cell::RefCell<sv_sema::fx::FxMap<LocalSlot, Value>> = Default::default();
 }
 
-/// Starts a generation for one lint run and makes it this thread's.
-pub(crate) fn begin() -> usize {
+/// The settings of the runs under way, by generation: a run's threads take
+/// theirs from here when they [`enter`].
+static SETTINGS: Mutex<Vec<(usize, Arc<crate::session::Settings>)>> = Mutex::new(Vec::new());
+
+/// Starts a generation for one lint run under `settings` and makes it this
+/// thread's.
+pub(crate) fn begin(settings: Arc<crate::session::Settings>) -> usize {
     let g = NEXT_GEN.fetch_add(1, Ordering::Relaxed);
+    SETTINGS.lock().unwrap_or_else(|e| e.into_inner()).push((g, settings.clone()));
     GEN.with(|c| c.set(g));
+    crate::session::bind(Some(settings));
     g
 }
 
-/// Makes generation `g` this thread's (a worker of that run).
+/// Makes generation `g` this thread's (a worker of that run), with the
+/// run's settings.
 pub(crate) fn enter(g: usize) {
     GEN.with(|c| c.set(g));
+    let settings =
+        SETTINGS.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(k, _)| *k == g).map(|(_, s)| s.clone());
+    crate::session::bind(settings);
 }
 
 /// This thread's generation, for threads it starts to [`enter`].
@@ -55,7 +66,9 @@ pub(crate) fn end(g: usize) {
         }
     }
     LOCAL.with(|l| l.borrow_mut().retain(|k, _| k.4 != g));
+    SETTINGS.lock().unwrap_or_else(|e| e.into_inner()).retain(|(k, _)| *k != g);
     GEN.with(|c| c.set(0));
+    crate::session::bind(None);
 }
 
 /// The value `name` for `key`, built by `make` the first time.

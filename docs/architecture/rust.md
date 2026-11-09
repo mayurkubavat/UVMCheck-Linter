@@ -129,12 +129,23 @@ crates/dv-lint/src/
   syntax.rs          Cst: a tree with parents, per-kind node lists, locations
   expr_types.rs      expression types as slang gives them (--exprs)
   shared.rs          work built once per compile and shared between threads
+  session.rs         Session: the settings one run of the rules reads
   uvm_api.rs, waivers.rs
 ```
 
 A rule file such as `rules/uvm/blocking_in_observer.rs` opens with the
 rule's id, name and what it flags, and holds the helpers only that rule
 uses.
+
+The settings a run reads (rule options, the `style` and `naming` blocks,
+`-top`, `--skip-libraries`) live in a `dv_lint::Session`. A run hands them
+to the threads it starts, so two sessions with different settings can lint
+at the same time in one process: an editor with two workspaces, a test
+harness, a host language. The command line uses the process's own session,
+which is what the free functions (`dv_lint::options::set`,
+`dv_lint::lint_all`) work on. Still held by the process, and so next to
+move: the record of which waivers matched, the inline-waiver count, and the
+git-history switch.
 
 ## The language server
 

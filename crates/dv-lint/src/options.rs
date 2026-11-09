@@ -1,31 +1,31 @@
 //! Rule options from the project configuration (`rules.<RULE>.options`),
 //! as the C++ rules read them with `swe::ruleOption`: an integer per rule
 //! and key, the rule's own default when the config does not set it.
+//!
+//! The values live in the run's [`Session`](crate::Session); the setters
+//! here change the process's own session.
 
+use crate::session;
 use std::collections::HashMap;
-use std::sync::RwLock;
 
-static OPTIONS: RwLock<Option<HashMap<(String, String), i64>>> = RwLock::new(None);
+/// Options by (rule ID, key), with rule names resolved to IDs.
+pub(crate) fn resolved(options: &[(String, String, i64)]) -> HashMap<(String, String), i64> {
+    let rules = crate::rules();
+    let id_of =
+        |k: &str| -> String { rules.iter().find(|r| r.name == k).map_or_else(|| k.to_string(), |r| r.id.to_string()) };
+    options.iter().map(|(r, k, v)| ((id_of(r), k.clone()), *v)).collect()
+}
 
 /// Sets the options: (rule ID or name, key, value). Names are resolved to
 /// IDs here.
 pub fn set(options: &[(String, String, i64)]) {
-    let rules = crate::rules();
-    let id_of =
-        |k: &str| -> String { rules.iter().find(|r| r.name == k).map_or_else(|| k.to_string(), |r| r.id.to_string()) };
-    let m = options.iter().map(|(r, k, v)| ((id_of(r), k.clone()), *v)).collect();
-    if let Ok(mut o) = OPTIONS.write() {
-        *o = Some(m);
-    }
+    let m = resolved(options);
+    session::change_process(|s| s.options = m);
 }
 
 /// The value of option `key` of rule `id`, else `default`.
 pub(crate) fn get(id: &str, key: &str, default: i64) -> i64 {
-    OPTIONS
-        .read()
-        .ok()
-        .and_then(|o| o.as_ref().and_then(|m| m.get(&(id.to_string(), key.to_string())).copied()))
-        .unwrap_or(default)
+    session::with(|s| s.options.get(&(id.to_string(), key.to_string())).copied()).unwrap_or(default)
 }
 
 /// A `style` setting from the project configuration.
@@ -36,17 +36,13 @@ pub enum StyleValue {
     Str(String),
 }
 
-static STYLE: RwLock<Option<HashMap<String, StyleValue>>> = RwLock::new(None);
-
 /// Sets the `style` block (key, value), as uvmcheck's StyleConfiguration.
 pub fn set_style(style: &[(String, StyleValue)]) {
-    if let Ok(mut s) = STYLE.write() {
-        *s = Some(style.iter().cloned().collect());
-    }
+    session::change_process(|s| s.style = style.iter().cloned().collect());
 }
 
 fn style(key: &str) -> Option<StyleValue> {
-    STYLE.read().ok().and_then(|s| s.as_ref().and_then(|m| m.get(key).cloned()))
+    session::with(|s| s.style.get(key).cloned())
 }
 
 pub(crate) fn style_bool(key: &str, default: bool) -> bool {
@@ -81,15 +77,11 @@ pub struct NamingOverride {
     pub enabled: Option<bool>,
 }
 
-static NAMING: RwLock<Option<HashMap<String, NamingOverride>>> = RwLock::new(None);
-
 /// Sets the `naming` block (target, settings).
 pub fn set_naming(naming: &[(String, NamingOverride)]) {
-    if let Ok(mut n) = NAMING.write() {
-        *n = Some(naming.iter().cloned().collect());
-    }
+    session::change_process(|s| s.naming = naming.iter().cloned().collect());
 }
 
 pub(crate) fn naming(target: &str) -> Option<NamingOverride> {
-    NAMING.read().ok().and_then(|n| n.as_ref().and_then(|m| m.get(target).cloned()))
+    session::with(|s| s.naming.get(target).cloned())
 }

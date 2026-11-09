@@ -88,6 +88,8 @@ pub mod init;
 pub mod plugins;
 pub mod project;
 pub mod report;
+mod session;
+pub use session::Session;
 pub mod suppress;
 pub mod tbgraph;
 pub mod tbmap;
@@ -296,27 +298,22 @@ impl Rule {
     }
 }
 
-/// Top modules from `-top` (see [`add_tops`]).
-pub(crate) static TOPS: std::sync::RwLock<Vec<String>> = std::sync::RwLock::new(Vec::new());
-
-/// Adds top modules (`-top`): elaboration starts from them only.
+/// Adds top modules (`-top`) to the process's session: elaboration starts
+/// from them only.
 pub fn add_tops(tops: &[String]) {
-    if let Ok(mut t) = TOPS.write() {
-        t.extend(tops.iter().cloned());
-    }
+    session::change_process(|s| s.tops.extend(tops.iter().cloned()));
 }
 
-static SKIP_LIBRARIES: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
 /// Reports nothing in library files (`-v`, `-y`): they are read only to
-/// resolve instances. Off by default, as uvmcheck reports in them.
+/// resolve instances. Off by default, as uvmcheck reports in them. Sets the
+/// process's session.
 pub fn set_skip_libraries(on: bool) {
-    SKIP_LIBRARIES.store(on, std::sync::atomic::Ordering::Relaxed);
+    session::change_process(|s| s.skip_libraries = on);
 }
 
 /// The tops `-top` named (empty: every module nothing instantiates).
 pub(crate) fn tops() -> Vec<String> {
-    TOPS.read().map(|t| t.clone()).unwrap_or_default()
+    session::with(|s| s.tops.clone())
 }
 
 /// Rules with no uvmcheck (C++) twin: dv-lint's own. `--list` marks them
@@ -364,7 +361,7 @@ pub fn lint_all(
     trees: &[sv_syntax::Tree],
     keep: impl Fn(&str) -> bool,
 ) -> (Vec<String>, Vec<Finding>) {
-    lint_from(Source::Ready(design), trees, keep).1
+    lint_from(session::process(), Source::Ready(design), trees, keep).1
 }
 
 /// [`lint_all`] for a design that `build` makes from `trees`: with several
@@ -375,7 +372,7 @@ pub fn lint_built(
     trees: &[sv_syntax::Tree],
     keep: impl Fn(&str) -> bool,
 ) -> (Design, (Vec<String>, Vec<Finding>)) {
-    let (d, out) = lint_from(Source::Build(Box::new(build)), trees, keep);
+    let (d, out) = lint_from(session::process(), Source::Build(Box::new(build)), trees, keep);
     (d.expect("a built design"), out)
 }
 
@@ -386,12 +383,14 @@ pub(crate) enum Source<'d> {
 }
 
 pub(crate) fn lint_from(
+    settings: std::sync::Arc<session::Settings>,
     design: Source<'_>,
     trees: &[sv_syntax::Tree],
     keep: impl Fn(&str) -> bool,
 ) -> (Option<Design>, (Vec<String>, Vec<Finding>)) {
     let all: Vec<Rule> = rules().into_iter().filter(|r| keep(r.id)).collect();
-    let gen = shared::begin();
+    let skip_libs = settings.skip_libraries;
+    let gen = shared::begin(settings);
     let jobs = jobs().min(all.len());
     let built = std::sync::OnceLock::new();
     let given = match &design {
@@ -413,7 +412,6 @@ pub(crate) fn lint_from(
     let (files, mut f) = out;
     // Nothing is reported in the test UVM mock, nor in library files (-v,
     // -y) after `--skip-libraries`; uvmcheck reports in libraries.
-    let skip_libs = SKIP_LIBRARIES.load(std::sync::atomic::Ordering::Relaxed);
     let library: std::collections::HashSet<String> = trees
         .iter()
         .filter(|t| skip_libs && t.library)
