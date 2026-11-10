@@ -163,3 +163,25 @@ endclass
 ";
     assert_eq!(lint(src, &["SV-DRV-001"]), [("SV-DRV-001", 13)]);
 }
+
+#[test]
+fn a_monitor_drives_an_interface_by_declaration() {
+    let src = "\
+interface bus_if(input logic clk);
+    logic valid;
+endinterface
+typedef struct { int n; } intf_stats_t;
+class uvm_monitor; endclass
+class my_monitor extends uvm_monitor;
+    virtual bus_if bus;
+    intf_stats_t intf_stats;
+    task run();
+        bus.valid = 1;
+        intf_stats.n = 2;
+        bus = null;
+    endtask
+endclass
+";
+    // The handle is `bus`, not `vif`; the struct only has `intf` in its name.
+    assert_eq!(lint(src, &["UVM-VIF-DIR"]), [("UVM-VIF-DIR", 10)]);
+}
