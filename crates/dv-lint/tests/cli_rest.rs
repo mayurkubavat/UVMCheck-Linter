@@ -440,6 +440,27 @@ fn library_and_testbench(d: &Path) {
 }
 
 #[test]
+fn a_finding_in_a_macro_names_the_macro_and_the_place_in_its_body() {
+    let d = tmp("expansions");
+    std::fs::create_dir_all(&d).unwrap();
+    std::fs::write(
+        d.join("m.sv"),
+        "`define SET_ALL(v) \\\n  begin \\\n    a = v; \\\n    if (a == a) b = v; \\\n  end\n\nmodule m;\n  int a, b;\n  initial begin\n    `SET_ALL(1)\n    if (b == b) a = 2;\n  end\nendmodule\n",
+    )
+    .unwrap();
+    let out = text(&run(&d, &["--no-config", "--no-cache", "--rule", "SV-COR-008", "m.sv"]));
+    let lines: Vec<&str> = out.lines().filter(|l| l.contains("m.sv:")).collect();
+    // Reported where the macro is used, with the place in the body noted.
+    assert_eq!(lines.len(), 3, "{out}");
+    assert!(lines[0].contains("m.sv:10:0: [ERROR] SV-COR-008"), "{out}");
+    assert!(lines[1].trim_start().starts_with("note: "), "{out}");
+    assert!(lines[1].ends_with("m.sv:4:11: in the expansion of macro 'SET_ALL'"), "{out}");
+    // Code written outside a macro has no such note.
+    assert!(lines[2].contains("m.sv:11:11: [ERROR] SV-COR-008"), "{out}");
+    let _ = std::fs::remove_dir_all(&d);
+}
+
+#[test]
 fn the_uvm_library_is_left_out_beside_user_code() {
     let d = tmp("library");
     library_and_testbench(&d);

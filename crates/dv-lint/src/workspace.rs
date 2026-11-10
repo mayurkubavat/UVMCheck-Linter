@@ -159,6 +159,7 @@ impl Workspace {
             c.apply(&mut findings, &files);
         }
         let waived = inline + self.suppress.apply(&mut findings, &files);
+        crate::expansions::name_macros(&mut findings, &files);
         Ok(Checked { files, findings, waived })
     }
 }

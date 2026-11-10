@@ -61,6 +61,7 @@ mod uvm_api;
 mod waivers;
 
 pub mod catalog;
+pub mod expansions;
 mod guidelines;
 pub mod library;
 mod sem;

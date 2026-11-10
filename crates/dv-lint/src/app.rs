@@ -825,6 +825,7 @@ fn report(
     if let Some(c) = CONFIG.get() {
         c.apply(&mut found, files);
     }
+    dv_lint::expansions::name_macros(&mut found, files);
     if let (Some(path), Some(s)) = (UPDATE_BASELINE.get(), SUPPRESS.get()) {
         match s.save_baseline(std::path::Path::new(path), &found, files) {
             Ok(()) => eprintln!("[dv-lint] Saved {} findings to baseline: {path}", found.len()),

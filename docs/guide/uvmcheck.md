@@ -147,6 +147,16 @@ Run or debug a specific rule against a source file in milliseconds:
 ### Compiler errors and warnings
 The compiler's own diagnostics are findings too: errors are `SV-CMP-001` and warnings `SV-CMP-002`. They appear in the console, JSON, SARIF, HTML and the editor, and can be waived or baselined like any other finding. `-W` options and `` `pragma diagnostic `` decide which warnings are reported and at what severity (`-Wno-redef-macro`, `-Werror=index-oob`). Disable the rules to get slang's plain diagnostic output back.
 
+### Findings in macros
+A finding in code that a macro produced is reported at the line that uses the macro (column 0), because that is the line you can waive or change. The native engine adds a note that names the macro and points at the place in its body the finding is about:
+
+```
+tb/env.sv:10:0: [ERROR] SV-COR-008 (SelfComparison): Self-comparison detected: ...
+    note: tb/defs.svh:4:11: in the expansion of macro 'SET_ALL'
+```
+
+The note is in the console, JSON (`related`), SARIF (`relatedLocations`) and the editor. Findings on a macro's arguments are code you wrote at the call and have no note. The C++ engine reports the same line without the note.
+
 ### Exit status
 Both engines (the Slang-backed `uvmcheck` and the native `dv-lint`) exit with:
 
