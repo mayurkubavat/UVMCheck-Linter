@@ -38,3 +38,22 @@ A target or type the native engine cannot resolve (the handle's type is a type
 parameter, the path has a call in it, a class or interface is declared twice
 or is not compiled) is judged by its names, as in the C++ engine, so the two
 agree on those.
+
+## Objection pairing
+
+`UVM-OBJ-001`, `UVM-OBJ-003` and `UVM-PHS-006` each judged one routine alone,
+so the usual ways of holding an objection across routines were reported as
+defects, up to five ERRORs for a `pre_body`/`post_body` pair. The native
+engine answers all three from one analysis (`dv_lint::sem::objections`):
+
+| Code | Native engine | C++ engine |
+|---|---|---|
+| A raise in one routine, the drop in another routine of the class, a base class or a derived class (`pre_body`/`post_body`, `pre_start`/`post_start`, helper tasks) | Paired: no finding. A routine that raises and drops equally often is balanced in itself and does not pair with another one. | Each routine reported. |
+| `if (c) raise` ... `if (c) drop`, the same condition text | Balanced. | `UVM-OBJ-003` asymmetric branch, twice. |
+| `if (h != null) h.raise_objection(this)` with no `else` | Held under that condition; not an asymmetric branch. | `UVM-OBJ-003` asymmetric branch. |
+| Two objections in one routine (`phase` and another handle) | Each handle is followed on its own. | One state for all. |
+
+A raise nobody in the class family drops, a drop of something never raised, a
+`return` while the routine's own objection is held, and a drop in only one
+branch are reported by both engines. On uvm-core the three rules gave 8 ERROR
+findings, all in code that is correct; the native engine gives none.

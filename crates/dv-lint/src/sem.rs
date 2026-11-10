@@ -12,6 +12,8 @@
 //! interface declared twice or not compiled all give `None`, and the rule
 //! falls back to what it did before.
 
+pub(crate) mod objections;
+
 use std::sync::Arc;
 
 use sv_sema::fx::{FxMap as HashMap, FxSet as HashSet};

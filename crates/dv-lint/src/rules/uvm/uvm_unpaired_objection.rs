@@ -2,10 +2,18 @@
 //! have a corresponding phase.drop_objection() within the same execution
 //! context to prevent simulation hangs or fatal errors.
 
+use crate::sem::objections::{Half, Objections};
+use crate::support::uvm_classes::Ix;
+use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, UvmKind};
 
-pub(crate) fn uvm_unpaired_objection(d: &Design, out: &mut Sink) {
+pub(crate) fn uvm_unpaired_objection(d: &Design, csts: &[Cst], out: &mut Sink) {
+    let ix = Ix::new(d, csts);
+    let mut pairs: Option<Objections> = None;
+    // The other half is in another routine of the class or of a base class.
+    let mut elsewhere =
+        |cls, routine: &str, half| pairs.get_or_insert_with(|| Objections::new(&ix)).elsewhere(&ix, cls, routine, half);
     for cls in d.classes() {
         if cls.is_parameterized || (!cls.uvm.is_component() && cls.uvm != UvmKind::Sequence) {
             continue;
@@ -17,6 +25,8 @@ pub(crate) fn uvm_unpaired_objection(d: &Design, out: &mut Sink) {
             let raise = sub.calls.iter().find(|c| c.name == "raise_objection");
             let drop = sub.calls.iter().find(|c| c.name == "drop_objection");
             match (raise, drop) {
+                (Some(_), None) if elsewhere(cls.id, &sub.name, Half::Drop) => {}
+                (None, Some(_)) if elsewhere(cls.id, &sub.name, Half::Raise) => {}
                 (Some(r), None) => {
                     out.add(
                         "UVM-OBJ-001",

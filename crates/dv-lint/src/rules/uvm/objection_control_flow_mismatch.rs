@@ -2,9 +2,17 @@
 //! (CFG) analysis on UVM phase and task routines to verify that every execution
 //! path containing raise_objection() is strictly guaranteed to reach a matching
 //! drop_objection() without early returns or asymmetric conditional branching.
+//!
+//! Each objection handle of a routine (`phase`, `starting_phase`) is followed
+//! on its own. A raise under a condition (`if (starting_phase != null)`) is
+//! held under that condition, and a drop under the same condition balances
+//! it. A routine whose other half is in another routine of the class
+//! (`pre_body`/`post_body`, see [`crate::sem::objections`]) is not reported
+//! for leaving the objection held, or for dropping one it did not raise.
 
-use crate::support::uvm_classes::{block_stmts, if_parts, is_component, is_sequence, Ix};
-use crate::support::uvm_syntax::{body_items, callee, name_node, routine_last_name, stmt_expr};
+use crate::sem::objections::{count, Half, Objections};
+use crate::support::uvm_classes::{block_stmts, if_parts, is_component, is_sequence, receiver, Ix};
+use crate::support::uvm_syntax::{body_items, callee, name_node, routine_last_name, stmt_expr, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
@@ -54,13 +62,59 @@ fn case_items(c: &Cst, n: NodeId) -> Vec<(NodeId, bool)> {
 enum Obj {
     Unheld,
     Held,
+    /// Held when a condition is true: the index of its text in `Flow::conds`.
+    HeldIf(usize),
     Unknown,
+}
+
+/// What an expression statement does to an objection, and to which one:
+/// the text of the handle it is called on (empty for a bare call).
+fn objection_call(c: &Cst, stmt: NodeId) -> Option<(Half, String)> {
+    let e = stmt_expr(c, stmt)?;
+    for n in subtree(c, e) {
+        if c.kind(n) != CallExpr {
+            continue;
+        }
+        let half = match callee(c, n) {
+            "raise_objection" => Half::Raise,
+            "drop_objection" => Half::Drop,
+            _ => continue,
+        };
+        let handle: String = receiver(c, n).map(|r| c.text(r)).unwrap_or_default().split_whitespace().collect();
+        return Some((half, handle));
+    }
+    // Not a call the tree shows (inside a macro argument, say).
+    let text = c.text(e);
+    if text.contains("raise_objection") {
+        Some((Half::Raise, String::new()))
+    } else if text.contains("drop_objection") {
+        Some((Half::Drop, String::new()))
+    } else {
+        None
+    }
+}
+
+/// The objection handles a routine raises or drops, in source order.
+fn handles(c: &Cst, items: &[NodeId]) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for &i in items {
+        for n in std::iter::once(i).chain(subtree(c, i)) {
+            if c.kind(n) == ExprStmt {
+                if let Some((_, h)) = objection_call(c, n) {
+                    if !out.contains(&h) {
+                        out.push(h);
+                    }
+                }
+            }
+        }
+    }
+    out
 }
 
 fn obj_str(o: Obj) -> &'static str {
     match o {
         Obj::Unheld => "Unheld",
-        Obj::Held => "Held",
+        Obj::Held | Obj::HeldIf(_) => "Held",
         Obj::Unknown => "Unknown",
     }
 }
@@ -68,6 +122,13 @@ fn obj_str(o: Obj) -> &'static str {
 struct Flow<'a, 'c> {
     c: &'a Cst<'c>,
     sub: String,
+    /// The handle being followed.
+    handle: String,
+    /// The routine drops nothing itself and the class drops elsewhere: a
+    /// `return` while held is the other routine's to close.
+    closed_elsewhere: bool,
+    /// Condition texts of `Obj::HeldIf`.
+    conds: Vec<String>,
     out: Vec<(Severity, String, NodeId)>,
 }
 
@@ -82,11 +143,8 @@ impl Flow<'_, '_> {
         let c = self.c;
         match c.kind(n) {
             SeqBlock | ParBlock | Body => self.list(&block_stmts(c, n), st),
-            ExprStmt => {
-                let text = stmt_expr(c, n).map(|e| c.text(e)).unwrap_or_default();
-                let named =
-                    stmt_expr(c, n).map(|e| if c.kind(e) == CallExpr { callee(c, e) } else { "" }).unwrap_or("");
-                if named == "raise_objection" || text.contains("raise_objection") {
+            ExprStmt => match objection_call(c, n).filter(|(_, h)| *h == self.handle) {
+                Some((Half::Raise, _)) => {
                     if st == Obj::Held {
                         let msg = format!(
                             "Redundant 'raise_objection()' call in '{}': objection is already actively held along this control-flow path.",
@@ -95,7 +153,8 @@ impl Flow<'_, '_> {
                         self.add(Severity::Warning, msg, n);
                     }
                     (false, Obj::Held)
-                } else if named == "drop_objection" || text.contains("drop_objection") {
+                }
+                Some((Half::Drop, _)) => {
                     if st == Obj::Unheld {
                         let msg = format!(
                             "Premature 'drop_objection()' in '{}': no active objection was raised along this execution path. \
@@ -105,16 +164,15 @@ impl Flow<'_, '_> {
                         self.add(Severity::Error, msg, n);
                     }
                     (false, Obj::Unheld)
-                } else {
-                    (false, st)
                 }
-            }
+                None => (false, st),
+            },
             TimedStmt => match c.items(n).into_iter().find(|&x| c.kind(x) != TimingControl) {
                 Some(inner) => self.stmt(inner, st),
                 None => (false, st),
             },
             ReturnStmt => {
-                if st == Obj::Held {
+                if st == Obj::Held && !self.closed_elsewhere {
                     let msg = format!(
                         "Early 'return' in '{}' while phase objection is still held. \
                          Bypassing drop_objection() causes simulation to hang indefinitely.",
@@ -125,11 +183,18 @@ impl Flow<'_, '_> {
                 (true, st)
             }
             IfStmt => {
-                let Some((_, then, els)) = if_parts(c, n) else { return (false, st) };
-                let (tr, to) = self.stmt(then, st);
+                let Some((cond, then, els)) = if_parts(c, n) else { return (false, st) };
+                let cond: String = c.text(cond).split_whitespace().collect();
+                // Held under this very condition: it is held in the 'if'
+                // branch and not in the 'else' branch.
+                let (st_then, st_else) = match st {
+                    Obj::HeldIf(k) if self.conds[k] == cond => (Obj::Held, Obj::Unheld),
+                    _ => (st, st),
+                };
+                let (tr, to) = self.stmt(then, st_then);
                 let (fr, fo) = match els {
-                    Some(e) => self.stmt(e, st),
-                    None => (false, st),
+                    Some(e) => self.stmt(e, st_else),
+                    None => (false, st_else),
                 };
                 if tr && fr {
                     return (true, to);
@@ -141,6 +206,19 @@ impl Flow<'_, '_> {
                     return (false, to);
                 }
                 if to != fo {
+                    // Raised under a condition and not otherwise: held
+                    // under that condition (`if (phase != null) raise`).
+                    if (to, fo) == (Obj::Held, Obj::Unheld) && st != Obj::Held {
+                        let k = self.conds.iter().position(|x| *x == cond).unwrap_or_else(|| {
+                            self.conds.push(cond);
+                            self.conds.len() - 1
+                        });
+                        return (false, Obj::HeldIf(k));
+                    }
+                    // One side is not known: neither is the result.
+                    if matches!(to, Obj::Unknown | Obj::HeldIf(_)) || matches!(fo, Obj::Unknown | Obj::HeldIf(_)) {
+                        return (false, Obj::Unknown);
+                    }
                     let msg = format!(
                         "Asymmetric objection state across conditional branch in '{}': 'if' branch leaves objection as {}, while 'else' branch leaves objection as {}. \
                          Unbalanced branch objections lead to unpredictable simulation termination or runtime fatals.",
@@ -205,6 +283,7 @@ impl Flow<'_, '_> {
 
 pub(crate) fn objection_control_flow(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);
+    let mut pairs: Option<Objections> = None;
     for cls in ix.model_classes() {
         if !is_component(d, cls.id) && !is_sequence(d, cls.id) {
             continue;
@@ -212,13 +291,27 @@ pub(crate) fn objection_control_flow(d: &Design, csts: &[Cst], s: &mut Sink) {
         for at in ix.own_routines(cls.id) {
             let c = ix.cst(at);
             let sub = routine_last_name(c, at.node);
-            let mut flow = Flow { c, sub: sub.clone(), out: Vec::new() };
-            let (ret, st) = flow.list(&body_items(c, at.node), Obj::Unheld);
-            for (sev, msg, n) in std::mem::take(&mut flow.out) {
-                let Some(t) = c.first_tok(n) else { continue };
-                s.add("UVM-OBJ-003", "ObjectionControlFlowMismatch", sev, msg, c.loc(t));
+            let items = body_items(c, at.node);
+            let (raises, drops) = count(c, at.node);
+            if raises + drops == 0 {
+                continue;
             }
-            if !ret && st == Obj::Held {
+            // The other half in another routine of the class or a base class.
+            let pairs = pairs.get_or_insert_with(|| Objections::new(&ix));
+            let closed_elsewhere = drops == 0 && pairs.elsewhere(&ix, cls.id, &sub, Half::Drop);
+            let opened_elsewhere = raises == 0 && pairs.elsewhere(&ix, cls.id, &sub, Half::Raise);
+            let start = if opened_elsewhere { Obj::Unknown } else { Obj::Unheld };
+            for handle in handles(c, &items) {
+                let mut flow =
+                    Flow { c, sub: sub.clone(), handle, closed_elsewhere, conds: Vec::new(), out: Vec::new() };
+                let (ret, st) = flow.list(&items, start);
+                for (sev, msg, n) in std::mem::take(&mut flow.out) {
+                    let Some(t) = c.first_tok(n) else { continue };
+                    s.add("UVM-OBJ-003", "ObjectionControlFlowMismatch", sev, msg, c.loc(t));
+                }
+                if ret || closed_elsewhere || !matches!(st, Obj::Held | Obj::HeldIf(_)) {
+                    continue;
+                }
                 let Some(loc) =
                     name_node(c, at.node).and_then(|x| c.tree.token_range(x).last().copied()).map(|t| c.loc(t))
                 else {

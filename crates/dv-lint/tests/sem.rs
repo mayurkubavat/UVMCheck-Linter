@@ -185,3 +185,124 @@ endclass
     // The handle is `bus`, not `vif`; the struct only has `intf` in its name.
     assert_eq!(lint(src, &["UVM-VIF-DIR"]), [("UVM-VIF-DIR", 10)]);
 }
+
+/// A UVM small enough to read: the classes the objection rules look for.
+const MINI_UVM: &str = "\
+class uvm_object; endclass
+class uvm_objection;
+    function void raise_objection(uvm_object o = null, string d = \"\"); endfunction
+    function void drop_objection(uvm_object o = null, string d = \"\"); endfunction
+endclass
+class uvm_phase extends uvm_objection; endclass
+class uvm_component extends uvm_object;
+    virtual task run_phase(uvm_phase phase); endtask
+endclass
+class uvm_test extends uvm_component; endclass
+class uvm_sequence_base extends uvm_object;
+    uvm_phase starting_phase;
+endclass
+";
+
+const OBJECTION_RULES: [&str; 3] = ["UVM-OBJ-001", "UVM-OBJ-003", "UVM-PHS-006"];
+
+/// Findings of the three objection pairing rules in `tb` (line 1 is its
+/// first line), compiled after [`MINI_UVM`].
+fn objections(tb: &str) -> Vec<(&'static str, u32)> {
+    let base = MINI_UVM.lines().count() as u32;
+    lint(&format!("{MINI_UVM}{tb}"), &OBJECTION_RULES).into_iter().map(|(r, l)| (r, l - base)).collect()
+}
+
+#[test]
+fn an_objection_dropped_in_another_routine_of_the_class_is_paired() {
+    // The UVM 1.1 sequence idiom, and a pair of helper tasks in a base class.
+    let tb = "\
+class seq_c extends uvm_sequence_base;
+    task pre_body();
+        if (starting_phase != null) starting_phase.raise_objection(this);
+    endtask
+    task post_body();
+        if (starting_phase != null) starting_phase.drop_objection(this);
+    endtask
+endclass
+class base_test extends uvm_test;
+    task finish(uvm_phase phase);
+        phase.drop_objection(this);
+    endtask
+endclass
+class my_test extends base_test;
+    task run_phase(uvm_phase phase);
+        phase.raise_objection(this);
+        if (phase == null) return;
+        #10;
+    endtask
+endclass
+";
+    assert_eq!(objections(tb), []);
+}
+
+#[test]
+fn an_objection_nobody_drops_is_still_reported() {
+    let tb = "\
+class my_test extends uvm_test;
+    task run_phase(uvm_phase phase);
+        phase.raise_objection(this);
+        #10;
+    endtask
+    task main_phase(uvm_phase phase);
+        phase.raise_objection(this);
+        #10;
+        phase.drop_objection(this);
+    endtask
+endclass
+class late_test extends uvm_test;
+    task run_phase(uvm_phase phase);
+        #5 phase.drop_objection(this);
+    endtask
+endclass
+";
+    // main_phase is balanced in itself: it does not drop run_phase's.
+    assert_eq!(
+        objections(tb),
+        [("UVM-OBJ-001", 3), ("UVM-OBJ-001", 14), ("UVM-OBJ-003", 2), ("UVM-OBJ-003", 14), ("UVM-PHS-006", 3)]
+    );
+}
+
+#[test]
+fn a_raise_and_a_drop_under_the_same_condition_balance() {
+    let tb = "\
+class my_test extends uvm_test;
+    bit quick;
+    task run_phase(uvm_phase phase);
+        if (!quick) phase.raise_objection(this);
+        #10;
+        if (!quick) phase.drop_objection(this);
+    endtask
+    task main_phase(uvm_phase phase);
+        phase.raise_objection(this);
+        if (quick) phase.drop_objection(this);
+        else #10;
+    endtask
+endclass
+";
+    // Dropped in one branch only is still a defect.
+    assert_eq!(objections(tb), [("UVM-OBJ-003", 10)]);
+}
+
+#[test]
+fn each_objection_handle_is_followed_on_its_own() {
+    let tb = "\
+class my_test extends uvm_test;
+    uvm_objection done;
+    task run_phase(uvm_phase phase);
+        phase.raise_objection(this);
+        done.raise_objection(this);
+        #10;
+        done.drop_objection(this);
+        phase.drop_objection(this);
+        done.drop_objection(this);
+    endtask
+endclass
+";
+    // The second drop of `done` has nothing to drop; `phase` is balanced.
+    assert_eq!(objections(tb), [("UVM-OBJ-003", 9)]);
+}
