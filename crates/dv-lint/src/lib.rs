@@ -62,6 +62,7 @@ mod waivers;
 
 pub mod catalog;
 mod guidelines;
+mod sem;
 
 #[allow(dead_code)]
 pub(crate) mod json;

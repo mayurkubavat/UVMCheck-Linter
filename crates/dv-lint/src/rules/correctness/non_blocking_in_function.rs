@@ -22,9 +22,12 @@ pub(crate) fn nonblocking_in_function(c: &Cst, s: &mut Sink) {
                 continue;
             }
             let Some(op) = c.tok(n, "<=") else { continue };
-            let lhs =
-                c.tree.children(n).next().map(|l| crate::support::slang_ast::slang_trimmed(c, l)).unwrap_or_default();
-            if crate::rules::concurrency::blocking_assignment_to_interface::interface_signal(&lhs) {
+            // A drive of an interface or clocking block signal is what '<='
+            // is for: by the target's declarations, else by its names.
+            let Some(l) = c.tree.children(n).next() else { continue };
+            let lhs = crate::support::slang_ast::slang_trimmed(c, l);
+            use crate::rules::concurrency::blocking_assignment_to_interface::interface_signal;
+            if crate::sem::reach(c, l).map_or_else(|| interface_signal(&lhs), |r| r.driven_from_testbench()) {
                 continue;
             }
             s.add(

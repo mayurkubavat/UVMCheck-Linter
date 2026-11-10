@@ -5,11 +5,19 @@
 //! Not in the UVM phases that run before simulation time starts
 //! (build, connect, end_of_elaboration, start_of_simulation): writing a
 //! configuration bit of an interface there (`cfg.vif.if_mode = ...`, as
-//! OpenTitan's agents do) races with nothing. Nor for a bare `cb.x` in a
-//! class, where `cb` cannot be a clocking block. The C++ rule is the same.
+//! OpenTitan's agents do) races with nothing.
+//!
+//! What the target is comes from its declarations ([`crate::sem::reach`]):
+//! `bus.drv.data` is a clocking drive when `bus` is declared `virtual
+//! bus_if` and `bus_if` declares the clocking block `drv`, whatever the
+//! names; `cb.fname` is not one when `cb` is a callback handle. Only a
+//! target that does not resolve (a type parameter, a call in the path, a
+//! class that is not compiled) is judged by its names, as the C++ engine
+//! judges every target: `vif.`, `_vif.`, `.cb.`, and a leading `cb.`
+//! outside a class.
 
-/// The text of an assignment target that is a clocking block or virtual
-/// interface signal (shared with SV-LANG-005).
+/// The text of an assignment target that looks like a clocking block or
+/// virtual interface signal.
 pub(crate) fn interface_signal(lhs: &str) -> bool {
     lhs.contains(".cb.") || lhs.starts_with("cb.") || lhs.contains("vif.") || lhs.contains("_vif.")
 }
@@ -18,7 +26,7 @@ pub(crate) fn interface_signal(lhs: &str) -> bool {
 /// a class, so there `cb` is a handle or a variable (UVM's own
 /// `for (uvm_vreg_cbs cb = cbs.first(); ...) cb.fname = ...`). A clocking
 /// block reached from a class goes through the interface (`vif.cb.x`).
-pub(crate) fn handle_named_cb(c: &Cst, n: sv_syntax::NodeId, lhs: &str) -> bool {
+fn handle_named_cb(c: &Cst, n: sv_syntax::NodeId, lhs: &str) -> bool {
     lhs.starts_with("cb.")
         && !lhs.contains(".cb.")
         && !lhs.contains("vif.")
@@ -49,6 +57,16 @@ use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 
+/// An assignment target that is a signal of a virtual interface or of a
+/// clocking block: by its declarations when they
+/// resolve, else by its names.
+pub(crate) fn drives_interface(c: &Cst, target: sv_syntax::NodeId, lhs: &str) -> bool {
+    match crate::sem::reach(c, target) {
+        Some(r) => r.driven_from_testbench(),
+        None => interface_signal(lhs) && !handle_named_cb(c, target, lhs),
+    }
+}
+
 pub(crate) fn blocking_to_interface(c: &Cst, s: &mut Sink) {
     for b in c.nodes(BinaryExpr) {
         let Some(op) = c.keyword(b) else { continue };
@@ -63,7 +81,7 @@ pub(crate) fn blocking_to_interface(c: &Cst, s: &mut Sink) {
         }
         let Some(&l) = kids(c, b).first() else { continue };
         let lhs = slang_trimmed(c, l);
-        if interface_signal(&lhs) && !handle_named_cb(c, b, &lhs) && !in_setup_phase(c, b) {
+        if drives_interface(c, l, &lhs) && !in_setup_phase(c, b) {
             s.add(
                 "SV-INT-001",
                 "BlockingAssignmentToInterface",

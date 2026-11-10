@@ -21,3 +21,17 @@ The constraint analyzers only read bounds of one variable against constants
 (comparisons, `inside`, `!`, `&&`, `soft`, `dist`) and leave everything else
 out, so what they report is certain: if a subset of the constraints has no
 solution, neither do all of them.
+
+## Rules the native engine answers from declarations
+
+Some rules both engines have must know what a reference is. The native engine
+resolves it; the C++ engine goes by how the handle is named.
+
+| Rule | Native engine | C++ engine |
+|---|---|---|
+| `SV-INT-001`, `SV-LANG-005` | An assignment target is an interface drive when its declarations say so: `cfg.bus.drv.data` with `bus` declared `virtual bus_if` (also through a typedef, an inherited property, or an array of handles) and `drv` a clocking block of `bus_if`. A struct called `my_vif` is not one. | A target whose text has `vif.`, `_vif.` or `.cb.`, or starts with `cb.` outside a class. |
+
+A target the native engine cannot resolve (the handle's type is a type
+parameter, the path has a call in it, a class or interface is declared twice
+or is not compiled) is judged by its names, as in the C++ engine, so the two
+agree on those.
