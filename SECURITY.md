@@ -8,7 +8,7 @@ Only the latest release and the `main` branch get security fixes.
 
 Please report vulnerabilities privately through GitHub:
 **Security > Report a vulnerability** on
-[the repository](https://github.com/mayurkubavat/UVMCheck-Linter/security/advisories/new).
+[the repository](https://github.com/mayurkubavat/svlang/security/advisories/new).
 Do not open a public issue.
 
 Include the version or commit, the command line, and a minimal input that

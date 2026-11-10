@@ -21,8 +21,8 @@ Real-time SystemVerilog and UVM static analysis in your editor, powered by **UVM
 The extension runs one server, `dv-lsp`: lint diagnostics and quick fixes, code browsing and completion. Release builds of the extension (`.vsix` per platform, attached to each GitHub release) bundle it for Linux x64 and macOS arm64; nothing else is needed. On other platforms, or to use your own build, put `dv-lsp` on `PATH` or set `uvmcheck.navigation.serverPath`:
 
 ```bash
-git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
-cd UVMCheck-Linter
+git clone https://github.com/mayurkubavat/svlang.git
+cd svlang
 cargo build --release -p dv-lsp
 export PATH="$(pwd)/target/release:$PATH"
 ```

@@ -20,4 +20,4 @@ interpreter).
     uvmcheck --init            # write a starter .uvmcheck/config.py for this project
     uvmcheck --explain SV-RND-001
 
-Guide, rule catalog and source: https://github.com/mayurkubavat/UVMCheck-Linter
+Guide, rule catalog and source: https://github.com/mayurkubavat/svlang

@@ -58,8 +58,8 @@ UVMCheck provides pre-configured CMake presets for fast, out-of-the-box building
 
 ```bash
 # Clone the repository
-git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
-cd UVMCheck-Linter
+git clone https://github.com/mayurkubavat/svlang.git
+cd svlang
 
 # Configure using Release preset
 cmake --preset reference
@@ -288,7 +288,7 @@ permissions: { contents: read, security-events: write }
 steps:
   - uses: actions/checkout@v4
     with: { fetch-depth: 0 }            # needed for changed-since
-  - uses: mayurkubavat/UVMCheck-Linter@main
+  - uses: mayurkubavat/svlang@main
     with:
       changed-since: origin/main         # optional: only findings on changed lines
       args: ""                           # optional: sources/-f lists; empty uses .uvmcheck/config.py
@@ -297,7 +297,7 @@ steps:
 
 **pre-commit.** Add to `.pre-commit-config.yaml` (uvmcheck on `PATH`); `uvmcheck` checks lines changed since `HEAD`, `uvmcheck-full` lints the whole project on push:
 ```yaml
-- repo: https://github.com/mayurkubavat/UVMCheck-Linter
+- repo: https://github.com/mayurkubavat/svlang
   rev: main
   hooks: [{ id: uvmcheck }, { id: uvmcheck-full }]
 ```

@@ -23,8 +23,8 @@ UVMCheck is configured with CMake presets and Ninja job pools to prevent out-of-
 
 ```bash
 # Clone the repository
-git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
-cd UVMCheck-Linter
+git clone https://github.com/mayurkubavat/svlang.git
+cd svlang
 
 # Configure using Release preset
 cmake --preset reference

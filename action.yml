@@ -60,7 +60,7 @@ runs:
           *) echo "uvmcheck has no release build for $RUNNER_OS-$RUNNER_ARCH; leave 'version' empty to build it" >&2; exit 2 ;;
         esac
         mkdir -p "$DEST"
-        curl -fsSL "https://github.com/mayurkubavat/UVMCheck-Linter/releases/download/$VERSION/uvmcheck-$target.tar.gz" \
+        curl -fsSL "https://github.com/mayurkubavat/svlang/releases/download/$VERSION/uvmcheck-$target.tar.gz" \
           | tar -xz -C "$DEST" --strip-components=1
         echo "UVMCHECK=$DEST/bin/uvmcheck" >> "$GITHUB_ENV"
 

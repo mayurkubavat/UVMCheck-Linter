@@ -113,5 +113,5 @@ Exit status: 0 no ERROR finding remains, 1 an ERROR finding remains,
 Environment: DV_LINT_JOBS (threads; default every core), UVMCHECK_PYTHON
 (the interpreter for config.py and Python rules).
 
-Guide and rule catalog: https://github.com/mayurkubavat/UVMCheck-Linter
+Guide and rule catalog: https://github.com/mayurkubavat/svlang
 ";

@@ -12,7 +12,7 @@ There are two engines that share one rule set and one test suite:
 | Engine | Where | Front end | Binary |
 |---|---|---|---|
 | **uvmcheck** (C++20) | [`cpp/`](cpp/) | [Slang](https://github.com/MikePopoloski/slang) | `build/uvmcheck` |
-| **dv-lint** and the DV tools (Rust): what releases ship | [`crates/`](crates/) | native lexer, preprocessor, parser and elaborator (Slang only as an opt-in reference) | `target/release/uvmcheck` (also built as `dv-lint`), `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist` |
+| **dv-lint** and the DV tools (Rust): what releases ship | [`crates/`](crates/) | [`svlang`](crates/svlang/) — pure-Rust lexer, preprocessor, parser and elaborator (Slang only as an opt-in reference) | `target/release/uvmcheck` (also built as `dv-lint`), `dv-lsp`, `dv-build`, `dv-map`, `dv-filelist` |
 
 Every rule has a `bad.sv` / `good.sv` pair under [`testdata/rules/`](testdata/rules/)
 that both engines are tested against, and parity gates check that their
@@ -22,7 +22,7 @@ findings match on real code. The rule catalog is in
 ## Install
 
 **A release build.** Tagged
-[releases](https://github.com/mayurkubavat/UVMCheck-Linter/releases) attach
+[releases](https://github.com/mayurkubavat/svlang/releases) attach
 `uvmcheck-<platform>.tar.gz` for Linux x64 and arm64 (glibc 2.28 or later)
 and macOS arm64 and x64: `uvmcheck` (the native engine), `dv-lsp`,
 `dv-build`, `dv-map`, `dv-filelist` and the Python SDK. Unpack it and put
@@ -31,8 +31,8 @@ its `bin/` on your `PATH`. The VS Code extension is attached too.
 **From source.** The native tools need only a Rust toolchain (1.82+):
 
 ```sh
-git clone https://github.com/mayurkubavat/UVMCheck-Linter.git
-cd UVMCheck-Linter
+git clone https://github.com/mayurkubavat/svlang.git
+cd svlang
 cargo build --release            # -> target/release/uvmcheck (also as dv-lint), dv-lsp, dv-build, dv-map, dv-filelist
 ```
 
