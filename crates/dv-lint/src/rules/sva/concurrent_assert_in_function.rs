@@ -5,7 +5,7 @@ use crate::support::procedural::start;
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn concurrent_in_function(c: &Cst, s: &mut Sink) {
     for a in c.nodes(ConcurrentAssert) {

@@ -9,8 +9,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{ClassId, Design, Method};
 use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn is_build_time(m: &str) -> bool {
     matches!(m, "new" | "build_phase" | "connect_phase" | "end_of_elaboration_phase" | "start_of_simulation_phase")

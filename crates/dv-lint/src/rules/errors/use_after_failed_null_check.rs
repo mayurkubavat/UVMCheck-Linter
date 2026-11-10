@@ -9,8 +9,8 @@ use crate::support::slang_ast::{call_parts, kids, user_routines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The declaration a handle-typed name or member access refers to.
 fn tracked(c: &Cst, e: NodeId) -> Option<(u32, String)> {

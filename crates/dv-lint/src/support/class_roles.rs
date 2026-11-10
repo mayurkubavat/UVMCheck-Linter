@@ -11,7 +11,7 @@
 use std::collections::HashMap;
 
 use dv_model::{Class, ClassId, Design, Loc, Method};
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use svlang::syntax::{Child, NodeId, SyntaxKind};
 
 use crate::syntax::Cst;
 use SyntaxKind::*;

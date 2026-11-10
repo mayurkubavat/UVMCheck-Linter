@@ -6,7 +6,7 @@ use crate::support::slang_ast::*;
 use crate::support::sva_cov::{bins_kw, bins_name, bins_values, label_of};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn illegal_bin_overlap(c: &Cst, s: &mut Sink) {
     for cp in c.nodes(Coverpoint) {

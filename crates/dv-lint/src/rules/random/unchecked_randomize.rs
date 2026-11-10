@@ -4,7 +4,7 @@
 use crate::support::class_items::{call_name, strip_casts};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unchecked_randomize(c: &Cst, s: &mut Sink) {
     for st in c.nodes(ExprStmt) {

@@ -7,8 +7,8 @@ use crate::support::routine_bodies::bodies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Class, Design};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The type arguments of `name#(A, B)` written in a data type or name.
 fn type_args(c: &Cst, n: NodeId) -> Vec<String> {

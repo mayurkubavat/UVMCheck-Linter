@@ -53,11 +53,11 @@ pub(crate) fn uvm_factory_missing_utils(d: &Design, csts: &[crate::syntax::Cst],
 fn register_fix(
     c: &crate::syntax::Cst,
     csts: &[crate::syntax::Cst],
-    cls: sv_syntax::NodeId,
+    cls: svlang::syntax::NodeId,
     mac: &str,
     name: &str,
 ) -> Option<crate::fix::Fix> {
-    use sv_syntax::SyntaxKind::*;
+    use svlang::syntax::SyntaxKind::*;
     if c.kind(cls) != ClassDecl {
         return None;
     }

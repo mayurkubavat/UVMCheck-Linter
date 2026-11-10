@@ -5,7 +5,7 @@ use crate::support::class_roles::{class_methods, user_classes, Ctx, Index};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Class, Design};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 fn singleton_finding(cls: &Class, var: &str, loc: dv_model::Loc, out: &mut Sink) {
     out.add(

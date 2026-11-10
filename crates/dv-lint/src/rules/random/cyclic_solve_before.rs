@@ -6,8 +6,8 @@ use crate::support::class_items::{class_decls, span_text, subtree, trim};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// A solve-before item: its `solve` token and the two lists of expressions
 /// (each as written, trimmed, with its tokens).

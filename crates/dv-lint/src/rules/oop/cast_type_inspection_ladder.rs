@@ -4,7 +4,7 @@
 use crate::support::calls::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn cast_ladder(c: &Cst, s: &mut Sink) {
     for n in c.nodes(IfStmt) {

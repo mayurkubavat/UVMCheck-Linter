@@ -37,9 +37,9 @@ fn a_workspace_applies_the_project_and_reads_editor_text() {
 
     // The editor's text stands in for the file: the first TODO moved down a
     // line, and the waived line now holds another.
-    sv_syntax::overlay::set(&top, "module top;\n// TODO moved\nlogic a; // TODO new\nendmodule\n");
+    svlang::syntax::overlay::set(&top, "module top;\n// TODO moved\nlogic a; // TODO new\nendmodule\n");
     let checked = ws.check(&[]).unwrap();
-    sv_syntax::overlay::clear(&top);
+    svlang::syntax::overlay::clear(&top);
     assert_eq!(rules(&checked), vec![("SV-STY-003", 3)], "line 4 is waived");
     assert_eq!(rules(&ws.check(&[]).unwrap()), vec![("SV-STY-003", 2)]);
 

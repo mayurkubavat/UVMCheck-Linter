@@ -10,8 +10,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// Variables assigned the result of a UVM library call (s = f.get_access()).
 fn from_library(d: &Design, ix: &Index, r: &Routine) -> HashSet<Sym> {

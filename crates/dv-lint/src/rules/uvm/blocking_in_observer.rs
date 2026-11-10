@@ -7,7 +7,7 @@ use crate::support::uvm_syntax::{body_items, name_node, routine_last_name, subtr
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 pub(crate) fn blocking_in_observer(d: &Design, csts: &[Cst], s: &mut Sink) {

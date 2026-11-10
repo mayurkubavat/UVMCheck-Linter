@@ -3,7 +3,7 @@
 
 use crate::fx::FxMap as HashMap;
 
-use dv_model::{Assignment, Call, Direction, Loc, RootKind, TypeShape};
+use crate::model::{Assignment, Call, Direction, Loc, RootKind, TypeShape};
 use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 

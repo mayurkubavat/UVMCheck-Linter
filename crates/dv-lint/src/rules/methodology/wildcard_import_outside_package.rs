@@ -6,7 +6,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::HashSet;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn wildcard_import_outside_package(_: &Design, csts: &[Cst], out: &mut Sink) {
     let mut seen = HashSet::new();

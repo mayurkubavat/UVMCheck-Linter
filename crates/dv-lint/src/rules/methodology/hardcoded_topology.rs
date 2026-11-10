@@ -7,8 +7,8 @@ use crate::support::routine_bodies::{bodies, creations, integer_literal, Calls};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind::*;
-use sv_syntax::{Child, NodeId};
+use svlang::syntax::SyntaxKind::*;
+use svlang::syntax::{Child, NodeId};
 
 /// A loop: its keyword, the slots between its parentheses (split at `;`)
 /// and its body.

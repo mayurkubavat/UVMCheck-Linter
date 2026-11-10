@@ -6,7 +6,7 @@ use crate::support::data_items::{data_items, methods, routine_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 const PRIMITIVE: &[&str] = &[
     "int",

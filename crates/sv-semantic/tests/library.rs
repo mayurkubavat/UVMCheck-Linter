@@ -4,7 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 
 fn scratch(name: &str) -> PathBuf {
-    let d = std::env::temp_dir().join(format!("sv-sema-lib-{}-{name}", std::process::id()));
+    let d = std::env::temp_dir().join(format!("sv-semantic-lib-{}-{name}", std::process::id()));
     fs::remove_dir_all(&d).ok();
     fs::create_dir_all(d.join("cells")).unwrap();
     fs::write(d.join("top.sv"), "module top; cellA u1(); cellB #(.W(2)) u2(); endmodule\n").unwrap();
@@ -17,8 +17,8 @@ fn scratch(name: &str) -> PathBuf {
 }
 
 fn hier(args: &[String]) -> Vec<String> {
-    let (trees, _) = sv_sema::parse_args(args).unwrap();
-    sv_sema::elaborate_full(&trees, &[]).hierarchy
+    let (trees, _) = sv_semantic::parse_args(args).unwrap();
+    sv_semantic::elaborate_full(&trees, &[]).hierarchy
 }
 
 #[test]
@@ -32,7 +32,7 @@ fn v_files_and_y_dirs_resolve_instances() {
     // cellB's own instance is found too, and library modules are never tops.
     assert!(h.contains(&"top.u2 instance c : cellC".to_string()), "{h:?}");
     assert!(!h.iter().any(|l| l.contains("spare")), "{h:?}");
-    let (trees, _) = sv_sema::parse_args(&args).unwrap();
+    let (trees, _) = sv_semantic::parse_args(&args).unwrap();
     assert_eq!(trees.iter().filter(|t| t.library).count(), 3);
     fs::remove_dir_all(&d).ok();
 }
@@ -54,7 +54,7 @@ fn a_source_definition_wins_over_the_library() {
     let p = |s: &str| d.join(s).display().to_string();
     fs::write(d.join("own.sv"), "module cellA; endmodule\n").unwrap();
     let args = vec!["-v".into(), p("lib.v"), p("own.sv"), p("top.sv")];
-    let (trees, _) = sv_sema::parse_args(&args).unwrap();
+    let (trees, _) = sv_semantic::parse_args(&args).unwrap();
     assert_eq!(trees.iter().filter(|t| t.library).count(), 0);
     fs::remove_dir_all(&d).ok();
 }

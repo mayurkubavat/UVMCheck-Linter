@@ -8,7 +8,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
 use std::collections::{HashMap, HashSet};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// Names a `X::` scope may start with: classes, packages and typedefs.

@@ -1,6 +1,6 @@
 //! Lossless SystemVerilog syntax tree (R2 of the Rust front end).
 //!
-//! The parser reads `sv-preproc`'s token stream and builds a [`Tree`]: a
+//! The parser reads `sv-preprocessor`'s token stream and builds a [`Tree`]: a
 //! flat token array plus a node arena, where every token is a leaf exactly
 //! once and carries the source text before it as trivia, so each file can
 //! be given back byte for byte ([`Tree::file_text`]). Node kinds are in
@@ -47,7 +47,7 @@ pub use exprs::canonical_exprs;
 pub use kinds::SyntaxKind;
 pub use outline::{outline, OutlineEntry};
 pub use sv_lexer::Kind as TokenKind;
-pub use sv_preproc::{overlay, Options, Origin};
+pub use sv_preprocessor::{overlay, Options, Origin};
 /// A built-in data type keyword (`int`, `bit`, `string`, ...).
 pub fn is_builtin_type(s: &str) -> bool {
     grammar::BUILTIN_TYPES.contains(&s)
@@ -57,31 +57,31 @@ pub use tree::{Child, Node, NodeId, SyntaxError, Token, Tree};
 
 /// Preprocesses and parses one file.
 pub fn parse_file(path: &Path, opts: Options) -> Tree {
-    let out = sv_preproc::Preprocessor::new(opts).run_file(path);
+    let out = sv_preprocessor::Preprocessor::new(opts).run_file(path);
     parse_output(out)
 }
 
 /// Parses files in order as one compilation: a macro defined in one file is
 /// seen by the files after it, as simulators and slang do.
 pub fn parse_files(paths: &[impl AsRef<Path>], opts: Options) -> Vec<Tree> {
-    let mut pp = sv_preproc::Preprocessor::new(opts);
+    let mut pp = sv_preprocessor::Preprocessor::new(opts);
     paths.iter().map(|p| parse_output(pp.run_file(p.as_ref()))).collect()
 }
 
 /// Parses files in order as one compilation unit and one tree (slang's
 /// `--single-unit`): `$unit` declarations are shared too.
 pub fn parse_unit(paths: &[impl AsRef<Path>], opts: Options) -> Tree {
-    parse_output(sv_preproc::Preprocessor::new(opts).run_files(paths))
+    parse_output(sv_preprocessor::Preprocessor::new(opts).run_files(paths))
 }
 
 /// Preprocesses and parses `src` as if read from a file called `name`.
 pub fn parse_source(src: &str, name: &str, opts: Options) -> Tree {
-    let out = sv_preproc::Preprocessor::new(opts).run_source(src, name);
+    let out = sv_preprocessor::Preprocessor::new(opts).run_source(src, name);
     parse_output(out)
 }
 
 /// Parses tokens the preprocessor produced.
-pub fn parse_output(out: sv_preproc::Output) -> Tree {
+pub fn parse_output(out: sv_preprocessor::Output) -> Tree {
     let tokens = tree::tokens_from(&out);
     let mut p = parser::Parser::new(&tokens);
     grammar::source_file(&mut p);

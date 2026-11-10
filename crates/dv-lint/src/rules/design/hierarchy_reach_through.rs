@@ -8,7 +8,7 @@ use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn hierarchy_reach_through(c: &Cst, s: &mut Sink) {

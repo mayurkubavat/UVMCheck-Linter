@@ -5,7 +5,7 @@ use crate::support::class_index::decl_names;
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 pub(crate) fn mutable_package_state(c: &Cst, s: &mut Sink) {

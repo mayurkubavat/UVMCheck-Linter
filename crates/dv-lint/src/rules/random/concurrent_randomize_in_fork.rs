@@ -6,8 +6,8 @@ use crate::support::class_items::subtree;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn randomize_target(c: &Cst, e: NodeId, out: &mut Vec<(String, u32)>) {
     match c.kind(e) {

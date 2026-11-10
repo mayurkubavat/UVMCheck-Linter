@@ -5,7 +5,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 /// A lone literal: a quoted string, or a number (`0`, `8'hFF`, `'1`, `1.5`).

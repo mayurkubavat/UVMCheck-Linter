@@ -8,8 +8,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::BTreeSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// RUS-002's value types it leaves out: a class handle, a virtual
 /// interface or an unpacked array.

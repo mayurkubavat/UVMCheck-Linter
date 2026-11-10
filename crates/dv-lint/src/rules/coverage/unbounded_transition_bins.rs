@@ -5,7 +5,7 @@ use crate::support::slang_ast::*;
 use crate::support::sva_cov::bins_name;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unbounded_transition(c: &Cst, s: &mut Sink) {
     for it in c.nodes(TransItem) {

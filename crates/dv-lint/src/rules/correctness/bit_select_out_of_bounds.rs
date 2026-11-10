@@ -5,7 +5,7 @@ use crate::support::literal_values::{decl_of_expr, int_value};
 use crate::support::literals::ast_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// `[left:right]` of the first dimension a select on the declaration
@@ -35,7 +35,7 @@ fn fixed_range(c: &Cst, d: &crate::support::slang_ast::Decl) -> Option<(i64, i64
     for _ in 0..4 {
         let toks: Vec<u32> = c.toks(dt).collect();
         let [t] = toks[..] else { break };
-        if c.tree.tokens[t as usize].kind != sv_syntax::TokenKind::Identifier {
+        if c.tree.tokens[t as usize].kind != svlang::syntax::TokenKind::Identifier {
             break;
         }
         let name = c.text_of(t);

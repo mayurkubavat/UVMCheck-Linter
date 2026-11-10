@@ -6,8 +6,8 @@
 use crate::support::calls::{args, callee};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn config_db_wildcard(c: &Cst, s: &mut Sink) {
     for call in c.nodes(CallExpr) {

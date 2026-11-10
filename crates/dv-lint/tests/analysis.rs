@@ -23,7 +23,7 @@ fn run_with(src: &str, opts: &[String]) -> Vec<(u32, &'static str, String)> {
     std::fs::write(&f, src).unwrap();
     let mut args = opts.to_vec();
     args.push(f.display().to_string());
-    let (design, trees) = sv_sema::load_with_trees(&args).unwrap();
+    let (design, trees) = dv_model::load_with_trees(&args).unwrap();
     let (files, found) = dv_lint::lint_all(&design, &trees, |r| IDS.contains(&r));
     std::fs::remove_dir_all(&d).ok();
     found.iter().map(|x| (x.position_in(&files).1, x.rule, x.message.clone())).collect()

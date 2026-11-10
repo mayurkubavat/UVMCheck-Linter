@@ -4,8 +4,8 @@
 use crate::support::handles::{body_refs_if_good, routine_is_virtual};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unused_routine_argument(c: &Cst, out: &mut Sink) {
     for (r, n) in crate::support::slang_ast::user_routines(c) {

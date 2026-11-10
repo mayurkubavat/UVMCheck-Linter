@@ -8,7 +8,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
 use std::collections::HashSet;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn accellera_only_api(_: &Design, csts: &[Cst], out: &mut Sink) {
     let Some(pack) = api_pack(csts) else { return };

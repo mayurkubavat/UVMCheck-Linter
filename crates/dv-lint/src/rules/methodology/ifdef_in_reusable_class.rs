@@ -6,9 +6,9 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::HashSet;
-use sv_lexer::Kind;
-use sv_syntax::SyntaxKind::*;
-use sv_syntax::Tree;
+use svlang::lexer::Kind;
+use svlang::syntax::SyntaxKind::*;
+use svlang::syntax::Tree;
 
 /// A conditional directive (token `i` of file `f`) was seen by the
 /// preprocessor. A skipped range runs from the first branch not taken, so a

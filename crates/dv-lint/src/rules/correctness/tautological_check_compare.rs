@@ -6,7 +6,7 @@ use crate::support::data_items::{is_number_literal, strip_conv, unparen};
 use crate::support::sema_facts::{ast_ok, visits};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn tautological_compare(c: &Cst, s: &mut Sink) {
     for n in c.nodes(BinaryExpr) {

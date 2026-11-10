@@ -6,7 +6,7 @@ use crate::support::uvm_syntax::{body_items, routine_last_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 fn strip_comments_and_ws(input: &str) -> String {

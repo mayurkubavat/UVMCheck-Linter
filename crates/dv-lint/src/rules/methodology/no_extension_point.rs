@@ -8,8 +8,8 @@ use crate::support::routine_bodies::{if_parts, is_report_guard, is_stmt};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn is_scaffolding(c: &Cst, s: NodeId) -> bool {
     match c.kind(s) {

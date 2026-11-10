@@ -8,7 +8,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Loc;
 use std::collections::HashMap;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn ignore_illegal_overlap(c: &Cst, s: &mut Sink) {
     for cp in c.nodes(Coverpoint) {

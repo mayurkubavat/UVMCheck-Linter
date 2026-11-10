@@ -3,11 +3,11 @@
 //!
 //! The literal rules visit slang's AST, which holds a literal once per
 //! elaborated copy of the code around it
-//! ([`sv_sema::Elaborated::copies`]) and leaves out what elaboration folds
+//! ([`svlang::semantic::Elaborated::copies`]) and leaves out what elaboration folds
 //! away: dimensions, generate conditions and loop headers, and parameter
 //! defaults every instance overrides.
 
-use sv_syntax::{NodeId, SyntaxKind, TokenKind};
+use svlang::syntax::{NodeId, SyntaxKind, TokenKind};
 
 use std::collections::HashMap;
 
@@ -103,7 +103,7 @@ pub(crate) fn instantiations(c: &Cst) -> std::rc::Rc<Insts> {
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
-            own = Cst::new(t, i, sv_sema::Locator::default());
+            own = Cst::new(t, i, svlang::semantic::Locator::default());
             own.all = c.all;
             &own
         };

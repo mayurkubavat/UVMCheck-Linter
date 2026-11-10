@@ -2,7 +2,7 @@
 //! instead of in the process.
 //!
 //! ```no_run
-//! # let (design, trees): (dv_model::Design, Vec<sv_syntax::Tree>) = todo!();
+//! # let (design, trees): (dv_model::Design, Vec<svlang::syntax::Tree>) = todo!();
 //! let mut session = dv_lint::Session::new();
 //! session.add_tops(&["tb_top".to_string()]).set_skip_libraries(true);
 //! let (files, findings) = session.lint_all(&design, &trees, |_| true);
@@ -123,7 +123,7 @@ impl Session {
     pub fn lint_all(
         &self,
         design: &Design,
-        trees: &[sv_syntax::Tree],
+        trees: &[svlang::syntax::Tree],
         keep: impl Fn(&str) -> bool,
     ) -> (Vec<String>, Vec<Finding>) {
         crate::lint_from(Arc::new(self.settings.clone()), crate::Source::Ready(design), trees, keep).1
@@ -133,7 +133,7 @@ impl Session {
     pub fn lint_built(
         &self,
         build: impl FnOnce() -> Design,
-        trees: &[sv_syntax::Tree],
+        trees: &[svlang::syntax::Tree],
         keep: impl Fn(&str) -> bool,
     ) -> (Design, (Vec<String>, Vec<Finding>)) {
         let settings = Arc::new(self.settings.clone());

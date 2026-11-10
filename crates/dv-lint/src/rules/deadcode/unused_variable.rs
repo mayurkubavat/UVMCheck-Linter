@@ -6,8 +6,8 @@ use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The classes slang's model lists: non-generic classes of `$unit`,
 /// packages and other such classes (not of modules, not generic).

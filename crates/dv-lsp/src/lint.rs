@@ -4,7 +4,7 @@
 //! Linting runs on a thread of its own, so navigation requests are answered
 //! while a check is under way. Every edit asks for a check; the thread waits
 //! for a pause in typing, then checks the project once with the editor's
-//! text standing in for the open files (`sv_syntax::overlay`) and publishes
+//! text standing in for the open files (`svlang::syntax::overlay`) and publishes
 //! each open file's diagnostics. What it published is kept, so a code action
 //! request is answered from it without linting again.
 
@@ -83,7 +83,7 @@ impl Texts {
         self.0
             .entry(path.to_string())
             .or_insert_with(|| {
-                let text = sv_syntax::overlay::read(Path::new(path)).ok()?;
+                let text = svlang::syntax::overlay::read(Path::new(path)).ok()?;
                 let index = LineIndex::new(&text);
                 Some((text, index))
             })
@@ -318,7 +318,7 @@ impl Linter {
 
     /// The editor opened `path` or changed its text.
     pub fn changed(&self, path: &Path, uri: &str, text: &str) {
-        sv_syntax::overlay::set(path, text);
+        svlang::syntax::overlay::set(path, text);
         self.state.lock().unwrap_or_else(|e| e.into_inner()).open.insert(path.to_path_buf(), uri.to_string());
         self.request();
     }
@@ -326,7 +326,7 @@ impl Linter {
     /// The editor closed `path`: the file on disk counts again, and its
     /// diagnostics go away.
     pub fn closed(&self, path: &Path, uri: &str) {
-        sv_syntax::overlay::clear(path);
+        svlang::syntax::overlay::clear(path);
         {
             let mut state = self.state.lock().unwrap_or_else(|e| e.into_inner());
             state.open.remove(path);

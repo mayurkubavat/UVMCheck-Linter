@@ -6,8 +6,8 @@ use crate::support::routine_bodies::{bodies, calls_in};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The object a call works on: `obj` of `obj.f()`, the first argument of
 /// `std::randomize(obj)`.

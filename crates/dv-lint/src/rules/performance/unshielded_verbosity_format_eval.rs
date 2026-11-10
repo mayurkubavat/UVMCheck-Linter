@@ -7,7 +7,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::HashMap;
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 fn unshielded_format(c: &Cst, a: &Ast, s: &mut Sink) {

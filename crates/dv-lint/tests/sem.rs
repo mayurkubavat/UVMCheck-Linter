@@ -59,10 +59,10 @@ endmodule
 /// (rule, line in tb.sv) of each finding of the two rules.
 fn findings() -> Vec<(&'static str, u32)> {
     let trees = [
-        sv_syntax::parse_source(LIB, "lib.sv", Default::default()),
-        sv_syntax::parse_source(TB, "tb.sv", Default::default()),
+        svlang::syntax::parse_source(LIB, "lib.sv", Default::default()),
+        svlang::syntax::parse_source(TB, "tb.sv", Default::default()),
     ];
-    let d = sv_sema::build(&trees);
+    let d = dv_model::build(&trees);
     let only = |id: &str| matches!(id, "SV-INT-001" | "SV-LANG-005");
     let mut out: Vec<(&'static str, u32)> = dv_lint::Session::new()
         .lint_all(&d, &trees, only)
@@ -101,8 +101,8 @@ fn interface_drives_are_recognised_by_declaration() {
 
 /// (rule, line) of the findings of `rules` in `src`.
 fn lint(src: &str, rules: &[&str]) -> Vec<(&'static str, u32)> {
-    let trees = [sv_syntax::parse_source(src, "t.sv", Default::default())];
-    let d = sv_sema::build(&trees);
+    let trees = [svlang::syntax::parse_source(src, "t.sv", Default::default())];
+    let d = dv_model::build(&trees);
     let mut out: Vec<(&'static str, u32)> = dv_lint::Session::new()
         .lint_all(&d, &trees, |id: &str| rules.contains(&id))
         .1

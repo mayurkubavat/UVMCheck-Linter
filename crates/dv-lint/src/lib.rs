@@ -2,7 +2,7 @@
 //!
 //! Each rule is a line-for-line port of its C++ twin under `cpp/src/rules/`.
 //! Model rules read only the class model, so any front end that fills a
-//! `Design` (slang or the native sv-sema) can feed them; syntax rules (see
+//! `Design` (slang or the native sv-semantic) can feed them; syntax rules (see
 //! [`syntax`]) read the native syntax tree. Messages are copied verbatim so
 //! findings compare one to one with `uvmcheck` (see `tools/gates/lint_parity.py`).
 //!
@@ -16,7 +16,7 @@
 //!
 //! Rules run on `DV_LINT_JOBS` threads (the machine's cores by default):
 //! each thread takes the next rule, slowest first. Work several rules need
-//! (expression types, sv-sema's checks, elaboration, specialization counts)
+//! (expression types, sv-semantic's checks, elaboration, specialization counts)
 //! is built once per compile in `shared` and waited for by the others; with
 //! many rules those caches are warmed first. Findings are put back in the
 //! serial order (model, then syntax, then mixed rules, each as registered),
@@ -406,7 +406,7 @@ pub fn lint(design: &Design, keep: impl Fn(&str) -> bool) -> Vec<Finding> {
 /// locations index (the design's, plus files only syntax rules reached).
 pub fn lint_all(
     design: &Design,
-    trees: &[sv_syntax::Tree],
+    trees: &[svlang::syntax::Tree],
     keep: impl Fn(&str) -> bool,
 ) -> (Vec<String>, Vec<Finding>) {
     lint_from(session::process(), Source::Ready(design), trees, keep).1
@@ -417,7 +417,7 @@ pub fn lint_all(
 /// thread builds the design. Returns the design too.
 pub fn lint_built(
     build: impl FnOnce() -> Design,
-    trees: &[sv_syntax::Tree],
+    trees: &[svlang::syntax::Tree],
     keep: impl Fn(&str) -> bool,
 ) -> (Design, (Vec<String>, Vec<Finding>)) {
     let (d, out) = lint_from(session::process(), Source::Build(Box::new(build)), trees, keep);
@@ -433,7 +433,7 @@ pub(crate) enum Source<'d> {
 pub(crate) fn lint_from(
     settings: std::sync::Arc<session::Settings>,
     design: Source<'_>,
-    trees: &[sv_syntax::Tree],
+    trees: &[svlang::syntax::Tree],
     keep: impl Fn(&str) -> bool,
 ) -> (Option<Design>, (Vec<String>, Vec<Finding>)) {
     let all: Vec<Rule> = rules().into_iter().filter(|r| keep(r.id)).collect();
@@ -496,14 +496,18 @@ pub(crate) fn jobs() -> usize {
 
 /// The rules one after another: model rules, then each tree's syntax
 /// rules, then the mixed rules over all trees.
-pub(crate) fn lint_serial(design: &Design, trees: &[sv_syntax::Tree], all: &[Rule]) -> (Vec<String>, Vec<Finding>) {
+pub(crate) fn lint_serial(
+    design: &Design,
+    trees: &[svlang::syntax::Tree],
+    all: &[Rule],
+) -> (Vec<String>, Vec<Finding>) {
     let mut sink = Sink::default();
     for r in all {
         if let Check::Model(run) = r.check {
             timed(r.id, || run(design, &mut sink));
         }
     }
-    let mut locator = sv_sema::Locator::new(design.files().to_vec());
+    let mut locator = svlang::semantic::Locator::new(design.files().to_vec());
     let mixed = all.iter().any(|r| matches!(r.check, Check::Mixed(_)));
     if all.iter().any(Rule::is_syntax) {
         let mut prior: std::collections::HashSet<std::path::PathBuf> = Default::default();
@@ -521,7 +525,7 @@ pub(crate) fn lint_serial(design: &Design, trees: &[sv_syntax::Tree], all: &[Rul
                 // Number every file of the tree now, so that the trees of
                 // the mixed pass below share one file table.
                 for f in 0..tree.files.len() as u32 {
-                    cst.loc_at(sv_syntax::Origin { file: f, offset: 0 });
+                    cst.loc_at(svlang::syntax::Origin { file: f, offset: 0 });
                 }
             }
             locator = cst.into_locator();
@@ -550,12 +554,12 @@ pub(crate) fn timed(id: &str, f: impl FnOnce()) {
 }
 
 /// The trees as the mixed rules see them, sharing file table `files`.
-pub(crate) fn mixed_csts<'t>(trees: &'t [sv_syntax::Tree], files: &[String]) -> Vec<syntax::Cst<'t>> {
+pub(crate) fn mixed_csts<'t>(trees: &'t [svlang::syntax::Tree], files: &[String]) -> Vec<syntax::Cst<'t>> {
     trees
         .iter()
         .enumerate()
         .map(|(ix, t)| {
-            let mut c = syntax::Cst::new(t, ix, sv_sema::Locator::new(files.to_vec()));
+            let mut c = syntax::Cst::new(t, ix, svlang::semantic::Locator::new(files.to_vec()));
             c.all = trees;
             c
         })
@@ -564,11 +568,11 @@ pub(crate) fn mixed_csts<'t>(trees: &'t [sv_syntax::Tree], files: &[String]) -> 
 
 /// The trees as the syntax rules see them (each knowing the files of the
 /// trees before it), sharing file table `files`.
-pub(crate) fn syntax_csts<'t>(trees: &'t [sv_syntax::Tree], files: &[String]) -> Vec<syntax::Cst<'t>> {
+pub(crate) fn syntax_csts<'t>(trees: &'t [svlang::syntax::Tree], files: &[String]) -> Vec<syntax::Cst<'t>> {
     let mut prior: std::collections::HashSet<std::path::PathBuf> = Default::default();
     let mut out = Vec::new();
     for (ix, tree) in trees.iter().enumerate() {
-        let mut c = syntax::Cst::new(tree, ix, sv_sema::Locator::new(files.to_vec()));
+        let mut c = syntax::Cst::new(tree, ix, svlang::semantic::Locator::new(files.to_vec()));
         c.prior_files = std::rc::Rc::new(prior.clone());
         c.all = trees;
         prior.extend(tree.files.iter().cloned());
@@ -608,7 +612,7 @@ pub(crate) const SLOW: &[&str] = &[
 pub(crate) fn lint_parallel<'d>(
     source: Source<'d>,
     built: &'d std::sync::OnceLock<Design>,
-    trees: &[sv_syntax::Tree],
+    trees: &[svlang::syntax::Tree],
     all: &[Rule],
     jobs: usize,
     gen: usize,
@@ -628,11 +632,11 @@ pub(crate) fn lint_parallel<'d>(
         }
     };
     let publish = |design: &'d Design| {
-        let mut locator = sv_sema::Locator::new(design.files().to_vec());
+        let mut locator = svlang::semantic::Locator::new(design.files().to_vec());
         for (ix, tree) in trees.iter().enumerate() {
             let cst = syntax::Cst::new(tree, ix, locator);
             for f in 0..tree.files.len() as u32 {
-                cst.loc_at(sv_syntax::Origin { file: f, offset: 0 });
+                cst.loc_at(svlang::syntax::Origin { file: f, offset: 0 });
             }
             locator = cst.into_locator();
         }
@@ -649,7 +653,7 @@ pub(crate) fn lint_parallel<'d>(
             |c| drop(shared::sema_checks(c)),
             |c| drop(shared::elaboration(c)),
             |c| {
-                let _ = c.spec_count(sv_syntax::NodeId(0));
+                let _ = c.spec_count(svlang::syntax::NodeId(0));
             },
         ]
     } else {
@@ -682,7 +686,7 @@ pub(crate) fn lint_parallel<'d>(
                                 let a = t0.elapsed().as_secs_f64() * 1e3;
                                 // The caches do not depend on the file table.
                                 if let Some(t) = trees.first() {
-                                    let mut c = syntax::Cst::new(t, 0, sv_sema::Locator::default());
+                                    let mut c = syntax::Cst::new(t, 0, svlang::semantic::Locator::default());
                                     c.all = trees;
                                     w(&c);
                                 }
@@ -766,19 +770,19 @@ pub(crate) fn lint_parallel<'d>(
 
 /// Visits of each generic class's body, one line per class, by the syntax
 /// engine and by the model: `<syntax count> <name>@<file>:<line> <model count>`.
-pub fn spec_report(design: &Design, trees: &[sv_syntax::Tree]) -> Vec<String> {
-    let mut locator = sv_sema::Locator::new(design.files().to_vec());
+pub fn spec_report(design: &Design, trees: &[svlang::syntax::Tree]) -> Vec<String> {
+    let mut locator = svlang::semantic::Locator::new(design.files().to_vec());
     let mut rows = Vec::new();
     for (ix, t) in trees.iter().enumerate() {
         let cst = syntax::Cst::new(t, ix, locator);
         for (node, k) in crate::support::specializations::spec_counts(&cst) {
-            let Some(nm) = cst.tree.child(sv_syntax::NodeId(node), sv_syntax::SyntaxKind::Name) else {
+            let Some(nm) = cst.tree.child(svlang::syntax::NodeId(node), svlang::syntax::SyntaxKind::Name) else {
                 continue;
             };
             let Some(tok) = cst.first_tok(nm) else {
                 continue;
             };
-            rows.push((k, cst.tree.bare_text(nm), cst.loc(tok), ix, sv_syntax::NodeId(node)));
+            rows.push((k, cst.tree.bare_text(nm), cst.loc(tok), ix, svlang::syntax::NodeId(node)));
         }
         locator = cst.into_locator();
     }
@@ -786,7 +790,7 @@ pub fn spec_report(design: &Design, trees: &[sv_syntax::Tree]) -> Vec<String> {
     let base =
         |f: u32| files.get(f as usize).map(|p| p.rsplit('/').next().unwrap_or("").to_string()).unwrap_or_default();
     let _ = design;
-    let model = sv_sema::spec_counts(trees);
+    let model = svlang::semantic::spec_counts(trees);
     let mut out: Vec<String> = rows
         .into_iter()
         .map(|(k, name, l, ix, node)| {

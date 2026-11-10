@@ -9,7 +9,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Class, Design, Loc};
 use std::collections::{BTreeMap, HashMap};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// A class's shape: its role, property count and method bodies with
 /// renaming; and how many tokens its methods have.

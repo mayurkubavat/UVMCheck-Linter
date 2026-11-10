@@ -4,7 +4,7 @@
 use crate::support::literal_values::int_value;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// slang's RangeSelectReversed diagnostic (the select itself does not

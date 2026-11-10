@@ -9,15 +9,15 @@ use std::collections::{HashMap, HashSet};
 
 use dv_model::{Design, Loc};
 
-use sv_lexer::Kind;
+use svlang::lexer::Kind;
 
-use sv_syntax::{NodeId, Origin, Tree};
+use svlang::syntax::{NodeId, Origin, Tree};
 
 use crate::support::class_roles::{key, role, user_classes, Role};
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn base_name(p: &str) -> &str {
     p.rsplit(['/', '\\']).next().unwrap_or(p)

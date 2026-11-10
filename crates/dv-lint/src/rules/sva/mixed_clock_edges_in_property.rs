@@ -5,8 +5,8 @@ use crate::support::slang_ast::*;
 use crate::support::sva_cov::assert_kw;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn edges(c: &Cst, n: NodeId) -> (bool, bool, Option<u32>) {
     let (mut pos, mut neg, mut first) = (false, false, None);

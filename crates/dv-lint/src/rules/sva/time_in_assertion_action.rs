@@ -7,7 +7,7 @@ use crate::support::slang_ast::*;
 use crate::support::sva_cov::{actions, add_n, ast_asserts};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn time_in_action(c: &Cst, s: &mut Sink) {
     for (kind, label) in [(AssertStmt, "immediate"), (ConcurrentAssert, "concurrent")] {

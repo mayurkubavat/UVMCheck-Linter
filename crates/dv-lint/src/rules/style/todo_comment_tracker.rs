@@ -3,8 +3,8 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_sema::fx::FxMap as HashMap;
-use sv_syntax::Origin;
+use svlang::semantic::fx::FxMap as HashMap;
+use svlang::syntax::Origin;
 
 /// The comments in `text` (which starts at byte `base` of its file), as
 /// byte ranges, with whether each is inside a `define. Strings are skipped.

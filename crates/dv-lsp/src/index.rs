@@ -6,7 +6,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use sv_syntax::{Child, NodeId, SyntaxKind as K, TokenKind, Tree};
+use svlang::syntax::{Child, NodeId, SyntaxKind as K, TokenKind, Tree};
 
 use crate::text::LineIndex;
 
@@ -130,8 +130,8 @@ pub struct FileIndex {
 impl FileIndex {
     pub fn build(path: &Path, text: String) -> FileIndex {
         // max_include_depth 1: the file alone, no `include followed.
-        let opts = sv_syntax::Options { max_include_depth: 1, ..Default::default() };
-        let tree = sv_syntax::parse_source(&text, &path.to_string_lossy(), opts);
+        let opts = svlang::syntax::Options { max_include_depth: 1, ..Default::default() };
+        let tree = svlang::syntax::parse_source(&text, &path.to_string_lossy(), opts);
         let mut b = Builder { tree: &tree, text: &text, syms: Vec::new(), imports: Vec::new() };
         b.walk(tree.root, None, false);
         let mut idents: HashMap<String, Vec<u32>> = HashMap::new();
@@ -627,7 +627,7 @@ fn join_tokens<'a>(toks: impl Iterator<Item = &'a str>, stop_at_semicolon: bool)
             || (txt == "(" && (word(prev) || prev == "#"))
             || (txt == "["
                 && word(prev)
-                && !sv_syntax::is_builtin_type(prev)
+                && !svlang::syntax::is_builtin_type(prev)
                 && !matches!(prev, "wire" | "reg" | "tri" | "signed" | "unsigned"))
             || (brackets > 0 && (txt == ":" || prev == ":"))
             || (word(txt) && prev.ends_with('\''));

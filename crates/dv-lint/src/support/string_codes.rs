@@ -5,7 +5,7 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 
 use dv_model::{Class, ClassId, Design, Loc};
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 use crate::support::routine_bodies::{bodies, case_parts, if_parts};
 
@@ -15,7 +15,7 @@ use crate::support::class_roles::{class_of_type_in, is_library, Ctx, Index, Type
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// A variable a name refers to: a routine's local or argument, or a class
 /// property (by the class that declares it).

@@ -9,7 +9,7 @@ use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use svlang::syntax::{Child, NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 pub(crate) fn fork_loop_variable(c: &Cst, s: &mut Sink) {

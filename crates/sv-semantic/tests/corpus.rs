@@ -21,7 +21,7 @@ fn paste_next_to_whitespace_is_dropped() {
          module m; bit [3:0] x; `CG(add) endmodule\n",
         &[],
     );
-    let s = sv_sema::scopes::build(&t);
+    let s = sv_semantic::scopes::build(&t);
     assert!(s.dump_full(None, None).iter().any(|l| l == "m covergroup add_cg"));
 }
 
@@ -41,8 +41,8 @@ fn based_literal_digits_from_a_macro() {
         "module m; parameter int unsigned A = 32'h`DM; parameter int unsigned B = 32'h`DM + (32'h`MK + 1); endmodule\n",
         &["DM=1A11_0000", "MK=0000_0FFF"],
     );
-    let s = sv_sema::scopes::build(&t);
-    let (tys, vals) = sv_sema::symbol_info(&t, &s);
+    let s = sv_semantic::scopes::build(&t);
+    let (tys, vals) = sv_semantic::symbol_info(&t, &s);
     let lines = s.dump_full(Some(tys.as_slice()), Some(vals.as_slice()));
     assert!(lines.iter().any(|l| l == "m parameter A : int unsigned = 32'd437321728"), "{lines:?}");
     assert!(lines.iter().any(|l| l == "m parameter B : int unsigned = 32'd437325824"), "{lines:?}");
@@ -63,9 +63,9 @@ fn macros_carry_from_one_file_to_the_next() {
 #[test]
 fn top_option_picks_the_roots() {
     let t = clean("module a; endmodule\nmodule b; endmodule\nmodule top; a u(); endmodule\n", &[]);
-    let (all, _) = sv_sema::elaborate(&t);
+    let (all, _) = sv_semantic::elaborate(&t);
     assert!(all.contains(&"$root instance b : b".to_string()));
-    let (only, _) = sv_sema::elaborate_tops(&t, &["top".to_string()]);
+    let (only, _) = sv_semantic::elaborate_tops(&t, &["top".to_string()]);
     assert!(only.iter().all(|l| !l.starts_with("$root instance b ")), "{only:?}");
     assert!(only.contains(&"top instance u : a".to_string()), "{only:?}");
 }
@@ -80,8 +80,8 @@ fn c_files_in_a_file_list_are_not_sources() {
 
 fn values(src: &str) -> Vec<String> {
     let t = clean(src, &[]);
-    let s = sv_sema::scopes::build(&t);
-    let (tys, vals) = sv_sema::symbol_info(&t, &s);
+    let s = sv_semantic::scopes::build(&t);
+    let (tys, vals) = sv_semantic::symbol_info(&t, &s);
     s.dump_full(Some(tys.as_slice()), Some(vals.as_slice()))
 }
 

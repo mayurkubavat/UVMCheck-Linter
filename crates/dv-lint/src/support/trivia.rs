@@ -1,6 +1,6 @@
 //! Identifier words, comments and library code, for the readability rules.
 
-use sv_lexer::Kind;
+use svlang::lexer::Kind;
 
 use crate::syntax::Cst;
 
@@ -61,7 +61,7 @@ pub(crate) enum Triv {
 /// byte `base` of its file: what follows the last directive or macro use
 /// (slang keeps the trivia before a directive inside the directive).
 pub(crate) fn split_trivia(text: &str, base: u32) -> Vec<Triv> {
-    let toks = sv_lexer::lex(text);
+    let toks = svlang::lexer::lex(text);
     let from = toks.iter().rposition(|t| !t.kind.is_trivia()).map_or(0, |i| i + 1);
     let mut out = Vec::new();
     if from > 0 {

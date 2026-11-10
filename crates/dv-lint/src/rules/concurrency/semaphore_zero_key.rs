@@ -3,7 +3,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use svlang::syntax::{Child, NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The first argument of an argument list when it is ordered (not named or

@@ -12,8 +12,8 @@ use super::values::{const_int, type_range, Set};
 use crate::support::ast::is_library_class;
 use crate::support::defines_packages::{user_tok, Files};
 use crate::syntax::Cst;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// One bound on one variable.
 pub(crate) struct Atom {

@@ -4,7 +4,7 @@
 use crate::support::source_layout::{routine_name, routines, Buffers};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn extern_method_threshold(c: &Cst, s: &mut Sink) {
     const THRESHOLD: u32 = 5;

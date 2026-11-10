@@ -5,8 +5,8 @@
 use crate::support::calls::{args, callee};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// An ordered (not named) argument's expression.
 fn ordered(c: &Cst, a: Option<NodeId>) -> Option<NodeId> {

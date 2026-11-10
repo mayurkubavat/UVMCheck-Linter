@@ -7,7 +7,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::HashSet;
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 /// The class's text as written, from `class` to `endclass`.
 fn class_text<'t>(c: &Cst<'t>, n: NodeId) -> &'t str {

@@ -5,8 +5,8 @@ use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// One finding of SV-DED-012: tree, name token, name, scope.
 type ParamFinding = (usize, u32, String, String);
@@ -106,7 +106,7 @@ fn unreferenced_params(c: &Cst) -> std::rc::Rc<Vec<ParamFinding>> {
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
-            own = Cst::new(t, i, sv_sema::Locator::default());
+            own = Cst::new(t, i, svlang::semantic::Locator::default());
             own.all = c.all;
             &own
         };

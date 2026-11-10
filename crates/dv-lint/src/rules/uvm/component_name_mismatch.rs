@@ -6,7 +6,7 @@ use crate::support::uvm_syntax::{arg_list, name_node, ordered_expr, params, rout
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn component_name_mismatch(d: &Design, csts: &[Cst], s: &mut Sink) {

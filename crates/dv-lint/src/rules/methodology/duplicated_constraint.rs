@@ -7,7 +7,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Class, Design};
 use std::collections::HashMap;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn duplicated_constraint(d: &Design, csts: &[Cst], out: &mut Sink) {
     // Option `min_tokens` (rules.SV-DUP-003.options).

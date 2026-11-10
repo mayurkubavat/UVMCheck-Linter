@@ -9,8 +9,8 @@ use crate::support::type_text::base_name;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashMap;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 struct Widths<'a> {
     params: HashMap<String, NodeId>,

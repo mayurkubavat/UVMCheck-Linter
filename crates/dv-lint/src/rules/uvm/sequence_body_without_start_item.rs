@@ -8,7 +8,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::HashSet;
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 fn start_finish(c: &Cst, cls: &str, n: NodeId, started: &mut HashSet<String>, s: &mut Sink) {

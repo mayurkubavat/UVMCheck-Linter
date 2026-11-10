@@ -6,8 +6,8 @@ use crate::support::class_docs::{class_methods, properties, Classes};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn is_generic_name(name: &str, local: bool) -> bool {
     const STEMS: [&str; 13] =

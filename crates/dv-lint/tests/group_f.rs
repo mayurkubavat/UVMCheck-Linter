@@ -4,8 +4,8 @@
 use std::collections::HashMap;
 
 fn counts(src: &str) -> HashMap<&'static str, usize> {
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let mut out = HashMap::new();
     for f in found {

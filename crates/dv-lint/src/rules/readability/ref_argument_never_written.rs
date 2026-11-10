@@ -6,7 +6,7 @@ use crate::support::class_index::{written_names, Classes};
 use crate::support::routine_metrics::user_routines;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The routine declaration whose name token is `tok`.

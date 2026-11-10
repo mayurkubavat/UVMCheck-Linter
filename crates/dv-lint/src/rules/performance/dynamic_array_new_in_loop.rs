@@ -5,7 +5,7 @@
 use crate::support::ast::{kids, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The loops whose body slang's loop visitors search: for, foreach,

@@ -5,8 +5,8 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// slang's IntegerVectorExpression (`4'b1`, `'hF`) or IntegerLiteralExpression (`7`).
 fn integer_literal(c: &Cst, n: NodeId) -> bool {

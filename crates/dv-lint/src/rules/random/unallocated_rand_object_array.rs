@@ -8,8 +8,8 @@ use crate::support::constraints::class_names;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unallocated_rand_array(c: &Cst, s: &mut Sink) {
     let classes: HashMap<String, NodeId> = class_names(c);

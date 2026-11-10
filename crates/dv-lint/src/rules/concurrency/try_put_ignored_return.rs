@@ -5,7 +5,7 @@ use crate::support::procedural::{add_n, start, stmt_call};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn try_put_ignored(c: &Cst, s: &mut Sink) {

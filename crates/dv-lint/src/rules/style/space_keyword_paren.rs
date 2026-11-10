@@ -4,8 +4,8 @@
 use crate::support::source_layout::Buffers;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn space_keyword_paren(c: &Cst, s: &mut Sink) {
     let b = Buffers::new(c);

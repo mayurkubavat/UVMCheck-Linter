@@ -7,7 +7,7 @@ use crate::support::uvm_syntax::{arg_list, decl_name, ordered_expr, params};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{ClassId, Design};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// Name of the nearest uvm_* ancestor.

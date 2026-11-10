@@ -8,7 +8,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Loc;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 #[derive(Clone, Copy, PartialEq, Eq)]

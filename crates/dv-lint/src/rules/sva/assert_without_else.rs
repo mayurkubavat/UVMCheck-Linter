@@ -6,8 +6,8 @@ use crate::support::slang_ast::*;
 use crate::support::sva_cov::{add_n, assert_kw, ast_asserts};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn has_else(c: &Cst, a: NodeId) -> bool {
     c.tree.child(a, ElseClause).is_some()

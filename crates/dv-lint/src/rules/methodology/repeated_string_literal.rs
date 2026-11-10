@@ -8,9 +8,9 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use sv_lexer::Kind;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::lexer::Kind;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn args_of(c: &Cst, n: NodeId) -> Vec<NodeId> {
     let Some(al) = c.tree.child(n, ArgList) else { return Vec::new() };

@@ -9,9 +9,9 @@ use crate::support::slang_ast::kids;
 use crate::support::slang_ast::DeclKind;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_sema::oracle::TypeOracle;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::semantic::oracle::TypeOracle;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The leftmost name of a chain (`a` of `a.b.c`).
 fn chain_root(c: &Cst, mut e: NodeId) -> NodeId {

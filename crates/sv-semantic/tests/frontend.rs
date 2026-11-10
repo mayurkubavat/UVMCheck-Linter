@@ -11,7 +11,7 @@ fn diags(src: &str, tops: &[&str]) -> Vec<(usize, String)> {
     assert!(t.errors.is_empty(), "syntax errors: {:?}", t.errors);
     let trees = vec![t];
     let tops: Vec<String> = tops.iter().map(|s| s.to_string()).collect();
-    let (d, _) = sv_sema::semantic_diags(&trees, &tops);
+    let (d, _) = sv_semantic::semantic_diags(&trees, &tops);
     let t = &trees[0];
     let mut out: Vec<(usize, String)> = d
         .into_iter()

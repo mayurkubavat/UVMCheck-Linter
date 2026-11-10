@@ -7,8 +7,8 @@ use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The declarations of output-only clocking items anywhere in the compile,
 /// as written (`d`, `h = x.y`).
@@ -29,7 +29,7 @@ fn clocking_outputs(c: &Cst) -> std::rc::Rc<HashSet<String>> {
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
-            own = Cst::new(t, i, sv_sema::Locator::default());
+            own = Cst::new(t, i, svlang::semantic::Locator::default());
             own.all = c.all;
             &own
         };

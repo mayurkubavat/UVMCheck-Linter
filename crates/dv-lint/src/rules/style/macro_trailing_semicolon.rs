@@ -5,7 +5,7 @@
 use crate::support::source_layout::at;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::Origin;
+use svlang::syntax::Origin;
 
 pub(crate) fn macro_trailing_semicolon(c: &Cst, s: &mut Sink) {
     let t = c.tree;

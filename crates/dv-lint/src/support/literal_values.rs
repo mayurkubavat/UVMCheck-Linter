@@ -1,7 +1,7 @@
 //! Literal and integer values of expressions, and the declaration an
 //! expression names.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 
 use crate::syntax::Cst;
 

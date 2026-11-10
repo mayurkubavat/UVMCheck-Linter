@@ -6,8 +6,8 @@ use crate::support::config_db_calls::{bool_literal, user_visits};
 use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The `min_flags` default.
 // Option `min_flags` (rules.SV-RDB-001.options).

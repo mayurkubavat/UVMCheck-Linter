@@ -5,15 +5,15 @@ use std::collections::HashMap;
 
 use dv_model::{Call, Class, Design, Loc, Method};
 
-use sv_lexer::Kind;
+use svlang::lexer::Kind;
 
-use sv_syntax::{Child, NodeId};
+use svlang::syntax::{Child, NodeId};
 
 use crate::support::class_roles::{class_methods, key, user_classes, Ctx, Index};
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// The statements of a block or body (declarations included, as slang's
 /// statement lists hold them).

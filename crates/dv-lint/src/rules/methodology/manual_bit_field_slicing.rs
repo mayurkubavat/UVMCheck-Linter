@@ -7,8 +7,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
 use std::collections::{BTreeSet, HashMap};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// An integral type that is not a struct or packed union.
 fn is_integral_type(td: &Typedefs, ty: &str) -> bool {

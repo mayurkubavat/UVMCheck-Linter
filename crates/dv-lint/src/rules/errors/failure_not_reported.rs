@@ -5,8 +5,8 @@
 use crate::support::class_index::{is_report_guard, is_report_scaffolding, report_level, Level};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 #[derive(Clone, Copy, PartialEq)]
 enum Status {

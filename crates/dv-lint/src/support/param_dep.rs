@@ -8,9 +8,9 @@
 
 use crate::support::slang_ast::{ancestors, kids, lookup, DeclKind};
 use crate::syntax::Cst;
-use sv_lexer::Kind;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::lexer::Kind;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// Some name in `n` (a type, or a size) at `at` is a parameter, a type
 /// parameter, or a typedef whose definition depends on one.

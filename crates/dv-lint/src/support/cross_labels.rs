@@ -1,10 +1,10 @@
 //! Labels, last lines and cross parts.
 
-use sv_syntax::{Child, NodeId};
+use svlang::syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn kids(c: &Cst, n: NodeId) -> Vec<NodeId> {
     c.tree.children(n).collect()

@@ -4,7 +4,7 @@
 
 use crate::syntax::{assignments, Cst};
 use crate::{Severity, Sink};
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use svlang::syntax::{Child, NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// slang's `NewClassExpression`: `new`, `new(...)` or `pkg::cls::new(...)`,

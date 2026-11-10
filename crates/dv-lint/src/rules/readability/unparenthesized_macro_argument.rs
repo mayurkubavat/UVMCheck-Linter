@@ -7,8 +7,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Loc;
 use std::collections::{HashMap, HashSet};
-use sv_lexer::Kind;
-use sv_syntax::Origin;
+use svlang::lexer::Kind;
+use svlang::syntax::Origin;
 
 /// A `define in the tree's text, as the preprocessor read it (not in a
 /// branch not taken): its name's position, formal argument names (None for

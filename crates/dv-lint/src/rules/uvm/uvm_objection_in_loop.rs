@@ -6,7 +6,7 @@ use crate::support::uvm_classes::{call_name, calls_in};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn objection_in_loop(_d: &Design, csts: &[Cst], s: &mut Sink) {

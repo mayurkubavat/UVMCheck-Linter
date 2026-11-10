@@ -1,10 +1,10 @@
 //! What the AST-walking C++ rules need from slang's semantic model, read off
-//! the native syntax tree and sv-sema's checks.
+//! the native syntax tree and sv-semantic's checks.
 //!
 //! - [`ast_ok`]: slang's AST visitors (`VisitFlags::AllGood`) skip an
 //!   expression that failed to bind, and so all of the statement-level
 //!   expression around it. Here an expression is bad when it overlaps an
-//!   sv-sema error (undeclared names, unknown types) or names a variable
+//!   sv-semantic error (undeclared names, unknown types) or names a variable
 //!   whose declared type is one.
 //!
 //! Each tree is checked on its own (repo tests, sv-tests and uvm_pkg are
@@ -14,21 +14,21 @@
 use std::collections::HashSet;
 use std::sync::Arc as Rc;
 
-use sv_syntax::{NodeId, SyntaxKind, Tree};
+use svlang::syntax::{NodeId, SyntaxKind, Tree};
 
 use crate::support::class_items::{kids, subtree};
 use crate::syntax::Cst;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) struct Info {
-    /// Token ranges of nodes sv-sema reports an error at.
+    /// Token ranges of nodes sv-semantic reports an error at.
     bad: Vec<(u32, u32)>,
     /// Token ranges of expressions slang rejects without rejecting the
     /// statement around them.
     bad_expr: Vec<(u32, u32)>,
     /// Variables whose declared type does not resolve.
     poisoned: HashSet<String>,
-    /// Every name the tree declares (any scope), for names sv-sema does
+    /// Every name the tree declares (any scope), for names sv-semantic does
     /// not check (scopes importing an unknown package, classes extending
     /// an unknown base): slang binds those as errors without a message.
     declared: HashSet<String>,
@@ -40,10 +40,10 @@ pub(crate) struct Info {
     memo: std::sync::Mutex<std::collections::HashMap<NodeId, bool>>,
 }
 
-/// What the whole compile says: sv-sema's diagnostics by tree (the
+/// What the whole compile says: sv-semantic's diagnostics by tree (the
 /// nodes), and the names every other tree declares at its top.
 struct Whole {
-    diags: std::collections::HashMap<usize, Vec<sv_syntax::NodeId>>,
+    diags: std::collections::HashMap<usize, Vec<svlang::syntax::NodeId>>,
     declared: HashSet<String>,
     /// Each interface's modport names.
     modports: std::collections::HashMap<String, HashSet<String>>,
@@ -57,7 +57,7 @@ fn build_whole(c: &Cst) -> Whole {
     let all = c.all;
     let sc = crate::shared::sema_checks(c);
     let diags = sc.names.iter().chain(&sc.bind).chain(&sc.checks).chain(&sc.order).chain(&sc.calls).chain(&sc.typed);
-    let mut by_tree: std::collections::HashMap<usize, Vec<sv_syntax::NodeId>> = Default::default();
+    let mut by_tree: std::collections::HashMap<usize, Vec<svlang::syntax::NodeId>> = Default::default();
     for d in diags.cloned() {
         // Constraint mode errors leave the expression itself bound.
         if d.message.starts_with("randc variable") {
@@ -224,7 +224,7 @@ fn build_info(c: &Cst) -> Info {
     let toks = &c.tree.tokens;
     if toks.iter().any(|t| &*t.text == "matches") {
         for w in toks.windows(2) {
-            if &*w[0].text == "." && w[1].kind == sv_syntax::TokenKind::Identifier {
+            if &*w[0].text == "." && w[1].kind == svlang::syntax::TokenKind::Identifier {
                 declared.insert(w[1].text.to_string());
             }
         }
@@ -237,7 +237,7 @@ fn build_info(c: &Cst) -> Info {
         let Some(dt) = c.tree.child(n, DataType) else { continue };
         let Some(first) = c.first_tok(dt) else { continue };
         let tok = &c.tree.tokens[first as usize];
-        if tok.kind != sv_syntax::TokenKind::Identifier || declared.contains(&*tok.text) || is_builtin(&tok.text) {
+        if tok.kind != svlang::syntax::TokenKind::Identifier || declared.contains(&*tok.text) || is_builtin(&tok.text) {
             continue;
         }
         for dcl in c.tree.children(n).filter(|&x| c.kind(x) == Declarator) {
@@ -541,7 +541,7 @@ fn tainted_classes(c: &Cst, declared: &HashSet<String>) -> HashSet<String> {
     }
 }
 
-/// Token ranges of the nodes sv-sema reports an error at.
+/// Token ranges of the nodes sv-semantic reports an error at.
 pub(crate) fn bad_ranges(c: &Cst) -> Vec<(u32, u32)> {
     info(c).bad.clone()
 }
@@ -631,7 +631,7 @@ fn expr_ok_of(c: &Cst, i: &Info, top: NodeId) -> bool {
             return false;
         }
         i.poisoned.contains(text)
-            || (tok.kind == sv_syntax::TokenKind::Identifier && !i.declared.contains(text) && !is_builtin(text))
+            || (tok.kind == svlang::syntax::TokenKind::Identifier && !i.declared.contains(text) && !is_builtin(text))
     })
 }
 
@@ -641,7 +641,7 @@ pub(crate) fn first_kid(c: &Cst, n: NodeId) -> Option<NodeId> {
 }
 
 /// How often slang's AST visitor reaches this node: once, or once per
-/// specialization of the generic class around it (see [`sv_sema::spec_counts`]).
+/// specialization of the generic class around it (see [`svlang::semantic::spec_counts`]).
 pub(crate) fn visits(_c: &Cst, _n: NodeId) -> usize {
     1
 }

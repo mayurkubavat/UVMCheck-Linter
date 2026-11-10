@@ -58,4 +58,4 @@ dv-build accepts seven probes that IEEE 1800 rejects (hierarchical names in
 constants, implicit enum and string conversions, declarations after
 statements, bare `#W` parameter values, self-determined streaming and
 assignment patterns in array concatenations). Each is a semantic check
-sv-sema does not make yet.
+sv-semantic does not make yet.

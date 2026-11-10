@@ -7,8 +7,8 @@ use crate::support::data_items::strip_conv;
 use crate::support::sema_facts::ast_ok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// `x = x;` (blocking, plain `=`) where x is a name or a member access.
 pub(crate) fn self_assignment(c: &Cst, s: &mut Sink) {

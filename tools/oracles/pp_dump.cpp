@@ -1,6 +1,6 @@
 // Prints the tokens Slang's preprocessor produces for one file, one per line
 // as "<kind> <text>", with escapes for newlines. The reference that
-// crates/sv-preproc is checked against (crates/sv-preproc/examples/ppdiff.rs).
+// crates/sv-preprocessor is checked against (crates/sv-preprocessor/examples/ppdiff.rs).
 //
 //   uvmcheck_pp_dump [+incdir+DIR]... [+define+NAME[=VALUE]]... FILE
 #include <cstdio>

@@ -4,13 +4,13 @@
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 /// Whether task `t` has a non-blocking drive of an interface signal: by the
 /// targets' declarations ([`crate::sem::reach`]), and by the names `vif.`
 /// and `intf.` for a task with a target that does not resolve.
-fn drives_interface(c: &Cst, t: sv_syntax::NodeId, text: &str) -> bool {
+fn drives_interface(c: &Cst, t: svlang::syntax::NodeId, text: &str) -> bool {
     let mut unresolved = false;
     for n in c.subtree(t) {
         if c.kind(n) != BinaryExpr || c.parent(n).map(|p| c.kind(p)) != Some(ExprStmt) || c.tok(n, "<=").is_none() {

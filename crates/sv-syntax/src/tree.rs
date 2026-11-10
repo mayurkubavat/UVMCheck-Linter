@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use sv_lexer::Kind;
-use sv_preproc::Origin;
+use sv_preprocessor::Origin;
 
 use crate::SyntaxKind;
 
@@ -20,7 +20,7 @@ pub struct Token {
     pub kind: Kind,
     /// The token's text.
     pub text: Arc<str>,
-    /// Where it is (see `sv_preproc::PpToken::origin`).
+    /// Where it is (see `sv_preprocessor::PpToken::origin`).
     pub origin: Origin,
     /// Made by a macro expansion (or `__FILE__`/`__LINE__`).
     pub from_macro: bool,
@@ -28,11 +28,11 @@ pub struct Token {
     /// `origin.offset`. Equal to it when there is none.
     pub trivia_start: u32,
     /// Where the text was written (in a `define body or macro argument for
-    /// expanded tokens); see `sv_preproc::PpToken::written`.
-    pub written: sv_preproc::Origin,
+    /// expanded tokens); see `sv_preprocessor::PpToken::written`.
+    pub written: sv_preprocessor::Origin,
     /// Trivia came before it, also inside a macro expansion.
     pub space_before: bool,
-    /// Put here as a macro argument (see `sv_preproc::PpToken::from_arg`).
+    /// Put here as a macro argument (see `sv_preprocessor::PpToken::from_arg`).
     pub from_arg: bool,
 }
 
@@ -86,12 +86,12 @@ pub struct Tree {
     /// Parse errors, in token order.
     pub errors: Vec<SyntaxError>,
     /// Preprocessor errors.
-    pub pp_diagnostics: Vec<sv_preproc::Diagnostic>,
-    /// Macros used in the source text, in order (see `sv_preproc::Output`).
-    pub macro_uses: Vec<sv_preproc::MacroUse>,
+    pub pp_diagnostics: Vec<sv_preprocessor::Diagnostic>,
+    /// Macros used in the source text, in order (see `sv_preprocessor::Output`).
+    pub macro_uses: Vec<sv_preprocessor::MacroUse>,
     /// Conditional branches not taken: (file, start, end) byte ranges.
     pub skipped: Vec<(u32, u32, u32)>,
-    /// `timescale units by token index (see `sv_preproc::Output`).
+    /// `timescale units by token index (see `sv_preprocessor::Output`).
     pub timescales: Vec<(u32, i32)>,
     /// The files read as compilation inputs (not included), in order.
     pub mains: Vec<u32>,
@@ -369,7 +369,7 @@ impl Tree {
 }
 
 /// Converts preprocessor tokens, filling in leading trivia per file.
-pub(crate) fn tokens_from(out: &sv_preproc::Output) -> Vec<Token> {
+pub(crate) fn tokens_from(out: &sv_preprocessor::Output) -> Vec<Token> {
     let mut last_end = vec![0u32; out.sources.len()];
     out.tokens
         .iter()

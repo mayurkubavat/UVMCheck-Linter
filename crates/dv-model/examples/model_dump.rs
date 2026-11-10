@@ -1,7 +1,7 @@
 //! Prints the class model of a design in dv-model's canonical dump form,
 //! built natively (default) or through slang (`--slang`), for diffing:
 //!
-//!     cargo run --release -p sv-sema --example model_dump -- [--slang] [--types] [--bodies] <compile options>
+//!     cargo run --release -p dv-model --features slang --example model_dump -- [--slang] [--types] [--bodies] <compile options>
 use dv_model::{Design, DumpOptions};
 
 fn main() {
@@ -16,7 +16,7 @@ fn main() {
             _ => args.push(a),
         }
     }
-    let design = if slang { Design::load(&args) } else { sv_sema::load(&args) };
+    let design = if slang { Design::load(&args) } else { dv_model::load(&args) };
     match design {
         Ok(d) => print!("{}", d.dump(opts)),
         Err(e) => {

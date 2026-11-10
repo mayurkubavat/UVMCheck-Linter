@@ -5,7 +5,7 @@
 use crate::support::source_layout::{at, end_and_label, end_label_fix, end_loc, routine_name, routines};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// The `style` block of the project configuration, with
 /// `StyleConfiguration`'s defaults.

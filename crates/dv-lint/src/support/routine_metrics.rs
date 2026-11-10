@@ -1,7 +1,7 @@
 //! Routine metrics (`metrics::computeRoutineMetrics`) for the SV-MET and
 //! SV-SML-004 rules.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 
 use crate::support::statements::*;
 

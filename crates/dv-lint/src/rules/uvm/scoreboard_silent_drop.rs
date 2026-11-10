@@ -6,7 +6,7 @@ use crate::support::uvm_syntax::{routine_last_name, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn scoreboard_silent_drop(d: &Design, csts: &[Cst], s: &mut Sink) {

@@ -10,9 +10,9 @@ fn trees(src: &str) -> Vec<sv_syntax::Tree> {
 
 fn errors(src: &str) -> Vec<String> {
     let t = trees(src);
-    let mut e: Vec<String> = sv_sema::bind::check(&t).into_iter().map(|d| d.message).collect();
-    e.extend(sv_sema::iclass::check(&t).into_iter().map(|d| d.message));
-    e.extend(sv_sema::checks::check(&t, &sv_sema::scopes::build(&t)).into_iter().map(|d| d.message));
+    let mut e: Vec<String> = sv_semantic::bind::check(&t).into_iter().map(|d| d.message).collect();
+    e.extend(sv_semantic::iclass::check(&t).into_iter().map(|d| d.message));
+    e.extend(sv_semantic::checks::check(&t, &sv_semantic::scopes::build(&t)).into_iter().map(|d| d.message));
     e
 }
 

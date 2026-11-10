@@ -4,7 +4,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 /// slang's WrongNumberAssignmentPatterns diagnostic, once per pattern.

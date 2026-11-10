@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use svlang::syntax::{Child, NodeId, SyntaxKind};
 
 use crate::support::statements::*;
 

@@ -5,7 +5,7 @@
 use crate::support::cross_labels::{kids, last_line};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unbounded_size(c: &Cst, s: &mut Sink) {
     for n in c.nodes(ConstraintItem) {

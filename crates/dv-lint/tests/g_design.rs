@@ -1,8 +1,8 @@
 //! Group D rules: design smells, metrics and dead code.
 
 fn findings(src: &str) -> Vec<(u32, u32, &'static str)> {
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (files, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     found
         .iter()

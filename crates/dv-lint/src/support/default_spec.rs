@@ -16,7 +16,7 @@
 
 use std::collections::HashSet;
 
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 
 use crate::syntax::Cst;
 use SyntaxKind::*;

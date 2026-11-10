@@ -5,9 +5,9 @@ use std::collections::HashMap;
 
 use dv_model::{Design, Loc};
 
-use sv_lexer::Kind;
+use svlang::lexer::Kind;
 
-use sv_syntax::{NodeId, Origin};
+use svlang::syntax::{NodeId, Origin};
 
 use crate::syntax::Cst;
 
@@ -17,13 +17,13 @@ pub(crate) type NormToken = (String, bool);
 /// Expanded from a macro body (not a macro argument written at the call).
 /// slang gives the literal of a `__FILE__ or `__LINE__ in a body a
 /// location of its own, outside the expansion.
-pub(crate) fn from_macro_body(c: &Cst, t: &sv_syntax::Token) -> bool {
+pub(crate) fn from_macro_body(c: &Cst, t: &svlang::syntax::Token) -> bool {
     !t.from_arg && in_define(c, t)
 }
 
 /// Written in a define body (or made by an expansion), not in the text a
 /// macro was used in: slang's fully original location is not the use's.
-pub(crate) fn in_define(c: &Cst, t: &sv_syntax::Token) -> bool {
+pub(crate) fn in_define(c: &Cst, t: &svlang::syntax::Token) -> bool {
     if !t.from_macro || (t.written.file == t.origin.file && t.written.offset > t.origin.offset) {
         return false;
     }

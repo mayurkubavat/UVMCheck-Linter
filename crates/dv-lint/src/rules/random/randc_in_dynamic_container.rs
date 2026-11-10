@@ -5,8 +5,8 @@
 use crate::support::class_items::{class_items, declarators, kids, model_classes, own, qualifiers};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// A dynamic array, queue or associative array dimension: `[]`, `[$]`,
 /// `[$:N]`, `[*]`, `[type]`.

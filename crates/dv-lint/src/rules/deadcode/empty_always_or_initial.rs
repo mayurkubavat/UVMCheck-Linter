@@ -3,7 +3,7 @@
 
 use crate::syntax::{procedural_blocks, Cst};
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 fn effectively_empty(c: &Cst, stmt: Option<NodeId>) -> bool {

@@ -4,7 +4,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A clock edge that gates `n`: a posedge/negedge event outside any fork.

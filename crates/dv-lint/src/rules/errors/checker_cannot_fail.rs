@@ -8,8 +8,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Class, Design};
 use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn looks_like_checker(d: &Design, cls: &Class) -> bool {
     let r = role(d, cls);
@@ -36,7 +36,9 @@ fn routine_in_library(d: &Design, c: &Cst, n: NodeId) -> bool {
     }
     std::iter::successors(c.parent(n), |&a| c.parent(a)).any(|a| {
         matches!(c.kind(a), ClassDecl | PackageDecl)
-            && c.tree.child(a, sv_syntax::SyntaxKind::Name).is_some_and(|nm| c.tree.bare_text(nm).starts_with("uvm_"))
+            && c.tree
+                .child(a, svlang::syntax::SyntaxKind::Name)
+                .is_some_and(|nm| c.tree.bare_text(nm).starts_with("uvm_"))
     })
 }
 
@@ -88,7 +90,7 @@ fn out_of_block_body(c: &Cst, proto: NodeId) -> Option<NodeId> {
         return None;
     }
     let cls = std::iter::successors(c.parent(proto), |&a| c.parent(a)).find(|&a| c.kind(a) == ClassDecl)?;
-    let cname = c.tree.bare_text(c.tree.child(cls, sv_syntax::SyntaxKind::Name)?);
+    let cname = c.tree.bare_text(c.tree.child(cls, svlang::syntax::SyntaxKind::Name)?);
     let name = crate::support::slang_ast::decl_name(c, proto);
     let want = format!("{cname}::{}", name.rsplit("::").next().unwrap_or(&name));
     c.nodes_of(&[FunctionDecl, TaskDecl]).into_iter().find(|&f| crate::support::slang_ast::decl_name(c, f) == want)

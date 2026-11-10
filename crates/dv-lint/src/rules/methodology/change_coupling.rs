@@ -8,7 +8,7 @@ use crate::{Severity, Sink};
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::Ordering;
 use std::sync::Arc;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// SV-EVO-002: two files in different packages that keep changing together.
 pub(crate) fn change_coupling(_: &dv_model::Design, csts: &[Cst], out: &mut Sink) {

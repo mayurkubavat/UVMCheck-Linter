@@ -2,7 +2,7 @@
 //! against Slang's on sv-tests and the repo by tools/gates/sym_gate.py; these
 //! cases pin the shapes that decide it.
 
-use sv_sema::{names, scopes};
+use sv_semantic::{names, scopes};
 
 fn trees(src: &str) -> Vec<sv_syntax::Tree> {
     vec![sv_syntax::parse_source(src, "t.sv", sv_syntax::Options::default())]
@@ -96,7 +96,7 @@ fn name_checks() {
 fn types(src: &str) -> Vec<String> {
     let t = trees(src);
     let s = scopes::build(&t);
-    let ty = sv_sema::symbol_types(&t, &s);
+    let ty = sv_semantic::symbol_types(&t, &s);
     s.dump_with(Some(&ty)).into_iter().filter(|l| l.contains(" : ")).collect()
 }
 
@@ -163,7 +163,7 @@ fn values_as_slang_prints_them() {
         "package glb; localparam int arr[3] = '{1, 2, 3}; endpackage\nfunction int clog(int n); int r = 0; for (int i = 1; i < n; i = i * 2) r++; return r; endfunction\nmodule m;\n parameter int A = clog(17);\n parameter logic [7:0] B = {2{4'ha}};\n parameter int C = glb::arr[1] + 1;\n parameter int X = 32'hzz;\n parameter int F = '1;\n parameter logic [31:0] P [1:0] = '{5, 6};\n enum integer {a = 0, b = {32{1'bx}}, c = 1} e;\nendmodule\n",
     );
     let s = scopes::build(&t);
-    let (ty, val) = sv_sema::symbol_info(&t, &s);
+    let (ty, val) = sv_semantic::symbol_info(&t, &s);
     let d = s.dump_full(Some(&ty), Some(&val));
     for l in [
         "m parameter A : int = 5",
@@ -180,7 +180,7 @@ fn values_as_slang_prints_them() {
 
 fn type_errors(src: &str) -> Vec<String> {
     let t = trees(src);
-    sv_sema::checks::check(&t, &scopes::build(&t)).into_iter().map(|d| d.message).collect()
+    sv_semantic::checks::check(&t, &scopes::build(&t)).into_iter().map(|d| d.message).collect()
 }
 
 #[test]

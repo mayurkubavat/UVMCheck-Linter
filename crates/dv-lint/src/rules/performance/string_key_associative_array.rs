@@ -3,7 +3,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The first unpacked dimension is `[string]`, or `[KEY]` with a type

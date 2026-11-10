@@ -4,7 +4,7 @@
 use crate::support::uvm_syntax::{callee, first_ordered};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn backdoor_path(c: &Cst, s: &mut Sink) {
     for n in c.nodes(CallExpr) {

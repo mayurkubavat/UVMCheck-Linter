@@ -9,9 +9,9 @@
 //! its own specializations, until no new ones appear.
 
 use std::collections::BTreeSet;
-use sv_sema::fx::FxMap as HashMap;
+use svlang::semantic::fx::FxMap as HashMap;
 
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 
 use crate::syntax::Cst;
 use SyntaxKind::*;
@@ -36,7 +36,7 @@ struct Ref {
 struct Engine<'a, 't> {
     c: &'a Cst<'t>,
     generics: Vec<Generic>,
-    by_name: sv_sema::fx::FxMap<String, usize>,
+    by_name: svlang::semantic::fx::FxMap<String, usize>,
     typedefs: HashMap<String, NodeId>,
 }
 
@@ -185,7 +185,7 @@ pub(crate) fn specs(c: &Cst) -> std::sync::Arc<HashMap<u32, ClassSpecs>> {
 
 fn compute(c: &Cst) -> HashMap<u32, ClassSpecs> {
     let mut generics = Vec::new();
-    let mut by_name = sv_sema::fx::FxMap::default();
+    let mut by_name = svlang::semantic::fx::FxMap::default();
     for n in c.nodes(ClassDecl) {
         let Some(params) = generic_params(c, n) else { continue };
         let name = c.tree.child(n, Name).map(|x| c.tree.bare_text(x)).unwrap_or_default();

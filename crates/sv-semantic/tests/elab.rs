@@ -9,7 +9,7 @@ fn trees(src: &str) -> Vec<sv_syntax::Tree> {
 }
 
 fn hier(src: &str) -> Vec<String> {
-    sv_sema::hierarchy(&trees(src))
+    sv_semantic::hierarchy(&trees(src))
 }
 
 #[test]
@@ -68,7 +68,7 @@ fn string_overrides_are_integral_values() {
 
 #[test]
 fn zero_width_part_select_is_an_error() {
-    let (_, d) = sv_sema::elaborate(&trees(
+    let (_, d) = sv_semantic::elaborate(&trees(
         "module t; parameter integer c = 0; bit [7:0] a, b; initial b[4+:c] = a[1+:2]; endmodule\n",
     ));
     let msgs: Vec<String> = d.into_iter().map(|d| d.message).collect();

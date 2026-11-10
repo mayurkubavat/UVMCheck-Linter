@@ -1,12 +1,12 @@
 //! Methods, data items and literals of classes, for the OOP rules.
 
-use sv_syntax::{Child, NodeId};
+use svlang::syntax::{Child, NodeId};
 
 use crate::support::class_items::class_items;
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// A class method: function or task declared in the class body.
 pub(crate) fn methods(c: &Cst, cls: NodeId) -> Vec<NodeId> {

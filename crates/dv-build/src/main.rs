@@ -1,9 +1,9 @@
 //! dv-build: the native SystemVerilog builder. Reads compile options and
 //! VCS/Xcelium file lists, parses every source with the native front end
 //! and reports what is wrong, as a compiler would: file list problems,
-//! preprocessor and syntax errors, then every semantic error sv-sema finds
+//! preprocessor and syntax errors, then every semantic error sv-semantic finds
 //! (names, types, constant evaluation, elaboration from `-top`, class,
-//! assertion and UDP rules); see `sv_sema::semantic_diags`.
+//! assertion and UDP rules); see `svlang::semantic::semantic_diags`.
 //!
 //!     dv-build [--dialect any|vcs|xcelium] [--dump] [--cst] [--symbols] [--types] [--values] [--hier] [--quiet] <options, e.g. -f top.f FILE...>
 //!
@@ -21,9 +21,8 @@
 
 use std::process::ExitCode;
 
-use sv_sema::Locator;
-use sv_source::{Dialect, FileList, ProcessEnv, Severity};
-use sv_syntax::{Options, Tree};
+use svlang::source::{Dialect, FileList, ProcessEnv, Severity};
+use svlang::syntax::{Options, Tree};
 
 struct Diag {
     file: String,
@@ -33,7 +32,7 @@ struct Diag {
 }
 
 fn main() -> ExitCode {
-    sv_source::exit_on_closed_pipe();
+    svlang::source::exit_on_closed_pipe();
     let mut dialect = Dialect::Any;
     let (mut dump, mut quiet, mut symbols, mut types, mut values) = (false, false, false, false, false);
     let mut cst = false;
@@ -111,28 +110,15 @@ fn main() -> ExitCode {
         }
     }
     let paths: Vec<_> = list.sources.iter().map(|s| s.value.clone()).collect();
-    let mut trees = sv_syntax::parse_files(&paths, opts.clone());
+    let mut trees = svlang::syntax::parse_files(&paths, opts.clone());
     // -v files and -y directories resolve what the sources instantiate.
-    sv_sema::library::add_library_trees(&mut trees, &list, &opts);
-    let mut loc = Locator::default();
-    for (ix, t) in trees.iter().enumerate() {
-        syntax_diagnostics(ix, t, &mut loc, &mut diags);
-    }
+    svlang::semantic::library::add_library_trees(&mut trees, &list, &opts);
     let tops: Vec<String> = list.top.iter().map(|t| t.value.clone()).collect();
-    let (checks, elab) = sv_sema::semantic_diags(&trees, &tops);
+    let comp = svlang::Compilation::from_trees_with_tops(trees, tops);
+    let (checked, elab) = comp.check();
     let hier_lines = elab.hierarchy;
-    for d in checks {
-        let t = &trees[d.tree];
-        let Some((tok, _)) = t.token_bounds(d.node) else {
-            continue;
-        };
-        let l = loc.loc(d.tree, t, tok);
-        let (file, line, column) = match l.expansion {
-            Some((f, line)) => (f, line, 0),
-            None => (l.file, l.line, l.column),
-        };
-        let file = loc.files().get(file as usize).cloned().unwrap_or_default();
-        diags.push(Diag { file, line, column, message: d.message });
+    for d in checked {
+        diags.push(Diag { file: d.file, line: d.line, column: d.column, message: d.message });
     }
     if !quiet {
         for d in &diags {
@@ -140,12 +126,12 @@ fn main() -> ExitCode {
         }
     }
     if dump {
-        for t in &trees {
+        for t in comp.trees() {
             print_dump(t);
         }
     }
     if cst {
-        for t in &trees {
+        for t in comp.trees() {
             print_cst(t, t.root, 0);
         }
     }
@@ -154,8 +140,9 @@ fn main() -> ExitCode {
             println!("{l}");
         }
     } else if symbols {
-        let scopes = sv_sema::scopes::build(&trees);
-        let (tys, vals) = if types || values { sv_sema::symbol_info(&trees, &scopes) } else { Default::default() };
+        let scopes = comp.scopes();
+        let (tys, vals) =
+            if types || values { svlang::semantic::symbol_info(comp.trees(), &scopes) } else { Default::default() };
         let lines = scopes.dump_full(types.then_some(tys.as_slice()), values.then_some(vals.as_slice()));
         for l in lines {
             println!("{l}");
@@ -169,38 +156,16 @@ fn main() -> ExitCode {
     }
 }
 
-fn syntax_diagnostics(ix: usize, t: &Tree, loc: &mut Locator, out: &mut Vec<Diag>) {
-    let files = |loc: &Locator, f: u32| loc.files().get(f as usize).cloned().unwrap_or_default();
-    for d in &t.pp_diagnostics {
-        let (f, line, column) = loc.position(ix, t, d.origin);
-        out.push(Diag { file: files(loc, f), line, column, message: d.message.clone() });
-    }
-    for e in &t.errors {
-        // An error at the end of input sits after the last token.
-        let tok = (e.token as usize).min(t.tokens.len().saturating_sub(1)) as u32;
-        if t.tokens.is_empty() {
-            out.push(Diag { file: String::new(), line: 0, column: 0, message: e.message.clone() });
-            continue;
-        }
-        let l = loc.loc(ix, t, tok);
-        let (file, line, column) = match l.expansion {
-            Some((f, line)) => (f, line, 0),
-            None => (l.file, l.line, l.column),
-        };
-        out.push(Diag { file: files(loc, file), line, column, message: e.message.clone() });
-    }
-}
-
 /// Declarations in source order, indented by nesting.
 /// The whole syntax tree: one node per line with its own tokens.
-fn print_cst(t: &Tree, n: sv_syntax::NodeId, depth: usize) {
+fn print_cst(t: &Tree, n: svlang::syntax::NodeId, depth: usize) {
     let own: Vec<&str> = t
         .node(n)
         .children
         .iter()
         .filter_map(|c| match c {
-            sv_syntax::Child::Token(i) => Some(&*t.tokens[*i as usize].text),
-            sv_syntax::Child::Node(_) => None,
+            svlang::syntax::Child::Token(i) => Some(&*t.tokens[*i as usize].text),
+            svlang::syntax::Child::Node(_) => None,
         })
         .collect();
     println!("{}{:?} {}", "  ".repeat(depth), t.kind(n), own.join(" "));
@@ -210,7 +175,7 @@ fn print_cst(t: &Tree, n: sv_syntax::NodeId, depth: usize) {
 }
 
 fn print_dump(t: &Tree) {
-    let entries = sv_syntax::outline(t);
+    let entries = svlang::syntax::outline(t);
     let mut depth_of = std::collections::HashMap::new();
     let mut parent = vec![u32::MAX; t.nodes.len()];
     for n in t.preorder() {

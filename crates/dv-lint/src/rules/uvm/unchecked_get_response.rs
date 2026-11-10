@@ -4,7 +4,7 @@
 use crate::support::uvm_syntax::{callee, decl_name, enclosing_class};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unchecked_get_response(c: &Cst, s: &mut Sink) {
     for n in c.nodes(CallExpr) {

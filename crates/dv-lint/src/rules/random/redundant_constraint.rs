@@ -5,7 +5,7 @@ use crate::support::class_items::{class_decls, decl_name, expression_constraint,
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 fn strip_comments_and_ws(input: &str) -> String {
     let b = input.as_bytes();

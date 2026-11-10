@@ -70,13 +70,13 @@ pub(crate) fn where_of(files: &[String], loc: Loc) -> Where {
 impl Graph {
     /// The graph of `design`, with the syntax trees it was built from
     /// (`files`: the lint's file table).
-    pub fn build(design: &Design, trees: &[sv_syntax::Tree], files: &[String]) -> Graph {
+    pub fn build(design: &Design, trees: &[svlang::syntax::Tree], files: &[String]) -> Graph {
         // Number every file of every tree first, so all trees share one table.
-        let mut locator = sv_sema::Locator::new(files.to_vec());
+        let mut locator = svlang::semantic::Locator::new(files.to_vec());
         for (ix, tree) in trees.iter().enumerate() {
             let c = Cst::new(tree, ix, locator);
             for f in 0..tree.files.len() as u32 {
-                c.loc_at(sv_syntax::Origin { file: f, offset: 0 });
+                c.loc_at(svlang::syntax::Origin { file: f, offset: 0 });
             }
             locator = c.into_locator();
         }
@@ -124,7 +124,7 @@ impl Graph {
             });
         }
         for c in &csts {
-            for n in c.nodes(sv_syntax::SyntaxKind::ClassDecl) {
+            for n in c.nodes(svlang::syntax::SyntaxKind::ClassDecl) {
                 let name = crate::support::slang_ast::decl_name(c, n);
                 let (Some(first), Some(last)) = (c.first_tok(n), c.toks(n).last()) else { continue };
                 let (a, b) = (at(c.loc(first)), at(c.loc(last)));

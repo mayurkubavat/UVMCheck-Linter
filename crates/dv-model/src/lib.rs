@@ -4,8 +4,9 @@
 //! A [`Design`] is an owned snapshot; nothing borrows from the front end
 //! afterwards. Two front ends fill it:
 //!
-//! - the native one, `sv_sema::load` (what every tool uses by default), which
-//!   builds it from `sv-syntax` trees with [`Design::from_parts`];
+//! - the native one, [`load`] (what every tool uses by default), which builds
+//!   the pure IEEE 1800 model via `sv-semantic` and classifies UVM roles and
+//!   phases via [`Design::from_sv`];
 //! - slang, through `Design::load` (feature `slang`, off by default; oracle
 //!   and parity use only), which copies the C++ `uvmcheck::model` across the
 //!   C ABI in `sv-slang`.
@@ -16,7 +17,6 @@
 
 #[cfg(feature = "slang")]
 use std::ffi::{CStr, CString};
-use std::fmt;
 #[cfg(feature = "slang")]
 use std::os::raw::c_char;
 #[cfg(feature = "slang")]
@@ -25,9 +25,30 @@ use std::time::Instant;
 #[cfg(feature = "slang")]
 use sv_slang as ffi;
 
-/// Index of a class in [`Design::classes`]; also how classes refer to each
-/// other ([`Class::base`], [`Property::type_class`]).
-pub type ClassId = u32;
+pub use svlang::semantic::model::{
+    Argument, Assignment, Call, ClassId, Constraint, Direction, Error, Loc, Local, MacroUse, Property, RootKind,
+    Timings, TypeShape, Typedef, Visibility,
+};
+
+/// Loads and models a UVM-classified [`Design`] from compile options.
+pub fn load<S: AsRef<str>>(args: &[S]) -> Result<Design, Error> {
+    svlang::semantic::load(args).map(Design::from_sv)
+}
+
+/// [`load`], also returning the parsed syntax trees (for syntax-level rules).
+pub fn load_with_trees<S: AsRef<str>>(args: &[S]) -> Result<(Design, Vec<svlang::syntax::Tree>), Error> {
+    svlang::semantic::load_with_trees(args).map(|(d, trees)| (Design::from_sv(d), trees))
+}
+
+/// Builds a [`Design`] from already-parsed syntax trees with timing metadata.
+pub fn design_of(trees: &[svlang::syntax::Tree], parse_ms: f64) -> Design {
+    Design::from_sv(svlang::semantic::design_of(trees, parse_ms))
+}
+
+/// Builds a [`Design`] directly from syntax trees.
+pub fn build(trees: &[svlang::syntax::Tree]) -> Design {
+    Design::from_sv(svlang::semantic::build(trees))
+}
 
 /// The UVM role of a class, from the nearest UVM base class it derives from.
 /// Component roles come last, so [`UvmKind::is_component`] is one comparison.
@@ -111,28 +132,6 @@ impl UvmKind {
     }
 }
 
-/// Access qualifier of a class member.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Visibility {
-    /// No qualifier.
-    Public,
-    /// `protected`.
-    Protected,
-    /// `local`.
-    Local,
-}
-
-impl Visibility {
-    #[cfg(feature = "slang")]
-    fn from_c(v: u8) -> Self {
-        match v {
-            1 => Visibility::Protected,
-            2 => Visibility::Local,
-            _ => Visibility::Public,
-        }
-    }
-}
-
 /// Whether a method is one of the standard UVM phase methods, and which kind.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PhaseKind {
@@ -144,99 +143,77 @@ pub enum PhaseKind {
     Task,
 }
 
-/// Direction of a subroutine argument.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Direction {
-    /// `input` (also the default when none is written).
-    In,
-    /// `output`.
-    Out,
-    /// `inout`.
-    InOut,
-    /// `ref` (and `const ref`).
-    Ref,
-}
-
-impl Direction {
-    #[cfg(feature = "slang")]
-    fn from_c(v: u8) -> Self {
-        match v {
-            1 => Direction::Out,
-            2 => Direction::InOut,
-            3 => Direction::Ref,
-            _ => Direction::In,
+impl PhaseKind {
+    /// Classifies a method name against standard IEEE 1800.2 UVM phases.
+    pub fn from_method_name(name: &str) -> Self {
+        if FUNCTION_PHASES.contains(&name) {
+            PhaseKind::Function
+        } else if TASK_PHASES.contains(&name) {
+            PhaseKind::Task
+        } else {
+            PhaseKind::None
         }
     }
 }
 
-/// The shape of a type, as far as rules care: aggregates that are costly to
-/// copy, and the rest.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum TypeShape {
-    /// Anything not listed below.
-    Other,
-    /// `T x[]`.
-    DynamicArray,
-    /// `T x[$]`.
-    Queue,
-    /// `T x[K]` with a key type or `*`.
-    AssociativeArray,
-    /// `T x[N]` or `T x[A:B]`.
-    FixedUnpackedArray,
-    /// An unpacked `struct` (not a packed one).
-    UnpackedStruct,
-}
+const FUNCTION_PHASES: &[&str] = &[
+    "build_phase",
+    "connect_phase",
+    "end_of_elaboration_phase",
+    "start_of_simulation_phase",
+    "extract_phase",
+    "check_phase",
+    "report_phase",
+    "final_phase",
+];
 
-impl TypeShape {
-    #[cfg(feature = "slang")]
-    fn from_c(v: u8) -> Self {
-        match v {
-            1 => TypeShape::DynamicArray,
-            2 => TypeShape::Queue,
-            3 => TypeShape::AssociativeArray,
-            4 => TypeShape::FixedUnpackedArray,
-            5 => TypeShape::UnpackedStruct,
-            _ => TypeShape::Other,
+const TASK_PHASES: &[&str] = &[
+    "run_phase",
+    "pre_reset_phase",
+    "reset_phase",
+    "post_reset_phase",
+    "pre_configure_phase",
+    "configure_phase",
+    "post_configure_phase",
+    "pre_main_phase",
+    "main_phase",
+    "post_main_phase",
+    "pre_shutdown_phase",
+    "shutdown_phase",
+    "post_shutdown_phase",
+];
+
+/// Classifies the UVM role from the names along a class's resolved base chain.
+fn classify_uvm(chain: &[&str]) -> UvmKind {
+    let has = |n: &str| chain.contains(&n);
+    if has("uvm_component") {
+        for (base, kind) in [
+            ("uvm_test", UvmKind::Test),
+            ("uvm_env", UvmKind::Env),
+            ("uvm_agent", UvmKind::Agent),
+            ("uvm_driver", UvmKind::Driver),
+            ("uvm_monitor", UvmKind::Monitor),
+            ("uvm_sequencer_base", UvmKind::Sequencer),
+            ("uvm_scoreboard", UvmKind::Scoreboard),
+            ("uvm_subscriber", UvmKind::Subscriber),
+        ] {
+            if has(base) {
+                return kind;
+            }
         }
+        return UvmKind::Component;
     }
-}
-
-/// A source position. Lines and columns start at 1; a default `Loc` (file 0,
-/// line 0) means "unknown".
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Loc {
-    /// Index into [`Design::files`]; 0 is "no file".
-    pub file: u32,
-    /// 1-based line.
-    pub line: u32,
-    /// 1-based byte column.
-    pub column: u32,
-    /// For code from a macro: the file and line of the outermost expansion,
-    /// where uvmcheck reports findings on it (with column 0).
-    pub expansion: Option<(u32, u32)>,
-}
-
-/// A class property (data member).
-#[derive(Clone, Debug)]
-pub struct Property {
-    /// Declared name.
-    pub name: String,
-    /// The type as slang prints it (parameter types resolved).
-    pub ty: String,
-    /// The property's type, when it is a class in this model.
-    pub type_class: Option<ClassId>,
-    /// Access qualifier.
-    pub visibility: Visibility,
-    /// Declared `static`.
-    pub is_static: bool,
-    /// Declared `const`.
-    pub is_const: bool,
-    /// Declared `rand` or `randc`.
-    pub is_rand: bool,
-    /// A virtual interface, or an array of them.
-    pub is_virtual_interface: bool,
-    /// Where the name is declared.
-    pub loc: Loc,
+    if has("uvm_sequence_base") || has("uvm_sequence") {
+        return UvmKind::Sequence;
+    }
+    if has("uvm_sequence_item") {
+        return UvmKind::SequenceItem;
+    }
+    if has("uvm_object") {
+        UvmKind::Object
+    } else {
+        UvmKind::None
+    }
 }
 
 /// A method (function or task) of a class, with the facts rules read from its
@@ -286,122 +263,6 @@ pub struct Method {
     pub super_new: Option<(u32, Loc)>,
 }
 
-/// What the left side of an assignment is rooted in: `x`, `x.f`, `x[i]`.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum RootKind {
-    /// Anything else (a call result, a concatenation, a hierarchical name).
-    Other,
-    /// An argument of the method.
-    Argument,
-    /// A local variable of the method.
-    Local,
-    /// A property of the class.
-    Property,
-}
-
-/// An assignment in a method body, in walk order.
-#[derive(Clone, Debug)]
-pub struct Assignment {
-    /// Left side as written.
-    pub lhs: String,
-    /// Right side as written.
-    pub rhs: String,
-    /// `<=` rather than `=` or an operator assignment.
-    pub is_non_blocking: bool,
-    /// What the left side is rooted in.
-    pub root_kind: RootKind,
-    /// The argument, local or property assigned into.
-    pub root_name: String,
-    /// Where the assignment is.
-    pub loc: Loc,
-}
-
-/// A call made in a method body, in the order the body is walked; calls nested
-/// in arguments and in nested blocks are included.
-#[derive(Clone, Debug)]
-pub struct Call {
-    /// As written: "randomize", "$urandom", "get".
-    pub name: String,
-    /// A system task or function, or a built-in method such as randomize().
-    pub is_system: bool,
-    /// Class (generic name) or package that declares the callee; empty if none.
-    pub callee_scope: String,
-    /// The callee has the `virtual` keyword itself.
-    pub callee_declared_virtual: bool,
-    /// The callee is made by the compiler (`randomize` and the like).
-    pub callee_builtin: bool,
-    /// The first argument is the `null` literal.
-    pub first_arg_is_null: bool,
-    /// Where the first argument starts (line 0 when there is none).
-    pub first_arg_loc: Loc,
-    /// The object called on, as written ("m_env.ap"); empty if none.
-    pub receiver: String,
-    /// Written as `super.name(...)`.
-    pub via_super: bool,
-    /// Where the call is.
-    pub loc: Loc,
-}
-
-/// A formal argument of a method.
-#[derive(Clone, Debug)]
-pub struct Argument {
-    /// Declared name.
-    pub name: String,
-    /// The type as declared.
-    pub ty: String,
-    /// The type with typedefs resolved.
-    pub canonical_type: String,
-    /// The argument's type, when it is a class in this model.
-    pub type_class: Option<ClassId>,
-    /// Argument direction.
-    pub direction: Direction,
-    /// Aggregate shape of the type (costly to pass by value or not).
-    pub shape: TypeShape,
-    /// Where the argument is declared.
-    pub loc: Loc,
-}
-
-/// A variable declared directly in a method's body.
-#[derive(Clone, Debug)]
-pub struct Local {
-    /// Declared name.
-    pub name: String,
-    /// The type as slang prints it.
-    pub ty: String,
-    /// A virtual interface, or an array of them.
-    pub is_virtual_interface: bool,
-    /// Where the variable is declared.
-    pub loc: Loc,
-}
-
-/// A named constraint block of a class.
-#[derive(Clone, Debug)]
-pub struct Constraint {
-    /// Constraint block name.
-    pub name: String,
-    /// Where the block is declared.
-    pub loc: Loc,
-}
-
-/// A use of a user macro written inside the class's text, by name without
-/// the backtick (`uvm_object_utils`).
-#[derive(Clone, Debug)]
-pub struct MacroUse {
-    /// Macro name without the backtick.
-    pub name: String,
-    /// Where the macro is used.
-    pub loc: Loc,
-}
-
-/// A typedef declared in the class (`type_id` and the like).
-#[derive(Clone, Debug)]
-pub struct Typedef {
-    /// Typedef name.
-    pub name: String,
-    /// Where the typedef is declared.
-    pub loc: Loc,
-}
-
 /// A class: one entry per definition. A specialization of a parameterized
 /// class (`uvm_driver #(pkt)`) maps to the entry of its generic class.
 #[derive(Clone, Debug)]
@@ -441,34 +302,6 @@ pub struct Class {
     /// Typedefs declared in the class, in order.
     pub typedefs: Vec<Typedef>,
 }
-
-/// Wall-clock cost of a load, by stage, in milliseconds.
-#[derive(Clone, Copy, Debug, Default)]
-pub struct Timings {
-    /// Preprocessing and parsing.
-    pub parse_ms: f64,
-    /// Elaboration (0 for the native front end, which builds the model straight
-    /// from syntax trees).
-    pub elaborate_ms: f64,
-    /// Building the C++ model from the elaborated AST.
-    pub model_ms: f64,
-    /// Copying the model across the C ABI into Rust.
-    pub copy_ms: f64,
-}
-
-/// A design that could not be loaded at all (bad options, missing files, ABI
-/// mismatch). Compile errors in the code are not an `Error`; see
-/// [`Design::compile_errors`].
-#[derive(Debug)]
-pub struct Error(pub String);
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str(&self.0)
-    }
-}
-
-impl std::error::Error for Error {}
 
 /// An owned snapshot of a loaded design: its files and classes. Nothing in it
 /// borrows from the front end that built it, so it can be shared between
@@ -519,8 +352,105 @@ fn id(v: u32) -> Option<ClassId> {
     (v != ffi::NONE).then_some(v)
 }
 
+#[cfg(feature = "slang")]
+fn visibility_from_c(v: u8) -> Visibility {
+    match v {
+        1 => Visibility::Protected,
+        2 => Visibility::Local,
+        _ => Visibility::Public,
+    }
+}
+
+#[cfg(feature = "slang")]
+fn direction_from_c(v: u8) -> Direction {
+    match v {
+        1 => Direction::Out,
+        2 => Direction::InOut,
+        3 => Direction::Ref,
+        _ => Direction::In,
+    }
+}
+
+#[cfg(feature = "slang")]
+fn shape_from_c(v: u8) -> TypeShape {
+    match v {
+        1 => TypeShape::DynamicArray,
+        2 => TypeShape::Queue,
+        3 => TypeShape::AssociativeArray,
+        4 => TypeShape::FixedUnpackedArray,
+        5 => TypeShape::UnpackedStruct,
+        _ => TypeShape::Other,
+    }
+}
+
 impl Design {
-    /// A design built by another front end (the native one in sv-sema).
+    /// Lifts a pure IEEE 1800 [`svlang::semantic::model::Design`] into [`Design`],
+    /// classifying UVM component/object roles and standard UVM phase methods.
+    pub fn from_sv(sv: svlang::semantic::model::Design) -> Design {
+        let (files, sv_classes, compile_errors, timings, specializations) = sv.into_parts();
+        let names: Vec<String> = sv_classes.iter().map(|c| c.name.clone()).collect();
+        let classes = sv_classes
+            .into_iter()
+            .map(|c| {
+                let uvm = if c.lineage.is_empty() {
+                    UvmKind::None
+                } else {
+                    let chain: Vec<&str> = c.lineage.iter().map(|&id| names[id as usize].as_str()).collect();
+                    classify_uvm(&chain)
+                };
+                let methods = c
+                    .methods
+                    .into_iter()
+                    .map(|m| {
+                        let phase = if m.is_builtin { PhaseKind::None } else { PhaseKind::from_method_name(&m.name) };
+                        Method {
+                            name: m.name,
+                            visibility: m.visibility,
+                            is_task: m.is_task,
+                            is_virtual: m.is_virtual,
+                            is_pure: m.is_pure,
+                            is_static: m.is_static,
+                            phase,
+                            declared_virtual: m.declared_virtual,
+                            is_builtin: m.is_builtin,
+                            is_extern: m.is_extern,
+                            return_type: m.return_type,
+                            returns_void: m.returns_void,
+                            loc: m.loc,
+                            arguments: m.arguments,
+                            locals: m.locals,
+                            calls: m.calls,
+                            assignments: m.assignments,
+                            timing_controls: m.timing_controls,
+                            calls_super_new: m.calls_super_new,
+                            super_new: m.super_new,
+                        }
+                    })
+                    .collect();
+                Class {
+                    id: c.id,
+                    name: c.name,
+                    scope: c.scope,
+                    base_name: c.base_name,
+                    base: c.base,
+                    uvm,
+                    is_virtual: c.is_virtual,
+                    is_parameterized: c.is_parameterized,
+                    is_library: c.is_library,
+                    is_interface: c.is_interface,
+                    loc: c.loc,
+                    properties: c.properties,
+                    methods,
+                    constraints: c.constraints,
+                    macros: c.macros,
+                    typedefs: c.typedefs,
+                }
+            })
+            .collect();
+        Design { files, classes, compile_errors, timings, specializations }
+    }
+
+    /// A design built by another front end.
     pub fn from_parts(files: Vec<String>, classes: Vec<Class>, compile_errors: u32, timings: Timings) -> Design {
         Design { files, classes, compile_errors, timings, specializations: Vec::new() }
     }
@@ -590,7 +520,7 @@ impl Design {
                     name: text(p.name),
                     ty: text(p.type_),
                     type_class: id(p.type_class),
-                    visibility: Visibility::from_c(p.visibility),
+                    visibility: visibility_from_c(p.visibility),
                     is_static: p.is_static != 0,
                     is_const: p.is_const != 0,
                     is_rand: p.is_rand != 0,
@@ -617,8 +547,8 @@ impl Design {
                         ty: text(x.type_),
                         canonical_type: text(x.canonical_type),
                         type_class: id(x.type_class),
-                        direction: Direction::from_c(x.direction),
-                        shape: TypeShape::from_c(x.shape),
+                        direction: direction_from_c(x.direction),
+                        shape: shape_from_c(x.shape),
                         loc: loc(x.loc),
                     });
                 }
@@ -687,7 +617,7 @@ impl Design {
                 }
                 methods.push(Method {
                     name: text(m.name),
-                    visibility: Visibility::from_c(m.visibility),
+                    visibility: visibility_from_c(m.visibility),
                     is_task: m.is_task != 0,
                     is_virtual: m.is_virtual != 0,
                     is_pure: m.is_pure != 0,

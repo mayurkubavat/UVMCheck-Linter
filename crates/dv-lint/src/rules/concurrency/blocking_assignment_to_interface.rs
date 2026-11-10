@@ -26,7 +26,7 @@ pub(crate) fn interface_signal(lhs: &str) -> bool {
 /// a class, so there `cb` is a handle or a variable (UVM's own
 /// `for (uvm_vreg_cbs cb = cbs.first(); ...) cb.fname = ...`). A clocking
 /// block reached from a class goes through the interface (`vif.cb.x`).
-fn handle_named_cb(c: &Cst, n: sv_syntax::NodeId, lhs: &str) -> bool {
+fn handle_named_cb(c: &Cst, n: svlang::syntax::NodeId, lhs: &str) -> bool {
     lhs.starts_with("cb.")
         && !lhs.contains(".cb.")
         && !lhs.contains("vif.")
@@ -35,7 +35,7 @@ fn handle_named_cb(c: &Cst, n: sv_syntax::NodeId, lhs: &str) -> bool {
 
 /// A function phase that runs before time 0 ends: `build_phase`, also as
 /// `cls::build_phase` out of its class.
-pub(crate) fn in_setup_phase(c: &Cst, n: sv_syntax::NodeId) -> bool {
+pub(crate) fn in_setup_phase(c: &Cst, n: svlang::syntax::NodeId) -> bool {
     crate::support::slang_ast::ancestors(c, n).find(|&a| matches!(c.kind(a), FunctionDecl | TaskDecl)).is_some_and(
         |f| {
             c.kind(f) == FunctionDecl
@@ -54,13 +54,13 @@ pub(crate) fn in_setup_phase(c: &Cst, n: sv_syntax::NodeId) -> bool {
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 /// An assignment target that is a signal of a virtual interface or of a
 /// clocking block: by its declarations when they
 /// resolve, else by its names.
-pub(crate) fn drives_interface(c: &Cst, target: sv_syntax::NodeId, lhs: &str) -> bool {
+pub(crate) fn drives_interface(c: &Cst, target: svlang::syntax::NodeId, lhs: &str) -> bool {
     match crate::sem::reach(c, target) {
         Some(r) => r.driven_from_testbench(),
         None => interface_signal(lhs) && !handle_named_cb(c, target, lhs),

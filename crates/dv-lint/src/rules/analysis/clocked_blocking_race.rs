@@ -9,8 +9,8 @@ use std::collections::{HashMap, HashSet};
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// `posedge clk` / `negedge clk` of an always block with one edge event.
 fn edge_of(c: &Cst, blk: NodeId) -> Option<(NodeId, String)> {

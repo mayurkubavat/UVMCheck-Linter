@@ -4,7 +4,7 @@
 use crate::support::statements::{if_parts, start};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn false_condition(c: &Cst, s: &mut Sink) {

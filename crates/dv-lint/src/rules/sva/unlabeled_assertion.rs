@@ -3,8 +3,8 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unlabeled_assertion(c: &Cst, s: &mut Sink) {
     let mut found: Vec<(NodeId, bool)> = c.nodes(AssertStmt).into_iter().map(|n| (n, false)).collect();

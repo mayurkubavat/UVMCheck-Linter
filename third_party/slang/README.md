@@ -23,8 +23,8 @@ is kept out of this repository:
 
 ## The `slang` Cargo feature: oracle and parity only
 
-The Rust tools have their own front end (`sv-lexer`, `sv-preproc`,
-`sv-syntax`, `sv-sema`) and do not need Slang. Slang is reachable from Rust
+The Rust tools have their own front end (`sv-lexer`, `sv-preprocessor`,
+`sv-syntax`, `sv-semantic`) and do not need Slang. Slang is reachable from Rust
 only through the C ABI bridge (`crates/sv-slang`, used by `crates/dv-model`'s
 `Design::load`), and only behind a Cargo feature named `slang`:
 
@@ -34,7 +34,7 @@ only through the C ABI bridge (`crates/sv-slang`, used by `crates/dv-model`'s
   default workspace member.
 - **Never the default front end.** With the feature on, a tool still loads
   natively unless asked: `dv-lint --slang`, `dv-map --slang`,
-  `dv-filelist --load --slang`, and `model_dump --slang` (sv-sema example).
+  `dv-filelist --load --slang`, and `model_dump --slang` (dv-model example).
   Built without it, `--slang` exits with an error that names the feature.
 - **Who turns it on:** the parity gates (`tools/gates/lint_parity.py --slang`,
   `model_parity.py`) and ctest's `rust_model_test`

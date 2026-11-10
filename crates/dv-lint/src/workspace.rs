@@ -13,7 +13,7 @@
 //!
 //! The findings are the ones the command line reports for the project:
 //! the same rule selection, configuration, waivers and baseline. Text set
-//! with [`sv_syntax::overlay`] stands in for files on disk, so a language
+//! with [`svlang::syntax::overlay`] stands in for files on disk, so a language
 //! server checks what is in the editor.
 
 use crate::{project, suppress, Finding, Session};
@@ -117,7 +117,8 @@ impl Workspace {
     pub fn check(&self, open: &[PathBuf]) -> Result<Checked, String> {
         let args: &[String] = self.config.as_ref().map_or(&[], |c| &c.compile_args);
         let cwd = std::env::current_dir().unwrap_or_default();
-        let list = sv_source::FileList::read_args(args, &cwd, sv_source::Dialect::Any, &sv_source::ProcessEnv);
+        let list =
+            svlang::source::FileList::read_args(args, &cwd, svlang::source::Dialect::Any, &svlang::source::ProcessEnv);
         // Include folders and defines, for files parsed on their own.
         let mut shared: Vec<String> =
             list.include_dirs.iter().map(|d| format!("+incdir+{}", d.value.display())).collect();
@@ -127,7 +128,7 @@ impl Workspace {
         }));
         let mut trees = Vec::new();
         if !list.sources.is_empty() {
-            trees = sv_sema::parse_args(args).map_err(|e| e.to_string())?.0;
+            trees = svlang::semantic::parse_args(args).map_err(|e| e.to_string())?.0;
         }
         let compiled: HashSet<PathBuf> = trees.iter().flat_map(|t| t.files.iter().map(|f| canonical(f))).collect();
         let mut seen = HashSet::new();
@@ -138,12 +139,12 @@ impl Workspace {
             .collect();
         if !alone.is_empty() {
             shared.extend(alone);
-            trees.extend(sv_sema::parse_args(&shared).map_err(|e| e.to_string())?.0);
+            trees.extend(svlang::semantic::parse_args(&shared).map_err(|e| e.to_string())?.0);
         }
         if trees.is_empty() {
             return Ok(Checked { files: Vec::new(), findings: Vec::new(), waived: 0 });
         }
-        let design = sv_sema::design_of(&trees, 0.0);
+        let design = dv_model::design_of(&trees, 0.0);
         let waived_before = crate::inline_waived();
         let (files, mut findings) = self.session.lint_all(&design, &trees, |id| self.keep.contains(id));
         let inline = crate::inline_waived() - waived_before;

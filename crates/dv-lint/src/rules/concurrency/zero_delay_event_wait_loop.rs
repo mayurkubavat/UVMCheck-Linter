@@ -6,7 +6,7 @@ use crate::support::procedural::{add_n, is_wait_loop, loop_body, start};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn triggered_wait_loop(c: &Cst, s: &mut Sink) {

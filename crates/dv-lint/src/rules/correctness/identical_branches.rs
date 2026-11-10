@@ -8,7 +8,7 @@ use crate::support::statements::{case_parts, if_parts, in_bad_body, list, report
 use crate::support::sva_cov::user_code_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The end offset of the macro use whose backtick is at `at`: past its

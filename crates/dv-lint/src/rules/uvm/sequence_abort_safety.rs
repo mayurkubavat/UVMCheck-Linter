@@ -8,7 +8,7 @@ use crate::support::uvm_syntax::{
 };
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn sequence_abort_safety(c: &Cst, s: &mut Sink) {
     for cls in c.nodes(ClassDecl) {

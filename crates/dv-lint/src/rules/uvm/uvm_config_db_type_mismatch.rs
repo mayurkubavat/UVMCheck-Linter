@@ -13,7 +13,7 @@ use crate::{Severity, Sink};
 
 /// Type parameters by class name: `class c #(type T = int)` -> c -> {T}.
 fn type_params(csts: &[Cst]) -> std::collections::HashMap<String, Vec<String>> {
-    use sv_syntax::SyntaxKind::*;
+    use svlang::syntax::SyntaxKind::*;
     let mut out: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
     for c in csts {
         for k in c.nodes(ClassDecl) {

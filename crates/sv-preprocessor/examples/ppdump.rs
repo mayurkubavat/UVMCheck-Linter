@@ -2,11 +2,11 @@
 //! form as the Slang reference tool (build/uvmcheck_pp_dump), so the two
 //! can be diffed:
 //!
-//!     cargo run --release -p sv-preproc --example ppdump -- [+incdir+DIR]... [+define+X[=V]]... FILE
+//!     cargo run --release -p sv-preprocessor --example ppdump -- [+incdir+DIR]... [+define+X[=V]]... FILE
 use std::path::PathBuf;
 
 fn main() {
-    let mut opts = sv_preproc::Options::default();
+    let mut opts = sv_preprocessor::Options::default();
     let mut file = None;
     let mut diags = false;
     for a in std::env::args().skip(1) {
@@ -22,7 +22,7 @@ fn main() {
     }
     let file = file.expect("a file to preprocess");
     let t = std::time::Instant::now();
-    let out = sv_preproc::Preprocessor::new(opts).run_file(&file);
+    let out = sv_preprocessor::Preprocessor::new(opts).run_file(&file);
     let ms = t.elapsed().as_secs_f64() * 1e3;
     if diags {
         for d in &out.diagnostics {

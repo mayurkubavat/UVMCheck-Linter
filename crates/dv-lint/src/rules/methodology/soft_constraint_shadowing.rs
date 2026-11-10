@@ -10,8 +10,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{ClassId, Design};
 use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The expressions of `soft` constraints under a constraint block or item,
 /// through lists, implications, conditionals and foreach.

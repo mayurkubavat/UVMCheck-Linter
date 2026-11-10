@@ -5,7 +5,7 @@ use crate::support::defines_packages::{container_of, user_types, Container, File
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn implicit_enum_base_type(_: &Design, csts: &[Cst], out: &mut Sink) {
     for c in csts {

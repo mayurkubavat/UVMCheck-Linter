@@ -1,6 +1,6 @@
 //! Declared types of class properties.
 
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 
 use crate::support::slang_ast::decl_name;
 

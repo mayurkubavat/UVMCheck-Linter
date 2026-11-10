@@ -9,7 +9,8 @@ members = ["crates/*"]
 # C++ build. sv-slang (the C ABI binding to libuvmcheck_model) is built only
 # when a crate's `slang` feature asks for it; see third_party/slang/README.md.
 default-members = [
-    "crates/sv-source", "crates/sv-lexer", "crates/sv-preproc", "crates/sv-syntax", "crates/sv-sema",
+    "crates/sv-source", "crates/sv-lexer", "crates/sv-preprocessor", "crates/sv-syntax", "crates/sv-semantic",
+    "crates/svlang",
     "crates/dv-model", "crates/dv-lint", "crates/dv-lsp", "crates/dv-build", "crates/dv-map",
     "crates/dv-filelist",
 ]
@@ -19,6 +20,9 @@ version = "0.1.0"
 edition = "2021"
 license = "Apache-2.0"
 rust-version = "1.82"
+repository = "https://github.com/mayurkubavat/UVMCheck-Linter"
+keywords = ["systemverilog", "verilog", "eda", "parser", "hdl"]
+categories = ["compilers", "parser-implementations", "development-tools"]
 
 [profile.release]
 debug = 1

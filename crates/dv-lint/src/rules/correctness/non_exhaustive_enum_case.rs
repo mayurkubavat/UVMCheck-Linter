@@ -6,7 +6,7 @@ use crate::support::literal_values::{decl_of_expr, literal_value};
 use crate::support::literals::ast_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The enum a declaration's type is, through typedefs: its name as slang
@@ -87,7 +87,7 @@ fn typed_enum(c: &Cst, e: NodeId) -> Option<EnumMembers> {
     if tree == c.index() {
         return enum_of(c, dt);
     }
-    let mut other = Cst::new(c.all.get(tree)?, tree, sv_sema::Locator::default());
+    let mut other = Cst::new(c.all.get(tree)?, tree, svlang::semantic::Locator::default());
     other.all = c.all;
     enum_of(&other, dt)
 }

@@ -1,10 +1,10 @@
 //! Name tokens, cross parts and port directions.
 
-use sv_syntax::{Child, NodeId};
+use svlang::syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// The name token of a declaration's `Name` child.
 pub(crate) fn name_tok(c: &Cst, n: NodeId) -> Option<u32> {

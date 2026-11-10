@@ -4,7 +4,7 @@
 use crate::support::class_items::{class_items, decl_name, model_classes, op, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn non_invertible_op(c: &Cst, s: &mut Sink) {
     for (cls, _) in model_classes(c) {

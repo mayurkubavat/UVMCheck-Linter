@@ -5,7 +5,7 @@
 use crate::support::uvm_syntax::{base_name_node, class_routines, decl_name, name_node, routine_last_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn sequence_item_default_new(c: &Cst, s: &mut Sink) {
     for cls in c.nodes(ClassDecl) {
@@ -45,7 +45,7 @@ pub(crate) fn sequence_item_default_new(c: &Cst, s: &mut Sink) {
 
 /// `string name` becomes `string name = "cls"`. Unsafe: callers that relied
 /// on the argument being required now get the default.
-fn default_fix(c: &Cst, nm: sv_syntax::NodeId, class: &str) -> Option<crate::fix::Fix> {
+fn default_fix(c: &Cst, nm: svlang::syntax::NodeId, class: &str) -> Option<crate::fix::Fix> {
     let t = c.tree.token_bounds(nm)?.1;
     let tok = &c.tree.tokens[t as usize];
     if tok.from_macro {

@@ -6,8 +6,8 @@ use crate::support::class_items::{class_decls, class_items, decl_name, declarato
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// Whether a name chain (slang's ScopedName / IdentifierSelectName
 /// pieces) starts here: names, selects of names, members of names.

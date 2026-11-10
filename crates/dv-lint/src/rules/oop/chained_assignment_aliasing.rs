@@ -4,8 +4,8 @@
 use crate::support::class_items::{kids, op};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn chained_assignment(c: &Cst, s: &mut Sink) {
     let is_assign = |n: NodeId| c.kind(n) == BinaryExpr && op(c, n) == "=";

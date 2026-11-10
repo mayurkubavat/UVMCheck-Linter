@@ -1,9 +1,9 @@
 //! config_db calls and their field arguments, generate headers and literal
 //! shapes, for the type rules.
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 use crate::support::slang_ast::kids;
 

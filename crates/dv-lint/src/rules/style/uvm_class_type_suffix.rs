@@ -5,7 +5,7 @@
 use crate::support::source_layout::classes;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 const CLASS_SUFFIXES: [(&str, &[&str], &str); 8] = [
     (

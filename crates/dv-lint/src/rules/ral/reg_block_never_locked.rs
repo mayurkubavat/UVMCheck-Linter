@@ -7,7 +7,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{ClassId, Design};
 use std::collections::HashSet;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn reg_block_never_locked(d: &Design, csts: &[Cst], s: &mut Sink) {

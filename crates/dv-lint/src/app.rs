@@ -21,7 +21,7 @@
 //! `--in-context` lints each header given as a source (`.svh`, `.vh`, or a
 //! `.sv` with no design unit) inside
 //! the file that includes it, found by indexing the repository's includes
-//! (`sv_source::owners`), and reports only the header's findings.
+//! (`svlang::source::owners`), and reports only the header's findings.
 //! `--frames` prints, under each finding and note, its source line with a
 //! caret under the flagged token (as uvmcheck's text report does); a
 //! terminal gets them without asking, and `--no-frames` turns them off.
@@ -52,7 +52,7 @@ use dv_model::Design;
 
 /// The command line: `dv-lint` and `uvmcheck` are this one program.
 pub fn run() {
-    sv_source::exit_on_closed_pipe();
+    svlang::source::exit_on_closed_pipe();
     let mut slang = false;
     let mut time = false;
     // The source line under each finding: on a terminal unless --no-frames,
@@ -284,7 +284,8 @@ pub fn run() {
         }
         inputs.extend(extra.python_rules.iter().map(std::path::PathBuf::from));
         let cwd = std::env::current_dir().unwrap_or_default();
-        let lists = sv_source::FileList::read_args(&args, &cwd, sv_source::Dialect::Any, &sv_source::ProcessEnv);
+        let lists =
+            svlang::source::FileList::read_args(&args, &cwd, svlang::source::Dialect::Any, &svlang::source::ProcessEnv);
         inputs.extend(lists.lists);
         let mut key: Vec<String> = vec![cwd.display().to_string()];
         key.extend(lint_args());
@@ -363,10 +364,10 @@ pub fn run() {
             report(None, time, frames, t, &hit.files, only_in(&headers, &hit.files, &hit.found));
         }
         // The design is built while the rules' shared caches start.
-        let (trees, parse_ms) = sv_sema::parse_args(&args).unwrap_or_else(|e| fail(e.to_string()));
+        let (trees, parse_ms) = svlang::semantic::parse_args(&args).unwrap_or_else(|e| fail(e.to_string()));
         let t = std::time::Instant::now();
         let (design, (mut files, mut found)) =
-            dv_lint::lint_built(|| sv_sema::design_of(&trees, parse_ms), &trees, keep);
+            dv_lint::lint_built(|| dv_model::design_of(&trees, parse_ms), &trees, keep);
         if let Some(rules) = &extra.python_rules {
             eprintln!("[dv-lint] Executing custom Python rules from: {rules}");
             let options = CONFIG.get().map_or(&[][..], |c| &c.rule_options[..]);
@@ -396,7 +397,7 @@ pub fn run() {
     let loaded = if slang {
         load_slang(&args).map(|d| (d, Vec::new()))
     } else {
-        sv_sema::load_with_trees(&args).map_err(|e| e.to_string())
+        dv_model::load_with_trees(&args).map_err(|e| e.to_string())
     };
     let (design, trees) = loaded.unwrap_or_else(|e| fail(e));
     if exprs {
@@ -461,12 +462,12 @@ fn serve_editor() -> ! {
 }
 
 /// `--in-context`: each header source (`.svh`, `.vh`, ...) is replaced by
-/// the compile root that includes it (see `sv_source::owners`), with the
+/// the compile root that includes it (see `svlang::source::owners`), with the
 /// folders on the way as include directories. Returns the headers, whose
 /// findings are the ones to report; a header nothing includes stays a
 /// source of its own.
 fn in_owner(args: &mut Vec<String>) -> Vec<std::path::PathBuf> {
-    use sv_source::owners::{is_header, search_root, IncludeIndex};
+    use svlang::source::owners::{is_header, search_root, IncludeIndex};
     let incdirs: Vec<std::path::PathBuf> = args
         .iter()
         .filter_map(|a| a.strip_prefix("+incdir+"))
@@ -640,7 +641,7 @@ fn init_project(args: &[String]) -> ! {
         },
         d.uvm_note
     );
-    let (design, _trees) = sv_sema::load_with_trees(&d.compile_args()).unwrap_or_else(|e| fail(e.to_string()));
+    let (design, _trees) = dv_model::load_with_trees(&d.compile_args()).unwrap_or_else(|e| fail(e.to_string()));
     let library = d.library_rel.first().map(|l| {
         let e = match l.strip_prefix("$UVM_HOME") {
             Some(rest) => format!("{}{rest}", std::env::var("UVM_HOME").unwrap_or_default()),

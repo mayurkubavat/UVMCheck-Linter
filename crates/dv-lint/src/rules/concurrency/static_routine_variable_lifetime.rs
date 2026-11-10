@@ -13,7 +13,7 @@ use crate::support::procedural::{add_n, routine_name};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn static_routine_variable(c: &Cst, s: &mut Sink) {

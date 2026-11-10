@@ -234,7 +234,7 @@ impl PushField for Json {
 pub fn run(
     path: &str,
     design: &Design,
-    trees: &[sv_syntax::Tree],
+    trees: &[svlang::syntax::Tree],
     files: &mut Vec<String>,
     options: &[(String, String)],
 ) -> Vec<Finding> {

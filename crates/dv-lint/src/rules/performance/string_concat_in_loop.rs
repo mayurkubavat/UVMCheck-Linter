@@ -5,8 +5,8 @@
 use crate::support::for_loops::{kids, op_text, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn concat_in_loop(c: &Cst, s: &mut Sink) {
     let mut loops = c.nodes(LoopStmt);

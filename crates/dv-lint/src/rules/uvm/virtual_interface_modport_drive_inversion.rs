@@ -12,13 +12,13 @@ use crate::support::uvm_classes::assign_parts;
 use crate::syntax::Cst;
 use crate::{derives_from, Severity, Sink};
 use dv_model::Design;
-use sv_sema::fx::FxMap as HashMap;
+use svlang::semantic::fx::FxMap as HashMap;
 
 /// Whether the assignment on `line` of `file` to `lhs` reaches an interface
 /// signal, where the declarations say.
 fn reaches_interface(
     csts: &[Cst],
-    targets: &HashMap<(u32, u32), Vec<(usize, sv_syntax::NodeId)>>,
+    targets: &HashMap<(u32, u32), Vec<(usize, svlang::syntax::NodeId)>>,
     a: &dv_model::Assignment,
 ) -> Option<bool> {
     let here = targets.get(&(a.loc.file, a.loc.line))?;
@@ -32,7 +32,7 @@ fn reaches_interface(
 
 pub(crate) fn virtual_interface_modport_drive_inversion(d: &Design, csts: &[Cst], out: &mut Sink) {
     // Assignment targets by file and line, to find the model's assignments in the trees.
-    let mut targets: HashMap<(u32, u32), Vec<(usize, sv_syntax::NodeId)>> = HashMap::default();
+    let mut targets: HashMap<(u32, u32), Vec<(usize, svlang::syntax::NodeId)>> = HashMap::default();
     for (i, c) in csts.iter().enumerate() {
         for n in c.pre.iter().copied() {
             if let Some((lhs, _)) = assign_parts(c, n) {

@@ -2,16 +2,16 @@
 //! rules (IEEE 1800 11.6 and 11.8): each expression's self-determined type,
 //! then the type context-determined operators take from their context
 //! (comparison operands, assignment right-hand sides, arithmetic operands).
-//! Declared types come from sv-sema's [`TypeOracle`], printed as slang's
+//! Declared types come from sv-semantic's [`TypeOracle`], printed as slang's
 //! `Type::toString()`. Gated against slang by tools/gates/expr_gate.py
 //! (tools/oracles/exprdump.cpp is the reference).
 
 use std::sync::Arc;
-use sv_sema::fx::FxMap as HashMap;
+use svlang::semantic::fx::FxMap as HashMap;
 
-use sv_sema::oracle::{TypeInfo, TypeOracle};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::semantic::oracle::{TypeInfo, TypeOracle};
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 use crate::support::slang_ast::{kids, lookup, DeclKind};
 use crate::syntax::Cst;
@@ -812,7 +812,7 @@ pub(crate) fn inst_types(c: &Cst) -> Arc<InstTypes> {
 }
 
 /// The routine formals (their declarators) of one bit.
-pub(crate) fn one_bit_formals(c: &Cst) -> Arc<sv_sema::fx::FxSet<(usize, NodeId)>> {
+pub(crate) fn one_bit_formals(c: &Cst) -> Arc<svlang::semantic::fx::FxSet<(usize, NodeId)>> {
     facts(c).2
 }
 
@@ -877,7 +877,7 @@ pub(crate) fn spec_types(c: &Cst) -> Arc<SpecTypes> {
 type Facts = (
     Arc<HashMap<(usize, NodeId), ETy>>,
     Arc<HashMap<(usize, NodeId), String>>,
-    Arc<sv_sema::fx::FxSet<(usize, NodeId)>>,
+    Arc<svlang::semantic::fx::FxSet<(usize, NodeId)>>,
     Arc<SpecTypes>,
     Arc<CfgDbTypes>,
     Arc<InstTypes>,
@@ -919,7 +919,7 @@ fn cfgdb_entry(
     ty: &mut Typer,
     o: &TypeOracle,
     n: NodeId,
-    ifaces: &mut Option<sv_sema::fx::FxSet<String>>,
+    ifaces: &mut Option<svlang::semantic::fx::FxSet<String>>,
 ) -> Option<Option<(ETy, String, bool)>> {
     let i = tc.index();
     let &callee = kids(tc, n).first()?;
@@ -944,7 +944,7 @@ fn cfgdb_entry(
             if !ifaces.get_or_insert_with(|| interface_names(tc.all)).contains(base) {
                 return Some(None);
             }
-            sv_sema::oracle::TypeInfo::other(ct)
+            svlang::semantic::oracle::TypeInfo::other(ct)
         }
         None => return Some(None),
     };
@@ -958,10 +958,10 @@ fn cfgdb_entry(
 }
 
 /// The names of the interfaces declared in the compile.
-fn interface_names(all: &[sv_syntax::Tree]) -> sv_sema::fx::FxSet<String> {
-    let mut out = sv_sema::fx::FxSet::default();
+fn interface_names(all: &[svlang::syntax::Tree]) -> svlang::semantic::fx::FxSet<String> {
+    let mut out = svlang::semantic::fx::FxSet::default();
     for (i, t) in all.iter().enumerate() {
-        let c = Cst::new(t, i, sv_sema::Locator::default());
+        let c = Cst::new(t, i, svlang::semantic::Locator::default());
         for n in c.nodes(InterfaceDecl) {
             out.insert(crate::support::slang_ast::decl_name(&c, n));
         }
@@ -982,10 +982,10 @@ fn build_facts(c: &Cst) -> Facts {
     let o = o;
     let mut out = HashMap::default();
     let mut canon = HashMap::default();
-    let mut one_bit = sv_sema::fx::FxSet::default();
+    let mut one_bit = svlang::semantic::fx::FxSet::default();
     let mut in_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::default();
     let mut cfgdb: CfgDbTypes = HashMap::default();
-    let mut ifaces: Option<sv_sema::fx::FxSet<String>> = None;
+    let mut ifaces: Option<svlang::semantic::fx::FxSet<String>> = None;
     let mut cfg_generic: HashMap<(usize, usize, usize), Vec<NodeId>> = HashMap::default();
     let mut scoped_calls: Vec<(usize, NodeId)> = Vec::new();
     for (i, t) in c.all.iter().enumerate() {
@@ -993,7 +993,7 @@ fn build_facts(c: &Cst) -> Facts {
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
-            own = Cst::new(t, i, sv_sema::Locator::default());
+            own = Cst::new(t, i, svlang::semantic::Locator::default());
             own.all = c.all;
             &own
         };
@@ -1013,7 +1013,7 @@ fn build_facts(c: &Cst) -> Facts {
                         .spawn_scoped(s, move || {
                             crate::shared::enter(gen);
                             let o = TypeOracle::new(all);
-                            let mut tc = Cst::new(t, i, sv_sema::Locator::default());
+                            let mut tc = Cst::new(t, i, svlang::semantic::Locator::default());
                             tc.all = all;
                             let mut ty = Typer::new(&tc, &o);
                             ch.iter().filter_map(|&n| ty.final_type(n).map(|x| (n, x))).collect::<Vec<_>>()
@@ -1107,7 +1107,7 @@ fn build_facts(c: &Cst) -> Facts {
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
-            own = Cst::new(t, i, sv_sema::Locator::default());
+            own = Cst::new(t, i, svlang::semantic::Locator::default());
             own.all = c.all;
             &own
         };
@@ -1143,7 +1143,7 @@ fn build_facts(c: &Cst) -> Facts {
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
-            own = Cst::new(t, i, sv_sema::Locator::default());
+            own = Cst::new(t, i, svlang::semantic::Locator::default());
             own.all = c.all;
             &own
         };
@@ -1170,7 +1170,7 @@ fn build_facts(c: &Cst) -> Facts {
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
-            own = Cst::new(t, i, sv_sema::Locator::default());
+            own = Cst::new(t, i, svlang::semantic::Locator::default());
             own.all = c.all;
             &own
         };
@@ -1221,12 +1221,12 @@ fn type_instances<'t>(
         let tc = if std::ptr::eq(t, c.tree) {
             c
         } else {
-            own = Cst::new(t, ti, sv_sema::Locator::default());
+            own = Cst::new(t, ti, svlang::semantic::Locator::default());
             own.all = c.all;
             &own
         };
         let exprs: Vec<NodeId> = t.subtree(decl).into_iter().filter(|&n| is_expr(tc.kind(n))).collect();
-        let casts: sv_sema::fx::FxSet<NodeId> = cast_nodes(tc).into_iter().collect();
+        let casts: svlang::semantic::fx::FxSet<NodeId> = cast_nodes(tc).into_iter().collect();
         let mut per: Vec<Vec<Typed>> = Vec::new();
         let mut copies = Vec::new();
         for (rep, members) in &groups {
@@ -1360,7 +1360,7 @@ pub(crate) fn visit_types(c: &Cst, e: NodeId, nodes: &[NodeId]) -> Vec<(usize, V
     parts
 }
 
-pub(crate) fn is_expr(k: sv_syntax::SyntaxKind) -> bool {
+pub(crate) fn is_expr(k: svlang::syntax::SyntaxKind) -> bool {
     matches!(
         k,
         BinaryExpr
@@ -1463,9 +1463,9 @@ pub(crate) fn slang_kind(c: &Cst, e: NodeId) -> Option<&'static str> {
 
 /// One line per typed expression, as tools/oracles/exprdump.cpp prints slang's:
 /// `<file>:<line>:<col> <kind> <bits> <s|u> <4|2> <type>`, sorted.
-pub fn expr_dump(files: Vec<String>, trees: &[sv_syntax::Tree]) -> Vec<String> {
+pub fn expr_dump(files: Vec<String>, trees: &[svlang::syntax::Tree]) -> Vec<String> {
     let o = TypeOracle::new(trees);
-    let mut locator = sv_sema::Locator::new(files);
+    let mut locator = svlang::semantic::Locator::new(files);
     let mut rows = Vec::new();
     for (i, t) in trees.iter().enumerate() {
         let mut cst = Cst::new(t, i, locator);

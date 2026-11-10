@@ -18,8 +18,8 @@ use crate::support::slang_ast::{ancestors, kids};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The name a `.sample()` call is made on: `a.b[i].cg.sample()` -> `cg`.
 fn sampled_name(c: &Cst, call: NodeId) -> Option<String> {

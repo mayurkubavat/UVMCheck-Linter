@@ -8,7 +8,7 @@ use crate::support::routine_bodies::{bodies, calls_in};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 fn is_error_severity(a: &str) -> bool {
     a.contains("UVM_ERROR") || a.contains("UVM_FATAL")

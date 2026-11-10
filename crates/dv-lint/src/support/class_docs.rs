@@ -3,13 +3,13 @@
 
 use std::collections::HashMap;
 
-use sv_lexer::Kind;
+use svlang::lexer::Kind;
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Role {
@@ -281,8 +281,8 @@ pub(crate) fn own_comments(c: &Cst, t: u32) -> Vec<(u32, String)> {
 /// Comments of a trivia region `[from, to)` of file `f`, as above.
 pub(crate) fn region_comments(c: &Cst, f: u32, from: u32, to: u32, nested: bool, out: &mut Vec<(u32, String)>) {
     let text = &c.tree.sources[f as usize][from as usize..to as usize];
-    let toks = sv_lexer::lex(text);
-    let tx = |x: &sv_lexer::Token| &text[x.start as usize..(x.start + x.len) as usize];
+    let toks = svlang::lexer::lex(text);
+    let tx = |x: &svlang::lexer::Token| &text[x.start as usize..(x.start + x.len) as usize];
     // Included files first: their tails come before this file's comments.
     for (i, x) in toks.iter().enumerate() {
         if x.kind != Kind::Directive || tx(x) != "`include" {

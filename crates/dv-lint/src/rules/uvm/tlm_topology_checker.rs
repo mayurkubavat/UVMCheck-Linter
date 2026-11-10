@@ -8,7 +8,7 @@ use crate::support::uvm_syntax::{callee, decl_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// `swe::normalizedText`: tokens with any trivia between them as one space.

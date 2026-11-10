@@ -12,8 +12,8 @@
 use std::collections::HashMap;
 
 use dv_model::ClassId;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 use crate::support::uvm_classes::{At, Ix};
 use crate::support::uvm_syntax::{callee, routine_last_name, subtree};

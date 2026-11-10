@@ -8,8 +8,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Class, Design};
 use std::collections::BTreeMap;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// Field uses in one method: its own class's properties, and other
 /// objects' properties per receiver (count, receiver class).

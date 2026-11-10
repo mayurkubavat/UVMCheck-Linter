@@ -5,7 +5,7 @@
 use crate::support::class_index::{decl_names, Classes, Role};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn rand_field_budget(c: &Cst, s: &mut Sink) {

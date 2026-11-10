@@ -4,8 +4,8 @@
 use crate::support::class_items::{call_name, kids, op, strip_casts, user_code};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn calls_randomize(c: &Cst, e: NodeId) -> bool {
     let e = strip_casts(c, e);

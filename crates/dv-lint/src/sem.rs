@@ -16,9 +16,9 @@ pub(crate) mod objections;
 
 use std::sync::Arc;
 
-use sv_sema::fx::{FxMap as HashMap, FxSet as HashSet};
-use sv_syntax::SyntaxKind::*;
-use sv_syntax::{Child, NodeId, Tree};
+use svlang::semantic::fx::{FxMap as HashMap, FxSet as HashSet};
+use svlang::syntax::SyntaxKind::*;
+use svlang::syntax::{Child, NodeId, Tree};
 
 use crate::support::slang_ast::{ancestors, decl_name, enclosing_class, lookup};
 use crate::syntax::Cst;
@@ -72,7 +72,7 @@ fn own_tokens(t: &Tree, n: NodeId) -> impl Iterator<Item = &str> {
 
 fn is_ident(s: &str) -> bool {
     s.chars().next().is_some_and(|c| c.is_ascii_alphabetic() || c == '_' || c == '\\')
-        && !sv_syntax::is_builtin_type(s)
+        && !svlang::syntax::is_builtin_type(s)
         && !matches!(s, "virtual" | "interface" | "struct" | "union" | "enum" | "packed" | "signed" | "unsigned")
 }
 

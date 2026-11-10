@@ -4,7 +4,7 @@
 use crate::support::spans::child_nodes;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// An unsized integer literal, read as `std::stoll(text, nullptr, 0)`
 /// does: a leading 0 means octal, and parsing stops at the first `_`.

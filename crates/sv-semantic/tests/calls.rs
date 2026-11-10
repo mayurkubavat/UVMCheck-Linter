@@ -7,11 +7,11 @@ fn errors(src: &str) -> Vec<String> {
     let t = sv_syntax::parse_source(src, "t.sv", sv_syntax::Options::default());
     assert!(t.errors.is_empty(), "syntax errors: {:?}", t.errors);
     let t = vec![t];
-    let scopes = sv_sema::scopes::build(&t);
-    let mut e: Vec<String> = sv_sema::calls::check(&t).into_iter().map(|d| d.message).collect();
-    e.extend(sv_sema::checks::check(&t, &scopes).into_iter().map(|d| d.message));
-    e.extend(sv_sema::order::check(&t, &scopes).into_iter().map(|d| d.message));
-    e.extend(sv_sema::elaborate_full(&t, &[]).diags.into_iter().map(|d| d.message));
+    let scopes = sv_semantic::scopes::build(&t);
+    let mut e: Vec<String> = sv_semantic::calls::check(&t).into_iter().map(|d| d.message).collect();
+    e.extend(sv_semantic::checks::check(&t, &scopes).into_iter().map(|d| d.message));
+    e.extend(sv_semantic::order::check(&t, &scopes).into_iter().map(|d| d.message));
+    e.extend(sv_semantic::elaborate_full(&t, &[]).diags.into_iter().map(|d| d.message));
     e
 }
 
@@ -149,7 +149,7 @@ fn top_level_interface_ports() {
 fn class_errors(src: &str) -> Vec<String> {
     let t = sv_syntax::parse_source(src, "t.sv", sv_syntax::Options::default());
     assert!(t.errors.is_empty(), "syntax errors: {:?}", t.errors);
-    sv_sema::classes::check(&[t]).into_iter().map(|d| d.message).collect()
+    sv_semantic::classes::check(&[t]).into_iter().map(|d| d.message).collect()
 }
 
 #[test]
@@ -197,8 +197,8 @@ fn typed_errors(src: &str) -> Vec<String> {
     let t = sv_syntax::parse_source(src, "t.sv", sv_syntax::Options::default());
     assert!(t.errors.is_empty(), "syntax errors: {:?}", t.errors);
     let t = vec![t];
-    let scopes = sv_sema::scopes::build(&t);
-    sv_sema::typed::check(&t, &scopes).into_iter().map(|d| d.message).collect()
+    let scopes = sv_semantic::scopes::build(&t);
+    sv_semantic::typed::check(&t, &scopes).into_iter().map(|d| d.message).collect()
 }
 
 #[test]

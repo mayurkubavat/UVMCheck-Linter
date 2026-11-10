@@ -4,7 +4,7 @@
 use crate::support::literals::ast_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn info_at_none(c: &Cst, s: &mut Sink) {

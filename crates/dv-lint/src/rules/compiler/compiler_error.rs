@@ -5,7 +5,7 @@
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 
-type SemaDiags = std::sync::Arc<Vec<sv_sema::names::Diag>>;
+type SemaDiags = std::sync::Arc<Vec<svlang::semantic::names::Diag>>;
 
 /// The native front end's semantic errors for the compile, computed once.
 fn semantic_diags(c: &Cst) -> SemaDiags {

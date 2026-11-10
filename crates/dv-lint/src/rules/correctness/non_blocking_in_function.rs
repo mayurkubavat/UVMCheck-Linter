@@ -11,7 +11,7 @@
 use crate::support::literals::compact;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn nonblocking_in_function(c: &Cst, s: &mut Sink) {

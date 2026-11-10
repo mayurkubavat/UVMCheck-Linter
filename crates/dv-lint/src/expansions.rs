@@ -40,7 +40,7 @@ pub fn name_macros(found: &mut [Finding], files: &[String]) {
         let Some(_) = f.loc.expansion else { continue };
         let lines = texts.entry(f.loc.file).or_insert_with(|| {
             let path = files.get(f.loc.file as usize).map(String::as_str).unwrap_or("");
-            sv_syntax::overlay::read(Path::new(path))
+            svlang::syntax::overlay::read(Path::new(path))
                 .map(|t| t.lines().map(str::to_string).collect())
                 .unwrap_or_default()
         });

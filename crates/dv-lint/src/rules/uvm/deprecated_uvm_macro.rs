@@ -10,7 +10,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::HashSet;
-use sv_lexer::Kind;
+use svlang::lexer::Kind;
 
 pub(crate) fn deprecated_uvm_macro(_: &Design, csts: &[Cst], out: &mut Sink) {
     let Some(pack) = api_pack(csts) else { return };

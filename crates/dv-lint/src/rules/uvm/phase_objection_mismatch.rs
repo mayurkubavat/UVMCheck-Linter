@@ -8,7 +8,7 @@ use crate::support::uvm_syntax::{body_items, callee, routine_last_name, routines
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn phase_objection_mismatch(d: &Design, csts: &[Cst], s: &mut Sink) {
     let ix = Ix::new(d, csts);

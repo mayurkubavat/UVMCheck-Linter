@@ -6,7 +6,7 @@ use crate::support::ast::Ast;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 fn resize_in_loop(c: &Cst, a: &Ast, s: &mut Sink) {

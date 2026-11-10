@@ -5,12 +5,12 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+publish = false
 build = "build.rs"
 
 [dependencies]
 dv-model = { path = "../dv-model", default-features = false }
-sv-sema = { path = "../sv-sema" }
-sv-source = { path = "../sv-source" }
+svlang = { path = "../svlang" }
 # Only for the rpath to libuvmcheck_model (build.rs), with the slang feature.
 sv-slang = { path = "../sv-slang", optional = true }
 

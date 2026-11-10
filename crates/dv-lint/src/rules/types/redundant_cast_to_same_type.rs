@@ -11,8 +11,8 @@ use crate::support::param_dep::{declared_as, depends_on_params};
 use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// `$cast(a, b)` on matching types, or a cast to the operand's own type:
 /// once per AST visit.

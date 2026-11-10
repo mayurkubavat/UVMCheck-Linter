@@ -8,7 +8,7 @@ use crate::support::procedural::{
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 pub(crate) fn unbounded_spawn(c: &Cst, s: &mut Sink) {

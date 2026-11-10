@@ -8,9 +8,9 @@
 //! `n` times is reported `n` times, as slang visits each instance body
 //! ([`Units::times`]).
 
-use sv_sema::fx::FxMap as HashMap;
+use svlang::semantic::fx::FxMap as HashMap;
 
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use svlang::syntax::{Child, NodeId, SyntaxKind};
 
 use crate::syntax::Cst;
 
@@ -402,7 +402,10 @@ impl Units {
 /// [`Units`]' instance counts over every tree of the compile: a module
 /// one file declares is often instantiated in another. Keyed by tree index
 /// and definition node; cached per compile.
-pub(crate) fn compile_counts(all: &[sv_syntax::Tree], direct_only: bool) -> std::rc::Rc<HashMap<(usize, u32), usize>> {
+pub(crate) fn compile_counts(
+    all: &[svlang::syntax::Tree],
+    direct_only: bool,
+) -> std::rc::Rc<HashMap<(usize, u32), usize>> {
     type Cache = Vec<((usize, usize, bool), std::rc::Rc<HashMap<(usize, u32), usize>>)>;
     thread_local! {
         static CACHE: std::cell::RefCell<Cache> = const { std::cell::RefCell::new(Vec::new()) };
@@ -432,7 +435,7 @@ pub(crate) fn compile_counts(all: &[sv_syntax::Tree], direct_only: bool) -> std:
         parents_of.push(parent);
     }
     let mut parents: HashMap<Key, Vec<(Key, usize)>> = HashMap::default();
-    let mut instantiated: sv_sema::fx::FxSet<(usize, u32)> = Default::default();
+    let mut instantiated: svlang::semantic::fx::FxSet<(usize, u32)> = Default::default();
     for (ti, t) in all.iter().enumerate() {
         let parent = &parents_of[ti];
         let up = |n: u32| (parent[n as usize] != u32::MAX).then(|| parent[n as usize]);
@@ -474,7 +477,7 @@ pub(crate) fn compile_counts(all: &[sv_syntax::Tree], direct_only: bool) -> std:
     type Key = (usize, u32);
     fn times_of(
         d: Key,
-        tops: &sv_sema::fx::FxSet<Key>,
+        tops: &svlang::semantic::fx::FxSet<Key>,
         parents: &HashMap<Key, Vec<(Key, usize)>>,
         memo: &mut HashMap<Key, Option<usize>>,
     ) -> usize {

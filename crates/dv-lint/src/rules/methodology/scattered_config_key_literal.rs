@@ -7,8 +7,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// `uvm_config_db#(T)::<method>(...)` written outside a class, where the
 /// model has no calls: the scope names uvm_config_db (or a typedef of it).

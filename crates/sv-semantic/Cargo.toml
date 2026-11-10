@@ -1,0 +1,14 @@
+[package]
+name = "sv-semantic"
+description = "IEEE 1800-2023 semantic analysis, constant evaluation, elaboration, and class model"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+sv-syntax = { version = "0.1.0", path = "../sv-syntax" }
+sv-source = { version = "0.1.0", path = "../sv-source" }

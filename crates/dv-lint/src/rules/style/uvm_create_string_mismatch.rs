@@ -3,7 +3,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn create_string_mismatch(c: &Cst, s: &mut Sink) {
     for n in c.nodes(BinaryExpr) {

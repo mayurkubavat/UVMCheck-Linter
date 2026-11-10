@@ -4,7 +4,7 @@
 use crate::support::statements::{call_args, call_name, report, start, string_literal, Units};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn generic_report_id(c: &Cst, s: &mut Sink) {

@@ -15,10 +15,7 @@ dependencies = [
 name = "dv-build"
 version = "0.1.0"
 dependencies = [
- "dv-model",
- "sv-sema",
- "sv-source",
- "sv-syntax",
+ "svlang",
 ]
 
 [[package]]
@@ -26,9 +23,8 @@ name = "dv-filelist"
 version = "0.1.0"
 dependencies = [
  "dv-model",
- "sv-sema",
  "sv-slang",
- "sv-source",
+ "svlang",
 ]
 
 [[package]]
@@ -37,10 +33,7 @@ version = "0.1.0"
 dependencies = [
  "dv-model",
  "regex",
- "sv-lexer",
- "sv-sema",
- "sv-source",
- "sv-syntax",
+ "svlang",
 ]
 
 [[package]]
@@ -48,7 +41,7 @@ name = "dv-lsp"
 version = "0.1.0"
 dependencies = [
  "dv-lint",
- "sv-syntax",
+ "svlang",
 ]
 
 [[package]]
@@ -56,9 +49,8 @@ name = "dv-map"
 version = "0.1.0"
 dependencies = [
  "dv-model",
- "sv-sema",
  "sv-slang",
- "sv-source",
+ "svlang",
 ]
 
 [[package]]
@@ -66,6 +58,7 @@ name = "dv-model"
 version = "0.1.0"
 dependencies = [
  "sv-slang",
+ "svlang",
 ]
 
 [[package]]
@@ -108,17 +101,16 @@ name = "sv-lexer"
 version = "0.1.0"
 
 [[package]]
-name = "sv-preproc"
+name = "sv-preprocessor"
 version = "0.1.0"
 dependencies = [
  "sv-lexer",
 ]
 
 [[package]]
-name = "sv-sema"
+name = "sv-semantic"
 version = "0.1.0"
 dependencies = [
- "dv-model",
  "sv-source",
  "sv-syntax",
 ]
@@ -136,5 +128,16 @@ name = "sv-syntax"
 version = "0.1.0"
 dependencies = [
  "sv-lexer",
- "sv-preproc",
+ "sv-preprocessor",
+]
+
+[[package]]
+name = "svlang"
+version = "0.1.0"
+dependencies = [
+ "sv-lexer",
+ "sv-preprocessor",
+ "sv-semantic",
+ "sv-source",
+ "sv-syntax",
 ]

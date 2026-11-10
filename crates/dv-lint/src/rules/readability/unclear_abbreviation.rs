@@ -7,8 +7,8 @@ use crate::support::trivia::ident_words;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn is_unclear_abbreviation(word: &str) -> bool {
     const LEXICON: &[&str] = &[

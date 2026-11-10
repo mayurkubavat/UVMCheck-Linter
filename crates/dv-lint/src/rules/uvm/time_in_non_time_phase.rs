@@ -5,8 +5,8 @@
 use crate::support::uvm_syntax::{body_items, name_node, routine_last_name, routines, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// slang's TimingControlStatement, WaitStatement or WaitForkStatement.
 fn timing_kind(c: &Cst, n: NodeId) -> Option<&'static str> {

@@ -7,8 +7,8 @@ fn errors(src: &str) -> Vec<String> {
     let t = sv_syntax::parse_source(src, "t.sv", sv_syntax::Options::default());
     assert!(t.errors.is_empty(), "syntax errors: {:?}", t.errors);
     let t = vec![t];
-    let mut e: Vec<String> = sv_sema::sva::check(&t).into_iter().map(|d| d.message).collect();
-    e.extend(sv_sema::udp::check(&t).into_iter().map(|d| d.message));
+    let mut e: Vec<String> = sv_semantic::sva::check(&t).into_iter().map(|d| d.message).collect();
+    e.extend(sv_semantic::udp::check(&t).into_iter().map(|d| d.message));
     e
 }
 

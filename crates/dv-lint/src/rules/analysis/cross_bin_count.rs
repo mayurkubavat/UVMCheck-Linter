@@ -12,8 +12,8 @@ use super::values::{const_int, type_range, Set};
 use crate::support::ast::resolve;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 const LIMIT: u128 = 10_000;
 

@@ -4,7 +4,7 @@
 use crate::support::ast::{call_site, subtree, user_class_methods, CallSite};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 fn calls_in(c: &Cst, root: NodeId) -> Vec<CallSite> {

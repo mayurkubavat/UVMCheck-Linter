@@ -5,7 +5,7 @@
 use crate::support::statements::exprs;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn unused_pure_result(c: &Cst, s: &mut Sink) {

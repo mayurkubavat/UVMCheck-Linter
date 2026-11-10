@@ -7,8 +7,8 @@ use crate::support::config_db_calls::{bool_literal, in_generate_header, strip, u
 use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// A statement under `begin ... end` blocks of one statement.
 fn unwrap_stmt(c: &Cst, mut s: NodeId) -> NodeId {

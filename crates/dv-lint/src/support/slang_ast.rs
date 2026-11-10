@@ -12,9 +12,9 @@
 //!   some messages list them in.
 
 use std::sync::{Arc, Mutex};
-use sv_sema::fx::{FxMap as HashMap, FxSet as HashSet};
+use svlang::semantic::fx::{FxMap as HashMap, FxSet as HashSet};
 
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 use crate::syntax::Cst;

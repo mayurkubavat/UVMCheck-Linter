@@ -12,7 +12,7 @@ use crate::support::type_text::expr_text;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashMap;
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 fn fieldwise(name: &str) -> bool {

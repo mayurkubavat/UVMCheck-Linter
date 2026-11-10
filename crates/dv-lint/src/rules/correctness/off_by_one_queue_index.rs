@@ -4,7 +4,7 @@
 use crate::support::spans::span;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn off_by_one_index(c: &Cst, s: &mut Sink) {
     for n in c.nodes(SelectExpr) {

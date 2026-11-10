@@ -3,7 +3,7 @@
 
 use crate::syntax::{assignments, Cst};
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn intra_assignment_delay(c: &Cst, s: &mut Sink) {

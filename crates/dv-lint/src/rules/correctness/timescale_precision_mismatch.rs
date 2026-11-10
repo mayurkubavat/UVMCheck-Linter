@@ -4,7 +4,7 @@
 use crate::support::data_items::main_files;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::Origin;
+use svlang::syntax::Origin;
 
 fn time_exp(s: &str) -> i32 {
     let mut s = s.trim_start_matches([' ', '\t']).trim_end_matches([' ', '\t', '\r', '\n', ';']);

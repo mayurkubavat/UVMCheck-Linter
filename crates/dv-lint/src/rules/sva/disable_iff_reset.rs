@@ -4,8 +4,8 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn has_disable(c: &Cst, n: NodeId) -> bool {
     c.tree.child(n, PropertyExpr).is_some_and(|p| c.tree.child(p, DisableIff).is_some())

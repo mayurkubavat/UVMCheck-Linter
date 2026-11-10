@@ -6,7 +6,7 @@ use crate::support::class_index::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::BTreeMap;
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 /// slang's `Type::toString()` of a port type, as far as grouping needs.
 fn type_text(c: &Cst, ty: Option<NodeId>) -> String {

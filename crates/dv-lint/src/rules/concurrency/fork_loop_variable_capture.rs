@@ -7,8 +7,8 @@ use crate::support::for_loops::{for_parts, for_vars, is_ident_name, keyword_is, 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The names slang reads as `IdentifierName`s under `n`, in order, with
 /// the names `DataDeclaration`s declared before each: plain names, member

@@ -2,8 +2,8 @@
 //! and the ranges declared integral types allow.
 
 use crate::syntax::Cst;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// A set of integers as sorted, disjoint, non-adjacent closed intervals.
 #[derive(Clone, Debug, PartialEq, Eq)]

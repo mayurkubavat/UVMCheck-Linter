@@ -6,24 +6,24 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::{HashMap, HashSet};
-use sv_lexer::Kind;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::lexer::Kind;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The names each package declares at its top (what a wildcard import of
 /// it can supply).
 fn package_exports(csts: &[Cst]) -> HashMap<String, HashSet<String>> {
     let Some(first) = csts.first() else { return HashMap::new() };
-    let scopes = sv_sema::scopes::build(first.all);
+    let scopes = svlang::semantic::scopes::build(first.all);
     let mut out: HashMap<String, HashSet<String>> = HashMap::new();
     for sym in &scopes.symbols {
         let sc = &scopes.scopes[sym.scope];
-        if sc.symbol.is_some_and(|o| scopes.symbols[o].kind == sv_sema::scopes::SymKind::Package) {
+        if sc.symbol.is_some_and(|o| scopes.symbols[o].kind == svlang::semantic::scopes::SymKind::Package) {
             out.entry(sc.path.clone()).or_default().insert(sym.name.clone());
         }
     }
     for sc in &scopes.scopes {
-        if let Some(o) = sc.symbol.filter(|&o| scopes.symbols[o].kind == sv_sema::scopes::SymKind::Package) {
+        if let Some(o) = sc.symbol.filter(|&o| scopes.symbols[o].kind == svlang::semantic::scopes::SymKind::Package) {
             out.entry(scopes.symbols[o].name.clone()).or_default();
         }
     }

@@ -1,8 +1,8 @@
 use dv_lint::{lint, rules};
 
 fn findings(src: &str) -> Vec<(String, u32, u32, &'static str)> {
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(&[tree]);
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(&[tree]);
     lint(&d, |_| true)
         .iter()
         .map(|f| {
@@ -86,8 +86,8 @@ fn syntax_rules() {
                endmodule\n\
                program p; endprogram\n\
                class c; mailbox mb = new; semaphore sem; task t(); sem.get(0); endtask endclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (files, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let got: Vec<_> = found
         .iter()
@@ -123,8 +123,8 @@ fn syntax_rules_batch_two() {
                class c; covergroup cg @(posedge k); cp: coverpoint x { bins d = default; } cross cp; endgroup\n\
                static constraint sk { x > 0; }\n\
                task int t(); assert (x); disable fork; wait (0); void'(randomize() with {}); phase.jump(p); endtask endclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let got: Vec<_> = found.iter().map(|f| f.rule).collect();
     for want in [
@@ -160,8 +160,8 @@ fn syntax_rules_batch_three() {
                module m; logic clk, a, b;\n\
                assert property (@(posedge clk) a ##[1:$] b[=0] ##1 b[->1]);\n\
                endmodule\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
     assert_eq!(count("SV-RND-021"), 1);
@@ -187,8 +187,8 @@ fn syntax_rules_batch_three_b() {
                endclass\n\
                `ifdef NOPE\n// TODO in a branch not taken\n`endif\n\
                // XXX at the end\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
     assert_eq!(count("SV-ARR-001"), 1);
@@ -210,8 +210,8 @@ fn syntax_rules_batch_four() {
                i += 1; s = {s, \"x\"}; s = {2{s}}; end\n\
                foreach (q[n]) fork q[n] = 1; join_none\n\
                end endmodule\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
     assert_eq!(count("SV-COR-005"), 1);
@@ -238,8 +238,8 @@ fn syntax_rules_batch_five() {
                if ($cast(a, b)) ; else if ($cast(a, y)) ; else if ($cast(a, z)) ;\n\
                a = {<< {b}}; a = {>> byte {b}};\n\
                endfunction endclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
     for id in [
@@ -270,8 +270,8 @@ fn syntax_rules_batch_six() {
                function void build_phase(uvm_phase phase); s.start(sqr); endfunction\n\
                task t(); s.start(null); endtask\n\
                endclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
     for id in [
@@ -356,7 +356,7 @@ fn uvm_and_ral_rules_on_fixtures() {
         let json = std::fs::read_to_string(dir.join("expect.json")).unwrap();
         let args =
             [format!("+incdir+{}", root.join("testdata/common").display()), dir.join("bad.sv").display().to_string()];
-        let (d, trees) = sv_sema::load_with_trees(&args).unwrap();
+        let (d, trees) = dv_model::load_with_trees(&args).unwrap();
         let (files, found) = dv_lint::lint_all(&d, &trees, |r| r == id);
         let lines: Vec<u32> = found.iter().map(|f| f.position_in(&files).1).collect();
         let want: Vec<u32> = expected(&json).into_iter().filter(|(r, _)| r == id).map(|(_, l)| l).collect();
@@ -374,8 +374,8 @@ fn early_return_before_finish_item() {
                task body(); start_item(req); if (req == null) return; finish_item(req); endtask\n\
                task other(); if (req == null) return; endtask\n\
                endclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (files, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |r| r == "UVM-SEQ-004");
     let got: Vec<_> = found.iter().map(|f| f.position_in(&files)).map(|(_, l, c)| (l, c)).collect();
     assert_eq!(got, vec![(4, 6)]);
@@ -387,8 +387,8 @@ fn mirror_set_on_element_select() {
     let src = "class fld; function void set(int v); endfunction endclass\n\
                class blk; fld foo[4]; fld bar;\n\
                function void f(); foo[2].set(1); bar.set(3); (bar).set(1); endfunction\nendclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |r| r == "RAL-ACC-001");
     assert_eq!(found.len(), 1);
     assert!(found[0].message.starts_with("Direct mirror update 'reg.set(...)'"));
@@ -405,8 +405,8 @@ fn group_g_rules() {
     files.sort();
     let mut found = Vec::new();
     for p in files {
-        let tree = sv_syntax::parse_file(&p, Default::default());
-        let d = sv_sema::build(std::slice::from_ref(&tree));
+        let tree = svlang::syntax::parse_file(&p, Default::default());
+        let d = dv_model::build(std::slice::from_ref(&tree));
         found.extend(dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true).1.into_iter().map(|f| f.rule));
     }
     let count = |id: &str| found.iter().filter(|r| **r == id).count();
@@ -483,9 +483,9 @@ fn concurrency_sva_coverage_rules() {
         ("SVA-CTX-001", "sva/SVA-CTX-001", 1),
     ];
     for (id, dir, want) in cases {
-        let opts = sv_syntax::Options { include_dirs: vec![root.join("common")], ..Default::default() };
-        let tree = sv_syntax::parse_file(&root.join("rules").join(dir).join("bad.sv"), opts);
-        let d = sv_sema::build(std::slice::from_ref(&tree));
+        let opts = svlang::syntax::Options { include_dirs: vec![root.join("common")], ..Default::default() };
+        let tree = svlang::syntax::parse_file(&root.join("rules").join(dir).join("bad.sv"), opts);
+        let d = dv_model::build(std::slice::from_ref(&tree));
         let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
         let got = found.iter().filter(|f| f.rule == id).count();
         assert_eq!(got, want, "{id}");
@@ -516,8 +516,8 @@ fn group_e_random_and_correctness_rules() {
                endfunction\n\
                function void g(int a, int b); endfunction\n\
                endclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let count = |id: &str| found.iter().filter(|f| f.rule == id).count();
     for id in [
@@ -560,8 +560,8 @@ fn methodology_rules_group_a() {
                endfunction\n\
                endclass\n\
                endpackage\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let at = |id: &str| found.iter().filter(|f| f.rule == id).map(|f| f.message.as_str()).collect::<Vec<_>>();
     assert_eq!(at("SV-CNS-001"), ["`define DEPTH holds the constant '16'. As a macro it has no type, no scope and can be redefined by any later file. Declare it as a parameter or localparam in a package instead."]);
@@ -587,8 +587,8 @@ fn identical_branches_and_mismatched_fields() {
                else begin a = a + b; return a; end\n\
                endfunction\n\
                endclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let of =
         |id: &str| found.iter().filter(|f| f.rule == id).map(|f| (f.loc.line, f.message.clone())).collect::<Vec<_>>();
@@ -613,8 +613,8 @@ fn virtual_class_new_only_in_named_specializations() {
                maker #(leaf) m;\n\
                initial b = new();\n\
                endmodule\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let lines: Vec<u32> = found.iter().filter(|f| f.rule == "SV-OOP-013").map(|f| f.loc.line).collect();
     // The default specialization (T = base) is not reported, as in slang.
@@ -622,8 +622,8 @@ fn virtual_class_new_only_in_named_specializations() {
 }
 
 fn rule_lines(src: &str, rule: &str) -> Vec<u32> {
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let mut lines: Vec<u32> = found.iter().filter(|f| f.rule == rule).map(|f| f.loc.line).collect();
     lines.sort();
@@ -716,8 +716,8 @@ fn enum_case_lists_missing_variants_in_declaration_order() {
     // whichever standard library the C++ twin was built with.
     let src = "typedef enum {A, B, C, D, E, F, G, H, I, J} e_t;\n\
                module m; e_t s; initial case (s) C: ; default: ; endcase endmodule\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "SV-FSM-001").map(|f| f.message).collect();
     assert_eq!(msgs.len(), 1);
@@ -730,8 +730,8 @@ fn enum_case_through_a_package_type_and_scoped_labels() {
                module m(input p::m_t mi); logic x;\n\
                always_comb case (mi) p::TOR: x = 1; p::NAPOT: x = 0; default: x = 0; endcase\n\
                endmodule\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "SV-FSM-001").map(|f| f.message).collect();
     assert_eq!(msgs.len(), 1);
@@ -980,8 +980,8 @@ fn queue_concat_append() {
 }
 
 fn rule_count(src: &str, rule: &str) -> usize {
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     found.iter().filter(|f| f.rule == rule).count()
 }
@@ -1027,8 +1027,8 @@ fn macro_body_text_keeps_the_first_tokens_trivia() {
                function sqr mk(int i); return null; endfunction\n\
                task body(); `CR(p_sequencer) endtask\n\
                endclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "UVM-SEQ-011").map(|f| f.message).collect();
     assert_eq!(msgs.len(), 1);
@@ -1059,8 +1059,8 @@ fn component_new_through_a_type_parameter() {
                function uvm_component make(string name, uvm_component parent); T obj; obj = new(name, parent); return obj; endfunction\n\
                endclass\n\
                class user; reg_t #(my_comp, \"a\") r1; reg_t #(my_obj, \"b\") r2; endclass\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |_| true);
     let msgs: Vec<String> = found.into_iter().filter(|f| f.rule == "UVM-FAC-001").map(|f| f.message).collect();
     assert_eq!(msgs.len(), 1, "{msgs:?}");
@@ -1073,8 +1073,8 @@ fn reg_keyword_and_non_ansi_ports_in_expression_types() {
     // takes the type of its separate `reg` declaration.
     let src = "module m(o, clk); output o; input clk; reg o; reg signed [7:0] a; reg [7:0] b;\n\
                initial begin a[3:0] = b[5:2]; o = b[2]; end endmodule\n";
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let lines = dv_lint::expr_types::expr_dump(d.files().to_vec(), std::slice::from_ref(&tree));
     for want in ["RangeSelect 4 u 4 reg[3:0]", "ElementSelect 1 u 4 reg", "NamedValue 1 u 4 reg"] {
         assert!(lines.iter().any(|l| l.ends_with(want)), "{want} in {lines:?}");
@@ -1082,8 +1082,8 @@ fn reg_keyword_and_non_ansi_ports_in_expression_types() {
 }
 
 fn messages(src: &str, rule: &str) -> Vec<String> {
-    let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+    let tree = svlang::syntax::parse_source(src, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     let (_, found) = dv_lint::lint_all(&d, std::slice::from_ref(&tree), |r| r == rule);
     let mut m: Vec<String> = found.iter().map(|f| f.message.split(". ").next().unwrap_or("").to_string()).collect();
     m.sort();

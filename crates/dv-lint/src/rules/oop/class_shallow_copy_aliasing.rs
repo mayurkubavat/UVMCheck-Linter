@@ -8,8 +8,8 @@ use crate::support::type_text::{base_name, is_class_type, type_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashMap;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The class around `n`, also for an out-of-block method body.
 fn enclosing_class(c: &Cst, n: NodeId, classes: &HashMap<String, NodeId>) -> Option<NodeId> {

@@ -2,7 +2,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn static_constraint(c: &Cst, s: &mut Sink) {
     for n in c.nodes(ConstraintDecl) {

@@ -27,7 +27,7 @@ static NEXT_GEN: AtomicUsize = AtomicUsize::new(1);
 thread_local! {
     static GEN: Cell<usize> = const { Cell::new(0) };
     /// This thread's copies of the values it got, by (name, key, generation).
-    static LOCAL: std::cell::RefCell<sv_sema::fx::FxMap<LocalSlot, Value>> = Default::default();
+    static LOCAL: std::cell::RefCell<svlang::semantic::fx::FxMap<LocalSlot, Value>> = Default::default();
 }
 
 /// The settings of the runs under way, by generation: a run's threads take
@@ -103,20 +103,20 @@ pub(crate) fn get<T: Any + Send + Sync>(name: &'static str, key: (usize, usize),
 
 /// `src` lexed with its trivia, once per source text (several rules and
 /// shared builds read the same files).
-pub(crate) fn raw_lex(src: &str) -> Arc<Vec<sv_lexer::Token>> {
+pub(crate) fn raw_lex(src: &str) -> Arc<Vec<svlang::lexer::Token>> {
     // Keyed by the text's address: only within a lint run, whose end drops it.
     if current() == 0 {
-        return Arc::new(sv_lexer::lex(src));
+        return Arc::new(svlang::lexer::lex(src));
     }
-    get("raw_lex", (src.as_ptr() as usize, src.len()), || sv_lexer::lex(src))
+    get("raw_lex", (src.as_ptr() as usize, src.len()), || svlang::lexer::lex(src))
 }
 
-/// sv-sema's semantic checks of the compile.
-pub(crate) fn sema_checks(c: &crate::syntax::Cst) -> Arc<sv_sema::SemaChecks> {
-    get("sema_checks", c.compile_key(), || sv_sema::SemaChecks::new(c.all))
+/// sv-semantic's semantic checks of the compile.
+pub(crate) fn sema_checks(c: &crate::syntax::Cst) -> Arc<svlang::semantic::SemaChecks> {
+    get("sema_checks", c.compile_key(), || svlang::semantic::SemaChecks::new(c.all))
 }
 
 /// The compile's elaboration (from the `-top` modules).
-pub(crate) fn elaboration(c: &crate::syntax::Cst) -> Arc<sv_sema::Elaborated> {
-    get("elaboration", c.compile_key(), || sv_sema::elaborate_full(c.all, &crate::tops()))
+pub(crate) fn elaboration(c: &crate::syntax::Cst) -> Arc<svlang::semantic::Elaborated> {
+    get("elaboration", c.compile_key(), || svlang::semantic::elaborate_full(c.all, &crate::tops()))
 }

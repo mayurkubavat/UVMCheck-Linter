@@ -7,7 +7,7 @@ use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The identifiers slang keeps as `IdentifierName` under a node: names and

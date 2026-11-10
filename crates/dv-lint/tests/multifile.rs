@@ -13,7 +13,7 @@ fn root() -> PathBuf {
 fn rules_read_declarations_of_other_files() {
     let dir = root().join("testdata/multifile");
     let args = [dir.join("a.sv").display().to_string(), dir.join("b.sv").display().to_string()];
-    let (d, trees) = sv_sema::load_with_trees(&args).unwrap();
+    let (d, trees) = dv_model::load_with_trees(&args).unwrap();
     assert_eq!(trees.len(), 2);
     let (files, found) = dv_lint::lint_all(&d, &trees, |_| true);
     let oop13: Vec<_> = found
@@ -34,7 +34,7 @@ fn rules_read_declarations_of_other_files() {
 #[test]
 fn unreadable_file_is_reported() {
     let dir = root().join("testdata/multifile");
-    let trees = sv_syntax::parse_files(&[dir.join("a.sv"), dir.join("missing.sv")], Default::default());
+    let trees = svlang::syntax::parse_files(&[dir.join("a.sv"), dir.join("missing.sv")], Default::default());
     let d = &trees[1].pp_diagnostics;
     assert!(d.iter().any(|x| x.message.starts_with("cannot read")), "{d:?}");
     assert!(d.iter().all(|x| (x.origin.file as usize) < trees[1].files.len()));
@@ -58,7 +58,7 @@ fn every_rule_runs_on_fixtures_as_one_compile() {
     assert!(files.len() > 500, "only {} fixtures", files.len());
     let files: Vec<PathBuf> = files.into_iter().step_by(8).collect();
     args.extend(files.iter().map(|p| p.display().to_string()));
-    let (d, trees) = sv_sema::load_with_trees(&args).unwrap();
+    let (d, trees) = dv_model::load_with_trees(&args).unwrap();
     assert_eq!(trees.len(), files.len());
     let (_, found) = dv_lint::lint_all(&d, &trees, |_| true);
     assert!(!found.is_empty());

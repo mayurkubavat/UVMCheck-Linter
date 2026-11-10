@@ -9,7 +9,7 @@ use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::{BTreeMap, HashSet};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A fork's branches: its statements less declarations and empty ones.

@@ -6,8 +6,8 @@ use crate::support::slang_ast::*;
 use crate::support::sva_cov::{add_n, bins_kw, bins_name, label_of};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// Width and signedness of a declared integral type, as written.
 fn type_width(c: &Cst, dt: NodeId) -> Option<(u32, bool)> {

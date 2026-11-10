@@ -7,7 +7,7 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::HashSet;
-use sv_lexer::Kind;
+use svlang::lexer::Kind;
 
 const DECLARATION_KEYWORDS: &[&str] = &[
     "class",

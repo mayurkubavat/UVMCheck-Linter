@@ -5,8 +5,8 @@
 use crate::support::class_items::{kids, with_clause};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn non_pure_walk(c: &Cst, n: NodeId, inside: &mut bool, s: &mut Sink) {
     let k = c.kind(n);

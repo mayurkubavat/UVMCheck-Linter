@@ -4,7 +4,7 @@
 
 use dv_model::Loc;
 
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use svlang::syntax::{Child, NodeId, SyntaxKind};
 
 use crate::support::slang_ast::*;
 

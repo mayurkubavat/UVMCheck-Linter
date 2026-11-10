@@ -2,9 +2,9 @@
 
 use std::collections::HashSet;
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 use crate::syntax::Cst;
 

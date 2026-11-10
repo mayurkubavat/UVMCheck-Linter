@@ -4,7 +4,7 @@
 use crate::support::names::name_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn package_naming(c: &Cst, s: &mut Sink) {
     for n in c.nodes(PackageDecl) {

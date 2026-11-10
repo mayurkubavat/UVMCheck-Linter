@@ -4,7 +4,7 @@
 use crate::support::literals::{ast_times, compact, integer_literal, is_streaming, unparen};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A concatenation whose operands slang keeps as written: not the `n{...}`

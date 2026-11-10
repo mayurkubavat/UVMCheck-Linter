@@ -2,11 +2,11 @@
 
 use dv_model::{Class, Design};
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// Subroutines outside classes, in user code (`swe::freeRoutines`).
 pub(crate) fn free_routines(d: &Design, c: &Cst) -> Vec<NodeId> {

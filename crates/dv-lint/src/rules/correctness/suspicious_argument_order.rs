@@ -11,8 +11,8 @@ use crate::support::type_text::expr_text;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashMap;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The formal arguments of a routine, in order: name and declared type
 /// text (carried over from the previous port when left out).

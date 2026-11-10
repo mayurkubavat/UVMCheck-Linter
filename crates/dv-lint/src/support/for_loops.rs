@@ -1,10 +1,10 @@
 //! Operators, keywords and for-loop parts.
 
-use sv_syntax::{Child, NodeId};
+use svlang::syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn op_text<'t>(c: &Cst<'t>, n: NodeId) -> &'t str {
     c.toks(n).next().map_or("", |t| c.text_of(t))

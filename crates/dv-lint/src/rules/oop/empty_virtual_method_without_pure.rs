@@ -6,7 +6,7 @@ use crate::support::class_items::{class_decls, decl_name, own};
 use crate::support::data_items::{methods, routine_name};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn empty_virtual(c: &Cst, s: &mut Sink) {
     for cls in class_decls(c) {

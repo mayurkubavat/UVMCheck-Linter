@@ -2,7 +2,7 @@
 //!
 //!     dv-map [--json] [--bench N] [--include-library] [--slang] -- <uvmcheck compile options>
 //!
-//! The design comes from the native front end (sv-sema); --slang loads it
+//! The design comes from the native front end (sv-semantic); --slang loads it
 //! through Slang instead, when built with the `slang` feature.
 //!
 //! The tree is static: each test, then every component-typed property of each
@@ -100,7 +100,7 @@ fn tree_json(d: &Design, c: &Class, inst: &str, seen: &mut HashSet<u32>) -> Stri
 }
 
 fn main() -> ExitCode {
-    sv_source::exit_on_closed_pipe();
+    svlang::source::exit_on_closed_pipe();
     let o = match parse() {
         Ok(o) => o,
         Err(e) => {
@@ -205,7 +205,7 @@ fn load(o: &Opts) -> Result<Design, String> {
     if o.slang {
         load_slang(&o.compile)
     } else {
-        sv_sema::load(&o.compile).map_err(|e| e.to_string())
+        dv_model::load(&o.compile).map_err(|e| e.to_string())
     }
 }
 

@@ -6,7 +6,7 @@ use crate::support::class_index::Classes;
 use crate::support::literal_values::literal_value;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 fn is_display_call(n: &str) -> bool {

@@ -11,8 +11,8 @@ use crate::support::type_text::{base_name, expr_text};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// uvm base classes swe::classRole knows; the first one up the chain
 /// decides the role.

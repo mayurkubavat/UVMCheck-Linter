@@ -6,7 +6,7 @@ use crate::support::procedural::{add_n, is_task_call, loop_body, loop_kw, start}
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn zero_time_forever(c: &Cst, s: &mut Sink) {

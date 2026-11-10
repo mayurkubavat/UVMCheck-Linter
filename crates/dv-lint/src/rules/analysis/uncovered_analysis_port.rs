@@ -18,7 +18,7 @@ use crate::support::slang_ast::{decl_name, enclosing_class};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Class, Design, UvmKind};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// `pkg::uvm_analysis_port#(pkg::item_c)` -> (`uvm_analysis_port`, `item_c`).
 fn tlm_type(ty: &str) -> Option<(String, String)> {

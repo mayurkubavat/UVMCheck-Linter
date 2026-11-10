@@ -5,7 +5,7 @@ use crate::support::class_index::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::BTreeMap;
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A class's port parameters (not localparams): name and name token.

@@ -16,7 +16,7 @@ use crate::support::uvm_syntax::{body_items, callee, name_node, routine_last_nam
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::{Child, NodeId, SyntaxKind};
+use svlang::syntax::{Child, NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A case statement's items: each statement, and whether it is the default.

@@ -7,7 +7,7 @@ use crate::support::config_db_calls::{strip, user_visits, with_parens};
 use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// The words of a name: split at `_`, digits and lower-to-upper case steps,
 /// lowercased.

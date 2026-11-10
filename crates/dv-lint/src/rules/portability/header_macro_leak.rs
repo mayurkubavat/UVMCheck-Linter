@@ -58,7 +58,7 @@ pub(crate) fn header_macro_leak(c: &Cst, s: &mut Sink) {
                 "Macro `{name} is defined in header file '{full}' without a corresponding `undef before file end. \
                  Leaking preprocessor definitions into global compilation scope causes accidental macro collisions across packages."
             ),
-            c.loc_at(sv_syntax::Origin { file, offset: off as u32 }),
+            c.loc_at(svlang::syntax::Origin { file, offset: off as u32 }),
         );
     }
 }

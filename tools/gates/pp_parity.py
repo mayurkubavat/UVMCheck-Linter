@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Token-for-token parity of the Rust preprocessor (sv-preproc) with Slang.
+"""Token-for-token parity of the Rust preprocessor (sv-preprocessor) with Slang.
 
 Runs both dumpers over every .sv file under ROOT/tests (an sv-tests
 checkout), skipping :should_fail tests, and reports files whose
@@ -7,7 +7,7 @@ preprocessed token streams differ. __FILE__ paths are compared by basename,
 and Slang's split of based-literal digits (04 c11db6) is merged.
 
     cmake --build build --target uvmcheck_pp_dump
-    cargo build --release -p sv-preproc --example ppdump
+    cargo build --release -p sv-preprocessor --example ppdump
     tools/gates/pp_parity.py ~/sv-tests [chapter-22]
 """
 import sys, os, re, subprocess, glob

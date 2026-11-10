@@ -5,7 +5,7 @@ use crate::support::procedural::{loop_body, loop_kw, routine_name};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn repeat_without_timing(c: &Cst, s: &mut Sink) {

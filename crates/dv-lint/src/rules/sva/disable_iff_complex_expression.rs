@@ -5,8 +5,8 @@
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn is_ident_name(c: &Cst, e: NodeId) -> bool {
     if c.kind(e) != NameExpr || c.tree.children(e).next().is_some() {

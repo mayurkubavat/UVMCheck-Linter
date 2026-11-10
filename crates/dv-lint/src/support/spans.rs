@@ -1,6 +1,6 @@
 //! Node spans and children.
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 use crate::syntax::Cst;
 

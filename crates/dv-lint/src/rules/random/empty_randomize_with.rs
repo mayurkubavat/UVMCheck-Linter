@@ -3,7 +3,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// slang's `ArrayOrRandomizeMethodExpression` with a constraint block:
 /// `x.randomize() with { ... }` is a call whose `WithClause` holds one.

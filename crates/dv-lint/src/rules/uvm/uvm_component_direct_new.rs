@@ -6,7 +6,7 @@ use crate::support::class_index::{type_name, Classes};
 use crate::support::literals::ast_times;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A class type as written (`name#(args)`, no whitespace), without a package.

@@ -5,7 +5,7 @@ use crate::support::ast::{int_value, kids, source_text, unparen, Ast};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 fn zero_delay(c: &Cst, a: &Ast, s: &mut Sink) {

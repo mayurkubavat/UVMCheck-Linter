@@ -87,11 +87,11 @@ impl Library {
     /// reads them (`-f` lists, `$VAR`).
     pub fn of_args<S: AsRef<str>>(args: &[S]) -> Library {
         let cwd = std::env::current_dir().unwrap_or_else(|_| ".".into());
-        let list = sv_source::FileList::read_args(
+        let list = svlang::source::FileList::read_args(
             args.iter().map(|a| a.as_ref()),
             &cwd,
-            sv_source::Dialect::Any,
-            &sv_source::ProcessEnv,
+            svlang::source::Dialect::Any,
+            &svlang::source::ProcessEnv,
         );
         let sources: Vec<PathBuf> = list.sources.iter().map(|s| s.value.clone()).collect();
         Library::detect(&sources)
@@ -120,7 +120,7 @@ impl Library {
         let mut calls_library_macro = |file: u32, line: u32| -> bool {
             let lines = texts.entry(file).or_insert_with(|| {
                 let path = files.get(file as usize).map(String::as_str).unwrap_or("");
-                sv_syntax::overlay::read(Path::new(path))
+                svlang::syntax::overlay::read(Path::new(path))
                     .map(|t| t.lines().map(str::to_string).collect())
                     .unwrap_or_default()
             });

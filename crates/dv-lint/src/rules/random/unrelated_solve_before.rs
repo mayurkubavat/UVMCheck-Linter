@@ -8,8 +8,8 @@ use crate::support::type_text::base_name;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::{HashMap, HashSet};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// Union-find over variable names.
 #[derive(Default)]
@@ -78,7 +78,7 @@ fn item_names(c: &Cst, item: NodeId) -> HashSet<String> {
                     match c.text_of(t) {
                         "[" => depth += 1,
                         "]" => depth -= 1,
-                        v if depth == 1 && c.tree.tokens[t as usize].kind == sv_syntax::TokenKind::Identifier => {
+                        v if depth == 1 && c.tree.tokens[t as usize].kind == svlang::syntax::TokenKind::Identifier => {
                             loop_vars.insert(v.to_string());
                         }
                         _ => {}

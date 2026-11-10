@@ -5,7 +5,7 @@ use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unreferenced_covergroup(c: &Cst, s: &mut Sink) {
     // Declared: covergroups of the model's classes.

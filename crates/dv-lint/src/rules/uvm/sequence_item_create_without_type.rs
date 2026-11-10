@@ -6,7 +6,7 @@ use crate::support::uvm_syntax::{assignment, body_items, name_node, stmt_expr, s
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// slang's `NewClassExpression`: `new`, `new(...)`, `C::new(...)`.

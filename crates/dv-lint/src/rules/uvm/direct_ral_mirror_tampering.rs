@@ -6,7 +6,7 @@ use crate::support::uvm_classes::{assign_parts, derived, is_name_chain, At, Ix};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn ral_mirror_tampering(d: &Design, csts: &[Cst], s: &mut Sink) {

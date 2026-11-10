@@ -4,7 +4,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 const FUNCTION_PHASES: &[&str] = &[
     "build_phase",

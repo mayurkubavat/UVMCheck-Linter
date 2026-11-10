@@ -6,7 +6,7 @@ use crate::support::procedural::{join_kind, name_sym, own_methods, routine_name,
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// `swe::classRole` reduced to the two roles SV-CON-015 needs.

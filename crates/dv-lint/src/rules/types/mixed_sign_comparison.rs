@@ -6,8 +6,8 @@ use crate::support::config_db_calls::{in_generate_header, strip};
 use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// An integer literal (not `'0`) whose value is not negative.
 fn non_negative_literal(c: &Cst, e: NodeId, t: &ETy) -> bool {

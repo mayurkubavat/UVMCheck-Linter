@@ -5,8 +5,8 @@ use crate::support::copies::copies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashMap;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The declared type of variable `name` as seen from `at`: the closest
 /// declaration in an enclosing scope (data declarations and ports).

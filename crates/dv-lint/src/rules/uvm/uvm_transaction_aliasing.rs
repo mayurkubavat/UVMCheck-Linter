@@ -4,8 +4,8 @@
 use crate::support::uvm_syntax::{assignment, body_items, callee, first_ordered, stmt_expr};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn transaction_aliasing(c: &Cst, s: &mut Sink) {
     let mut lists: Vec<Vec<NodeId>> = Vec::new();

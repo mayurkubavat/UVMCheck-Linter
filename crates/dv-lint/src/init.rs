@@ -107,7 +107,12 @@ fn includes(text: &str) -> Vec<&str> {
 fn usable_filelist(f: &Path) -> bool {
     let l = f.display().to_string();
     let cwd = f.parent().unwrap_or(Path::new("."));
-    let fl = sv_source::FileList::read_args(["-F", l.as_str()], cwd, sv_source::Dialect::Any, &sv_source::ProcessEnv);
+    let fl = svlang::source::FileList::read_args(
+        ["-F", l.as_str()],
+        cwd,
+        svlang::source::Dialect::Any,
+        &svlang::source::ProcessEnv,
+    );
     !fl.has_errors() && !fl.sources.is_empty()
 }
 

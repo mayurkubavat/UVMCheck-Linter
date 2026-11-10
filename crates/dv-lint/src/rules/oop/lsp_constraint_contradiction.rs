@@ -3,7 +3,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn lsp_constraint_mode(c: &Cst, s: &mut Sink) {
     for cls in c.nodes(ClassDecl) {

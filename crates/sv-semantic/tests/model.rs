@@ -1,21 +1,20 @@
-use dv_model::UvmKind;
-
-fn design(src: &str) -> dv_model::Design {
+fn design(src: &str) -> sv_semantic::Design {
     let tree = sv_syntax::parse_source(src, "t.sv", Default::default());
-    sv_sema::build(&[tree])
+    sv_semantic::build(&[tree])
 }
 
 #[test]
-fn classes_bases_and_roles() {
+fn classes_bases_and_lineage() {
     let d = design(
-        "class uvm_object; endclass\nclass uvm_component extends uvm_object; endclass\n\
-         class uvm_driver #(type T = int) extends uvm_component; endclass\n\
-         class my_drv extends uvm_driver #(int); endclass\n",
+        "class root_obj; endclass\nclass comp extends root_obj; endclass\n\
+         class drv #(type T = int) extends comp; endclass\n\
+         class my_drv extends drv #(int); endclass\n",
     );
     let drv = d.find_class("my_drv").unwrap();
-    assert_eq!(drv.base_name, "uvm_driver");
-    assert_eq!(drv.uvm, UvmKind::Driver);
-    assert!(d.find_class("uvm_driver").unwrap().is_parameterized);
+    assert_eq!(drv.base_name, "drv");
+    let names: Vec<&str> = drv.lineage.iter().map(|&id| d.class(id).name.as_str()).collect();
+    assert_eq!(names, ["my_drv", "drv", "comp", "root_obj"]);
+    assert!(d.find_class("drv").unwrap().is_parameterized);
 }
 
 #[test]
@@ -48,7 +47,7 @@ fn virtual_overrides_and_extern_bodies() {
     assert_eq!(g.arguments.len(), 1);
 }
 
-fn method<'d>(d: &'d dv_model::Design, class: &str, name: &str) -> &'d dv_model::Method {
+fn method<'d>(d: &'d sv_semantic::Design, class: &str, name: &str) -> &'d sv_semantic::Method {
     d.find_class(class).unwrap().methods.iter().find(|m| m.name == name).unwrap()
 }
 
@@ -68,7 +67,7 @@ fn body_calls_assignments_and_timing() {
     let calls: Vec<(&str, &str)> = new.calls.iter().map(|c| (c.name.as_str(), c.callee_scope.as_str())).collect();
     assert_eq!(calls, [("new", "base"), ("new", "base")]);
     assert_eq!(new.assignments[0].lhs, "h");
-    assert_eq!(new.assignments[0].root_kind, dv_model::RootKind::Property);
+    assert_eq!(new.assignments[0].root_kind, sv_semantic::RootKind::Property);
 
     let run = method(&d, "c", "run");
     assert_eq!(run.timing_controls.len(), 2);

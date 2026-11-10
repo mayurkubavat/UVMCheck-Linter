@@ -6,7 +6,7 @@
 //! Default output is a summary plus every problem with its file:line.
 //! --args prints the normalized compile options, one per line: a flat .f
 //! that uvmcheck (and slang) read directly. --json prints everything.
-//! --load also compiles the design with the native front end (sv-sema) and
+//! --load also compiles the design with the native front end (sv-semantic) and
 //! reports the result; --slang compiles it through Slang instead, when built
 //! with the `slang` feature.
 //! Exit status: 0 clean, 1 problems found, 2 bad usage.
@@ -14,7 +14,7 @@
 use dv_model::Design;
 use std::path::PathBuf;
 use std::process::ExitCode;
-use sv_source::{Dialect, FileList, Item, ProcessEnv, Severity};
+use svlang::source::{Dialect, FileList, Item, ProcessEnv, Severity};
 
 fn esc(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
@@ -95,7 +95,7 @@ fn to_json(fl: &FileList) -> String {
 }
 
 fn main() -> ExitCode {
-    sv_source::exit_on_closed_pipe();
+    svlang::source::exit_on_closed_pipe();
     let mut dialect = Dialect::Any;
     let (mut json, mut args_out, mut load, mut slang) = (false, false, false, false);
     let mut rest = Vec::new();
@@ -163,7 +163,7 @@ fn main() -> ExitCode {
 
     if load {
         let args = fl.to_compile_args();
-        let loaded = if slang { load_slang(&args) } else { sv_sema::load(&args).map_err(|e| e.to_string()) };
+        let loaded = if slang { load_slang(&args) } else { dv_model::load(&args).map_err(|e| e.to_string()) };
         match loaded {
             Ok(d) => {
                 eprintln!(

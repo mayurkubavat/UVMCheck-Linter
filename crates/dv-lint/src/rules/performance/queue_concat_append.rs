@@ -4,13 +4,13 @@
 use crate::support::style_config::ast_visits;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The declarator has a queue dimension (`[$]`, `[$:N]`), or its type is a
 /// typedef of a queue.
 fn is_queue(c: &Cst, d: &crate::support::slang_ast::Decl) -> bool {
-    let q = |t: &sv_syntax::Tree, n: NodeId| {
+    let q = |t: &svlang::syntax::Tree, n: NodeId| {
         t.children(n).filter(|&k| t.kind(k) == Dim).any(|k| {
             let text = t.bare_text(k);
             text.trim_start_matches('[').trim_start().starts_with('$')

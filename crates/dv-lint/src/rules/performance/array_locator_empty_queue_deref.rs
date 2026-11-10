@@ -4,7 +4,7 @@
 use crate::support::ast::{is_name, kids};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 const LOCATORS: &[&str] = &[

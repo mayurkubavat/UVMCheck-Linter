@@ -8,8 +8,8 @@ use crate::support::routine_bodies::{bodies, calls_in, is_config_db_call, Calls}
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn is_run_time_phase(m: &str) -> bool {
     crate::is_task_phase(m)

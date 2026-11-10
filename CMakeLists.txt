@@ -52,7 +52,7 @@ find_package(Python3 COMPONENTS Interpreter REQUIRED)
 # The C++ engine (uvmcheck, libuvmcheck_model) and its tests.
 add_subdirectory(cpp)
 
-# Reference dump of Slang's preprocessor, for checking crates/sv-preproc.
+# Reference dump of Slang's preprocessor, for checking crates/sv-preprocessor.
 add_executable(uvmcheck_pp_dump tools/oracles/pp_dump.cpp)
 target_link_libraries(uvmcheck_pp_dump PRIVATE slang::slang)
 

@@ -8,8 +8,8 @@ use crate::support::sva_cov::{actions, add_n, ast_asserts, user_code_times};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn side_effect_in_action(c: &Cst, s: &mut Sink) {
     for kind in [AssertStmt, ConcurrentAssert] {

@@ -5,7 +5,7 @@ use crate::support::uvm_classes::{args, call_name, calls_in, int_value, string_v
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn low_verbosity_debug(_d: &Design, csts: &[Cst], s: &mut Sink) {

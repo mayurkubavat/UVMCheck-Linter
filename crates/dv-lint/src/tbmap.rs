@@ -43,7 +43,7 @@ fn canonical(p: &str) -> String {
 
 impl Map {
     /// The design's structure (see [`Graph::build`] for `trees`, `files`).
-    pub fn new(design: &Design, trees: &[sv_syntax::Tree], files: &[String]) -> Map {
+    pub fn new(design: &Design, trees: &[svlang::syntax::Tree], files: &[String]) -> Map {
         let graph = Graph::build(design, trees, files);
         let mut classes = Vec::new();
         for c in user_classes(design) {

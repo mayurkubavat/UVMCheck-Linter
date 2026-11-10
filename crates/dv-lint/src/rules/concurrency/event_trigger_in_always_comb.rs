@@ -5,7 +5,7 @@ use crate::support::procedural::{add_n, start};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 fn proc_kind<'a>(c: &'a Cst, p: NodeId) -> &'a str {

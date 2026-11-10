@@ -6,8 +6,8 @@ use crate::support::class_items::{class_items, declarators, kids};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The loop variables of a `foreach (a[i, j])` header: names and tokens.
 fn foreach_vars(c: &Cst, l: NodeId) -> Vec<(String, u32)> {

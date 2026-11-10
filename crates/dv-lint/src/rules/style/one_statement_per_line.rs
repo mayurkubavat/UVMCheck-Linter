@@ -4,8 +4,8 @@
 use crate::support::source_layout::Buffers;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The first token slang gives a statement. A statement the parser could
 /// not read (tokens only, no expression) is, after a stray `.`, slang's

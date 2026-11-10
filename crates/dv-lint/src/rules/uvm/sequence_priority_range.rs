@@ -3,8 +3,8 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::Child;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::Child;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn sequence_priority(c: &Cst, s: &mut Sink) {
     for call in c.nodes(CallExpr) {

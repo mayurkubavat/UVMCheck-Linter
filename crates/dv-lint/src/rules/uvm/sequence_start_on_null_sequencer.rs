@@ -4,8 +4,8 @@
 use crate::support::cross_labels::last_line;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::Child;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::Child;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn start_on_null(c: &Cst, s: &mut Sink) {
     for call in c.nodes(CallExpr) {

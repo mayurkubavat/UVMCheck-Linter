@@ -6,7 +6,7 @@ use crate::support::class_index::{all_stmts, strongest_report, Classes, Level, R
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 pub(crate) fn procedural_timeout(c: &Cst, s: &mut Sink) {

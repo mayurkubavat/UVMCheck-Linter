@@ -5,7 +5,7 @@ use std::collections::HashSet;
 
 use dv_model::Loc;
 
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 
 use crate::support::slang_ast::*;
 
@@ -15,7 +15,7 @@ use crate::syntax::Cst;
 
 use crate::{Severity, Sink};
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn add_n(
     s: &mut Sink,

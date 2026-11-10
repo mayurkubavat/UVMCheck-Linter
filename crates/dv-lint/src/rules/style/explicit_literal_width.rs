@@ -4,7 +4,7 @@
 use crate::support::literals::{integer_literal, written_times};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// A plain decimal's value is above one.

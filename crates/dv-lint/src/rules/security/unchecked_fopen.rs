@@ -4,7 +4,7 @@
 use crate::support::ast::{kids, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn unchecked_fopen(c: &Cst, s: &mut Sink) {

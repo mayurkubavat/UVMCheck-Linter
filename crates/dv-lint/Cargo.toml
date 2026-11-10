@@ -5,6 +5,7 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+publish = false
 build = "build.rs"
 
 # One program under two names: `uvmcheck` is the product's command, `dv-lint`
@@ -25,10 +26,7 @@ slang = ["dv-model/slang"]
 
 [dependencies]
 dv-model = { path = "../dv-model", default-features = false }
-sv-sema = { path = "../sv-sema" }
-sv-lexer = { path = "../sv-lexer" }
-sv-syntax = { path = "../sv-syntax" }
-sv-source = { path = "../sv-source" }
+svlang = { path = "../svlang" }
 # Waiver, header and naming patterns (src/pattern.rs): bytes, ASCII, no
 # Unicode tables or SIMD literal search; the inputs are one line long.
 regex = { version = "1.13", default-features = false, features = ["std"] }

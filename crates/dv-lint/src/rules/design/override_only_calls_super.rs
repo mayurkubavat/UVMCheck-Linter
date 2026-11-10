@@ -6,7 +6,7 @@ use crate::support::class_index::Classes;
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The only statement of a body, looking through begin/end.

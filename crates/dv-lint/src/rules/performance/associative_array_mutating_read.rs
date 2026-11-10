@@ -6,8 +6,8 @@ use crate::support::slang_ast::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// Names declared anywhere in the compile with an unpacked dimension that
 /// reads like an associative index (`[int]`, `[*]`; also `[4]`, as the

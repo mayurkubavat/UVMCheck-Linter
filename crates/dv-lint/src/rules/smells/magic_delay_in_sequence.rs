@@ -5,7 +5,7 @@ use crate::support::class_index::Classes;
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn magic_delay_in_sequence(c: &Cst, s: &mut Sink) {

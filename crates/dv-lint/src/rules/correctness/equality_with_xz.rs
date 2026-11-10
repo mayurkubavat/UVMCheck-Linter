@@ -6,7 +6,7 @@ use crate::support::class_index::Classes;
 use crate::support::literals::{ast_times, integer_literal, unparen};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind, TokenKind};
+use svlang::syntax::{NodeId, SyntaxKind, TokenKind};
 use SyntaxKind::*;
 
 fn has_unknown(digits: &str) -> bool {

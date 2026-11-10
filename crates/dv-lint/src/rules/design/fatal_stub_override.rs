@@ -7,7 +7,7 @@ use crate::support::class_index::{
 use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 pub(crate) fn fatal_stub_override(c: &Cst, s: &mut Sink) {

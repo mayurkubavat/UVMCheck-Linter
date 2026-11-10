@@ -9,8 +9,8 @@ use crate::support::routine_bodies::bodies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn is_this_or_super(c: &Cst, e: NodeId) -> bool {
     let x = skip_selects(c, e);

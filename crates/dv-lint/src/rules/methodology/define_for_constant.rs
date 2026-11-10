@@ -5,7 +5,7 @@ use crate::support::defines_packages::{define_src, is_overridable_default, origi
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_lexer::Kind;
+use svlang::lexer::Kind;
 
 pub(crate) fn define_for_constant(_: &Design, csts: &[Cst], out: &mut Sink) {
     for d in user_defines(csts) {

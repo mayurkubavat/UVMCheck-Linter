@@ -61,8 +61,8 @@ pub(crate) fn display_in_uvm(d: &Design, csts: &[Cst], s: &mut Sink) {
 /// `$display("..", args);` as a statement becomes
 /// `` `uvm_info(get_type_name(), $sformatf("..", args), UVM_LOW) ``. Unsafe:
 /// the message now obeys verbosity (UVM_LOW) and report catchers.
-fn info_fix(c: &Cst, call: sv_syntax::NodeId, name: &str) -> Option<crate::fix::Fix> {
-    use sv_syntax::SyntaxKind::*;
+fn info_fix(c: &Cst, call: svlang::syntax::NodeId, name: &str) -> Option<crate::fix::Fix> {
+    use svlang::syntax::SyntaxKind::*;
     if name != "$display" {
         return None;
     }

@@ -4,7 +4,7 @@
 use crate::support::for_loops::{for_parts, keyword_is, kids, op_text, predicates, subtree};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn assignment_in_condition(c: &Cst, s: &mut Sink) {
     let mut roots = predicates(c);

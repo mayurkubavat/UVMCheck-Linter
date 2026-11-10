@@ -13,8 +13,8 @@ workspace.
               ▼                                      ▼              │
   cpp/  uvmcheck (C++20)                 crates/  dv-lint (Rust) ◄──┤
         Slang front end                          native front end   │
-        rules in cpp/src/rules/                  sv-source → sv-lexer → sv-preproc
-        reporting, fixes, LSP,                   → sv-syntax → sv-sema
+        rules in cpp/src/rules/                  sv-source → sv-lexer → sv-preprocessor
+        reporting, fixes, LSP,                   → sv-syntax → sv-semantic
         baselines, waivers, Python rules         rules in crates/dv-lint
               │                                      ▲
               │ libuvmcheck_model (C ABI)            │ --slang: Slang as the reference

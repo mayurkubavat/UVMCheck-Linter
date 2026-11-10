@@ -5,7 +5,7 @@
 use crate::support::trivia::is_library_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn complex_inline_property(c: &Cst, s: &mut Sink) {
     // Option `max_temporal_ops` (rules.SV-SVA-006.options).

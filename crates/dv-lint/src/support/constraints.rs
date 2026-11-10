@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 use crate::support::class_items::{declarators, is_parameterized, kids, model_classes, qualifiers, user_code};
 
@@ -13,7 +13,7 @@ use crate::support::sema_facts::ast_ok;
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// Classes the UVM model lists, without the library's: (class, name).
 pub(crate) fn user_model_classes(c: &Cst) -> Vec<(NodeId, String)> {
@@ -128,7 +128,7 @@ pub(crate) fn type_width(
             Some(b) => type_width(c, b, params, typedefs, depth + 1)?,
             None => 32,
         },
-        _ if c.tree.tokens[ft as usize].kind == sv_syntax::TokenKind::Identifier
+        _ if c.tree.tokens[ft as usize].kind == svlang::syntax::TokenKind::Identifier
             && c.tree.token_range(dt).len() == 1 =>
         {
             type_width(c, *typedefs.get(first)?, params, typedefs, depth + 1)?

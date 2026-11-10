@@ -6,7 +6,7 @@ use crate::support::uvm_classes::{args, call_name, calls_in, is_component, strin
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 /// `globMatch` of UvmModel: `*` and `?` wildcards.

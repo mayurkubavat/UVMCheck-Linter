@@ -7,7 +7,7 @@ use crate::support::statements::{
 };
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 pub(crate) fn type_switch_by_name(c: &Cst, s: &mut Sink) {

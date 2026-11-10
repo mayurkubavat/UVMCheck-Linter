@@ -1,11 +1,11 @@
 //! Names, routines, arguments and register blocks read off the syntax tree,
 //! for the UVM rules.
 
-use sv_syntax::{Child, NodeId};
+use svlang::syntax::{Child, NodeId};
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// `n` and everything under it, in source order.
 pub(crate) fn case_keyword(c: &Cst, n: NodeId) -> Option<u32> {

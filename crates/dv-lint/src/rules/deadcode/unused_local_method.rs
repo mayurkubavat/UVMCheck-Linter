@@ -4,8 +4,8 @@
 use crate::support::handles::{body_refs_if_good, method_decl_in, routine_is_virtual};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unused_local_method(c: &Cst, out: &mut Sink) {
     use crate::support::slang_ast::{class_methods, decl_name, enclosing_class, has_kw, last_name, user_classes};

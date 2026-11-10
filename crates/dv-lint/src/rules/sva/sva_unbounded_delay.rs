@@ -4,7 +4,7 @@
 use crate::support::spans::span;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unbounded_delay(c: &Cst, s: &mut Sink) {
     for n in c.nodes(TimingControl) {

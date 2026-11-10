@@ -6,7 +6,7 @@ use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::BTreeSet;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn multi_clock(c: &Cst, s: &mut Sink) {
     for p in c.nodes(PropertyDecl) {

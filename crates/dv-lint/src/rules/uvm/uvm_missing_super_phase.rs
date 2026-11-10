@@ -42,8 +42,8 @@ pub(crate) fn uvm_missing_super_phase(d: &Design, csts: &[crate::syntax::Cst], o
 /// declaration after a statement), at the indent of the first item. Unsafe:
 /// the base phase now runs, first. Only for a base class that declares the
 /// method (so the call compiles) and a phase with one argument.
-fn super_call_fix(c: &crate::syntax::Cst, decl: sv_syntax::NodeId, name: &str) -> Option<crate::fix::Fix> {
-    use sv_syntax::SyntaxKind::*;
+fn super_call_fix(c: &crate::syntax::Cst, decl: svlang::syntax::NodeId, name: &str) -> Option<crate::fix::Fix> {
+    use svlang::syntax::SyntaxKind::*;
     if !matches!(c.kind(decl), FunctionDecl | TaskDecl) {
         return None;
     }

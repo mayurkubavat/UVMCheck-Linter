@@ -8,7 +8,7 @@ use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::{BTreeMap, HashMap, HashSet};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// Enum typedef names.

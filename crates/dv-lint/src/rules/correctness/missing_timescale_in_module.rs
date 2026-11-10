@@ -6,8 +6,8 @@ use crate::support::class_items::{op, own};
 use crate::support::data_items::main_files;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 fn has_timescale(src: &str) -> bool {
     for (word, len) in [("`timescale", 10), ("timeunit", 8)] {

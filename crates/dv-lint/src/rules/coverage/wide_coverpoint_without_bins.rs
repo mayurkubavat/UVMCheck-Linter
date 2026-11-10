@@ -4,8 +4,8 @@
 use crate::support::cross_labels::label;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::Child;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::Child;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn coverpoint_without_bins(c: &Cst, s: &mut Sink) {
     for n in c.nodes(Coverpoint) {

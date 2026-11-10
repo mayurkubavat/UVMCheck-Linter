@@ -5,7 +5,7 @@ use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::BTreeMap;
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn file_in_many_packages(c: &Cst, s: &mut Sink) {

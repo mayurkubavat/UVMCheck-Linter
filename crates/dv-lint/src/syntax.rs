@@ -9,9 +9,9 @@ use std::cell::RefCell;
 
 use dv_model::Loc;
 
-use sv_sema::Locator;
+use svlang::semantic::Locator;
 
-use sv_syntax::{Child, NodeId, SyntaxKind, Tree};
+use svlang::syntax::{Child, NodeId, SyntaxKind, Tree};
 
 use crate::Sink;
 
@@ -65,7 +65,7 @@ impl<'t> Cst<'t> {
     /// declared at `class` in this tree (None for a class that is not
     /// generic).
     pub fn spec_count(&self, class: NodeId) -> Option<usize> {
-        crate::shared::get("spec_counts", self.compile_key(), || sv_sema::spec_counts(self.all))
+        crate::shared::get("spec_counts", self.compile_key(), || svlang::semantic::spec_counts(self.all))
             .get(&(self.index(), class))
             .copied()
     }
@@ -259,19 +259,19 @@ impl<'t> Cst<'t> {
     }
 
     /// Location of a preprocessor position (not in a macro).
-    pub fn loc_at(&self, o: sv_syntax::Origin) -> Loc {
+    pub fn loc_at(&self, o: svlang::syntax::Origin) -> Loc {
         let (file, line, column) = self.locator.borrow_mut().position(self.ix, self.tree, o);
         Loc { file, line, column, expansion: None }
     }
 
     /// Location of token `tok`, with the expansion site for macro-made tokens
-    /// (see `sv_sema::Locator::loc`).
+    /// (see `svlang::semantic::Locator::loc`).
     pub fn loc(&self, tok: u32) -> Loc {
         self.locator.borrow_mut().loc(self.ix, self.tree, tok)
     }
 
     /// Where a preprocessor diagnostic points.
-    pub fn origin_loc(&self, o: sv_syntax::Origin) -> Loc {
+    pub fn origin_loc(&self, o: svlang::syntax::Origin) -> Loc {
         let (file, line, column) = self.locator.borrow_mut().position(self.ix, self.tree, o);
         Loc { file, line, column, expansion: None }
     }

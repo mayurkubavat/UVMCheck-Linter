@@ -5,7 +5,7 @@ use crate::support::ast::{assignment_op, kids, source_text, symbol_ref, type_hea
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 pub(crate) fn ast_queue_slice(d: &Design, csts: &[Cst], s: &mut Sink) {

@@ -6,7 +6,7 @@ use crate::support::statements::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 pub(crate) fn scratchpad_property(c: &Cst, s: &mut Sink) {

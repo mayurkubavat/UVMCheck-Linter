@@ -4,11 +4,11 @@ use std::collections::HashSet;
 
 use dv_model::{Class, Design};
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// Routine names a plain call can reach outside classes: free functions
 /// and tasks, and DPI imports.

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Specialization counts: dv-lint's syntax engine (dv-lint --specs first column, which also
-folds in body-level heuristics) or, with --model, sv-sema's (third column,
-sv_sema::spec_counts: exact per class) against
+folds in body-level heuristics) or, with --model, sv-semantic's (third column,
+sv_semantic::spec_counts: exact per class) against
 slang's, as uvmcheck's AST walk sees them (build/specdump, see
 tools/oracles/specdump.cpp). A generic class's body is visited once per count, so
 every rule that walks bodies depends on these numbers.

@@ -5,8 +5,8 @@
 use crate::support::spans::child_nodes;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// A `new` that slang reads as a class instantiation: not an array or a
 /// copy, and not a call argument.

@@ -1,14 +1,14 @@
-//! The native semantic layer: everything above the syntax tree that slang
-//! used to provide. It reads `sv-syntax` trees and gives three things:
+//! The native IEEE 1800-2023 semantic layer: everything above the syntax tree
+//! that a SystemVerilog compiler or static analyzer needs. It reads `sv-syntax`
+//! trees and gives three things:
 //!
 //! - **The class model.** [`load`] takes compile options (`-f`, `+incdir+`,
-//!   `+define+`, files, `--single-unit`) and returns a [`dv_model::Design`]
-//!   like `Design::load` does: packages, `$unit`, nested and parameterized
-//!   classes (with the specializations the design names), typedefs,
-//!   imports, base classes, UVM roles, properties, methods with their
-//!   bodies (calls, assignments, timing controls, `super.new`), arguments,
-//!   locals, constraints and type strings as slang prints them.
-//!   [`load_with_trees`] also hands back the trees, for syntax rules.
+//!   `+define+`, files, `--single-unit`) and returns a [`model::Design`]:
+//!   packages, `$unit`, nested and parameterized classes (with the
+//!   specializations the design names), typedefs, imports, base classes,
+//!   properties, methods with their bodies (calls, assignments, timing
+//!   controls, `super.new`), arguments, locals, constraints and resolved type
+//!   strings. [`load_with_trees`] also hands back the trees, for syntax rules.
 //! - **Elaboration.** [`elaborate_full`] builds the instance tree from the
 //!   top modules: instances, generate blocks taken, parameter values.
 //! - **Semantic checks.** [`SemaChecks`] runs the checks a compiler makes
@@ -32,9 +32,9 @@ use std::rc::Rc;
 use std::time::Instant;
 use sv_source::{Dialect, FileList, ProcessEnv};
 
-use dv_model::{
-    Argument, Class, ClassId, Constraint, Design, Direction, Error, Loc, Local, MacroUse, Method, PhaseKind, Property,
-    Timings, TypeShape, Typedef, UvmKind, Visibility,
+pub use crate::model::{
+    Argument, Assignment, Call, Class, ClassId, Constraint, Design, Direction, Error, Loc, Local, MacroUse, Method,
+    Property, RootKind, Timings, TypeShape, Typedef, Visibility,
 };
 use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
@@ -50,6 +50,7 @@ pub mod fx;
 pub mod hier;
 pub mod iclass;
 pub mod library;
+pub mod model;
 pub mod names;
 pub mod oracle;
 pub mod order;
@@ -188,7 +189,7 @@ impl Locator {
         &self.files
     }
 
-    /// The file table, for [`dv_model::Design::from_parts`].
+    /// The file table, for [`Design::from_parts`].
     pub fn into_files(self) -> Vec<String> {
         self.files
     }
@@ -2044,12 +2045,12 @@ impl<'t> Builder<'t> {
                 }
             }
         }
-        // UVM roles follow the resolved base chain; a definition nothing
-        // specialized has none.
+        // Specialized classes record their resolved inheritance lineage
+        // (including type-parameterized bases); unspecialized generic classes
+        // leave `lineage` empty.
         for (id, &c) in order.iter().enumerate() {
             if !self.classes[c].generic || self.used_names.contains(&self.classes[c].name) {
-                let chain: Vec<&str> = self.chain(c).into_iter().map(|x| self.classes[x].name.as_str()).collect();
-                out[id].uvm = classify(&chain);
+                out[id].lineage = self.chain(c).into_iter().map(|x| ids[x]).collect();
             }
         }
         let files = std::mem::take(&mut self.locator).into_files();
@@ -2079,7 +2080,7 @@ impl<'t> Builder<'t> {
             scope,
             base_name: String::new(),
             base: None,
-            uvm: UvmKind::None,
+            lineage: Vec::new(),
             is_virtual,
             is_parameterized: generic,
             is_library: false,
@@ -2261,13 +2262,6 @@ impl<'t> Builder<'t> {
         // An out-of-block body that overrides a virtual method is marked
         // virtual like its base (slang sets the flag when it joins them).
         let declared_virtual = declared_virtual || (is_extern && !is_pure && overrides);
-        let phase = if FUNCTION_PHASES.contains(&name.as_str()) {
-            PhaseKind::Function
-        } else if TASK_PHASES.contains(&name.as_str()) {
-            PhaseKind::Task
-        } else {
-            PhaseKind::None
-        };
         let return_type = if is_task || name == "new" {
             "void".to_string()
         } else {
@@ -2284,7 +2278,6 @@ impl<'t> Builder<'t> {
             is_virtual,
             is_pure,
             is_static,
-            phase,
             declared_virtual,
             is_builtin: false,
             is_extern,
@@ -2451,67 +2444,6 @@ fn visibility(own: &[&str]) -> Visibility {
     }
 }
 
-const FUNCTION_PHASES: &[&str] = &[
-    "build_phase",
-    "connect_phase",
-    "end_of_elaboration_phase",
-    "start_of_simulation_phase",
-    "extract_phase",
-    "check_phase",
-    "report_phase",
-    "final_phase",
-];
-
-const TASK_PHASES: &[&str] = &[
-    "run_phase",
-    "pre_reset_phase",
-    "reset_phase",
-    "post_reset_phase",
-    "pre_configure_phase",
-    "configure_phase",
-    "post_configure_phase",
-    "pre_main_phase",
-    "main_phase",
-    "post_main_phase",
-    "pre_shutdown_phase",
-    "shutdown_phase",
-    "post_shutdown_phase",
-];
-
-/// The UVM role from the names along the base chain, most specific first
-/// (as slang's model does it).
-fn classify(chain: &[&str]) -> UvmKind {
-    let has = |n: &str| chain.contains(&n);
-    if has("uvm_component") {
-        for (base, kind) in [
-            ("uvm_test", UvmKind::Test),
-            ("uvm_env", UvmKind::Env),
-            ("uvm_agent", UvmKind::Agent),
-            ("uvm_driver", UvmKind::Driver),
-            ("uvm_monitor", UvmKind::Monitor),
-            ("uvm_sequencer_base", UvmKind::Sequencer),
-            ("uvm_scoreboard", UvmKind::Scoreboard),
-            ("uvm_subscriber", UvmKind::Subscriber),
-        ] {
-            if has(base) {
-                return kind;
-            }
-        }
-        return UvmKind::Component;
-    }
-    if has("uvm_sequence_base") || has("uvm_sequence") {
-        return UvmKind::Sequence;
-    }
-    if has("uvm_sequence_item") {
-        return UvmKind::SequenceItem;
-    }
-    if has("uvm_object") {
-        UvmKind::Object
-    } else {
-        UvmKind::None
-    }
-}
-
 /// The methods every class has (randomize and friends), after its own
 /// members, unless the class declares one itself.
 /// Built-in class methods (IEEE 1800 18.5-18.13). Interface classes get
@@ -2529,7 +2461,6 @@ fn add_builtins(methods: &mut Vec<Method>, is_interface: bool) {
         is_virtual: virt,
         is_pure: false,
         is_static: false,
-        phase: PhaseKind::None,
         declared_virtual: virt,
         is_builtin: true,
         is_extern: false,

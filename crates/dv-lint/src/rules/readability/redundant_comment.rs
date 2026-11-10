@@ -7,9 +7,9 @@ use crate::support::trivia::{ident_words, is_library_tok, split_trivia, Triv};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::BTreeSet;
-use sv_lexer::Kind;
-use sv_syntax::Origin;
-use sv_syntax::SyntaxKind::*;
+use svlang::lexer::Kind;
+use svlang::syntax::Origin;
+use svlang::syntax::SyntaxKind::*;
 
 const STOP: [&str; 16] =
     ["the", "a", "an", "to", "of", "and", "for", "in", "on", "with", "this", "that", "is", "it", "from", "into"];

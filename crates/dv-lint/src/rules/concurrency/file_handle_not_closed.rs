@@ -6,7 +6,7 @@ use crate::support::procedural::{calls_in, start};
 use crate::support::slang_ast::*;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn file_not_closed(c: &Cst, s: &mut Sink) {

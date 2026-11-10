@@ -9,7 +9,7 @@ use std::collections::HashMap;
 
 use dv_model::{Class, ClassId, Design, Loc};
 
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 
 use crate::support::uvm_syntax::{
     arg_list, callee, class_routines, decl_name, enclosing_class, name_node, ordered_expr, params, routine_last_name,

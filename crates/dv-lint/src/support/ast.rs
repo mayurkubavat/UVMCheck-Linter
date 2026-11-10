@@ -8,7 +8,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 
 use crate::syntax::Cst;
 
@@ -32,7 +32,7 @@ pub(crate) fn last_tok(c: &Cst, n: NodeId) -> Option<u32> {
 }
 
 pub(crate) fn is_ident(c: &Cst, tok: u32) -> bool {
-    matches!(c.tree.tokens[tok as usize].kind, sv_lexer::Kind::Identifier | sv_lexer::Kind::EscapedIdentifier)
+    matches!(c.tree.tokens[tok as usize].kind, svlang::lexer::Kind::Identifier | svlang::lexer::Kind::EscapedIdentifier)
 }
 
 /// Whether slang parses `n` as a name (`a`, `a.b`, `p::c`, `a[i].b`)
@@ -169,8 +169,8 @@ pub(crate) fn call_args(c: &Cst, call: NodeId) -> Vec<Option<NodeId>> {
     let mut out = vec![None];
     for k in c.kids(list) {
         match *k {
-            sv_syntax::Child::Token(t) if c.text_of(t) == "," => out.push(None),
-            sv_syntax::Child::Node(a) => {
+            svlang::syntax::Child::Token(t) if c.text_of(t) == "," => out.push(None),
+            svlang::syntax::Child::Node(a) => {
                 *out.last_mut().unwrap() = if c.kind(a) == Arg { c.tree.children(a).next() } else { Some(a) }
             }
             _ => {}
@@ -194,7 +194,7 @@ pub(crate) fn call_site(c: &Cst, n: NodeId) -> Option<CallSite> {
         }
         NameExpr => {
             let t = c.first_tok(n)?;
-            if c.tree.tokens[t as usize].kind != sv_lexer::Kind::SystemIdentifier {
+            if c.tree.tokens[t as usize].kind != svlang::lexer::Kind::SystemIdentifier {
                 return None;
             }
             if matches!(c.text_of(t), "$" | "$root" | "$unit") {

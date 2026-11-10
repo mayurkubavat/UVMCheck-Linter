@@ -39,7 +39,7 @@ fn run(uvm: &str, ids: &[&str]) -> Vec<String> {
         d.join("uvm_pkg.sv").display().to_string(),
         d.join("user.sv").display().to_string(),
     ];
-    let (design, trees) = sv_sema::load_with_trees(&args).unwrap();
+    let (design, trees) = dv_model::load_with_trees(&args).unwrap();
     let (files, found) = dv_lint::lint_all(&design, &trees, |r| ids.contains(&r));
     fs::remove_dir_all(&d).ok();
     found

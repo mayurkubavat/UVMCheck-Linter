@@ -68,7 +68,7 @@ pub(crate) fn contradictory(ant: &str) -> bool {
 use crate::support::cross_labels::kids;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn vacuous_antecedent(c: &Cst, s: &mut Sink) {
     for n in c.nodes(SequenceExpr) {

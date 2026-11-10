@@ -7,7 +7,7 @@ use crate::support::class_items::{kids, op};
 use crate::support::data_items::unparen;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 /// The type a `new` constructs: the declared type of what it is assigned
@@ -51,7 +51,7 @@ pub(crate) fn abstract_new(c: &Cst, s: &mut Sink) {
         return;
     }
     let classes = Classes::new(c);
-    let mut model: Option<sv_sema::SpecModel> = None;
+    let mut model: Option<svlang::semantic::SpecModel> = None;
     for n in news {
         // `new[n]`, `new obj` (a copy) and `super.new` call no constructor.
         if c.toks(n).any(|t| c.text_of(t) == "[") || c.tree.child(n, ArgList).is_none() && !kids(c, n).is_empty() {
@@ -61,7 +61,7 @@ pub(crate) fn abstract_new(c: &Cst, s: &mut Sink) {
             continue;
         }
         let Some(dt) = new_target(c, &classes, n) else { continue };
-        let m = model.get_or_insert_with(|| sv_sema::SpecModel::new(c.all));
+        let m = model.get_or_insert_with(|| svlang::semantic::SpecModel::new(c.all));
         // The class may be declared in another tree of the compile.
         let any_virtual = m.class_per_named_spec(c.index(), dt).into_iter().flatten().any(|(ti, cls)| {
             let t = &c.all[ti];
@@ -69,7 +69,7 @@ pub(crate) fn abstract_new(c: &Cst, s: &mut Sink) {
                 t.node(cls)
                     .children
                     .iter()
-                    .any(|k| matches!(*k, sv_syntax::Child::Token(x) if &*t.tokens[x as usize].text == w))
+                    .any(|k| matches!(*k, svlang::syntax::Child::Token(x) if &*t.tokens[x as usize].text == w))
             };
             own("virtual") && own("class")
         });

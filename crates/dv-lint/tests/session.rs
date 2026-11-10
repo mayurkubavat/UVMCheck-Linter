@@ -8,9 +8,9 @@ const SRC: &str = "class c;\n\
                    endclass\n";
 
 /// How many findings SV-MET-003 (too many arguments) has in [`SRC`].
-fn count(lint: impl FnOnce(&dv_model::Design, &[sv_syntax::Tree]) -> Vec<dv_lint::Finding>) -> usize {
-    let tree = sv_syntax::parse_source(SRC, "t.sv", Default::default());
-    let d = sv_sema::build(std::slice::from_ref(&tree));
+fn count(lint: impl FnOnce(&dv_model::Design, &[svlang::syntax::Tree]) -> Vec<dv_lint::Finding>) -> usize {
+    let tree = svlang::syntax::parse_source(SRC, "t.sv", Default::default());
+    let d = dv_model::build(std::slice::from_ref(&tree));
     lint(&d, std::slice::from_ref(&tree)).len()
 }
 

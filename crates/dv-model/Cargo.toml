@@ -5,18 +5,24 @@ version.workspace = true
 edition.workspace = true
 license.workspace = true
 rust-version.workspace = true
+publish = false
 build = "build.rs"
 
 [features]
 default = []
 # `Design::load`: load designs through Slang over the C ABI (needs
 # libuvmcheck_model from `cmake --preset model`). Oracle and parity use only;
-# the native loader is `sv_sema::load`. See third_party/slang/README.md.
+# the native loader is `dv_model::load`. See third_party/slang/README.md.
 slang = ["dep:sv-slang"]
 
 [[test]]
 name = "load"
 required-features = ["slang"]
 
+[[example]]
+name = "model_dump"
+required-features = ["slang"]
+
 [dependencies]
+svlang = { path = "../svlang" }
 sv-slang = { path = "../sv-slang", optional = true }

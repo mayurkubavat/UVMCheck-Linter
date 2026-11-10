@@ -9,8 +9,8 @@ use crate::support::data_items::unparen;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashMap;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// Number of values `[lo:hi]` covers.
 fn range_width(c: &Cst, value: NodeId, params: &HashMap<String, NodeId>) -> Option<i64> {

@@ -8,7 +8,7 @@
 //! token made by a macro, the macro use).
 //!
 //! ```
-//! let mut pp = sv_preproc::Preprocessor::new(sv_preproc::Options::default());
+//! let mut pp = sv_preprocessor::Preprocessor::new(sv_preprocessor::Options::default());
 //! let out = pp.run_source("`define W 8\nlogic [`W-1:0] x;\n", "t.sv");
 //! let text: Vec<_> = out.tokens.iter().map(|t| &*t.text).collect();
 //! assert_eq!(text, ["logic", "[", "8", "-", "1", ":", "0", "]", "x", ";"]);

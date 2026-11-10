@@ -3,7 +3,7 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn unrestored_rand_mode(c: &Cst, s: &mut Sink) {
     for f in c.nodes(FunctionDecl).into_iter().chain(c.nodes(TaskDecl)) {

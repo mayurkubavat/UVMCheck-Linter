@@ -6,7 +6,7 @@ use crate::support::class_items::{class_decls, decl_name, declarators, op, quali
 use crate::support::data_items::data_items;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn non_virtual_interface(c: &Cst, s: &mut Sink) {
     for cls in class_decls(c) {

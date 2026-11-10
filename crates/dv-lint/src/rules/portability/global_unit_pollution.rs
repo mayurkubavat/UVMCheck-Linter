@@ -4,7 +4,7 @@
 use crate::support::ast::{kids, last_tok};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::{NodeId, SyntaxKind};
+use svlang::syntax::{NodeId, SyntaxKind};
 use SyntaxKind::*;
 
 const NET_TYPES: &[&str] = &[

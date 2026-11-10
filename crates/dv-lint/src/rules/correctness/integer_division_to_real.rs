@@ -8,8 +8,8 @@ use crate::support::sema_facts::ast_ok;
 use crate::support::type_text::expr_text;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The division sits where slang converts it to real implicitly.
 fn converted_to_real(types: &Types, div: NodeId) -> bool {

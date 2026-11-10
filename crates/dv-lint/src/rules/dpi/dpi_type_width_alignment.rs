@@ -6,7 +6,7 @@
 use crate::support::ast::last_tok;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 /// slang's `toString()` of the tokens `a..=b`: each with its leading trivia.

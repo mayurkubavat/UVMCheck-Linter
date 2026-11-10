@@ -7,7 +7,7 @@ use crate::support::slang_ast::kids;
 use crate::support::style_config::ast_visits;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// `x = a.sum()` (or `.product()`) into a target wider than the elements:
 /// once per AST visit.

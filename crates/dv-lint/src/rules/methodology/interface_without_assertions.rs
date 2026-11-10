@@ -7,8 +7,8 @@ use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
 use std::collections::HashSet;
-use sv_syntax::SyntaxKind::*;
-use sv_syntax::{Child, NodeId};
+use svlang::syntax::SyntaxKind::*;
+use svlang::syntax::{Child, NodeId};
 
 pub(crate) fn interface_without_assertions(d: &Design, csts: &[Cst], out: &mut Sink) {
     let mut bound = HashSet::new();

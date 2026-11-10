@@ -193,7 +193,7 @@ impl Suppress {
         for i in order {
             let (file, line, _) = found[i].position_in(files);
             let lines = texts.entry(file.to_string()).or_insert_with(|| {
-                sv_syntax::overlay::read(std::path::Path::new(file))
+                svlang::syntax::overlay::read(std::path::Path::new(file))
                     .map(|t| t.lines().map(str::to_string).collect())
                     .unwrap_or_default()
             });

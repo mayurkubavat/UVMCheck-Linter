@@ -2,11 +2,11 @@
 
 use std::collections::HashMap;
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// Tokens joined, any trivia between two of them read as one space
 /// (swe::exprText).
@@ -38,7 +38,7 @@ pub(crate) fn base_name(c: &Cst, cls: NodeId) -> Option<String> {
 /// The class name a data type names (`pkg::C #(T)` gives `C`).
 pub(crate) fn type_name(c: &Cst, dt: NodeId) -> Option<String> {
     let first = c.first_tok(dt)?;
-    if c.tree.tokens[first as usize].kind != sv_syntax::TokenKind::Identifier {
+    if c.tree.tokens[first as usize].kind != svlang::syntax::TokenKind::Identifier {
         return None;
     }
     let end = c

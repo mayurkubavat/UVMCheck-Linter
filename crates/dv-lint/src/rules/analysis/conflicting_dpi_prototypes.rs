@@ -10,8 +10,8 @@ use std::collections::BTreeMap;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::{Design, Loc};
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 /// The prototype without names: `function int (input int, output bit [7:0])`.
 fn signature(c: &Cst, n: NodeId) -> String {

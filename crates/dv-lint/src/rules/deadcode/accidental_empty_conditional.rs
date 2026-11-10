@@ -8,7 +8,7 @@
 use crate::support::statements::{body_of, if_parts, in_bad_body, report, start, stmt, St, Units};
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::SyntaxKind;
+use svlang::syntax::SyntaxKind;
 use SyntaxKind::*;
 
 pub(crate) fn empty_conditional(c: &Cst, s: &mut Sink) {

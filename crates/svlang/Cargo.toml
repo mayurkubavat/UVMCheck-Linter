@@ -1,0 +1,18 @@
+[package]
+name = "svlang"
+description = "Pure-Rust IEEE 1800-2023 SystemVerilog compiler front end: filelists, lexer, preprocessor, lossless CST, semantic analysis, and elaboration"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+readme = "README.md"
+
+[dependencies]
+sv-source = { version = "0.1.0", path = "../sv-source" }
+sv-lexer = { version = "0.1.0", path = "../sv-lexer" }
+sv-preprocessor = { version = "0.1.0", path = "../sv-preprocessor" }
+sv-syntax = { version = "0.1.0", path = "../sv-syntax" }
+sv-semantic = { version = "0.1.0", path = "../sv-semantic" }

@@ -1,12 +1,12 @@
 //! Report severities and the failure branches of compare checks.
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 use crate::support::routine_bodies::{calls_in, if_parts, integer_literal, is_report_guard};
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Level {

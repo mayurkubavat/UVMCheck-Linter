@@ -5,8 +5,8 @@ use crate::support::for_loops::{for_parts, for_vars, is_ident_name, keyword_is, 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use std::collections::HashSet;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn loop_index_modified(c: &Cst, s: &mut Sink) {
     fn walk(c: &Cst, n: NodeId, vars: &HashSet<String>, s: &mut Sink) {

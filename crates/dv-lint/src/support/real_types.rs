@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use sv_syntax::NodeId;
+use svlang::syntax::NodeId;
 
 use crate::support::class_items::{class_items, declarators, kids, op, qualifiers, user_code};
 
@@ -14,7 +14,7 @@ use crate::support::constraints::class_names;
 
 use crate::syntax::Cst;
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub(crate) enum Ty {
@@ -329,7 +329,7 @@ pub(crate) fn self_ty(c: &Cst, dt: NodeId, typedefs: &HashMap<String, NodeId>) -
                 Some(Ty::Int)
             }
             "struct" | "union" if c.tok(dt, "packed").is_some() => Some(Ty::Int),
-            _ if c.tree.tokens[ft as usize].kind == sv_syntax::TokenKind::Identifier
+            _ if c.tree.tokens[ft as usize].kind == svlang::syntax::TokenKind::Identifier
                 && c.tree.token_range(dt).len() == 1 =>
             {
                 dt = *typedefs.get(first)?;

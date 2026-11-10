@@ -1,17 +1,17 @@
 //! Line buffers, comments, banners, end labels and define ranges, for the
 //! style rules.
 
-use sv_sema::fx::FxMap as HashMap;
+use svlang::semantic::fx::FxMap as HashMap;
 
 use dv_model::Loc;
 
-use sv_syntax::{NodeId, Origin};
+use svlang::syntax::{NodeId, Origin};
 
 use crate::syntax::Cst;
 
 use crate::{Severity, Sink};
 
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::SyntaxKind::*;
 
 /// Each file of the tree with its text as slang holds it (a trailing NUL).
 /// A file included again whose include guard skips it all is not read
@@ -45,7 +45,7 @@ pub(crate) fn buffers<'t>(c: &Cst<'t>) -> impl Iterator<Item = (u32, String)> + 
 
 /// The file's code starts with `ifndef (after comments and whitespace).
 pub(crate) fn guarded(src: &str) -> bool {
-    sv_lexer::lex(src)
+    svlang::lexer::lex(src)
         .iter()
         .find(|t| !t.kind.is_trivia())
         .is_some_and(|t| src[t.start as usize..].starts_with("`ifndef"))
@@ -188,9 +188,11 @@ fn build_comments_before(src: &str) -> HashMap<u32, Vec<(u32, u32)>> {
     let mut pending = Vec::new();
     for &tk in crate::shared::raw_lex(src).iter() {
         match tk.kind {
-            sv_lexer::Kind::LineComment | sv_lexer::Kind::BlockComment => pending.push((tk.start, tk.start + tk.len)),
+            svlang::lexer::Kind::LineComment | svlang::lexer::Kind::BlockComment => {
+                pending.push((tk.start, tk.start + tk.len))
+            }
             k if k.is_trivia() => {}
-            sv_lexer::Kind::Directive => pending.clear(),
+            svlang::lexer::Kind::Directive => pending.clear(),
             _ => {
                 if !pending.is_empty() {
                     map.insert(tk.start, std::mem::take(&mut pending));
@@ -208,9 +210,9 @@ pub(crate) fn last_directive(text: &str, base: u32) -> u32 {
     if !text.as_bytes().contains(&b'`') {
         return 0;
     }
-    sv_lexer::lex(text)
+    svlang::lexer::lex(text)
         .iter()
-        .filter(|t| t.kind == sv_lexer::Kind::Directive)
+        .filter(|t| t.kind == svlang::lexer::Kind::Directive)
         .map(|t| base + t.start)
         .next_back()
         .unwrap_or(0)

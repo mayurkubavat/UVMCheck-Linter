@@ -4,8 +4,8 @@
 
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
-use sv_syntax::Child;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::Child;
+use svlang::syntax::SyntaxKind::*;
 
 pub(crate) fn stream_slice(c: &Cst, s: &mut Sink) {
     for n in c.nodes(ConcatExpr) {

@@ -6,8 +6,8 @@ use crate::support::routine_bodies::bodies;
 use crate::syntax::Cst;
 use crate::{Severity, Sink};
 use dv_model::Design;
-use sv_syntax::NodeId;
-use sv_syntax::SyntaxKind::*;
+use svlang::syntax::NodeId;
+use svlang::syntax::SyntaxKind::*;
 
 #[derive(Default)]
 struct ArgUse {
