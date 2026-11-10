@@ -36,6 +36,8 @@ diagnostics are left out of all-rules runs, except in the SV-CMP tests. Some bad
 the file is incomplete. The baseline records both until the broken ones are fixed.
 """
 
+import atexit
+import shutil
 import sys
 import os
 import json
@@ -83,6 +85,7 @@ class Linter:
         self.uvm_home = Path(uvm_home).resolve() if uvm_home else None
         # Run from an empty directory so a stray uvmcheck.json in the tree can't leak in
         self.workdir = tempfile.mkdtemp(prefix="uvmcheck-tests-")
+        atexit.register(shutil.rmtree, self.workdir, ignore_errors=True)
 
     def run(self, sv_file, rule_id=None):
         sv_file = Path(sv_file).resolve()
@@ -105,7 +108,9 @@ class Linter:
             # all-rules mode includes the opt-in Advisory and experimental rules
             cmd += ["--preset", "all", "--experimental"]
         # Rule tests must not pick up the repository's own .uvmcheck/ configuration.
-        cmd += ["--no-config", "--json", json_path, "--diag-json", diag_path]
+        # Every fixture is its own compile: a result cache would only fill the
+        # disk (gigabytes with the real UVM library), so none is written.
+        cmd += ["--no-config", "--no-cache", "--json", json_path, "--diag-json", diag_path]
 
         start_time = time.time()
         res = subprocess.run(cmd, capture_output=True, text=True, cwd=self.workdir)
