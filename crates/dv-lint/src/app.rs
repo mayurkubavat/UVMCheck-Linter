@@ -175,6 +175,8 @@ pub fn run() {
             "--history" => dv_lint::set_history(true),
             // Report nothing in -v/-y library files.
             "--skip-libraries" => dv_lint::set_skip_libraries(true),
+            // Report in the UVM library too (it is left out beside user code).
+            "--report-library" => REPORT_LIBRARY.store(true, std::sync::atomic::Ordering::Relaxed),
             // The design's tops, as slang's --top: modules no top reaches
             // are not elaborated.
             "-top" | "--top" => {
@@ -340,6 +342,7 @@ pub fn run() {
     let keep = |id: &str| user_keep(id) || (fixing && id == "SV-CMP-001");
     let _ = ACTIVE.set(dv_lint::rules().into_iter().map(|r| r.id).filter(|id| user_keep(id)).collect());
     let _ = EXTRA.set(extra.clone());
+    let _ = LIBRARY.set(dv_lint::library::Library::of_args(&args));
     if !slang && !exprs && !specs {
         let looked = cache.as_ref().map(dv_lint::cache::Cache::lookup);
         if let Some(Err(changed)) = &looked {
@@ -697,6 +700,8 @@ fn init_project(args: &[String]) -> ! {
 }
 
 /// The project configuration in use, if any.
+static LIBRARY: std::sync::OnceLock<dv_lint::library::Library> = std::sync::OnceLock::new();
+static REPORT_LIBRARY: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 static CONFIG: std::sync::OnceLock<dv_lint::project::Config> = std::sync::OnceLock::new();
 
 /// `--json FILE`: where to write the JSON report.
@@ -805,6 +810,18 @@ fn report(
     dv_lint::fix::guard_macro_calls(&mut found);
     let (bad_waivers, rest): (Vec<_>, Vec<_>) = found.into_iter().partition(dv_lint::is_bad_waiver_pattern);
     found = rest;
+    if !REPORT_LIBRARY.load(std::sync::atomic::Ordering::Relaxed) {
+        let none = dv_lint::library::Library::default();
+        let lib = LIBRARY.get().unwrap_or(&none);
+        let hidden = lib.hide(&mut found, files, CONFIG.get().is_some_and(|c| c.reports_library_macros()));
+        if hidden > 0 {
+            let roots: Vec<String> = lib.roots().iter().map(|r| r.display().to_string()).collect();
+            eprintln!(
+                "[dv-lint] {hidden} finding(s) in the UVM library ({}) are not shown; --report-library shows them",
+                roots.join(", ")
+            );
+        }
+    }
     if let Some(c) = CONFIG.get() {
         c.apply(&mut found, files);
     }

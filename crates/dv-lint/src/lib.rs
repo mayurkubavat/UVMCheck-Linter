@@ -62,6 +62,7 @@ mod waivers;
 
 pub mod catalog;
 mod guidelines;
+pub mod library;
 mod sem;
 
 #[allow(dead_code)]

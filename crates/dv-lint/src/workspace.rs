@@ -148,6 +148,13 @@ impl Workspace {
         let (files, mut findings) = self.session.lint_all(&design, &trees, |id| self.keep.contains(id));
         let inline = crate::inline_waived() - waived_before;
         crate::fix::guard_macro_calls(&mut findings);
+        // The editor shows the user's code: never the UVM library's findings.
+        let sources: Vec<std::path::PathBuf> = trees.iter().filter_map(|t| t.files.first().cloned()).collect();
+        crate::library::Library::detect(&sources).hide(
+            &mut findings,
+            &files,
+            self.config.as_ref().is_some_and(|c| c.reports_library_macros()),
+        );
         if let Some(c) = &self.config {
             c.apply(&mut findings, &files);
         }

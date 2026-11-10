@@ -703,6 +703,12 @@ impl Config {
         });
     }
 
+    /// `report_library_macro_expansions`: findings inside the bodies of
+    /// library macros are reported where the macros are used.
+    pub fn reports_library_macros(&self) -> bool {
+        self.report_library_macros
+    }
+
     /// Nothing is reported in `file`: a library or excluded path.
     pub fn hides_file(&self, file: &str) -> bool {
         let path = normalized(file);

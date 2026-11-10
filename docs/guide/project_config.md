@@ -146,6 +146,13 @@ Running from `blocks/dma/` prints the layers that were loaded.
 | `RuleConfig.only_paths` | Globs where this rule reports; elsewhere it is silent. For example strict naming only under `env/**`, or a rule kept out of generated code without listing every other folder. `exclude_paths` still applies inside them. |
 | any other attribute | A rule option, e.g. `max_columns` (SV-STY-016), `max_complexity` / `warning_complexity` (SV-SML-004). |
 
+**The UVM library needs no configuration (native engine).** When a compile holds `uvm_pkg.sv` and files outside
+its folder, that folder is library code: nothing is reported in its files, nor for what its macros expand to in your
+code (the routines of `` `uvm_object_utils ``, the method of `` `uvm_field_int ``), and a note says how many
+findings were left out. `--report-library` shows them. A compile of the library alone reports everything, and
+`report_library_macro_expansions = True` keeps the macro expansions. Other libraries (VIP) are named with
+`library_paths`. The C++ engine (`uvmcheck-slang`) leaves the UVM library out only when `library_paths` names it.
+
 Unknown rule names produce a warning so typos do not go unnoticed.
 
 ### Path globs

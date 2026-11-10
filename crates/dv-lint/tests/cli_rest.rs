@@ -415,3 +415,57 @@ fn lsp_starts_the_language_server() {
     let _ = child.wait();
     assert!(out.contains(r#""name":"dv-lsp""#) && out.contains("codeActionProvider"), "{out}");
 }
+
+/// A small UVM library (a package, a class and a macro with a self
+/// comparison in its body) and a testbench that uses the macro.
+fn library_and_testbench(d: &Path) {
+    std::fs::create_dir_all(d.join("uvm/src/base")).unwrap();
+    std::fs::write(
+        d.join("uvm/src/uvm_pkg.sv"),
+        "package uvm_pkg;\n`include \"base/uvm_object.svh\"\nendpackage : uvm_pkg\n",
+    )
+    .unwrap();
+    std::fs::write(
+        d.join("uvm/src/base/uvm_object.svh"),
+        "class uvm_object;\n  function void lib();\n    int a;\n    if (a == a) $display(\"lib\");\n  endfunction : lib\nendclass : uvm_object\n",
+    )
+    .unwrap();
+    std::fs::write(d.join("uvm/src/uvm_macros.svh"), "`define uvm_check(x) \\\n  if (x == x) $display(\"macro\");\n")
+        .unwrap();
+    std::fs::write(
+        d.join("tb.sv"),
+        "`include \"uvm_macros.svh\"\nmodule tb;\n  int a, b;\n  initial begin\n    `uvm_check(a)\n    if (b == b) $display(\"mine\");\n  end\nendmodule : tb\n",
+    )
+    .unwrap();
+}
+
+#[test]
+fn the_uvm_library_is_left_out_beside_user_code() {
+    let d = tmp("library");
+    library_and_testbench(&d);
+    let lint = |extra: &[&str]| {
+        let mut args =
+            vec!["--no-config", "--no-cache", "--rule", "SV-COR-008", "+incdir+uvm/src", "uvm/src/uvm_pkg.sv"];
+        args.extend(extra);
+        text(&run(&d, &args))
+    };
+    let lines = |out: &str| -> Vec<String> {
+        out.lines().filter(|l| l.contains("SV-COR-008")).map(|l| l.split(": [").next().unwrap().to_string()).collect()
+    };
+    // Beside the testbench: only the user's own line, and a note.
+    let out = lint(&["tb.sv"]);
+    let found = lines(&out);
+    assert_eq!(found.len(), 1, "{out}");
+    assert!(found[0].ends_with("tb.sv:6:11"), "{out}");
+    assert!(out.contains("2 finding(s) in the UVM library"), "{out}");
+    assert!(out.contains("--report-library"), "{out}");
+    // Asked for: the library's file and its macro's body too.
+    let all = lint(&["tb.sv", "--report-library"]);
+    assert_eq!(lines(&all).len(), 3, "{all}");
+    assert!(!all.contains("in the UVM library"), "{all}");
+    // The library alone is someone linting the library.
+    let alone = lint(&[]);
+    assert_eq!(lines(&alone).len(), 1, "{alone}");
+    assert!(alone.contains("uvm_object.svh:4"), "{alone}");
+    let _ = std::fs::remove_dir_all(&d);
+}

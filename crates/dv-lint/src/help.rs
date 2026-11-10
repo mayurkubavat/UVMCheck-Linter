@@ -44,6 +44,8 @@ Compile options (as a simulator takes them):
                            the sources instantiate (+libext+.sv+.v)
   --single-unit            Compile all files as one compilation unit
   --skip-libraries         Report nothing in -v and -y library files
+  --report-library         Report in the UVM library too; beside your own
+                           files its findings are left out
   --in-context             Lint a header inside the file that includes it
 
 Rules:
