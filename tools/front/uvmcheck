@@ -56,4 +56,12 @@ if [ "$engine" = slang ]; then
     [ -n "${why-}" ] && echo "uvmcheck: '$why' needs the Slang engine; running $slang" >&2
     exec "$slang" "$@"
 fi
+case " $* " in
+    *" --cache-dir "*|*" --cache-dir="*|*" --no-cache "*) ;;
+    *)
+        if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            exec "$native" --cache-dir "${XDG_CACHE_HOME:-$HOME/.cache}/uvmcheck" "$@"
+        fi
+        ;;
+esac
 exec "$native" "$@"
