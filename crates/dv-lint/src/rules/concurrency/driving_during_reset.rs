@@ -7,13 +7,30 @@ use crate::{Severity, Sink};
 use sv_syntax::SyntaxKind;
 use SyntaxKind::*;
 
+/// Whether task `t` has a non-blocking drive of an interface signal: by the
+/// targets' declarations ([`crate::sem::reach`]), and by the names `vif.`
+/// and `intf.` for a task with a target that does not resolve.
+fn drives_interface(c: &Cst, t: sv_syntax::NodeId, text: &str) -> bool {
+    let mut unresolved = false;
+    for n in c.subtree(t) {
+        if c.kind(n) != BinaryExpr || c.parent(n).map(|p| c.kind(p)) != Some(ExprStmt) || c.tok(n, "<=").is_none() {
+            continue;
+        }
+        match c.tree.children(n).next().and_then(|l| crate::sem::reach(c, l)) {
+            Some(r) if r.driven_from_testbench() => return true,
+            Some(_) => {}
+            None => unresolved = true,
+        }
+    }
+    unresolved && (text.contains("vif.") || text.contains("intf.")) && text.contains("<=")
+}
+
 pub(crate) fn driving_during_reset(c: &Cst, s: &mut Sink) {
     for t in c.nodes(TaskDecl) {
         let Some(kw) = c.tok(t, "task") else { continue };
         let Some((_, last)) = c.tree.token_bounds(t) else { continue };
         let text = span_text(c, kw, last);
-        let drives = (text.contains("vif.") || text.contains("intf.")) && text.contains("<=");
-        if !drives {
+        if !drives_interface(c, t, &text) {
             continue;
         }
         let mut clean = text.clone();

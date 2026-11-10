@@ -98,3 +98,68 @@ fn interface_drives_are_recognised_by_declaration() {
         ]
     );
 }
+
+/// (rule, line) of the findings of `rules` in `src`.
+fn lint(src: &str, rules: &[&str]) -> Vec<(&'static str, u32)> {
+    let trees = [sv_syntax::parse_source(src, "t.sv", Default::default())];
+    let d = sv_sema::build(&trees);
+    let mut out: Vec<(&'static str, u32)> = dv_lint::Session::new()
+        .lint_all(&d, &trees, |id: &str| rules.contains(&id))
+        .1
+        .iter()
+        .map(|f| (f.rule, f.position(&d).1))
+        .collect();
+    out.sort();
+    out
+}
+
+#[test]
+fn an_interface_is_one_by_declaration_not_by_suffix() {
+    let src = "\
+interface apb_bus;
+    logic psel;
+endinterface
+interface class printable_if;
+    pure virtual function void print();
+endclass
+class env_c;
+    apb_bus bus;
+    printable_if helper;
+    unknown_if other;
+endclass
+";
+    // `apb_bus` is an interface without the suffix; `printable_if` is a
+    // class with it; `unknown_if` is not declared, so its name decides.
+    assert_eq!(lint(src, &["SV-OOP-008"]), [("SV-OOP-008", 8), ("SV-OOP-008", 10)]);
+}
+
+#[test]
+fn a_task_drives_an_interface_by_declaration() {
+    let src = "\
+interface apb_bus(input logic clk);
+    logic psel;
+    clocking drv @(posedge clk);
+        output psel;
+    endclocking
+endinterface
+typedef struct { int level; } vif_stats_t;
+class drv_c;
+    virtual apb_bus bus;
+    vif_stats_t vif_stats;
+    int count;
+    bit in_reset;
+    task send();
+        bus.drv.psel <= 1;
+    endtask
+    task tally();
+        vif_stats.level <= 1;
+        count <= count + 1;
+    endtask
+    task guarded();
+        wait (!in_reset);
+        bus.drv.psel <= 1;
+    endtask
+endclass
+";
+    assert_eq!(lint(src, &["SV-DRV-001"]), [("SV-DRV-001", 13)]);
+}

@@ -199,6 +199,16 @@ fn model(c: &Cst) -> Arc<Model> {
     crate::shared::get("sem_model", c.compile_key(), || build(c.all))
 }
 
+/// Whether the type called `name` is an interface: `None` when this compile
+/// does not declare the name exactly once.
+pub(crate) fn is_interface(c: &Cst, name: &str) -> Option<bool> {
+    let m = model(c);
+    match m.at(&Ty::Named(name.to_string()), false)? {
+        At::Unit(unit, _) => Some(m.units.get(&unit).is_some_and(|u| u.interface)),
+        _ => Some(false),
+    }
+}
+
 /// Where following a reference has got to.
 enum At {
     /// An interface (or module) by name; `virt`: through a virtual handle.

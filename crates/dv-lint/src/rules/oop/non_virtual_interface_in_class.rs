@@ -18,7 +18,11 @@ pub(crate) fn non_virtual_interface(c: &Cst, s: &mut Sink) {
                 continue;
             }
             let ty = c.last_text(dt);
-            if ty.starts_with("virtual") || !(ty.ends_with("_if") || ty.ends_with("_vif")) {
+            // An interface by its declaration; by its name (`_if`, `_vif`) only
+            // when nothing in the compile declares the type.
+            let interface =
+                crate::sem::is_interface(c, ty).unwrap_or_else(|| ty.ends_with("_if") || ty.ends_with("_vif"));
+            if ty.starts_with("virtual") || !interface {
                 continue;
             }
             // Unsafe: the member becomes a handle that must be set (config_db) before use.

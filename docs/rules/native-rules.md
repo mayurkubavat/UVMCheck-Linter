@@ -30,8 +30,10 @@ resolves it; the C++ engine goes by how the handle is named.
 | Rule | Native engine | C++ engine |
 |---|---|---|
 | `SV-INT-001`, `SV-LANG-005` | An assignment target is an interface drive when its declarations say so: `cfg.bus.drv.data` with `bus` declared `virtual bus_if` (also through a typedef, an inherited property, or an array of handles) and `drv` a clocking block of `bus_if`. A struct called `my_vif` is not one. | A target whose text has `vif.`, `_vif.` or `.cb.`, or starts with `cb.` outside a class. |
+| `SV-DRV-001` | A task drives an interface when one of its `<=` targets is such a signal by declaration. | A task whose text has `vif.` or `intf.` and `<=`. |
+| `SV-OOP-008` | A class member is a non-virtual interface when its type is a declared `interface`; an `interface class` called `printable_if` is not one. | A type whose name ends in `_if` or `_vif`. |
 
-A target the native engine cannot resolve (the handle's type is a type
+A target or type the native engine cannot resolve (the handle's type is a type
 parameter, the path has a call in it, a class or interface is declared twice
 or is not compiled) is judged by its names, as in the C++ engine, so the two
 agree on those.
