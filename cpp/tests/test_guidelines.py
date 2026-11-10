@@ -72,7 +72,8 @@ def test_mapping(binary):
         for rule in g["rules"]:
             check(rule in known, f"{g['id']} names unknown rule {rule}")
         check(g["id"] in docs, f"{g['id']} has no 'Enforced by' line in docs/methodology")
-        check(docs.get(g["id"], []) == g["rules"],
+        # The docs are generated from the native engine, which lists rules by ID.
+        check(sorted(docs.get(g["id"], [])) == sorted(g["rules"]),
               f"{g['id']}: docs list {docs.get(g['id'])}, linter maps {g['rules']}")
         check(g["id"] in readme, f"{g['id']} missing from docs/methodology/README.md")
     for gid in docs:

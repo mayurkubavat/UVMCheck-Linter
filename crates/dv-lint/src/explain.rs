@@ -3,55 +3,61 @@
 //! uvmcheck's `--explain` layout. A sub-rule (a naming or style finding ID
 //! such as UVM-NAM-101) is explained with the rule that reports it.
 
-use crate::rule_profiles::{CATALOG, GUIDELINES};
+use crate::catalog;
+use crate::guidelines::GUIDELINES;
 
 include!(concat!(env!("OUT_DIR"), "/explain_data.rs"));
 
 /// The explanation of `query` (an ID or name), with `bold` escape codes for a
 /// terminal; Err for a rule nothing knows.
 pub fn explain(query: &str, bold: bool) -> Result<String, String> {
-    let entry = CATALOG.iter().find(|r| r.0 == query || r.1 == query);
-    let native = crate::rules().into_iter().find(|r| r.id == query || r.name == query);
-    let Some(&(id, name, category, severity, experimental, reported_by, description)) = entry else {
-        return match native {
-            // A native rule with no uvmcheck twin: no catalog entry.
-            Some(r) => Ok(render_native(r.id, r.name, bold)),
-            None => Err(format!("unknown rule '{query}' (see --list)")),
-        };
+    let all = catalog::entries();
+    // A sub-rule is also known by the name its findings carry.
+    let by_finding_name = || {
+        crate::rules()
+            .iter()
+            .flat_map(|r| crate::sub_rules(r.id))
+            .find(|s| s.finding_name == query)
+            .and_then(|s| all.iter().find(|e| e.id == s.id))
     };
-    let parent = CATALOG.iter().find(|r| !reported_by.is_empty() && r.0 == reported_by);
+    let Some(e) = all.iter().find(|e| e.id == query || e.name == query).or_else(by_finding_name) else {
+        return Err(format!("unknown rule '{query}' (see --list-rules)"));
+    };
+    let (id, name) = (e.id, e.name);
+    let parent = e.reported_by.and_then(|p| all.iter().find(|x| x.id == p));
     let (b, r) = if bold { ("\x1b[1m", "\x1b[0m") } else { ("", "") };
     let mut out = format!(
-        "{b}{id}  {name}{r}  [{category}, {severity}{}]\n\n{description}\n",
-        if experimental { ", experimental: runs with --experimental" } else { "" }
+        "{b}{id}  {name}{r}  [{}, {}{}{}]\n\n{}\n",
+        e.category,
+        e.severity.as_str(),
+        if e.experimental { ", experimental: runs with --experimental" } else { "" },
+        if e.native { ", native engine only" } else { "" },
+        e.about
     );
     if let Some(p) = parent {
-        out.push_str(&format!("\nReported by {} ({}).\n", p.0, p.1));
+        out.push_str(&format!("\nReported by {} ({}).\n", p.id, p.name));
     }
-    let guides_of = |rule: &str| -> Vec<&'static str> {
-        crate::rule_profiles::RULES.iter().find(|x| x.0 == rule).map(|x| x.3.to_vec()).unwrap_or_default()
-    };
-    let mut guides = guides_of(id);
+    let mut guides = e.guidelines;
     if guides.is_empty() {
         if let Some(p) = parent {
-            guides = guides_of(p.0);
+            guides = p.guidelines;
         }
     }
     let lines: Vec<String> = guides
         .iter()
         .filter_map(|g| GUIDELINES.iter().find(|x| x.0 == *g))
-        .map(|(gid, level, text)| format!("  {gid} ({level}) {text}\n"))
+        .map(|(gid, _, level, text)| format!("  {gid} ({level}) {text}\n"))
         .collect();
     if !lines.is_empty() {
         out.push_str("\nMethodology guidelines:\n");
         out.extend(lines);
     }
     // Options and examples belong to the finding ID, else to its rule.
-    let owner = |pick: &dyn Fn(&str) -> bool| if pick(id) { id } else { parent.map_or(id, |p| p.0) };
+    let owner = |pick: &dyn Fn(&str) -> bool| if pick(id) { id } else { parent.map_or(id, |p| p.id) };
     let opts_owner = owner(&|x| OPTIONS.iter().any(|o| o.0 == x));
     let opts: Vec<&(&str, &str, &str)> = OPTIONS.iter().filter(|o| o.0 == opts_owner).collect();
     if !opts.is_empty() {
-        let class = parent.map_or(name, |p| p.1);
+        let class = parent.map_or(name, |p| p.name);
         out.push_str(&format!("\nOptions, set in .uvmcheck/config.py:\n    class {class}(RuleConfig):\n"));
         for (_, key, default) in opts {
             out.push_str(&format!("        {key} = {default}    # default\n"));
@@ -66,20 +72,6 @@ pub fn explain(query: &str, bold: bool) -> Result<String, String> {
     Ok(out)
 }
 
-fn render_native(id: &str, name: &str, bold: bool) -> String {
-    let (b, r) = if bold { ("\x1b[1m", "\x1b[0m") } else { ("", "") };
-    let mut out = format!(
-        "{b}{id}  {name}{r}  [native]\n\nA rule of the native engine with no uvmcheck twin; docs/rules/native-rules.md describes it.\n"
-    );
-    if let Some((_, dir, bad, good)) = EXAMPLES.iter().find(|e| e.0 == id) {
-        show(&mut out, "Flagged", &format!("{dir}/bad.sv"), bad);
-        show(&mut out, "Not flagged", &format!("{dir}/good.sv"), good);
-    }
-    out.push_str(&format!("\nWaive one finding with  // uvmcheck:waive {id} -- <reason>  on the flagged line.\n"));
-    out
-}
-
-/// An example, indented, at most 60 lines (then `...`).
 fn show(out: &mut String, title: &str, path: &str, text: &str) {
     if text.is_empty() {
         return;

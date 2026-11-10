@@ -67,7 +67,7 @@ Write:
 bus_driver::type_id::set_type_override(slow_driver::get_type());
 ```
 
-Enforced by: `UVM-RUS-004`, `UVM-RUS-005`, `PORT-PTH-001`, `PORT-PRP-001`
+Enforced by: `PORT-PRP-001`, `PORT-PTH-001`, `UVM-RUS-004`, `UVM-RUS-005`
 
 ## MG-4.4 (Should)
 
@@ -75,7 +75,7 @@ Enforced by: `UVM-RUS-004`, `UVM-RUS-005`, `PORT-PTH-001`, `PORT-PRP-001`
 
 Without do_copy, do_compare and convert2string, clone() returns an empty copy, compare() always passes and logs print nothing useful.
 
-Enforced by: `UVM-RUS-006`, `SV-BUG-004`, `UVM-SEQ-008`
+Enforced by: `SV-BUG-004`, `UVM-RUS-006`, `UVM-SEQ-008`
 
 ## MG-4.5 (Shall)
 
@@ -83,4 +83,4 @@ Enforced by: `UVM-RUS-006`, `SV-BUG-004`, `UVM-SEQ-008`
 
 Only factory-created classes can be replaced by tests. Direct new() and missing registration remove that extension point.
 
-Enforced by: `UVM-FAC-001`, `UVM-FAC-002`, `UVM-FAC-003`, `UVM-FAC-004`, `UVM-STR-005`, `UVM-SEQ-010`, `UVM-FAC-005`
+Enforced by: `UVM-FAC-001`, `UVM-FAC-002`, `UVM-FAC-003`, `UVM-FAC-004`, `UVM-FAC-005`, `UVM-SEQ-010`, `UVM-STR-005`

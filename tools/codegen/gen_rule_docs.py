@@ -2,18 +2,22 @@
 """
 Regenerates the rule documentation from the rules themselves.
 
-Each rule declares its metadata once, in its own source file (ID, name, category,
-severity, profiles, description; sub-rules for the configurable naming and style
-engines; guideline tags from cpp/src/rules/Guidelines.cpp). This script asks the built
-binary for that metadata and writes:
+Each rule declares its metadata once, where the native engine registers it
+(crates/dv-lint/src/rules/<category>/mod.rs: ID, name, category, severity,
+profiles, guidelines, description; sub-rules of the naming and style engines in
+crates/dv-lint/src/support/style_config.rs). This script asks the built binary
+for that metadata and writes:
 
   docs/rules/catalog.json           machine-readable catalog (uvmcheck --list-rules --json)
   docs/rules/README.md              human-readable catalog, grouped by category
   docs/methodology/MG-*.md          the "Enforced by:" line under each guideline
 
+The C++ engine (uvmcheck-slang) declares the same metadata in its own rule
+sources; cpp/tests/test_catalog.py checks that the two agree.
+
 Usage:
-  tools/codegen/gen_rule_docs.py [--binary build/uvmcheck]          rewrite the files
-  tools/codegen/gen_rule_docs.py --check                            exit 1 if any file is stale
+  tools/codegen/gen_rule_docs.py [--binary target/release/uvmcheck]   rewrite the files
+  tools/codegen/gen_rule_docs.py --check                              exit 1 if any file is stale
 """
 
 import argparse
@@ -56,7 +60,9 @@ def render_markdown(catalog):
         "",
         f"{len(rules)} rules in {len(catalog['categories'])} categories. Each rule links to its "
         "tests, whose `bad.sv` and `good.sv` are the rule's examples. Run "
-        "`uvmcheck --list-rules --json -` for the same data as JSON.",
+        "`uvmcheck --list-rules --json -` for the same data as JSON, and `uvmcheck --explain ID` for "
+        "one rule with its options and examples. Rules marked **Native** are in the native engine "
+        "only; the C++ engine (`uvmcheck-slang`) does not have them.",
         "",
     ]
     by_cat = {c: [] for c in catalog["categories"]}
@@ -77,6 +83,8 @@ def render_markdown(catalog):
             desc = r["description"].replace("|", "\\|").replace("\n", " ")
             if r.get("reportedBy"):
                 desc += f" (reported by `{r['reportedBy']}`)"
+            if r.get("engine") == "native":
+                desc = "**Native.** " + desc
             if r.get("maturity") == "experimental":
                 desc = "**Experimental** (runs with `--experimental`). " + desc
             lines.append(f"| {rid} | {r['name']} | {r['severity']} | {', '.join(r['profiles'])} | "
@@ -101,10 +109,14 @@ def render_guide_page(text, rules_by_guideline):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--binary", default=str(REPO / "build" / "uvmcheck"))
+    ap.add_argument("--binary", help="the native uvmcheck (default: the newer of target/release and target/debug)")
     ap.add_argument("--check", action="store_true", help="report stale files instead of writing them")
     args = ap.parse_args()
-    binary = str(Path(args.binary).resolve())
+    built = [p for p in (REPO / "target" / "release" / "uvmcheck", REPO / "target" / "debug" / "uvmcheck") if p.exists()]
+    built.sort(key=lambda p: p.stat().st_mtime, reverse=True)
+    if not args.binary and not built:
+        sys.exit("no native uvmcheck built: run `cargo build -p dv-lint --bin uvmcheck`, or pass --binary")
+    binary = str(Path(args.binary or built[0]).resolve())
 
     catalog_text = run_json(binary, "--list-rules")
     catalog = json.loads(catalog_text)

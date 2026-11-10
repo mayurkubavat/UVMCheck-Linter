@@ -1,8 +1,8 @@
-# Rules only dv-lint has
+# Rules only the native engine has
 
-Most dv-lint rules are ports of uvmcheck's C++ rules and are listed in
-[README.md](README.md) (generated from the C++ binary). The rules below have no
-C++ twin: `dv-lint --list` marks them `native`, and the parity gates
+Most rules exist in both engines. The rules below are in the native engine
+only: the catalog ([README.md](README.md)) marks them **Native**,
+`uvmcheck --list` prints `native` after them, and the parity gates
 (`tools/gates/lint_parity.py`) leave them out.
 
 | Rule | Name | Severity | What it flags |

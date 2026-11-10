@@ -22,7 +22,7 @@ Write:
 if (!act.compare(exp)) `uvm_error("SB", "mismatch")
 ```
 
-Enforced by: `UVM-REP-007`, `UVM-REP-008`, `SV-ERR-001`, `SV-ERR-002`, `SV-ERR-003`, `SV-OOP-002`, `SV-RND-001`, `UVM-CFG-004`, `UVM-TST-001`, `UVM-REP-006`, `UVM-SCB-001`, `UVM-SCB-002`, `UVM-SEQ-006`, `UVM-TLM-002`, `SV-IPC-001`, `SV-SYS-001`, `SVA-ACT-001`, `UVM-LOG-002`
+Enforced by: `SV-ERR-001`, `SV-ERR-002`, `SV-ERR-003`, `SV-IPC-001`, `SV-OOP-002`, `SV-RND-001`, `SV-SYS-001`, `SVA-ACT-001`, `UVM-CFG-004`, `UVM-LOG-002`, `UVM-REP-006`, `UVM-REP-007`, `UVM-REP-008`, `UVM-SCB-001`, `UVM-SCB-002`, `UVM-SEQ-006`, `UVM-TLM-002`, `UVM-TST-001`
 
 ## MG-8.2 (Should)
 

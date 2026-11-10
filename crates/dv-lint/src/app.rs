@@ -72,6 +72,8 @@ pub fn run() {
     let mut sarif: Option<String> = None;
     let mut html: Option<String> = None;
     let mut fix_rules: Vec<String> = Vec::new();
+    let mut listing: Option<Listing> = None;
+    let mut json_bare = false;
     // --explain, --changed-since, waiver hygiene, the cache, --map, --init,
     // --python-rules (dv_lint::cli).
     let mut extra = dv_lint::cli::Extra::default();
@@ -159,12 +161,16 @@ pub fn run() {
             ),
             // Also write the findings as uvmcheck's JSON report.
             "--json" => {
+                // Alone it means standard output, for the two listings.
                 let path = it.next().unwrap_or_else(|| {
-                    eprintln!("error: --json needs a file");
-                    std::process::exit(2);
+                    json_bare = true;
+                    "-".to_string()
                 });
                 let _ = JSON_OUT.set(path);
             }
+            // The catalog and the guide, as text or with --json.
+            "--list-rules" => listing = Some(Listing::Rules),
+            "--list-guidelines" => listing = Some(Listing::Guidelines),
             // Read git history for SV-EVO-001 and SV-EVO-002.
             "--history" => dv_lint::set_history(true),
             // Report nothing in -v/-y library files.
@@ -178,10 +184,10 @@ pub fn run() {
             "--list" => {
                 for r in dv_lint::rules() {
                     let kind = if r.is_syntax() { "syntax" } else { "model" };
-                    let native = if dv_lint::NATIVE_ONLY.contains(&r.id) { " native" } else { "" };
+                    let native = if r.native { " native" } else { "" };
                     println!("{} {} {}{native}", r.id, r.name, kind);
-                    for (id, name) in dv_lint::sub_rules(r.id) {
-                        println!("{id} {name} {kind}");
+                    for s in dv_lint::sub_rules(r.id) {
+                        println!("{} {} {kind}", s.id, s.finding_name);
                     }
                 }
                 return;
@@ -197,6 +203,13 @@ pub fn run() {
         }
         std::process::exit(2);
     };
+    if let Some(l) = listing {
+        list(l, JSON_OUT.get().map(String::as_str)).unwrap_or_else(|e| fail(e));
+        return;
+    }
+    if json_bare {
+        fail("--json needs a file".to_string());
+    }
     extra.validate().unwrap_or_else(|e| fail(e));
     if let Some(q) = &extra.explain {
         use std::io::IsTerminal;
@@ -304,7 +317,8 @@ pub fn run() {
         .into_iter()
         .filter(|r| {
             let named = |id: &str, name: &str| fix_rules.iter().any(|f| f == id || f == name);
-            named(r.id, r.name) || dv_lint::sub_rules(r.id).iter().any(|(id, name)| named(id, name))
+            named(r.id, r.name)
+                || dv_lint::sub_rules(r.id).iter().any(|s| named(s.id, s.name) || named(s.id, s.finding_name))
         })
         .map(|r| r.id)
         .collect();
@@ -403,6 +417,33 @@ pub fn run() {
 
 /// `--lsp`: the language server is `dv-lsp`, installed next to this binary
 /// (else on PATH). It takes over standard input and output.
+/// What `--list-rules` and `--list-guidelines` print.
+#[derive(Clone, Copy)]
+enum Listing {
+    Rules,
+    Guidelines,
+}
+
+/// Prints a listing: as text, or as JSON to `json` (`-`: standard output).
+fn list(what: Listing, json: Option<&str>) -> Result<(), String> {
+    use dv_lint::catalog;
+    let text = match (what, json.is_some()) {
+        (Listing::Rules, true) => catalog::rules_json(),
+        (Listing::Rules, false) => catalog::rules_text(),
+        (Listing::Guidelines, true) => catalog::guidelines_json(),
+        (Listing::Guidelines, false) => catalog::guidelines_text(),
+    };
+    match json {
+        Some(path) if path != "-" => std::fs::write(path, text).map_err(|e| format!("cannot write {path}: {e}")),
+        _ => {
+            use std::io::Write;
+            // A closed pipe (`| head`) is not an error.
+            let _ = std::io::stdout().write_all(text.as_bytes());
+            Ok(())
+        }
+    }
+}
+
 fn serve_editor() -> ! {
     let name = if cfg!(windows) { "dv-lsp.exe" } else { "dv-lsp" };
     let beside = std::env::current_exe().ok().and_then(|e| e.canonicalize().ok()).map(|e| e.with_file_name(name));

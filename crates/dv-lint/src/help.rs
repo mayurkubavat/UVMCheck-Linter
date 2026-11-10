@@ -56,7 +56,11 @@ Rules:
   --experimental           Also run experimental rules
   --python-rules PATH      Also run rules written with the Python SDK
   --history                Let the git history rules (SV-EVO-*) read the log
-  --list                   List every rule and exit
+  --list-rules             List every rule with its category, severity and
+                           description, and exit (--json [FILE]: the catalog)
+  --list-guidelines        List the methodology guidelines and the rules that
+                           enforce each, and exit (--json [FILE])
+  --list                   List rule ids and names only, and exit
   --explain RULE           Describe a rule, with its example, and exit
 
 Project:

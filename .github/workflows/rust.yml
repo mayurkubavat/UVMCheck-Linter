@@ -42,6 +42,11 @@ jobs:
       - name: cargo test
         run: cargo test --locked
 
+      - name: Rule docs are generated from the rules
+        run: |
+          cargo build --locked -p dv-lint --bin uvmcheck
+          python3 tools/codegen/gen_rule_docs.py --binary target/debug/uvmcheck --check
+
   msrv:
     name: test (MSRV 1.82, ${{ matrix.os }})
     strategy:

@@ -28,7 +28,7 @@ endclass
 
 Packages follow the same order: an agent package that imports an env or test package (SV-PKG-004) cannot be compiled or reused without it.
 
-Enforced by: `UVM-ARC-001`, `SV-PKG-004`
+Enforced by: `SV-PKG-004`, `UVM-ARC-001`
 
 ## MG-1.2 (Should)
 
@@ -64,7 +64,7 @@ endpackage
 
 Imports follow the same rule. `import pkg::*` at file scope puts the whole package into $unit, and an import inside a class file that is included into a package applies to every file included after it (SV-PKG-002). An import that supplies nothing is a dependency the code does not have (SV-PKG-003).
 
-Enforced by: `UVM-ARC-003`, `SV-MOD-001`, `SV-MAC-001`, `SV-STY-013`, `SV-PKG-002`, `SV-PKG-003`
+Enforced by: `SV-MAC-001`, `SV-MOD-001`, `SV-PKG-002`, `SV-PKG-003`, `SV-STY-013`, `UVM-ARC-003`
 
 ## MG-1.4 (May)
 

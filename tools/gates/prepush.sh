@@ -59,6 +59,7 @@ if [ "$rust" = 1 ]; then
     echo "Rust flow (rust.yml)"
     step "rust_gate: profiles, fmt, clippy" tools/gates/rust_gate.sh --native
     step "cargo test" cargo test --locked
+    step "rule docs are current" sh -c 'cargo build --locked -q -p dv-lint --bin uvmcheck && python3 tools/codegen/gen_rule_docs.py --binary target/debug/uvmcheck --check'
     if [ "$quick" = 1 ]; then
         skip "release archive and smoke test" "skipped by --quick"
     else

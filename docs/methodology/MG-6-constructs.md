@@ -35,7 +35,7 @@ class bus_monitor extends uvm_monitor;
 endclass
 ```
 
-Enforced by: `UVM-BAN-001`, `UVM-BAN-002`, `SV-CNS-001`, `SV-CNS-002`, `SV-CNS-003`
+Enforced by: `SV-CNS-001`, `SV-CNS-002`, `SV-CNS-003`, `UVM-BAN-001`, `UVM-BAN-002`
 
 ## MG-6.2 (Should)
 
@@ -71,4 +71,4 @@ Deprecated constructs (program blocks, defparam, $random, set_config_*) are remo
 
 Three Advisory rules ask for explicit types: an enum without a base type is a 32-bit int (SV-CNS-006), the Verilog-1995 integer type is 4-state and signed (SV-CNS-007), and a void function that hands back results through output arguments hides its data flow (SV-CNS-008).
 
-Enforced by: `SV-DEP-001`, `SV-DEP-002`, `SV-DEP-003`, `SV-DEP-004`, `SV-DEP-005`, `SV-DEP-006`, `UVM-DEP-001`, `UVM-DEP-002`, `UVM-DEP-003`, `UVM-DEP-004`, `SV-BAN-001`, `SV-COR-009`, `SV-CNS-006`, `SV-CNS-007`, `SV-CNS-008`
+Enforced by: `SV-BAN-001`, `SV-CNS-006`, `SV-CNS-007`, `SV-CNS-008`, `SV-COR-009`, `SV-DEP-001`, `SV-DEP-002`, `SV-DEP-003`, `SV-DEP-004`, `SV-DEP-005`, `SV-DEP-006`, `UVM-DEP-001`, `UVM-DEP-002`, `UVM-DEP-003`, `UVM-DEP-004`

@@ -43,7 +43,7 @@ fi
 step() { echo "== $*"; "$@"; }
 
 # dv-lint's rule selection table comes from the rule catalog.
-step python3 tools/codegen/gen_rule_profiles.py --check
+step python3 tools/codegen/gen_guidelines.py --check
 step cargo fmt --all --check
 step cargo clippy --all-targets --locked -- -D warnings
 if [ "$slang" = yes ]; then

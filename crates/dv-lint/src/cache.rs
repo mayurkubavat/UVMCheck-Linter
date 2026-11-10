@@ -297,10 +297,10 @@ fn write_finding(f: &Finding) -> Json {
 /// when there is one (Python rules' are leaked, a few per run).
 fn intern(s: &str) -> &'static str {
     let known = crate::rules().into_iter().flat_map(|r| {
-        let subs = crate::sub_rules(r.id).iter().flat_map(|(a, b)| [*a, *b]);
+        let subs = crate::sub_rules(r.id).iter().flat_map(|s| [s.id, s.name, s.finding_name]);
         [r.id, r.name].into_iter().chain(subs)
     });
-    for k in known.chain(crate::rule_profiles::CATALOG.iter().flat_map(|c| [c.0, c.1])) {
+    for k in known {
         if k == s {
             return k;
         }

@@ -489,8 +489,11 @@ impl Config {
         // As uvmcheck: a rules key that names no rule is a warning.
         let all = crate::rules();
         for (key, _) in &c.rules {
-            let known =
-                all.iter().any(|r| r.id == key || r.name == key || crate::sub_rules(r.id).iter().any(|s| s.0 == key));
+            let known = all.iter().any(|r| {
+                r.id == key
+                    || r.name == key
+                    || crate::sub_rules(r.id).iter().any(|s| s.id == key || s.name == key || s.finding_name == key)
+            });
             if !known {
                 c.warnings.push(format!("rules: '{key}' does not match any rule ID or name"));
             }
@@ -642,7 +645,7 @@ impl Config {
         let on = |key: &str| self.rules.iter().any(|(k, r)| k == key && r.enabled != Some(false));
         on(id)
             || (!name.is_empty() && on(name))
-            || crate::sub_rules(id).iter().any(|(sub, sub_name)| on(sub) || on(sub_name))
+            || crate::sub_rules(id).iter().any(|s| on(s.id) || on(s.name) || on(s.finding_name))
             || (id == "SV-STY-100" && !self.style.is_empty())
             || (id == "SV-NAM-100" && !self.naming.is_empty())
     }

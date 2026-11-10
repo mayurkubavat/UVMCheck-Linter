@@ -44,10 +44,8 @@ pub fn sarif(files: &[String], found: &[Finding]) -> String {
         "          \"name\": \"dv-lint\",\n          \"version\": {},\n          \"informationUri\": \"https://github.com/uvmcheck/uvmcheck\",\n          \"rules\": [\n",
         s(env!("CARGO_PKG_VERSION"))
     ));
-    let docs = crate::rule_profiles::DOCS;
-    let cats = crate::rule_profiles::RULES;
-    for (i, (id, name, desc)) in docs.iter().enumerate() {
-        let cat = cats.iter().find(|r| r.0 == *id).map_or("", |r| r.1);
+    let docs = crate::rules();
+    for (i, crate::Rule { id, name, about: desc, category: cat, .. }) in docs.iter().enumerate() {
         o.push_str(&format!(
             "            {{\n              \"id\": {},\n              \"name\": {},\n              \"shortDescription\": {{ \"text\": {} }},\n              \"properties\": {{ \"category\": {} }}\n            }}{}\n",
             s(id),
@@ -146,12 +144,10 @@ fn now_utc() -> String {
 pub fn html(files: &[String], found: &[Finding]) -> String {
     use std::collections::{HashMap, HashSet};
     let category = |id: &str| -> &'static str {
-        let parent = crate::rules()
+        crate::rules()
             .iter()
-            .find(|r| crate::sub_rules(r.id).iter().any(|s| s.0 == id))
-            .map(|r| r.id)
-            .unwrap_or(id);
-        crate::rule_profiles::RULES.iter().find(|r| r.0 == parent).map_or("Custom", |r| r.1)
+            .find(|r| r.id == id || crate::sub_rules(r.id).iter().any(|s| s.id == id))
+            .map_or("Custom", |r| r.category)
     };
     let (mut errors, mut warnings, mut infos, mut debt) = (0usize, 0usize, 0usize, 0u64);
     let mut by_cat: HashMap<&str, usize> = HashMap::new();

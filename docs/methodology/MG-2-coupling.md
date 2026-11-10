@@ -25,7 +25,7 @@ Write:
 agt_cfg.drive_enable = 0;
 ```
 
-Enforced by: `UVM-CPL-002`, `UVM-CPL-003`, `UVM-ARC-002`, `UVM-SEQ-003`, `UVM-SEQ-011`, `UVM-PHS-010`, `SV-ENC-001`, `SV-DSN-004`
+Enforced by: `SV-DSN-004`, `SV-ENC-001`, `UVM-ARC-002`, `UVM-CPL-002`, `UVM-CPL-003`, `UVM-PHS-010`, `UVM-SEQ-003`, `UVM-SEQ-011`
 
 ## MG-2.2 (Shall)
 
@@ -45,7 +45,7 @@ Write:
 @(posedge vif.irq);   // vif from uvm_config_db
 ```
 
-Enforced by: `UVM-CPL-004`, `SV-OOP-008`
+Enforced by: `SV-OOP-008`, `UVM-CPL-004`
 
 ## MG-2.3 (Should)
 
@@ -75,7 +75,7 @@ endfunction
 // run-time changes come through a TLM port, an event or a method on cfg
 ```
 
-Enforced by: `SV-DSN-008`, `SV-OOP-007`, `UVM-CFG-003`, `UVM-CFG-005`, `UVM-CFG-006`, `UVM-ARC-004`, `UVM-CFG-007`, `UVM-CFG-009`
+Enforced by: `SV-DSN-008`, `SV-OOP-007`, `UVM-ARC-004`, `UVM-CFG-003`, `UVM-CFG-005`, `UVM-CFG-006`, `UVM-CFG-007`, `UVM-CFG-009`
 
 ## MG-2.4 (Should)
 
@@ -100,4 +100,4 @@ localparam string BUS_CFG_KEY = "bus_cfg";   // in bus_pkg, used on both sides
 seq.do_op(OP_WRITE);                          // enum argument
 ```
 
-Enforced by: `UVM-CFG-001`, `UVM-CFG-010`, `UVM-CFG-011`, `UVM-DAG-001`, `SV-RDB-001`, `SV-BUG-007`, `UVM-CFG-008`, `SV-CPL-001`
+Enforced by: `SV-BUG-007`, `SV-CPL-001`, `SV-RDB-001`, `UVM-CFG-001`, `UVM-CFG-008`, `UVM-CFG-010`, `UVM-CFG-011`, `UVM-DAG-001`

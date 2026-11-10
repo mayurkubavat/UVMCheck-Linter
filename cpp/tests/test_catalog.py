@@ -4,8 +4,8 @@ Checks the rule catalog generated from the rules' own metadata:
 
 - every rule and sub-rule has a unique ID and a category from the closed set;
 - every ID a rule reports appears in the catalog (no rule reports an undeclared ID);
-- docs/rules/catalog.json, docs/rules/README.md and the methodology "Enforced by" lines
-  match what tools/codegen/gen_rule_docs.py generates from the binary.
+- the binary declares the same metadata as docs/rules/catalog.json (generated from the
+  native engine by tools/codegen/gen_rule_docs.py) for every rule not marked native there.
 """
 
 import argparse
@@ -53,10 +53,25 @@ def main():
                 if f["rule"] not in known:
                     failures.append(f"{expect.relative_to(REPO)} expects undeclared rule {f['rule']}")
 
-    res = subprocess.run([sys.executable, str(REPO / "tools" / "codegen" / "gen_rule_docs.py"), "--binary", binary,
-                          "--check"], capture_output=True, text=True)
-    if res.returncode != 0:
-        failures.append(res.stdout.strip() or res.stderr.strip())
+    # The catalog is generated from the native engine's rules
+    # (tools/codegen/gen_rule_docs.py). This engine must declare the same
+    # metadata for every rule it has; rules marked "engine": "native" are the
+    # native engine's alone.
+    published = json.loads((REPO / "docs" / "rules" / "catalog.json").read_text())
+    if published["categories"] != catalog["categories"]:
+        failures.append("categories differ from docs/rules/catalog.json")
+    shared = {r["id"]: r for r in published["rules"] if r.get("engine") != "native"}
+    mine = {r["id"]: r for r in rules}
+    for rid in sorted(set(shared) | set(mine)):
+        if rid not in mine:
+            failures.append(f"{rid}: in docs/rules/catalog.json, not registered here (native only? mark it so)")
+        elif rid not in shared:
+            failures.append(f"{rid}: registered here, missing from docs/rules/catalog.json or marked native there")
+        else:
+            for key in sorted(set(shared[rid]) | set(mine[rid])):
+                if shared[rid].get(key) != mine[rid].get(key):
+                    failures.append(f"{rid}: {key} is {mine[rid].get(key)!r} here, "
+                                    f"{shared[rid].get(key)!r} in docs/rules/catalog.json")
 
     for f in failures:
         print(f"FAIL: {f}")

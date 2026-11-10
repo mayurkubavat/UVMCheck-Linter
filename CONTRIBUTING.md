@@ -163,11 +163,16 @@ as the reference `--engine isolated` mode.
 The `UVMCHECK_REGISTER_RULE` line at the end of the rule file registers it; there is no central
 list to edit. If the rule enforces a guideline of the
 [UVM Methodology Guide](docs/methodology/README.md), add its ID to that guideline in
-`cpp/src/rules/Guidelines.cpp`. Then regenerate the docs from the rules' own metadata:
+`cpp/src/rules/Guidelines.cpp`. The published catalog is generated from the native
+engine, where the rule declares the same ID, name, category, severity, profiles, guidelines
+and description (`crates/dv-lint/src/rules/<category>/mod.rs`). Regenerate the docs, then
+check that this engine agrees with them:
 
 ```bash
+cargo build -p dv-lint --bin uvmcheck
 python3 tools/codegen/gen_rule_docs.py          # docs/rules/catalog.json, docs/rules/README.md, MG "Enforced by" lines
-python3 tools/codegen/gen_rule_docs.py --check  # what CI runs (cpp/tests/test_catalog.py): fails if any of them is stale
+python3 tools/codegen/gen_rule_docs.py --check  # what CI runs: fails if any of them is stale
+python3 cpp/tests/test_catalog.py               # the C++ rules declare what the catalog says
 ```
 
 The guide also describes how to turn a software-engineering principle into a rule and how to
@@ -225,12 +230,15 @@ It needs Rust 1.82 or newer (the MSRV in `Cargo.toml`).
 ```bash
 cargo build --release              # native only; no C++ build
 cargo test                         # unit and rule tests (default members)
-tools/gates/rust_gate.sh --native  # rule-profile check, cargo fmt --check, Clippy -D warnings
+tools/gates/rust_gate.sh --native  # guideline table check, cargo fmt --check, Clippy -D warnings
 ```
 
 A Rust rule reads the same `testdata/rules/<category>/<RULE_ID>/` cases as its C++
-twin. `rule_profiles.rs` is generated from the catalog
-(`python3 tools/codegen/gen_rule_profiles.py`); the gate fails if it is stale. The
+twin. A rule declares its category, severity, profiles, guidelines and description
+where it is registered (`crates/dv-lint/src/rules/<category>/mod.rs`); the catalog in
+`docs/rules/` is generated from those (`python3 tools/codegen/gen_rule_docs.py`) and
+the tests fail if it is stale. A rule the C++ engine also has declares the same
+metadata there, and `cpp/tests/test_catalog.py` checks the two agree. The
 `slang` Cargo feature, and the parity gates in `tools/gates/` that use it, need the
 C++ model library (`cmake --preset model && cmake --build build-model`); they are not
 required for a pull request that touches only the native engine.

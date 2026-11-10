@@ -28,7 +28,7 @@ task bus_driver::run_phase(uvm_phase phase);
 endtask
 ```
 
-Enforced by: `UVM-ROL-001`, `UVM-ROL-002`, `UVM-ROL-005`, `UVM-SEQ-001`, `UVM-VIF-DIR`, `UVM-OBS-001`, `UVM-TLM-005`, `UVM-ALS-001`, `SV-DSN-002`, `SV-DSN-003`, `SV-MET-006`, `SV-DSN-011`
+Enforced by: `SV-DSN-002`, `SV-DSN-003`, `SV-DSN-011`, `SV-MET-006`, `UVM-ALS-001`, `UVM-OBS-001`, `UVM-ROL-001`, `UVM-ROL-002`, `UVM-ROL-005`, `UVM-SEQ-001`, `UVM-TLM-005`, `UVM-VIF-DIR`
 
 ## MG-3.2 (Should)
 

@@ -60,7 +60,8 @@ mod uvm_api;
 
 mod waivers;
 
-mod rule_profiles;
+pub mod catalog;
+mod guidelines;
 
 #[allow(dead_code)]
 pub(crate) mod json;
@@ -133,7 +134,7 @@ pub const DEFAULT_PROFILES: u32 = 1 | (1 << 1) | (1 << 2) | (1 << 4);
 /// With no preset, or `default`, the rules that find bugs and methodology
 /// problems run ([`DEFAULT_PROFILES`]): soundness, methodology, performance
 /// and security. Style, smells and advisory rules are asked for by name, or
-/// with `all`. Rules dv-lint has with no uvmcheck twin always run. Err for
+/// with `all`. Err for
 /// an unknown preset.
 pub fn rule_selection(preset: Option<&str>, experimental: bool) -> Result<impl Fn(&str) -> bool, String> {
     const ALL: u32 = u32::MAX;
@@ -163,16 +164,18 @@ pub fn rule_selection(preset: Option<&str>, experimental: bool) -> Result<impl F
     };
     // "MG-4" selects MG-4.1, MG-4.2 ... but not MG-40.1.
     let matches = |s: &str, g: &str| g == s || (g.len() > s.len() && g.starts_with(s) && g.as_bytes()[s.len()] == b'.');
+    let known: std::collections::HashMap<&'static str, Rule> = rules().into_iter().map(|r| (r.id, r)).collect();
     Ok(move |id: &str| {
-        let Some(&(_, category, profiles, guides, exp)) = rule_profiles::RULES.iter().find(|r| r.0 == id) else {
+        // Not a built-in rule (a Python rule): it runs.
+        let Some(Rule { category, profiles, guidelines: guides, experimental: exp, .. }) = known.get(id) else {
             return true;
         };
-        if exp && !experimental {
+        if *exp && !experimental {
             return false;
         }
         match &sel {
             Sel::Profiles(m) => profiles & m != 0,
-            Sel::Category(c) => category == *c,
+            Sel::Category(c) => category == c,
             Sel::Guidelines(gs) => guides.iter().any(|g| gs.iter().any(|s| matches(s, g))),
             Sel::AnyGuideline => !guides.is_empty(),
         }
@@ -282,14 +285,66 @@ pub enum Check {
     Mixed(MixedFn),
 }
 
-/// A ported rule: its id, name and check.
+/// Profile bits: the kinds of problem a rule looks for. A preset selects
+/// rules by them (`--preset soundness`).
+pub mod profile {
+    /// Bugs: code that does not do what it says.
+    pub const SOUNDNESS: u32 = 1;
+    /// UVM and testbench methodology.
+    pub const METHODOLOGY: u32 = 1 << 1;
+    /// Simulation speed and memory.
+    pub const PERFORMANCE: u32 = 1 << 2;
+    /// Layout and naming.
+    pub const STYLE: u32 = 1 << 3;
+    /// What leaks or can be abused.
+    pub const SECURITY: u32 = 1 << 4;
+    /// Maintainability smells.
+    pub const SMELLS: u32 = 1 << 5;
+    /// Advice, asked for by name.
+    pub const ADVISORY: u32 = 1 << 6;
+    /// The profile names, in bit order, as the catalog prints them.
+    pub const NAMES: [&str; 7] = ["soundness", "methodology", "performance", "style", "security", "smells", "advisory"];
+}
+
+/// A rule: what it is called, how it is selected and documented, and its
+/// check. Declared once, in its category's `rules/<category>/mod.rs`; the
+/// catalog (`--list-rules`, docs/rules/) is generated from these.
 pub struct Rule {
-    /// Rule id (`"SV-OOP-003"`), as uvmcheck registers it.
+    /// Rule id (`"SV-OOP-003"`).
     pub id: &'static str,
     /// Rule name (`"MissingSuperNew"`).
     pub name: &'static str,
+    /// Catalog category (`"OOP"`), one of [`catalog::CATEGORIES`].
+    pub category: &'static str,
+    /// The severity the rule reports at by default.
+    pub severity: Severity,
+    /// [`profile`] bits.
+    pub profiles: u32,
+    /// The methodology guidelines the rule enforces (`"MG-4.3"`).
+    pub guidelines: &'static [&'static str],
+    /// Runs only with `--experimental`.
+    pub experimental: bool,
+    /// Only this engine has it: the C++ engine (uvmcheck-slang) does not.
+    pub native: bool,
+    /// What the rule flags and why, for the catalog and `--explain`.
+    pub about: &'static str,
     /// What the rule reads and the function that runs it.
     pub check: Check,
+}
+
+/// A finding id a rule reports besides its own: the naming and style
+/// engines report each convention under its own id.
+pub struct Sub {
+    /// Finding id (`"SV-STY-101"`).
+    pub id: &'static str,
+    /// Catalog name (`"NoTabs"`).
+    pub name: &'static str,
+    /// The name findings carry (`"TabCharactersProhibited"`); often `name`.
+    pub finding_name: &'static str,
+    /// The severity it is reported at by default.
+    pub severity: Severity,
+    /// What it flags.
+    pub about: &'static str,
 }
 
 impl Rule {
@@ -318,24 +373,12 @@ pub(crate) fn tops() -> Vec<String> {
     session::with(|s| s.tops.clone())
 }
 
-/// Rules with no uvmcheck (C++) twin: dv-lint's own. `--list` marks them
-/// `native`, and the parity gates leave them out.
-pub const NATIVE_ONLY: &[&str] = &[
-    "UVM-API-003",
-    "SV-RND-030",
-    "SV-RND-031",
-    "SV-RND-032",
-    "SV-COV-018",
-    "SV-RCE-002",
-    "DPI-PRT-001",
-    "UVM-TLM-007",
-];
-
 /// Ids a rule reports under besides its own (a rule engine's sub-rules).
-pub fn sub_rules(id: &str) -> &'static [(&'static str, &'static str)] {
+pub fn sub_rules(id: &str) -> &'static [Sub] {
     match id {
         "SV-STY-100" => crate::support::style_config::STYLE_SUBS,
         "SV-NAM-100" => crate::support::style_config::NAMING_SUBS,
+        "SV-CMP-001" => crate::support::style_config::COMPILER_SUBS,
         _ => &[],
     }
 }
