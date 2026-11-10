@@ -171,6 +171,15 @@ impl Flow<'_, '_> {
                 Some(inner) => self.stmt(inner, st),
                 None => (false, st),
             },
+            // A loop's body is walked once from the state before the loop,
+            // so a `return` while held or a drop of nothing inside it is
+            // found. It may run any number of times: a body that changes
+            // the state leaves it unknown after the loop.
+            LoopStmt | DoWhileStmt => {
+                let Some(body) = crate::support::procedural::loop_body(c, n) else { return (false, st) };
+                let (_, after) = self.stmt(body, st);
+                (false, if after == st { st } else { Obj::Unknown })
+            }
             ReturnStmt => {
                 if st == Obj::Held && !self.closed_elsewhere {
                     let msg = format!(

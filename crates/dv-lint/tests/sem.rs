@@ -306,3 +306,32 @@ endclass
     // The second drop of `done` has nothing to drop; `phase` is balanced.
     assert_eq!(objections(tb), [("UVM-OBJ-003", 9)]);
 }
+
+#[test]
+fn a_return_inside_a_loop_while_the_objection_is_held_is_found() {
+    let tb = "\
+class my_test extends uvm_test;
+    int q[$];
+    task run_phase(uvm_phase phase);
+        phase.raise_objection(this);
+        foreach (q[i]) begin
+            if (q[i] < 0) return;
+        end
+        forever begin
+            #1;
+            if (q.size() == 0) break;
+        end
+        phase.drop_objection(this);
+    endtask
+    task main_phase(uvm_phase phase);
+        forever begin
+            phase.raise_objection(this);
+            #10;
+            phase.drop_objection(this);
+        end
+    endtask
+endclass
+";
+    // The loop in main_phase is balanced in each round.
+    assert_eq!(objections(tb), [("UVM-OBJ-003", 6)]);
+}

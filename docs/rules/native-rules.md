@@ -52,6 +52,7 @@ engine answers all three from one analysis (`dv_lint::sem::objections`):
 | `if (c) raise` ... `if (c) drop`, the same condition text | Balanced. | `UVM-OBJ-003` asymmetric branch, twice. |
 | `if (h != null) h.raise_objection(this)` with no `else` | Held under that condition; not an asymmetric branch. | `UVM-OBJ-003` asymmetric branch. |
 | Two objections in one routine (`phase` and another handle) | Each handle is followed on its own. | One state for all. |
+| A `return` inside a loop while the objection is held, a drop of nothing inside a loop | `UVM-OBJ-003` reports it; a loop that raises and drops in each round is balanced. | Loop bodies are not looked at. |
 
 A raise nobody in the class family drops, a drop of something never raised, a
 `return` while the routine's own objection is held, and a drop in only one
