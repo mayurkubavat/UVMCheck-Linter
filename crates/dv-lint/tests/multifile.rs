@@ -62,4 +62,13 @@ fn every_rule_runs_on_fixtures_as_one_compile() {
     assert_eq!(trees.len(), files.len());
     let (_, found) = dv_lint::lint_all(&d, &trees, |_| true);
     assert!(!found.is_empty());
+    // The severity a rule declares is the worst it reports: presets, the
+    // ERROR budget and the catalog go by it. (A rule may report a milder
+    // tier, as SV-STY-010 does for decimal literals.)
+    let declared: std::collections::HashMap<&str, dv_lint::Severity> =
+        dv_lint::catalog::entries().into_iter().map(|e| (e.id, e.severity)).collect();
+    for f in &found {
+        let Some(&worst) = declared.get(f.rule) else { panic!("{} is reported but not in the catalog", f.rule) };
+        assert!(f.severity <= worst, "{} reports {} but declares {}", f.rule, f.severity.as_str(), worst.as_str());
+    }
 }
