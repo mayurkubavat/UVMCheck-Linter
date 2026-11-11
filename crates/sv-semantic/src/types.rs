@@ -6,15 +6,32 @@ use super::*;
 
 pub(crate) use super::bigint::Int;
 
+/// Four-state logic value of a single bit.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum BitState {
+    /// Logic `0`.
+    Zero,
+    /// Logic `1`.
+    One,
+    /// Unknown `x`.
+    X,
+    /// High-impedance `z`.
+    Z,
+}
+
 /// A constant integer: its width, signedness and four-state value, of any
 /// width. `v` is kept normalized: below 2^w when unsigned, and in
 /// -2^(w-1) .. 2^(w-1) when signed. `u` marks unknown bits (below 2^w);
 /// at those bits `v` holds 0 for x and 1 for z, as in slang.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct CVal {
+pub struct CVal {
+    /// Bit width (`>= 1` for sized values).
     pub w: u32,
+    /// Whether the constant is signed (`2'sb11`).
     pub s: bool,
+    /// Value bits (`0`/`1` when known; `0` for `x` and `1` for `z` where `u` is `1`).
     pub v: Int,
+    /// Unknown mask (`1` where the bit is `x` or `z`).
     pub u: Int,
 }
 
@@ -22,10 +39,27 @@ pub(crate) struct CVal {
 /// constant defined by itself gives up.
 pub(crate) const MAX_EVAL_DEPTH: usize = 200;
 
+/// Maximum packed vector bit width accepted during elaboration and binding.
+pub(crate) const MAX_BIT_WIDTH: u32 = 1 << 24;
+
+/// Maximum element count accepted for unpacked dimensions, replications, and patterns.
+pub(crate) const MAX_ARRAY_ELEMS: u32 = 1 << 20;
+
+/// Maximum cycle count accepted in SVA delay and repetition bounds.
+pub(crate) const MAX_SVA_CYCLES: u32 = 1 << 20;
+
+/// Computes `|a - b| + 1` as a `u32` bounded by `max_len`, returning `None` on overflow.
+pub(crate) fn range_len_u32(a: i128, b: i128, max_len: u32) -> Option<u32> {
+    let span = a.abs_diff(b).checked_add(1)?;
+    let cnt = u32::try_from(span).ok()?;
+    (cnt <= max_len).then_some(cnt)
+}
+
 /// slang abbreviates a value with more active bits than this.
 const ABBREVIATE_BITS: u32 = 128;
 
 impl CVal {
+    /// Constructs a two-state constant of width `w` and signedness `s`, normalized to `w` bits.
     pub fn new(w: u32, s: bool, v: impl Into<Int>) -> CVal {
         CVal { w, s, v: v.into(), u: Int::from(0) }.norm()
     }
@@ -35,12 +69,118 @@ impl CVal {
         CVal { w, s, v: Int::from(0), u: Int::from(-1) }.norm()
     }
 
+    /// Every bit z.
+    pub fn all_z(w: u32, s: bool) -> CVal {
+        CVal { w, s, v: Int::from(-1), u: Int::from(-1) }.norm()
+    }
+
+    /// Four-state logic value of bit `i` (`0` = LSB).
+    pub fn bit_state(&self, i: u32) -> BitState {
+        if i >= self.w {
+            return BitState::Zero;
+        }
+        let v = self.bits_v().bit(i);
+        let u = self.u.bit(i);
+        match (u, v) {
+            (false, false) => BitState::Zero,
+            (false, true) => BitState::One,
+            (true, false) => BitState::X,
+            (true, true) => BitState::Z,
+        }
+    }
+
+    /// Parses a standalone SystemVerilog integer or string literal (`8'hff`, `-4`, `'x`, `"abc"`).
+    pub fn parse_literal(raw: &str) -> Option<CVal> {
+        let s = raw.trim();
+        if s.starts_with('"') {
+            return string_value(s);
+        }
+        if let Some(rest) = s.strip_prefix('-') {
+            return unary("-", Self::parse_literal(rest)?);
+        }
+        if let Some(rest) = s.strip_prefix('+') {
+            return Self::parse_literal(rest);
+        }
+        literal(&[s])
+    }
+
+    /// Evaluates a binary operator on two 4-state constants using IEEE 1800 rules.
+    pub fn eval_binary(op: &str, a: CVal, b: CVal) -> Option<CVal> {
+        if matches!(op, "==?" | "!=?") {
+            let w = a.w.max(b.w);
+            let s = a.s && b.s;
+            let (ca, cb) = (a.cast(w, s), b.cast(w, s));
+            // IEEE 11.4.6: unknown bits (x/z/?) in RHS act as don't-care wildcards;
+            // unknown bits in LHS at non-wildcard positions make the comparison 1'bx unless
+            // another non-wildcard bit mismatches!
+            let mask = cb.u.not().trunc(w, false);
+            let diff_known = ca.bits_v().xor(&cb.bits_v()).and(&mask).and(&ca.u.not());
+            if !diff_known.is_zero() {
+                return Some(CVal::bool(op == "!=?"));
+            }
+            let lhs_unk = ca.u.and(&mask);
+            if !lhs_unk.is_zero() {
+                return Some(CVal::all_x(1, false));
+            }
+            return Some(CVal::bool(op == "==?"));
+        }
+        binary(op, a, b)
+    }
+
+    /// Evaluates a unary or reduction operator on a 4-state constant.
+    pub fn eval_unary(op: &str, a: CVal) -> Option<CVal> {
+        if let Some(r) = unary(op, a.clone()) {
+            return Some(r);
+        }
+        let w = a.w.max(1);
+        let full = Int::from(-1).trunc(w, false);
+        let a1 = a.ones();
+        let a0 = a.bits_v().or(&a.u).not().trunc(w, false);
+        match op {
+            "&" | "~&" => {
+                let res = if !a0.is_zero() {
+                    CVal::bool(false)
+                } else if a1 == full {
+                    CVal::bool(true)
+                } else {
+                    CVal::all_x(1, false)
+                };
+                Some(if op == "~&" { unary("!", res)? } else { res })
+            }
+            "|" | "~|" => {
+                let res = if !a1.is_zero() {
+                    CVal::bool(true)
+                } else if a0 == full {
+                    CVal::bool(false)
+                } else {
+                    CVal::all_x(1, false)
+                };
+                Some(if op == "~|" { unary("!", res)? } else { res })
+            }
+            "^" | "~^" | "^~" => {
+                if !a.known() {
+                    return Some(CVal::all_x(1, false));
+                }
+                let mut parity = false;
+                for i in 0..w {
+                    parity ^= a1.bit(i);
+                }
+                if op != "^" {
+                    parity = !parity;
+                }
+                Some(CVal::bool(parity))
+            }
+            _ => None,
+        }
+    }
+
     /// Value and unknown bits as unsigned integers of the width.
     pub fn four(w: u32, s: bool, v: Int, u: Int) -> CVal {
         let u = u.trunc(w.max(1), false);
         CVal { w, s, v, u }.norm()
     }
 
+    /// Returns `true` when every bit is `0` or `1` with no `x` or `z` bits.
     pub fn known(&self) -> bool {
         self.u.is_zero()
     }
@@ -103,10 +243,12 @@ impl CVal {
         CVal::new(self.w, self.s, self.ones())
     }
 
+    /// Constructs a 32-bit signed two-state integer constant (`int`).
     pub fn int(v: i128) -> CVal {
         CVal::new(32, true, v)
     }
 
+    /// Constructs a 1-bit unsigned two-state boolean constant (`1'b0` or `1'b1`).
     pub fn bool(b: bool) -> CVal {
         CVal::new(1, false, b as i128)
     }
@@ -116,6 +258,7 @@ impl CVal {
         self.v.low_i128()
     }
 
+    /// Returns `true` when at least one bit is known `1` under IEEE 1800 condition truth rules.
     pub fn is_true(&self) -> bool {
         self.truth() == Some(true)
     }
@@ -128,6 +271,10 @@ impl CVal {
         CVal { w: self.w, s: self.s, v, u }
     }
 
+    /// Resizes and reinterprets this constant to width `w` and signedness `s`.
+    ///
+    /// Widening sign-extends both value and top-bit `x`/`z` states when `self.s` is `true`,
+    /// and zero-extends when `self.s` is `false`.
     pub fn cast(&self, w: u32, s: bool) -> CVal {
         // A signed value's unknown top bit extends.
         let u = if self.s && w > self.w { self.u.trunc(self.w.max(1), true) } else { self.u.clone() };
@@ -366,7 +513,8 @@ impl<'t> Builder<'t> {
                     for d in self.children(dt) {
                         if self.kind(d) == Dim {
                             let (a, b) = self.dim_range(d, scope, env)?;
-                            w = w.checked_mul((a - b).unsigned_abs() as u32 + 1)?;
+                            let cnt = range_len_u32(a, b, MAX_BIT_WIDTH)?;
+                            w = w.checked_mul(cnt).filter(|&tw| tw <= MAX_BIT_WIDTH)?;
                         }
                     }
                     return Some((w, sg));
@@ -383,12 +531,16 @@ impl<'t> Builder<'t> {
                     let (mw, _) = self.int_shape(self.child(m, DataType)?, scope, env, depth + 1)?;
                     let n = self.children(m).into_iter().filter(|d| self.kind(*d) == Declarator).count() as u32;
                     w = if union { w.max(mw) } else { w.checked_add(mw.checked_mul(n)?)? };
+                    if w > MAX_BIT_WIDTH {
+                        return None;
+                    }
                 }
                 let mut w = w.max(1);
                 for d in self.children(dt) {
                     if self.kind(d) == Dim {
                         let (a, b) = self.dim_range(d, scope, env)?;
-                        w = w.checked_mul((a - b).unsigned_abs() as u32 + 1)?;
+                        let cnt = range_len_u32(a, b, MAX_BIT_WIDTH)?;
+                        w = w.checked_mul(cnt).filter(|&tw| tw <= MAX_BIT_WIDTH)?;
                     }
                 }
                 return Some((w, own.contains(&"signed")));
@@ -411,7 +563,8 @@ impl<'t> Builder<'t> {
         for d in self.children(dt) {
             if self.kind(d) == Dim {
                 let (a, b) = self.dim_range(d, scope, env)?;
-                w *= (a - b).unsigned_abs() as u32 + 1;
+                let cnt = range_len_u32(a, b, MAX_BIT_WIDTH)?;
+                w = w.checked_mul(cnt).filter(|&tw| tw <= MAX_BIT_WIDTH)?;
             }
         }
         Some((w, s))
@@ -651,13 +804,14 @@ impl<'t> Builder<'t> {
                 .and_then(|e| self.eval(e, scope, env, depth + 1));
             let v = match val {
                 Some(v) => v.cast(w, s),
-                None => next,
+                None => next.clone(),
             };
             // `C[2]` names C0 and C1.
             match self.child(d, Dim).and_then(|dim| self.dim_range(dim, scope, env)) {
                 Some((a, b)) => {
+                    let Some(cnt) = range_len_u32(a, b, MAX_ARRAY_ELEMS) else { continue };
                     let mut cur = v;
-                    let n = (a - b).abs() + 1;
+                    let n = i128::from(cnt);
                     // `C[2]` names C0, C1; `C[3:5]` names C3, C4, C5.
                     let two = self.child(d, Dim).is_some_and(|dim| {
                         self.children(dim).into_iter().filter(|c| body_is_expr(self.kind(*c))).count() == 2
@@ -1874,6 +2028,16 @@ fn four_state_literal(digits: &str, radix: u32, w: u32, signed: bool) -> Option<
     Some(CVal::four(w, signed, v.trunc(w, false), u))
 }
 
+/// Extracts the unsigned shift count from `b` per IEEE 1800 §11.4.10, saturating to `lhs_w + 1`.
+fn shift_amount(b: &CVal, lhs_w: u32) -> u32 {
+    let ub = b.bits_v();
+    let limit = u128::from(lhs_w) + 1;
+    match ub.to_i128() {
+        Some(v) if v >= 0 && (v as u128) <= limit => v as u32,
+        _ => lhs_w.saturating_add(1),
+    }
+}
+
 fn binary(op: &str, a: CVal, b: CVal) -> Option<CVal> {
     if !a.known() || !b.known() {
         return binary_unknown(op, a, b);
@@ -1891,21 +2055,58 @@ fn binary(op: &str, a: CVal, b: CVal) -> Option<CVal> {
         "/" => x.divrem(&y)?.0,
         "%" => x.divrem(&y)?.1,
         "**" => {
-            let e = u32::try_from(b.i()).ok()?;
-            // The result has the left operand's type.
-            return Some(CVal::new(a.w, a.s, a.v.pow(e.min(a.w.max(64) + 1))));
+            // IEEE 1800 Table 11-4: result has the left operand's width and signedness.
+            if b.s && b.v.is_neg() {
+                let av = if a.s { a.v.clone() } else { a.bits_v() };
+                if av.is_zero() {
+                    return Some(CVal::all_x(a.w, a.s));
+                }
+                if av == Int::from(1) {
+                    return Some(CVal::new(a.w, a.s, 1));
+                }
+                if a.s && av == Int::from(-1) {
+                    let r = if b.v.bit(0) { -1 } else { 1 };
+                    return Some(CVal::new(a.w, a.s, r));
+                }
+                return Some(CVal::new(a.w, a.s, 0));
+            }
+            let exp = b.bits_v();
+            if exp.is_zero() {
+                return Some(CVal::new(a.w, a.s, 1));
+            }
+            let w_mod = a.w.max(1);
+            if w_mod > 4096 && exp.active_bits() > 16 {
+                return None;
+            }
+            let mut acc = Int::from(1).trunc(w_mod, a.s);
+            let mut base = a.v.trunc(w_mod, a.s);
+            let bits = exp.active_bits();
+            for i in 0..bits {
+                if exp.bit(i) {
+                    acc = acc.mul(&base).trunc(w_mod, a.s);
+                }
+                if i + 1 < bits {
+                    base = base.mul(&base).trunc(w_mod, a.s);
+                }
+            }
+            return Some(CVal::new(a.w, a.s, acc));
         }
         "&" => x.and(&y),
         "|" => x.or(&y),
         "^" => x.xor(&y),
         "~^" | "^~" => x.xor(&y).not(),
         "<<" | "<<<" => {
-            let n = b.i().clamp(0, a.w as i128 + 1) as u32;
+            let n = shift_amount(&b, a.w);
             return Some(CVal { v: a.v.shl(n), ..a }.norm());
         }
-        ">>" | ">>>" => {
-            let n = b.i().clamp(0, a.w as i128 + 1) as u32;
-            return Some(CVal { v: a.v.shr(n), ..a }.norm());
+        ">>" => {
+            let n = shift_amount(&b, a.w);
+            return Some(CVal { v: a.bits_v().shr(n), ..a }.norm());
+        }
+        ">>>" => {
+            let n = shift_amount(&b, a.w);
+            let rv = if a.s { a.v.shr(n) } else { a.bits_v().shr(n) };
+            return Some(CVal { v: rv, ..a }.norm());
         }
         "==" | "===" => return Some(CVal::bool(x == y)),
         "!=" | "!==" => return Some(CVal::bool(x != y)),
@@ -1913,8 +2114,10 @@ fn binary(op: &str, a: CVal, b: CVal) -> Option<CVal> {
         "<=" => return Some(CVal::bool(x <= y)),
         ">" => return Some(CVal::bool(x > y)),
         ">=" => return Some(CVal::bool(x >= y)),
-        "&&" => return Some(CVal::bool(!x.is_zero() && !y.is_zero())),
-        "||" => return Some(CVal::bool(!x.is_zero() || !y.is_zero())),
+        "&&" => return Some(CVal::bool(a.is_true() && b.is_true())),
+        "||" => return Some(CVal::bool(a.is_true() || b.is_true())),
+        "->" => return Some(CVal::bool(!a.is_true() || b.is_true())),
+        "<->" => return Some(CVal::bool(a.is_true() == b.is_true())),
         _ => return None,
     };
     Some(CVal::new(w, s, r))
@@ -1996,9 +2199,18 @@ fn binary_unknown(op: &str, a: CVal, b: CVal) -> Option<CVal> {
             };
             r.map_or_else(|| x1(""), CVal::bool)
         }
+        "->" => match (a.truth(), b.truth()) {
+            (Some(false), _) | (_, Some(true)) => CVal::bool(true),
+            (Some(true), Some(false)) => CVal::bool(false),
+            _ => x1(""),
+        },
+        "<->" => match (a.truth(), b.truth()) {
+            (Some(ta), Some(tb)) => CVal::bool(ta == tb),
+            _ => x1(""),
+        },
         "==" | "!=" | "<" | "<=" | ">" | ">=" => x1(""),
         "<<" | "<<<" | ">>" | ">>>" if b.known() => {
-            let n = b.i().clamp(0, a.w as i128 + 1) as u32;
+            let n = shift_amount(&b, a.w);
             let (v, u) = if op.starts_with("<<") {
                 (a.v.shl(n), a.u.shl(n))
             } else if op == ">>>" && a.s {

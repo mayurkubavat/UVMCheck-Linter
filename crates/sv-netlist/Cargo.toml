@@ -1,0 +1,15 @@
+[package]
+name = "sv-netlist"
+description = "Format-neutral, word-level RTL netlist lowering, procedural symbolic execution, and bit-level driver analysis for IEEE 1800-2023 SystemVerilog"
+readme = "README.md"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+rust-version.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[dependencies]
+sv-syntax = { version = "0.1.0", path = "../sv-syntax" }
+sv-semantic = { version = "0.1.0", path = "../sv-semantic" }

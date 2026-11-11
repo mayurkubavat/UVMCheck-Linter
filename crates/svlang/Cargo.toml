@@ -16,3 +16,4 @@ sv-lexer = { version = "0.1.0", path = "../sv-lexer" }
 sv-preprocessor = { version = "0.1.0", path = "../sv-preprocessor" }
 sv-syntax = { version = "0.1.0", path = "../sv-syntax" }
 sv-semantic = { version = "0.1.0", path = "../sv-semantic" }
+sv-netlist = { version = "0.1.0", path = "../sv-netlist" }

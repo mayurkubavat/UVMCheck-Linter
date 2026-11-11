@@ -101,6 +101,14 @@ name = "sv-lexer"
 version = "0.1.0"
 
 [[package]]
+name = "sv-netlist"
+version = "0.1.0"
+dependencies = [
+ "sv-semantic",
+ "sv-syntax",
+]
+
+[[package]]
 name = "sv-preprocessor"
 version = "0.1.0"
 dependencies = [
@@ -136,6 +144,7 @@ name = "svlang"
 version = "0.1.0"
 dependencies = [
  "sv-lexer",
+ "sv-netlist",
  "sv-preprocessor",
  "sv-semantic",
  "sv-source",

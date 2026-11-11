@@ -1,18 +1,19 @@
 # `svlang`
 
-Pure-Rust IEEE 1800-2023 SystemVerilog compiler front end — the Rust counterpart to C++ `slang` — with **zero C++ toolchain dependencies**, **zero external crates**, and **zero UVM coupling**.
+Pure-Rust IEEE 1800-2023 SystemVerilog compiler front end and RTL netlist SDK, serving as the Rust counterpart to C++ `slang` with **zero C++ toolchain dependencies**, **zero external crates**, and **zero UVM coupling**.
 
 ## Architecture
 
-`svlang` unifies five focused crates behind one ergonomic SDK:
+`svlang` unifies six focused crates behind one SDK:
 
 | Module | Crate | Responsibility |
 | --- | --- | --- |
-| `svlang::source` | `sv-source` | VCS and Xcelium `-f` / `-F` filelists, `$VAR` expansion, `+incdir+`, `+define+`, `-y` / `-v` |
+| `svlang::source` | `sv-source` | VCS and Xcelium `-f` / `-F` filelists, `$VAR` expansion, `+incdir+`, `+define+`, `-G` / `--param` / `-pvalue+`, `-y` / `-v` |
 | `svlang::lexer` | `sv-lexer` | Lossless IEEE 1800-2023 tokenizer (every source byte preserved) |
 | `svlang::preprocessor` | `sv-preprocessor` | Clause 22 macro, `` `include ``, and `` `ifdef `` expansion with full token provenance |
 | `svlang::syntax` | `sv-syntax` | Error-recovering lossless Concrete Syntax Tree (CST) |
-| `svlang::semantic` | `sv-semantic` | Scopes, 4-state arbitrary-width constant evaluation, type oracle, elaboration, compiler checks, and OOP class model |
+| `svlang::semantic` | `sv-semantic` | Scopes, 4-state arbitrary-width constant evaluation, elaborated design objects (`ElaboratedDesign`), IEEE 11.6/11.8 bound expressions (`ExprBinder`), bound SVA property/sequence trees (`SvaBinder`), compiler checks, and OOP class model |
+| `svlang::netlist` | `sv-netlist` | Format-neutral word-level RTL netlist IR (`Netlist`), symbolic procedural execution (`always_ff` / `always_comb` / `always_latch`), bit-level driver analysis, static loop unrolling, subroutine inlining, SVA lowering, and `blast_memories` |
 
 ## Quickstart
 
@@ -51,5 +52,6 @@ for diag in comp.diagnostics() {
 
 ## Examples
 
-- `cargo run -p svlang --example custom_linter` — custom CST + OOP semantic lint rules in ~70 lines of Rust
-- `cargo run -p svlang --example elab_hierarchy` — generate-loop unrolling and constant parameter propagation
+- `cargo run -p svlang --example custom_linter`: custom CST and OOP semantic lint rules in ~70 lines of Rust
+- `cargo run -p svlang --example elab_hierarchy`: generate-loop unrolling and constant parameter propagation
+- `cargo run -p svlang --example rtl_netlist`: parameterized RTL netlist lowering and external SVA property binding

@@ -9,6 +9,10 @@
 use std::sync::Arc;
 use svlang::semantic::fx::FxMap as HashMap;
 
+pub(crate) use svlang::semantic::expr_types::{
+    assigned_type, binary_type, is_unbased_unsized_tok, literal_type, ranged, syscall_type, vector, ARITH, ASSIGN,
+    COMPARE, LOGICAL, SHIFT,
+};
 use svlang::semantic::oracle::{TypeInfo, TypeOracle};
 use svlang::syntax::NodeId;
 use svlang::syntax::SyntaxKind::*;
@@ -18,59 +22,6 @@ use crate::syntax::Cst;
 
 /// A type: its text and, when integral, (width, signed, four-state).
 pub(crate) type ETy = TypeInfo;
-
-/// `bit`/`logic` vector of a width, as slang's `getType(width, flags)` prints it.
-pub(crate) fn vector(w: u32, s: bool, four: bool) -> ETy {
-    let base = if four { "logic" } else { "bit" };
-    let sign = if s { " signed" } else { "" };
-    let text = if w <= 1 { format!("{base}{sign}") } else { format!("{base}{sign}[{}:0]", w - 1) };
-    ETy { text, integral: Some((w.max(1), s, four)), src: None, aggregate: false }
-}
-
-/// A vector with an explicit range, as literals and casts print (`bit[0:0]`).
-fn ranged(w: u32, s: bool, four: bool) -> ETy {
-    let base = if four { "logic" } else { "bit" };
-    let sign = if s { " signed" } else { "" };
-    ETy {
-        text: format!("{base}{sign}[{}:0]", w.max(1) - 1),
-        integral: Some((w.max(1), s, four)),
-        src: None,
-        aggregate: false,
-    }
-}
-
-/// A simple bit vector type slang treats as matching another of the same
-/// shape (not an enum or struct).
-fn simple(t: &ETy) -> bool {
-    !(t.text.starts_with("enum") || t.text.starts_with("struct") || t.text.starts_with("union")) && t.integral.is_some()
-        && !t.aggregate
-        // A part-select type with its own bounds (`logic[31:16]`).
-        && !(t.text.ends_with(']') && t.text.rsplit_once(':').is_some_and(|(_, lo)| lo != "0]"))
-}
-
-/// slang's `binaryOperatorType`: the wider width, signed only when both are,
-/// four-state when either is; an operand's own type when it has that shape.
-pub(crate) fn binary_type(l: &ETy, r: &ETy, force_four: bool) -> Option<ETy> {
-    let (lw, ls, l4) = l.integral?;
-    let (rw, rs, r4) = r.integral?;
-    let shape = (lw.max(rw), ls && rs, l4 || r4 || force_four);
-    if l.integral == Some(shape) && simple(l) {
-        return Some(l.clone());
-    }
-    if r.integral == Some(shape) && simple(r) {
-        return Some(r.clone());
-    }
-    if l.integral == Some(shape) && !force_four && l.text == r.text {
-        return Some(l.clone());
-    }
-    Some(vector(shape.0, shape.1, shape.2))
-}
-
-const ARITH: &[&str] = &["+", "-", "*", "/", "%", "&", "|", "^", "^~", "~^"];
-const COMPARE: &[&str] = &["==", "!=", "===", "!==", "==?", "!=?", "<", "<=", ">", ">="];
-const LOGICAL: &[&str] = &["&&", "||", "->", "<->"];
-const SHIFT: &[&str] = &["<<", ">>", "<<<", ">>>", "**"];
-const ASSIGN: &[&str] = &["=", "+=", "-=", "*=", "/=", "%=", "&=", "|=", "^=", "<<=", ">>=", "<<<=", ">>>="];
 
 pub(crate) struct Typer<'a, 't> {
     c: &'a Cst<'t>,
@@ -234,21 +185,7 @@ impl<'a, 't> Typer<'a, 't> {
     fn assigned(&mut self, l: ETy, e: NodeId) -> Option<ETy> {
         let c = self.c;
         let r = self.self_type(e)?;
-        let (lw, ls, l4) = l.integral?;
-        if c.kind(e) == Literal && unbased(c, e) {
-            // `'1` takes the target's type, unsigned (a vector of its width
-            // for an enum, struct or union).
-            return Some(if ls || l.aggregate { vector(lw, false, l4) } else { l });
-        }
-        let (rw, rs, r4) = r.integral?;
-        let shape = (lw.max(rw), rs, l4 || r4);
-        if r.integral == Some(shape) && (simple(&r) || same_type(&r, &l)) {
-            return Some(r);
-        }
-        if l.integral == Some(shape) && simple(&l) {
-            return Some(l);
-        }
-        Some(vector(shape.0, shape.1, shape.2))
+        assigned_type(l, r, c.kind(e) == Literal && unbased(c, e))
     }
 
     /// The self-determined type.
@@ -266,7 +203,7 @@ impl<'a, 't> Typer<'a, 't> {
         let ks = kids(c, e);
         match c.kind(e) {
             ParenExpr => self.self_type(*ks.first()?),
-            Literal => literal(&c.tree.bare_text(e)),
+            Literal => literal_type(&c.tree.bare_text(e)),
             NameExpr => self.name_type(e),
             ScopedExpr => {
                 // `pkg::name`.
@@ -580,30 +517,8 @@ impl<'a, 't> Typer<'a, 't> {
         };
         let args = call_args(c, e);
         if name.starts_with('$') {
-            return match name.as_str() {
-                "$signed" | "$unsigned" => {
-                    let (w, _, f) = self.self_type(*args.first()?)?.integral?;
-                    let s = name == "$signed";
-                    Some(vector(w, s, f))
-                }
-                "$clog2"
-                | "$bits"
-                | "$size"
-                | "$high"
-                | "$low"
-                | "$left"
-                | "$right"
-                | "$increment"
-                | "$dimensions"
-                | "$unpacked_dimensions" => Some(vector(32, true, true).named("integer")),
-                "$countones" | "$test$plusargs" | "$value$plusargs" => Some(vector(32, true, false).named("int")),
-                "$random" => Some(vector(32, true, false).named("int")),
-                "$urandom" | "$urandom_range" => Some(vector(32, false, false).named("int unsigned")),
-                "$isunknown" | "$onehot" | "$onehot0" => Some(vector(1, false, false)),
-                "$time" | "$stime" => Some(vector(64, false, true).named("time")),
-                "$realtime" | "$itor" | "$bitstoreal" => Some(ETy::other("real")),
-                _ => None,
-            };
+            let arg0 = args.first().and_then(|&a| self.self_type(a)).and_then(|t| t.integral);
+            return syscall_type(&name, arg0);
         }
         // Built-in methods of strings, arrays and enums.
         if c.kind(callee) == MemberExpr {
@@ -721,75 +636,9 @@ fn four(t: &ETy) -> bool {
     t.integral.is_some_and(|x| x.2)
 }
 
-/// An integer, real or string literal's type.
-/// The same type, an enum member's type printed whole or by its name.
-fn same_type(a: &ETy, b: &ETy) -> bool {
-    let name = |t: &ETy| t.text.rsplit_once('}').map_or(t.text.clone(), |(_, n)| n.to_string());
-    a.integral == b.integral && name(a) == name(b)
-}
-
 /// `'0`, `'1`, `'x`, `'z`.
 fn unbased(c: &Cst, e: NodeId) -> bool {
-    c.first_tok(e).is_some_and(|t| matches!(c.text_of(t), "'0" | "'1" | "'x" | "'z" | "'X" | "'Z"))
-}
-
-fn literal(text: &str) -> Option<ETy> {
-    if let Some(body) = text.strip_prefix('"') {
-        let body = body.strip_suffix('"').unwrap_or(body);
-        let mut n = 0u32;
-        let mut it = body.chars();
-        while let Some(ch) = it.next() {
-            if ch == '\\' {
-                match it.next() {
-                    Some('x') => {
-                        for _ in 0..2 {
-                            if it.clone().next().is_some_and(|c| c.is_ascii_hexdigit()) {
-                                it.next();
-                            }
-                        }
-                    }
-                    Some('0'..='7') => {
-                        for _ in 0..2 {
-                            if it.clone().next().is_some_and(|c| ('0'..='7').contains(&c)) {
-                                it.next();
-                            }
-                        }
-                    }
-                    // A line continuation adds nothing.
-                    Some('\n') => continue,
-                    _ => {}
-                }
-            }
-            n += 1;
-        }
-        return Some(ranged(8 * n.max(1), false, false));
-    }
-    let t = text.replace('_', "");
-    if let Some(rest) = t.strip_prefix('\'') {
-        if rest.len() == 1 && matches!(rest, "0" | "1" | "x" | "X" | "z" | "Z") {
-            // Four states only for x and z.
-            return Some(vector(1, false, !matches!(rest, "0" | "1")));
-        }
-    }
-    if let Some(q) = t.find('\'') {
-        let size: u32 = if q == 0 { 32 } else { t[..q].trim().parse().ok()? };
-        let rest = t[q + 1..].to_ascii_lowercase();
-        let signed = rest.starts_with('s');
-        let digits = rest.trim_start_matches('s');
-        let digits = &digits[1.min(digits.len())..];
-        let f = digits.contains(['x', 'z', '?']);
-        return Some(ranged(size, signed, f));
-    }
-    if t.contains('.') || (t.contains(['e', 'E']) && t.parse::<f64>().is_ok()) {
-        return Some(ETy::other("real"));
-    }
-    if t.chars().all(|ch| ch.is_ascii_digit()) {
-        return Some(vector(32, true, false).named("int"));
-    }
-    if t.ends_with('s') {
-        return Some(ETy::other("realtime"));
-    }
-    None
+    c.first_tok(e).is_some_and(|t| is_unbased_unsized_tok(c.text_of(t)))
 }
 
 /// A call's argument expressions, in order.

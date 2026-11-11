@@ -421,9 +421,14 @@ impl Int {
         rem as u64
     }
 
-    /// The digits of the magnitude in `radix` (2, 8, 10 or 16), most
-    /// significant first; "0" for zero.
+    /// Returns the digits of the magnitude in `radix` (2, 8, 10, or 16), most
+    /// significant first, or `"0"` for zero.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `radix` is not one of `2`, `8`, `10`, or `16`.
     pub fn digits(&self, radix: u32) -> String {
+        assert!(matches!(radix, 2 | 8 | 10 | 16), "unsupported radix {radix}");
         let mut m = self.magnitude();
         if m.iter().all(|w| *w == 0) {
             return "0".into();

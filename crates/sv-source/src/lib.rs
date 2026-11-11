@@ -108,6 +108,10 @@ pub struct FileList {
     pub library_exts: Vec<String>,
     /// `-top` names.
     pub top: Vec<Item<String>>,
+    /// Top-level or hierarchical parameter overrides (`-G name=val`,
+    /// `--param name=val`, `-pvalue+name=val`), in order; a later override for
+    /// the same parameter wins.
+    pub param_overrides: Vec<Item<(String, String)>>,
     /// `-timescale` value, the last one given.
     pub timescale: Option<Item<String>>,
     /// What was asked about UVM.
@@ -357,6 +361,19 @@ impl Reader<'_> {
         }
     }
 
+    fn push_param(&mut self, raw: &str, origin: &Origin) {
+        match raw.split_once('=') {
+            Some((name, val)) if !name.trim().is_empty() => {
+                self.out
+                    .param_overrides
+                    .push(Item { value: (name.trim().to_string(), val.trim().to_string()), origin: origin.clone() });
+            }
+            _ => {
+                self.diag(Severity::Error, format!("parameter override needs '<name>=<value>': {raw}"), origin);
+            }
+        }
+    }
+
     fn read_list(&mut self, list: &Path, relative_to_list: bool, cwd: &Path, origin: &Origin) {
         let canon = list.canonicalize().unwrap_or_else(|_| list.to_path_buf());
         if self.stack.contains(&canon) {
@@ -461,10 +478,20 @@ impl Reader<'_> {
                 if let Some(v) = value(&mut i, self) {
                     self.out.library_exts.extend(v.split(',').filter(|s| !s.is_empty()).map(str::to_string));
                 }
-            } else if tok == "-top" || tok == "-toplevel" {
+            } else if tok == "-top" || tok == "-toplevel" || tok == "--top" {
                 if let Some(v) = value(&mut i, self) {
                     self.out.top.push(Item { value: v, origin: origin.clone() });
                 }
+            } else if tok == "-G" || tok == "--param" {
+                if let Some(v) = value(&mut i, self) {
+                    self.push_param(&v, &origin);
+                }
+            } else if let Some(rest) = tok.strip_prefix("-G").filter(|r| !r.is_empty()) {
+                self.push_param(rest, &origin);
+            } else if let Some(rest) = tok.strip_prefix("--param=").filter(|r| !r.is_empty()) {
+                self.push_param(rest, &origin);
+            } else if let Some(rest) = tok.strip_prefix("-pvalue+").filter(|r| !r.is_empty()) {
+                self.push_param(rest, &origin);
             } else if let Some(ts) = tok.strip_prefix("-timescale=") {
                 self.out.timescale = Some(Item { value: ts.to_string(), origin: origin.clone() });
             } else if tok == "-timescale" {
@@ -510,6 +537,23 @@ impl Reader<'_> {
 impl FileList {
     /// Reads command-line style arguments (which may name `-f` lists),
     /// resolving relative paths against `cwd`.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use std::path::Path;
+    /// use sv_source::{Dialect, FileList, ProcessEnv};
+    ///
+    /// let list = FileList::read_args(
+    ///     ["+define+SYNTH=1", "+define+FAST", "-G", "WIDTH=16", "--top", "dut"],
+    ///     Path::new("."),
+    ///     Dialect::Any,
+    ///     &ProcessEnv,
+    /// );
+    /// assert!(!list.has_errors());
+    /// assert_eq!(list.effective_defines().get("SYNTH"), Some(&Some("1".to_string())));
+    /// assert_eq!(list.param_overrides[0].value, ("WIDTH".to_string(), "16".to_string()));
+    /// ```
     pub fn read_args<I, S>(args: I, cwd: &Path, dialect: Dialect, env: &dyn Env) -> FileList
     where
         I: IntoIterator<Item = S>,
@@ -544,9 +588,12 @@ impl FileList {
         m
     }
 
-    /// Compile options for uvmcheck and `dv_model::Design::load`, in
-    /// slang's spelling. UVM requests become uvmcheck's vendor options, which
-    /// need the `filelist-dialect` override (or a compat profile) to act.
+    /// Serializes the resolved front-end compile arguments in normalized flag form.
+    ///
+    /// Emits `+incdir+<dir>`, `+define+<name>[=<val>]` from [`Self::effective_defines`],
+    /// `-y <dir>`, `-v <file>`, `+libext+<exts>`, `--top <name>`, `-G <name>=<val>`,
+    /// `--timescale <ts>`, and each path in [`Self::sources`]. Simulator-only flags in
+    /// [`Self::ignored`], foreign inputs in [`Self::foreign`], and [`Self::uvm`] are omitted.
     pub fn to_compile_args(&self) -> Vec<String> {
         let mut a = Vec::new();
         for d in &self.include_dirs {
@@ -572,6 +619,10 @@ impl FileList {
         for t in &self.top {
             a.push("--top".into());
             a.push(t.value.clone());
+        }
+        for p in &self.param_overrides {
+            a.push("-G".into());
+            a.push(format!("{}={}", p.value.0, p.value.1));
         }
         if let Some(ts) = &self.timescale {
             a.push("--timescale".into());
@@ -740,5 +791,37 @@ mod tests {
         assert_eq!(fl.ignored[0].value, "-uvm");
         let fl = FileList::read_args(["-uvm"], &d.0, Dialect::Xcelium, &ProcessEnv);
         assert!(fl.uvm.requested);
+    }
+
+    #[test]
+    fn parses_parameter_overrides() {
+        let d = tmp("params");
+        let root = &d.0;
+        touch(&root.join("top.sv"));
+        let fl = FileList::read_args(
+            [
+                "-G",
+                "WIDTH=16",
+                "-GDEPTH=32",
+                "--param",
+                "top.MODE=1",
+                "--param=SIGNED=0",
+                "-pvalue+INIT=8'hff",
+                "top.sv",
+            ],
+            root,
+            Dialect::Any,
+            &ProcessEnv,
+        );
+        assert!(!fl.has_errors(), "{:?}", fl.diagnostics);
+        let got: Vec<(&str, &str)> =
+            fl.param_overrides.iter().map(|i| (i.value.0.as_str(), i.value.1.as_str())).collect();
+        assert_eq!(got, [("WIDTH", "16"), ("DEPTH", "32"), ("top.MODE", "1"), ("SIGNED", "0"), ("INIT", "8'hff")]);
+        let args = fl.to_compile_args();
+        assert!(args.windows(2).any(|w| w == ["-G", "WIDTH=16"]), "{args:?}");
+
+        let bad = FileList::read_args(["-G", "NO_EQUALS", "top.sv"], root, Dialect::Any, &ProcessEnv);
+        assert!(bad.has_errors());
+        assert!(bad.diagnostics[0].message.contains("parameter override needs"));
     }
 }

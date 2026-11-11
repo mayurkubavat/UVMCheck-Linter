@@ -1,20 +1,31 @@
 //! The native IEEE 1800-2023 semantic layer: everything above the syntax tree
 //! that a SystemVerilog compiler or static analyzer needs. It reads `sv-syntax`
-//! trees and gives three things:
+//! trees and provides five core capabilities:
 //!
 //! - **The class model.** [`load`] takes compile options (`-f`, `+incdir+`,
 //!   `+define+`, files, `--single-unit`) and returns a [`model::Design`]:
 //!   packages, `$unit`, nested and parameterized classes (with the
 //!   specializations the design names), typedefs, imports, base classes,
 //!   properties, methods with their bodies (calls, assignments, timing
-//!   controls, `super.new`), arguments, locals, constraints and resolved type
-//!   strings. [`load_with_trees`] also hands back the trees, for syntax rules.
-//! - **Elaboration.** [`elaborate_full`] builds the instance tree from the
-//!   top modules: instances, generate blocks taken, parameter values.
-//! - **Semantic checks.** [`SemaChecks`] runs the checks a compiler makes
+//!   controls, `super.new`), arguments, locals, constraints, and resolved type
+//!   strings. [`load_with_trees`] also returns the parsed trees.
+//! - **RTL elaboration and instance IR.** [`elaborate_full`] and
+//!   [`elaborate_with_params`] unroll the module and interface hierarchy from
+//!   top modules and populate [`elab_ir::ElaboratedDesign`], giving each
+//!   elaborated [`Instance`] its own [`Symbol`]s, parameter values, active
+//!   generate-block items, and [`ScopeNode`] browser hierarchy.
+//! - **Typed RTL expression binding.** [`expr`] ([`ExprBinder`] and
+//!   [`ExprArena`]) binds SystemVerilog expressions against an
+//!   [`ElaboratedDesign`] with IEEE 1800 §11.6 context-determined sizing,
+//!   signedness propagation, 4-state [`CVal`] constant folding, and `let` /
+//!   constant-function expansion.
+//! - **SVA property and sequence binding.** [`sva_ir`] ([`SvaBinder`] and
+//!   [`BoundProperty`]) resolves concurrent assertions, named `sequence` and
+//!   `property` declarations, clocking events, and `disable iff` conditions
+//!   into typed temporal IR.
+//! - **Semantic checks.** [`SemaChecks`] runs compiler validation passes
 //!   (the `check` function of each public module below) and
-//!   [`semantic_diags`] merges them with elaboration's, which is what
-//!   `dv-build` reports.
+//!   [`semantic_diags`] merges them with elaboration diagnostics.
 //!
 //! Rules that need more than the model read it here too: [`oracle`] gives
 //! the declared type of any name for expression typing, [`SpecModel`] and
@@ -32,10 +43,23 @@ use std::rc::Rc;
 use std::time::Instant;
 use sv_source::{Dialect, FileList, ProcessEnv};
 
+pub use crate::bigint::Int;
+pub use crate::elab_ir::{
+    ElabItem, ElabItemKind, ElaboratedDesign, Instance, InstanceId, PackageScope, PackedField, PortConn, PortDir,
+    RtlType, ScopeNode, ScopeSignal, Symbol, SymbolId, SymbolKind,
+};
+pub use crate::expr::{
+    BinaryOp, BoundExpr, ExprArena, ExprBinder, ExprDiag, ExprId, ExprKind, InsideItem, LocalBinding, LocalId,
+    SampledKind, SysFunc, UnaryOp,
+};
 pub use crate::model::{
     Argument, Assignment, Call, Class, ClassId, Constraint, Design, Direction, Error, Loc, Local, MacroUse, Method,
     Property, RootKind, Timings, TypeShape, Typedef, Visibility,
 };
+pub use crate::sva_ir::{
+    BoundProperty, CycleBound, CycleRange, PropExpr, PropKind, RepeatKind, SeqExpr, SvaBinder, SvaClock, SvaEdge,
+};
+pub use crate::types::{BitState, CVal};
 use sv_syntax::{NodeId, Options, SyntaxKind, Tree};
 
 pub mod bigint;
@@ -46,6 +70,9 @@ pub mod checks;
 pub mod classes;
 mod consteval;
 mod elab;
+pub mod elab_ir;
+pub mod expr;
+pub mod expr_types;
 pub mod fx;
 pub mod hier;
 pub mod iclass;
@@ -57,6 +84,7 @@ pub mod order;
 mod packed;
 pub mod scopes;
 pub mod sva;
+pub mod sva_ir;
 pub mod typed;
 mod types;
 pub mod udp;
@@ -99,22 +127,29 @@ pub fn parse_args<S: AsRef<str>>(args: &[S]) -> Result<(Vec<Tree>, f64), Error> 
             .collect(),
         ..Options::default()
     };
-    // Inputs that are missing or cannot be read stop the run, as they stop
-    // uvmcheck (exit 2): file lists (nested ones too), library files and
-    // directories. A missing include directory does not (slang ignores it).
-    if let Some(d) = list.diagnostics.iter().find(|d| {
-        d.severity == sv_source::Severity::Error
-            && (d.message.starts_with("cannot read file list")
-                || d.message.starts_with("file list includes itself")
-                || d.message.starts_with("library file not found")
-                || d.message.starts_with("library directory not found"))
-    }) {
-        return Err(Error(d.message.clone()));
-    }
     // Simulator options (`-l log`, `+acc`) are ignored, as with uvmcheck's
     // filelist dialect; a `--name` option nothing knows is a mistake.
     if let Some(o) = list.ignored.iter().find(|o| o.value.starts_with("--")) {
         return Err(Error(format!("unknown command line argument '{}'", o.value)));
+    }
+    // Forward any file-list error diagnostic from `sv-source`. Allow an unsaved
+    // editor buffer registered in `sv_syntax::overlay` to satisfy a source path,
+    // and match slang by ignoring missing `+incdir+` directories.
+    if let Some(d) = list.diagnostics.iter().find(|d| {
+        if d.severity != sv_source::Severity::Error {
+            return false;
+        }
+        if d.message.starts_with("include directory not found:") {
+            return false;
+        }
+        if let Some(p) = d.message.strip_prefix("source file not found: ") {
+            if sv_syntax::overlay::get(std::path::Path::new(p)).is_some() {
+                return false;
+            }
+        }
+        true
+    }) {
+        return Err(Error(d.message.clone()));
     }
     let files: Vec<PathBuf> = list.sources.iter().map(|s| s.value.clone()).collect();
     if files.is_empty() {
@@ -266,12 +301,15 @@ pub fn elaborate_tops(trees: &[Tree], tops: &[String]) -> (Vec<String>, Vec<name
     (e.hierarchy, e.diags)
 }
 
-/// What elaboration finds: the hierarchy lines, errors, and the nodes no
-/// instance elaborates (whose name errors slang does not report).
+/// What elaboration finds: the hierarchy lines, the arena-backed [`ElaboratedDesign`]
+/// object model, errors, and the nodes no instance elaborates (whose name errors
+/// slang does not report).
 pub struct Elaborated {
     /// Instances, taken generate blocks and parameter values, one line each, in
     /// the form `uvmcheck_sym_dump --hier` prints.
     pub hierarchy: Vec<String>,
+    /// Arena-backed elaborated design object model (per-instance [`Instance`] and [`Symbol`]s).
+    pub design: elab_ir::ElaboratedDesign,
     /// Errors only elaboration finds (they depend on parameter values or on
     /// how an instance is connected).
     pub diags: Vec<names::Diag>,
@@ -286,8 +324,17 @@ pub struct Elaborated {
 /// `dv-build` reports after the syntax errors), with the hierarchy it
 /// elaborated.
 pub fn semantic_diags(trees: &[Tree], tops: &[String]) -> (Vec<names::Diag>, Elaborated) {
+    semantic_diags_with_params(trees, tops, &[])
+}
+
+/// Like [`semantic_diags`], also applying CLI `-G name=val` parameter overrides.
+pub fn semantic_diags_with_params(
+    trees: &[Tree],
+    tops: &[String],
+    params: &[(String, String)],
+) -> (Vec<names::Diag>, Elaborated) {
     let parts = SemaChecks::new(trees);
-    let elab = elaborate_full(trees, tops);
+    let elab = elaborate_with_params(trees, tops, params);
     (parts.diags(trees, &elab), elab)
 }
 
@@ -370,16 +417,22 @@ impl SemaChecks {
 /// Collects every declaration of `trees` and elaborates from `tops` (none:
 /// every module nothing instantiates), keeping everything [`Elaborated`] holds.
 pub fn elaborate_full(trees: &[Tree], tops: &[String]) -> Elaborated {
+    elaborate_with_params(trees, tops, &[])
+}
+
+/// Like [`elaborate_full`], also applying CLI `-G name=val` parameter overrides.
+pub fn elaborate_with_params(trees: &[Tree], tops: &[String], params: &[(String, String)]) -> Elaborated {
     let mut b = Builder::new(trees);
     b.designs = true;
     b.collect_names();
     b.collect();
     let mut e = elab::Elab::new(&b);
     e.top = tops.to_vec();
+    e.cli_params = params.to_vec();
     e.run();
     let skipped = e.skipped.iter().map(|r| (r.tree, r.node)).collect();
     let copies = e.copies.iter().map(|(r, k)| ((r.tree, r.node), *k)).collect();
-    Elaborated { hierarchy: e.out, diags: e.diags, skipped, copies }
+    Elaborated { hierarchy: e.out, design: e.design, diags: e.diags, skipped, copies }
 }
 
 /// Types (as [`symbol_types`]) and the values of parameters, specparams
@@ -498,10 +551,9 @@ pub fn symbol_info(trees: &[Tree], s: &scopes::Scopes) -> (Vec<Option<String>>, 
     (types, values)
 }
 
-/// Models already parsed trees (one per compilation unit).
-/// How many specializations slang elaborates for each parameterized
-/// class, the default one included, by (tree, class declaration node).
-/// Classes in modules, interfaces and programs count too.
+/// Returns the number of specializations elaborated for each parameterized
+/// class, including the default specialization, keyed by `(tree, class_decl_node)`.
+/// Classes declared inside modules, interfaces, and programs are included.
 pub fn spec_counts(trees: &[Tree]) -> HashMap<(usize, sv_syntax::NodeId), usize> {
     let mut b = Builder::new(trees);
     b.designs = true;

@@ -31,13 +31,17 @@ pub fn is_header(p: &Path) -> bool {
 /// needs as include directories.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Owner {
+    /// Top-level source file that transitively includes the header and is not included by any indexed file.
     pub root: PathBuf,
+    /// Package open in `root` at the `` `include `` site that begins the chain, if any.
     pub package: Option<String>,
     /// From the header up to the root, not counting either.
     pub chain: Vec<PathBuf>,
+    /// Parent directories of each file along the include chain from the header up to `root`.
     pub include_dirs: Vec<PathBuf>,
 }
 
+/// Reverse `` `include `` graph mapping included headers back to their enclosing source roots.
 #[derive(Default)]
 pub struct IncludeIndex {
     /// Included file -> (including file, package around the include).

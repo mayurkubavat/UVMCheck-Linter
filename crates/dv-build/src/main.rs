@@ -5,7 +5,7 @@
 //! (names, types, constant evaluation, elaboration from `-top`, class,
 //! assertion and UDP rules); see `svlang::semantic::semantic_diags`.
 //!
-//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--cst] [--symbols] [--types] [--values] [--hier] [--quiet] <options, e.g. -f top.f FILE...>
+//!     dv-build [--dialect any|vcs|xcelium] [--dump] [--cst] [--symbols] [--types] [--values] [--hier] [--netlist] [--blast-memories N] [--allow-four-state-ops] [--quiet] <options, e.g. -f top.f FILE...>
 //!
 //! Diagnostics go to stdout as `file:line:col: error: message`, then a
 //! summary line `errors N`. --dump also prints the design: one line per
@@ -17,6 +17,10 @@
 //! ` = <value>` to parameters, specparams and enum values (phase N3).
 //! --hier prints the elaborated design instead: instances, generate blocks
 //! and parameter values by hierarchical path (phase N4).
+//! --netlist lowers the elaborated RTL design into `sv-netlist` and prints its
+//! canonical netlist dump (`--blast-memories N` expands memories up to depth
+//! `N`; `--allow-four-state-ops` preserves 4-state `===`, `!==`, and
+//! `$isunknown` operators).
 //! Exit status: 0 no errors, 1 errors, 2 bad usage or unreadable input.
 
 use std::process::ExitCode;
@@ -37,6 +41,9 @@ fn main() -> ExitCode {
     let (mut dump, mut quiet, mut symbols, mut types, mut values) = (false, false, false, false, false);
     let mut cst = false;
     let mut hier = false;
+    let mut emit_netlist = false;
+    let mut blast_memories: Option<usize> = None;
+    let mut allow_four_state_ops = false;
     let mut args = Vec::new();
     let mut it = std::env::args().skip(1);
     while let Some(a) = it.next() {
@@ -46,6 +53,21 @@ fn main() -> ExitCode {
             "--quiet" => quiet = true,
             "--symbols" => symbols = true,
             "--hier" => hier = true,
+            "--netlist" => emit_netlist = true,
+            "--allow-four-state-ops" => allow_four_state_ops = true,
+            "--blast-memories" => {
+                let Some(val_s) = it.next() else {
+                    eprintln!("error: --blast-memories expects a maximum depth integer");
+                    return ExitCode::from(2);
+                };
+                match val_s.parse::<usize>() {
+                    Ok(n) => blast_memories = Some(n),
+                    Err(_) => {
+                        eprintln!("error: --blast-memories expects a non-negative integer, got {val_s:?}");
+                        return ExitCode::from(2);
+                    }
+                }
+            }
             "--values" => {
                 symbols = true;
                 values = true;
@@ -67,7 +89,7 @@ fn main() -> ExitCode {
             }
             "-h" | "--help" => {
                 println!(
-                    "usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--cst] [--symbols] [--types] [--values] [--hier] [--quiet] <options> FILE..."
+                    "usage: dv-build [--dialect any|vcs|xcelium] [--dump] [--cst] [--symbols] [--types] [--values] [--hier] [--netlist] [--blast-memories N] [--allow-four-state-ops] [--quiet] <options> FILE..."
                 );
                 return ExitCode::SUCCESS;
             }
@@ -114,7 +136,8 @@ fn main() -> ExitCode {
     // -v files and -y directories resolve what the sources instantiate.
     svlang::semantic::library::add_library_trees(&mut trees, &list, &opts);
     let tops: Vec<String> = list.top.iter().map(|t| t.value.clone()).collect();
-    let comp = svlang::Compilation::from_trees_with_tops(trees, tops);
+    let params: Vec<(String, String)> = list.param_overrides.iter().map(|p| p.value.clone()).collect();
+    let comp = svlang::Compilation::from_trees_with_tops(trees, tops).with_params(params);
     let (checked, elab) = comp.check();
     let hier_lines = elab.hierarchy;
     for d in checked {
@@ -148,6 +171,27 @@ fn main() -> ExitCode {
             println!("{l}");
         }
     }
+    if emit_netlist && diags.is_empty() {
+        let cfg = svlang::LowerConfig {
+            top: None,
+            blast_memories_up_to: blast_memories,
+            allow_four_state_ops,
+            ..svlang::LowerConfig::default()
+        };
+        match comp.lower_netlist(&cfg) {
+            svlang::LowerOutcome::Lowered(nl) => {
+                print!("{}", nl.dump());
+            }
+            svlang::LowerOutcome::Unsupported(ds) | svlang::LowerOutcome::Error(ds) => {
+                for d in ds {
+                    if !quiet {
+                        println!("{d}");
+                    }
+                    diags.push(Diag { file: d.file, line: d.loc.line, column: d.loc.column, message: d.message });
+                }
+            }
+        }
+    }
     println!("errors {}", diags.len());
     if diags.is_empty() {
         ExitCode::SUCCESS
@@ -156,7 +200,6 @@ fn main() -> ExitCode {
     }
 }
 
-/// Declarations in source order, indented by nesting.
 /// The whole syntax tree: one node per line with its own tokens.
 fn print_cst(t: &Tree, n: svlang::syntax::NodeId, depth: usize) {
     let own: Vec<&str> = t
@@ -174,6 +217,7 @@ fn print_cst(t: &Tree, n: svlang::syntax::NodeId, depth: usize) {
     }
 }
 
+/// Declarations in source order, indented by nesting.
 fn print_dump(t: &Tree) {
     let entries = svlang::syntax::outline(t);
     let mut depth_of = std::collections::HashMap::new();

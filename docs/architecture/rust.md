@@ -26,15 +26,19 @@ compile options / file lists (-f, +incdir+, +define+, -top, ...)
         │
         ▼
   sv-semantic ──┬─ pure SV class model ─► svlang::Design ──► dv-model::Design ◄── sv-slang (slang, C ABI)
-            ├─ elaboration (instances, generate, parameter values)
+            ├─ elaboration (instances, generate, parameter values, ElaboratedDesign)
+            ├─ typed RTL expressions (ExprBinder) and bound SVA properties (SvaBinder)
             ├─ semantic checks (names, types, constants, classes, SVA, UDPs)
             └─ type oracle, specializations, locations (for rules)
+        │
+        ▼
+  sv-netlist ─── word-level RTL netlist IR, procedural execution, driver checks, SVA lowering
         │
         ▼
   svlang ─────── single pure-Rust IEEE 1800 SDK (Driver, Compilation, re-exports)
         │
         ▼
-  tools: dv-lint (rules), dv-build (compiler-style errors), dv-lsp (editor),
+  tools: dv-lint (rules), dv-build (compiler errors, hierarchy, netlist), dv-lsp (editor),
          dv-map (UVM component tree), dv-filelist (file list doctor)
 ```
 
@@ -55,18 +59,19 @@ with `--features slang`; see `third_party/slang/README.md`.
 | `sv-lexer` | lib | Lossless lexer: every byte is in exactly one token, so tokens give the file back. Token set follows slang's so token streams compare one to one. |
 | `sv-preprocessor` | lib | IEEE 1800-2023 clause 22 preprocessor. Output is the parser's token stream with no trivia or directives; each token records its file offset, the place its text was written, and whether a macro made it. |
 | `sv-syntax` | lib | Event-based recovering parser. A `Tree` is a token array plus a node arena (`SyntaxKind` per node); trivia rides on tokens, so `Tree::file_text` rebuilds each file byte for byte. |
-| `sv-semantic` | lib | Pure IEEE 1800-2023 semantic analysis: scopes and name resolution, constant evaluation (arbitrary width, four-state), type strings, the OOP class model, elaboration and the semantic checks a compiler makes. |
-| `svlang` | lib | Public umbrella SDK re-exporting `source`, `lexer`, `preprocessor`, `syntax` and `semantic`, plus top-level `Driver` and `Compilation` APIs. |
+| `sv-semantic` | lib | Pure IEEE 1800-2023 semantic analysis: scopes and name resolution, constant evaluation (arbitrary width, four-state), elaborated design objects (`ElaboratedDesign`), IEEE 11.6/11.8 bound typed expressions (`ExprBinder`), bound SVA property/sequence trees (`SvaBinder`), type strings, the OOP class model, and compiler checks. |
+| `sv-netlist` | lib | Format-neutral word-level RTL netlist IR (`Netlist`): procedural execution (`always_ff`, async reset metadata, `always_comb`, `always_latch`, `assign`, port stitching, SCC combinational loop detection), bit-level driver resolution, static loop unrolling, subroutine inlining, memory ports, and `blast_memories`. |
+| `svlang` | lib | Public umbrella SDK re-exporting `source`, `lexer`, `preprocessor`, `syntax`, `semantic`, and `netlist`, plus top-level `Driver` and `Compilation` APIs (`lower_netlist`, `bind_property_in_scope`). |
 | `dv-model` | lib | The UVM-aware design model DV tools read: classes, UVM roles (`UvmKind`), UVM phases (`PhaseKind`), properties, methods and body facts, all owned. Lifted from `svlang` (native) or copied from slang through `sv-slang`. |
 | `sv-slang` | lib | Raw FFI to `libuvmcheck_model` (`cpp/include/uvmcheck/model/CApi.h`). Only `dv-model` uses it, and only with the `slang` feature. |
 | `dv-lint` | lib + bins | The linter: every uvmcheck rule ported to Rust, run in parallel over the model and the syntax trees. Its command line (`dv_lint::app`) is built under two names: `uvmcheck`, the product's command, and `dv-lint`, the name the gates call. |
-| `dv-build` | bin | The native builder: reports file list, preprocessor, syntax and semantic errors like a compiler; dumps symbols, types, values and hierarchy for the gates. |
+| `dv-build` | bin | The native builder: reports file list, preprocessor, syntax, semantic, and RTL lowering errors like a compiler; dumps symbols, types, values, hierarchy, and word-level netlists for the gates. |
 | `dv-lsp` | bin | The language server: code browsing (symbols, definition, references, hover, completion) on `svlang::syntax`, and lint diagnostics with quick fixes from `dv-lint`. |
 | `dv-map` | bin | Prints the static UVM component tree of a testbench (text or JSON). |
 | `dv-filelist` | bin | Checks a file list, prints it normalized or as JSON. |
 
 Dependencies point strictly upward: `sv-lexer` ← `sv-preprocessor` ← `sv-syntax` ←
-`sv-semantic` ← `svlang` ← `dv-model` ← DV tools (`dv-lint`, `dv-lsp`, `dv-map`, `dv-filelist`), while `dv-build` depends directly on `svlang` with zero UVM layer.
+`sv-semantic` ← `sv-netlist` ← `svlang` ← `dv-model` ← DV tools (`dv-lint`, `dv-lsp`, `dv-map`, `dv-filelist`), while `dv-build` depends directly on `svlang` with zero UVM layer.
 
 ## The front end in more detail
 
@@ -187,6 +192,7 @@ built with `--features slang` where a gate uses `--slang`; most need
 | `slang_unit_gate.py` | semantic errors on slang's own unit test cases |
 | `expr_gate.py` | expression types from `dv-lint --exprs` |
 | `spec_gate.py` | specialization counts from `dv-lint --specs` |
+| `netlist_gate.py` | word-level RTL lowering, memory blasting, and fail-closed diagnostics from `dv-build --netlist` |
 | `lint_parity.py` | dv-lint findings against uvmcheck's |
 
 Plus `cargo test` (native) and `cargo test --workspace --features slang`
@@ -209,4 +215,7 @@ identical.
   `misc`); check with `cst_parity.py`.
 - A wrong type, value or error: `sv-semantic`, starting from the module whose
   check reports it; check with `sym_gate.py` and `ieee_gate.py`.
+- An RTL lowering, procedural execution, driver, or SVA netlist issue:
+  `sv-netlist` (`lower`, `proc`, `loops_sub`, `expr_lower`, `drivers`, `builder`,
+  `ir`); check with `cargo test -p sv-netlist` and `netlist_gate.py`.
 - A file list option: `sv-source`.
