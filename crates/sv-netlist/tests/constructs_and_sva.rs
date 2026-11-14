@@ -1153,3 +1153,40 @@ fn immediate_assert_null_action_keeps_if_else() {
         assert_ne!(pair[0].enable, pair[1].enable);
     }
 }
+
+// ============================================================================
+// Formal attributes (* anyconst *) / (* anyseq *)
+// ============================================================================
+
+/// `(* anyconst *)` and `(* anyseq *)` on an undriven declaration mark its
+/// undriven slice, so a formal back end can hold an anyconst value for the
+/// whole trace (Yosys reads these attributes the same way).
+#[test]
+fn formal_free_attributes_mark_undriven_slices() {
+    let nl = expect_lowered(lower_src(
+        "module t(input wire clk);\n\
+           (* anyconst *) wire [4:0] chk;\n\
+           (* anyseq *) wire [3:0] d, e;\n\
+           wire [1:0] plain;\n\
+           reg [4:0] q;\n\
+           always @(posedge clk) q <= chk ^ {1'b0, d} ^ {1'b0, e} ^ {3'b0, plain};\n\
+         endmodule\n",
+    ));
+    let kind = |name: &str| nl.undriven.iter().find(|u| u.signal == name).map(|u| u.free);
+    assert_eq!(kind("t.chk"), Some(sv_netlist::FreeKind::AnyConst));
+    assert_eq!(kind("t.d"), Some(sv_netlist::FreeKind::AnySeq));
+    assert_eq!(kind("t.e"), Some(sv_netlist::FreeKind::AnySeq));
+    assert_eq!(kind("t.plain"), Some(sv_netlist::FreeKind::Undriven));
+}
+
+/// An attribute that says "free" on a signal something drives is a contradiction.
+#[test]
+fn formal_free_attribute_on_driven_signal_is_an_error() {
+    let out = lower_src(
+        "module t(input wire a);\n\
+           (* anyconst *) wire c;\n\
+           assign c = a;\n\
+         endmodule\n",
+    );
+    assert!(matches!(out, LowerOutcome::Error(_)), "{out:?}");
+}

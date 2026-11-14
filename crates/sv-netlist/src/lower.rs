@@ -16,7 +16,7 @@ use crate::expr_lower::{
     ObjSlot, ObjVal,
 };
 use crate::ir::{
-    ClockSpec, Edge, LowerConfig, LowerOutcome, MemId, Memory, NetOp, Netlist, NetlistDiag, PortInput, PortOutput,
+    ClockSpec, Edge, FreeKind, LowerConfig, LowerOutcome, MemId, Memory, NetOp, Netlist, NetlistDiag, PortInput, PortOutput,
     TraceSignal, ValueId, ValueKind, ValueNode,
 };
 
@@ -42,6 +42,8 @@ pub(crate) struct DesignLowerer<'a> {
     pub pending_aliases: Vec<PendingAlias>,
     pub next_local_id: u32,
     pub call_stack: Vec<(usize, NodeId)>,
+    /// Declarators under `(* anyseq *)` / `(* anyconst *)`, by (tree, node); built on first use.
+    pub free_attrs: Option<FxMap<(usize, NodeId), FreeKind>>,
 }
 
 /// Lowers an [`ElaboratedDesign`] and its parsed CST [`Tree`]s into a word-level [`Netlist`].
@@ -69,6 +71,7 @@ pub fn lower_design(trees: &[Tree], design: &ElaboratedDesign, config: &LowerCon
         pending_aliases: Vec::new(),
         next_local_id: 0,
         call_stack: Vec::new(),
+        free_attrs: None,
     };
 
     // Pass 1: allocate flattened signal slots, top-level ports, memories, and trace entries.
@@ -194,6 +197,7 @@ impl<'a> DesignLowerer<'a> {
             init: None,
             loc,
             drivers: Vec::new(),
+            free: FreeKind::Undriven,
         });
         self.slot_placeholders.push(placeholder);
         self.builder.traces.push(TraceSignal { name, width, signed, four_state, value: placeholder, loc });
@@ -207,24 +211,73 @@ impl<'a> DesignLowerer<'a> {
 
         for sid in syms {
             let sym = self.design.symbol(sid);
+            let first_slot = self.slots.len();
+            let free = self.free_attr(sym.decl_node);
+            self.alloc_symbol(sid, is_top);
+            if free != FreeKind::Undriven {
+                for slot in &mut self.slots[first_slot..] {
+                    slot.free = free;
+                }
+            }
+        }
+
+        for cid in children {
+            self.alloc_instance_recursive(cid, false);
+        }
+    }
+
+    /// `(* anyseq *)` or `(* anyconst *)` on the declaration holding `decl` (a declarator).
+    fn free_attr(&mut self, decl: (usize, NodeId)) -> FreeKind {
+        if self.free_attrs.is_none() {
+            let mut map = FxMap::default();
+            for (ti, t) in self.trees.iter().enumerate() {
+                for n in t.preorder() {
+                    if t.kind(n) != SyntaxKind::DataDecl {
+                        continue;
+                    }
+                    let mut free = FreeKind::Undriven;
+                    for a in t.children(n).filter(|&c| t.kind(c) == SyntaxKind::Attribute) {
+                        for spec in t.children(a) {
+                            match t.bare_text(spec).split('=').next().unwrap_or("").trim() {
+                                "anyconst" => free = FreeKind::AnyConst,
+                                "anyseq" => free = FreeKind::AnySeq,
+                                _ => {}
+                            }
+                        }
+                    }
+                    if free != FreeKind::Undriven {
+                        for d in t.children(n).filter(|&c| t.kind(c) == SyntaxKind::Declarator) {
+                            map.insert((ti, d), free);
+                        }
+                    }
+                }
+            }
+            self.free_attrs = Some(map);
+        }
+        self.free_attrs.as_ref().and_then(|m| m.get(&decl).copied()).unwrap_or_default()
+    }
+
+    fn alloc_symbol(&mut self, sid: SymbolId, is_top: bool) {
+        {
+            let sym = self.design.symbol(sid);
             if let RtlType::NonSynthesizable(reason) = &sym.ty {
                 self.builder.err(sym.loc, format!("signal '{}' has non-synthesizable type '{reason}'", sym.full_path));
-                continue;
+                return;
             }
             if matches!(sym.ty, RtlType::Event) {
                 self.builder.unsup(sym.loc, format!("named event '{}' is not synthesizable in RTL", sym.full_path));
-                continue;
+                return;
             }
             if matches!(sym.ty, RtlType::Interface { .. }) {
                 // Interface port handles resolve through `resolve_interface_port` to concrete interface symbols.
-                continue;
+                return;
             }
 
             match &sym.kind {
                 SymbolKind::Param { .. } | SymbolKind::Genvar => {
                     let Some(cv) = sym.cval.clone() else {
                         self.builder.err(sym.loc, format!("parameter '{}' has no constant value", sym.full_path));
-                        continue;
+                        return;
                     };
                     self.sym_slots.insert(sid, ObjSlot::Const(cv, sym.ty.is_four_state()));
                 }
@@ -234,7 +287,7 @@ impl<'a> DesignLowerer<'a> {
                             sym.loc,
                             format!("{} port '{}' is not supported in RTL netlist", dir.as_str(), sym.full_path),
                         );
-                        continue;
+                        return;
                     }
                     let port_is_net = if is_top && *dir == PortDir::Input { false } else { *is_net };
                     let top_dir = is_top.then_some(*dir);
@@ -263,7 +316,7 @@ impl<'a> DesignLowerer<'a> {
                             sym.loc,
                             format!("multi-resolution net type '{net_type}' on '{}' is not supported", sym.full_path),
                         );
-                        continue;
+                        return;
                     }
                     if let Some(obj_slot) =
                         self.alloc_type_slot(Some(sid), &sym.full_path, &sym.name, &sym.ty, true, None, sym.loc)
@@ -272,10 +325,6 @@ impl<'a> DesignLowerer<'a> {
                     }
                 }
             }
-        }
-
-        for cid in children {
-            self.alloc_instance_recursive(cid, false);
         }
     }
 

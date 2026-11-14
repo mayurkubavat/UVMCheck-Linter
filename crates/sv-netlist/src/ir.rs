@@ -513,6 +513,33 @@ pub struct Check {
     pub loc: Loc,
 }
 
+/// How a [`UndrivenSlice`] is free.
+///
+/// The formal attributes `(* anyseq *)` and `(* anyconst *)` on a declaration
+/// (as Yosys reads them) state the intent: any value on every step, or any value
+/// chosen once and held for the whole trace.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum FreeKind {
+    /// Nothing drives it (no attribute): consumers usually make it a free input.
+    #[default]
+    Undriven,
+    /// `(* anyseq *)`: an unconstrained value on every step.
+    AnySeq,
+    /// `(* anyconst *)`: an unconstrained value that never changes.
+    AnyConst,
+}
+
+impl FreeKind {
+    /// The attribute name (`"anyseq"`, `"anyconst"`), or `""` for a plain undriven slice.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            FreeKind::Undriven => "",
+            FreeKind::AnySeq => "anyseq",
+            FreeKind::AnyConst => "anyconst",
+        }
+    }
+}
+
 /// Undriven physical bit-interval on an internal signal or output port.
 ///
 /// Formal backends typically bind each `UndrivenSlice` to an unconstrained primary input,
@@ -529,6 +556,8 @@ pub struct UndrivenSlice {
     pub value: ValueId,
     /// Declaration location of `signal`.
     pub loc: Loc,
+    /// Plain undriven, or free by a formal attribute.
+    pub free: FreeKind,
 }
 
 /// Named hierarchical signal binding for waveform counterexample traces.

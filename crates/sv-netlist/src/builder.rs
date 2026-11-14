@@ -498,7 +498,14 @@ impl NetBuilder {
                 let w = self.nodes[i].width;
                 let loc = self.nodes[i].loc;
                 self.nodes[i].kind = BuildKind::Undriven(uid);
-                self.undriven.push(UndrivenSlice { signal: sig_name, hi: w - 1, lo: 0, value: ValueId(i as u32), loc });
+                self.undriven.push(UndrivenSlice {
+                    signal: sig_name,
+                    hi: w - 1,
+                    lo: 0,
+                    value: ValueId(i as u32),
+                    loc,
+                    free: Default::default(),
+                });
             }
         }
 

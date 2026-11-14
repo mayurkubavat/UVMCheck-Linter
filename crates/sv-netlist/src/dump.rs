@@ -56,7 +56,8 @@ impl Netlist {
                 writeln!(out, "output {} : {} = v{}", o.name, fmt_shape(o.width, o.signed, o.four_state), o.value.0);
         }
         for u in &self.undriven {
-            let _ = writeln!(out, "undriven {}[{}:{}] = v{}", u.signal, u.hi, u.lo, u.value.0);
+            let attr = if u.free == crate::ir::FreeKind::Undriven { String::new() } else { format!(" ({})", u.free.as_str()) };
+            let _ = writeln!(out, "undriven {}[{}:{}] = v{}{attr}", u.signal, u.hi, u.lo, u.value.0);
         }
         for m in &self.memories {
             let _ = write!(

@@ -8,7 +8,7 @@
 use sv_semantic::{CVal, Loc};
 
 use crate::builder::{BuildKind, NetBuilder};
-use crate::ir::{NetOp, UndrivenSlice, ValueId};
+use crate::ir::{FreeKind, NetOp, UndrivenSlice, ValueId};
 
 /// Origin category of a bit-slice driver.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -82,6 +82,8 @@ pub(crate) struct SignalSlot {
     pub(crate) loc: Loc,
     /// Registered bit-interval drivers across all blocks/ports.
     pub(crate) drivers: Vec<BitSliceDriver>,
+    /// `(* anyseq *)` / `(* anyconst *)` on the declaration: how its undriven bits are free.
+    pub(crate) free: FreeKind,
 }
 
 impl SignalSlot {
@@ -148,6 +150,14 @@ fn resolve_one_signal(slot: &SignalSlot, builder: &mut NetBuilder) {
         return;
     }
 
+    if slot.free != FreeKind::Undriven && !slot.drivers.is_empty() {
+        builder.err(
+            slot.drivers[0].loc,
+            format!("'{}' is declared (* {} *) but is also driven", slot.name, slot.free.as_str()),
+        );
+        return;
+    }
+
     // Fast path: zero drivers.
     if slot.drivers.is_empty() {
         if let Some(init_cv) = &slot.init {
@@ -170,6 +180,7 @@ fn resolve_one_signal(slot: &SignalSlot, builder: &mut NetBuilder) {
                 lo: 0,
                 value: uval,
                 loc: slot.loc,
+                free: slot.free,
             });
             builder.bind_placeholder(slot.placeholder, uval);
         }
@@ -216,6 +227,6 @@ fn make_gap_slice(slot: &SignalSlot, lo: u32, hi: u32, builder: &mut NetBuilder)
     let uid = builder.undriven.len();
     let name = format!("{}[{hi}:{lo}]", slot.name);
     let uval = builder.alloc_raw(w, false, slot.four_state, BuildKind::Undriven(uid), Some(name), slot.loc);
-    builder.undriven.push(UndrivenSlice { signal: slot.name.clone(), hi, lo, value: uval, loc: slot.loc });
+    builder.undriven.push(UndrivenSlice { signal: slot.name.clone(), hi, lo, value: uval, loc: slot.loc, free: slot.free });
     uval
 }
