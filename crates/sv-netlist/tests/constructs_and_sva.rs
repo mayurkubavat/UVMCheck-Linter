@@ -1130,3 +1130,26 @@ endmodule
     sim.tick_posedge("clk");
     assert!(!sim.failed_asserts.is_empty(), "rst-branch assert must fire when rst=1 and rst_ok=0");
 }
+
+// ============================================================================
+// Immediate assertions with a null pass statement inside if / else
+// ============================================================================
+
+/// `if (c) assume (a); else assume (b);`: the `;` is the assertion's null
+/// action block (IEEE 1800-2023 12.4), so the `else` belongs to the `if` and
+/// both assumptions are checks, each under its own path condition.
+#[test]
+fn immediate_assert_null_action_keeps_if_else() {
+    let nl = expect_lowered(lower_src(
+        "module t(input logic r, input logic [3:0] c);\n\
+           always @* if (c == 4'd0) assume (!r); else assume (r);\n\
+           always_comb if (c == 4'd1) assert (r); else assert (!r);\n\
+         endmodule\n",
+    ));
+    let kinds: Vec<&str> = nl.checks.iter().map(|c| c.kind.as_str()).collect();
+    assert_eq!(kinds, ["assume", "assume", "assert", "assert"]);
+    // Each else-branch check is enabled when the if's condition is false.
+    for pair in nl.checks.chunks(2) {
+        assert_ne!(pair[0].enable, pair[1].enable);
+    }
+}

@@ -1419,10 +1419,17 @@ fn statement_body(p: &mut Parser) -> SyntaxKind {
                 p.eat("final");
             }
             paren_expr(p);
-            if !p.at("else") {
-                statement_or_missing(p);
+            // action_block ::= statement_or_null | [statement] else statement_or_null
+            // (IEEE 1800-2023 12.4, 16.3): a null pass statement (`;`) ends the
+            // assertion, so in `if (c) assert (a); else ...` the `else` is the if's.
+            if p.at(";") {
+                p.bump();
+            } else {
+                if !p.at("else") {
+                    statement_or_missing(p);
+                }
+                else_clause(p);
             }
-            else_clause(p);
             AssertStmt
         }
         "return" => {
