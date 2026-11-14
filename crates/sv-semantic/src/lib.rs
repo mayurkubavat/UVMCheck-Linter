@@ -202,8 +202,6 @@ pub fn design_of(trees: &[Tree], parse_ms: f64) -> Design {
 pub struct Locator {
     files: Vec<String>,
     file_ids: crate::fx::FxMap<(usize, u32), u32>,
-    /// Byte offset of each line start, per (tree, preprocessor file).
-    line_starts: crate::fx::FxMap<(usize, u32), Vec<u32>>,
 }
 
 impl Default for Locator {
@@ -216,7 +214,7 @@ impl Locator {
     /// A locator with `files` as its file table (start it with `[""]` so 0
     /// stays "no file").
     pub fn new(files: Vec<String>) -> Self {
-        Locator { files, file_ids: Default::default(), line_starts: Default::default() }
+        Locator { files, file_ids: Default::default() }
     }
 
     /// File names by index, the table [`Loc::file`] indexes.
@@ -266,11 +264,7 @@ impl Locator {
         };
         let src = &t.sources[o.file as usize];
         let off = (o.offset as usize).min(src.len()) as u32;
-        let starts = self.line_starts.entry(key).or_insert_with(|| {
-            std::iter::once(0)
-                .chain(src.bytes().enumerate().filter(|&(_, b)| b == b'\n').map(|(i, _)| i as u32 + 1))
-                .collect()
-        });
+        let starts = t.line_starts(o.file as usize);
         // The last line start at or before the offset.
         let line = starts.partition_point(|&s| s <= off);
         (file, line as u32, off - starts[line - 1] + 1)

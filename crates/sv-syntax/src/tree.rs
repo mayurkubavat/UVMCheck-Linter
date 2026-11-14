@@ -105,9 +105,28 @@ pub struct Tree {
     pub(crate) spans: Vec<Option<(u32, u32)>>,
     /// [`Tree::preorder`], computed on first use.
     pub(crate) preorder_cache: std::sync::OnceLock<Preorder>,
+    /// [`Tree::line_starts`], computed on first use.
+    pub(crate) line_starts_cache: std::sync::OnceLock<Vec<Vec<u32>>>,
 }
 
 impl Tree {
+    /// Byte offset of each line start in `sources[file]` (the first is 0).
+    /// Computed once per tree, so turning many positions into lines stays
+    /// cheap however many locators ask.
+    pub fn line_starts(&self, file: usize) -> &[u32] {
+        let all = self.line_starts_cache.get_or_init(|| {
+            self.sources
+                .iter()
+                .map(|src| {
+                    std::iter::once(0)
+                        .chain(src.bytes().enumerate().filter(|&(_, b)| b == b'\n').map(|(i, _)| i as u32 + 1))
+                        .collect()
+                })
+                .collect()
+        });
+        all.get(file).map_or(&[0][..], Vec::as_slice)
+    }
+
     /// The node `id`.
     pub fn node(&self, id: NodeId) -> &Node {
         &self.nodes[id.0 as usize]

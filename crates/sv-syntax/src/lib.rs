@@ -104,6 +104,7 @@ pub fn parse_output(out: sv_preprocessor::Output) -> Tree {
         library: false,
         spans: Vec::new(),
         preorder_cache: Default::default(),
+        line_starts_cache: Default::default(),
     };
     tree.compute_spans();
     let mut more = checks::run(&tree);

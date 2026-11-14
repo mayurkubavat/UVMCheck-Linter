@@ -36,8 +36,9 @@ pub(crate) struct DesignLowerer<'a> {
     pub config: &'a LowerConfig,
     pub builder: NetBuilder,
     pub slots: Vec<SignalSlot>,
-    pub slot_placeholders: Vec<ValueId>,
-    pub sym_slots: FxMap<SymbolId, ObjSlot>,
+    /// Shared (`Rc`) so that each expression lowering borrows a snapshot instead of copying it.
+    pub slot_placeholders: std::rc::Rc<Vec<ValueId>>,
+    pub sym_slots: std::rc::Rc<FxMap<SymbolId, ObjSlot>>,
     pub eligible_memories: FxSet<SymbolId>,
     pub pending_aliases: Vec<PendingAlias>,
     pub next_local_id: u32,
@@ -65,8 +66,8 @@ pub fn lower_design(trees: &[Tree], design: &ElaboratedDesign, config: &LowerCon
         config,
         builder: NetBuilder::new(top_name, design.files.clone()),
         slots: Vec::new(),
-        slot_placeholders: Vec::new(),
-        sym_slots: FxMap::default(),
+        slot_placeholders: Default::default(),
+        sym_slots: Default::default(),
         eligible_memories,
         pending_aliases: Vec::new(),
         next_local_id: 0,
@@ -199,7 +200,7 @@ impl<'a> DesignLowerer<'a> {
             drivers: Vec::new(),
             free: FreeKind::Undriven,
         });
-        self.slot_placeholders.push(placeholder);
+        std::rc::Rc::make_mut(&mut self.slot_placeholders).push(placeholder);
         self.builder.traces.push(TraceSignal { name, width, signed, four_state, value: placeholder, loc });
         idx
     }
@@ -279,7 +280,7 @@ impl<'a> DesignLowerer<'a> {
                         self.builder.err(sym.loc, format!("parameter '{}' has no constant value", sym.full_path));
                         return;
                     };
-                    self.sym_slots.insert(sid, ObjSlot::Const(cv, sym.ty.is_four_state()));
+                    std::rc::Rc::make_mut(&mut self.sym_slots).insert(sid, ObjSlot::Const(cv, sym.ty.is_four_state()));
                 }
                 SymbolKind::Port { dir, is_net } => {
                     if matches!(dir, PortDir::Inout | PortDir::Ref) {
@@ -300,14 +301,14 @@ impl<'a> DesignLowerer<'a> {
                         top_dir,
                         sym.loc,
                     ) {
-                        self.sym_slots.insert(sid, obj_slot);
+                        std::rc::Rc::make_mut(&mut self.sym_slots).insert(sid, obj_slot);
                     }
                 }
                 SymbolKind::Var => {
                     if let Some(obj_slot) =
                         self.alloc_type_slot(Some(sid), &sym.full_path, &sym.name, &sym.ty, false, None, sym.loc)
                     {
-                        self.sym_slots.insert(sid, obj_slot);
+                        std::rc::Rc::make_mut(&mut self.sym_slots).insert(sid, obj_slot);
                     }
                 }
                 SymbolKind::Net { net_type } => {
@@ -321,7 +322,7 @@ impl<'a> DesignLowerer<'a> {
                     if let Some(obj_slot) =
                         self.alloc_type_slot(Some(sid), &sym.full_path, &sym.name, &sym.ty, true, None, sym.loc)
                     {
-                        self.sym_slots.insert(sid, obj_slot);
+                        std::rc::Rc::make_mut(&mut self.sym_slots).insert(sid, obj_slot);
                     }
                 }
             }
@@ -1306,8 +1307,8 @@ impl<'a> DesignLowerer<'a> {
     pub(crate) fn eval_comb_expr(&mut self, arena: &ExprArena, eid: ExprId) -> Option<ObjVal> {
         let empty_syms = FxMap::default();
         let empty_locals = FxMap::default();
-        let sym_slots = self.sym_slots.clone();
-        let placeholders = self.slot_placeholders.clone();
+        let sym_slots = std::rc::Rc::clone(&self.sym_slots);
+        let placeholders = std::rc::Rc::clone(&self.slot_placeholders);
         let config = self.config;
         let mut builder = std::mem::replace(&mut self.builder, NetBuilder::new(String::new(), Vec::new()));
         let mut lowerer = ExprLowerer {
@@ -1458,8 +1459,8 @@ impl<'a> DesignLowerer<'a> {
         let mut out = vec![None; sva_arena.exprs.len()];
         let empty_syms = FxMap::default();
         let empty_locals = FxMap::default();
-        let sym_slots = self.sym_slots.clone();
-        let placeholders = self.slot_placeholders.clone();
+        let sym_slots = std::rc::Rc::clone(&self.sym_slots);
+        let placeholders = std::rc::Rc::clone(&self.slot_placeholders);
         let config = self.config;
         let mut builder = std::mem::replace(&mut self.builder, NetBuilder::new(String::new(), Vec::new()));
 

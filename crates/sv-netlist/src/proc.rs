@@ -2710,8 +2710,8 @@ impl<'a> DesignLowerer<'a> {
     }
 
     pub(crate) fn lower_in_proc(&mut self, arena: &ExprArena, eid: ExprId, ctx: &ProcCtx) -> Option<ObjVal> {
-        let sym_slots = self.sym_slots.clone();
-        let placeholders = self.slot_placeholders.clone();
+        let sym_slots = std::rc::Rc::clone(&self.sym_slots);
+        let placeholders = std::rc::Rc::clone(&self.slot_placeholders);
         let config = self.config;
         let mut builder = std::mem::replace(&mut self.builder, NetBuilder::new(String::new(), Vec::new()));
         let mut lowerer = ExprLowerer {
