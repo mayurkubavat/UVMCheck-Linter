@@ -298,6 +298,13 @@ fn make_gap_slice(slot: &SignalSlot, lo: u32, hi: u32, builder: &mut NetBuilder)
     let uid = builder.undriven.len();
     let name = format!("{}[{hi}:{lo}]", slot.name);
     let uval = builder.alloc_raw(w, false, slot.four_state, BuildKind::Undriven(uid), Some(name), slot.loc);
-    builder.undriven.push(UndrivenSlice { signal: slot.name.clone(), hi, lo, value: uval, loc: slot.loc, free: slot.free });
+    builder.undriven.push(UndrivenSlice {
+        signal: slot.name.clone(),
+        hi,
+        lo,
+        value: uval,
+        loc: slot.loc,
+        free: slot.free,
+    });
     uval
 }

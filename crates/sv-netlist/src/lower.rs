@@ -16,8 +16,8 @@ use crate::expr_lower::{
     ObjSlot, ObjVal,
 };
 use crate::ir::{
-    ClockSpec, Edge, FreeKind, LowerConfig, LowerOutcome, MemId, Memory, NetOp, Netlist, NetlistDiag, PortInput, PortOutput,
-    TraceSignal, ValueId, ValueKind, ValueNode,
+    ClockSpec, Edge, FreeKind, LowerConfig, LowerOutcome, MemId, Memory, NetOp, Netlist, NetlistDiag, PortInput,
+    PortOutput, TraceSignal, ValueId, ValueKind, ValueNode,
 };
 
 #[derive(Clone, Debug)]
