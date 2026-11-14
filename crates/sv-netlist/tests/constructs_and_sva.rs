@@ -1190,3 +1190,22 @@ fn formal_free_attribute_on_driven_signal_is_an_error() {
     );
     assert!(matches!(out, LowerOutcome::Error(_)), "{out:?}");
 }
+
+/// A module-level `integer k` used as the loop index of two clocked `always`
+/// blocks: nothing reads `k` outside the loops, so which block wrote it last is
+/// unobservable and the design lowers. Reading it elsewhere keeps the error.
+#[test]
+fn shared_loop_index_written_by_two_blocks() {
+    let src = |extra: &str| {
+        format!(
+            "module t(input logic clk, input logic [7:0] d, output logic [7:0] a, b{extra});\n\
+               integer k;\n\
+               always @(posedge clk) for (k = 0; k < 8; k = k + 1) a[k] <= d[k];\n\
+               always @(posedge clk) for (k = 0; k < 8; k = k + 1) b[k] <= d[7 - k];\n\
+             {}endmodule\n",
+            if extra.is_empty() { "" } else { "  assign o = k[0];\n" }
+        )
+    };
+    expect_lowered(lower_src(&src("")));
+    assert!(matches!(lower_src(&src(", output logic o")), LowerOutcome::Error(_)));
+}

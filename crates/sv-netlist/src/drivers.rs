@@ -5,6 +5,7 @@
 //! rejects overlapping bit drivers fail-closed naming the exact `[hi:lo]` bit slice and both
 //! source [`Loc`]s (`overlap_drivers`), and emits [`UndrivenSlice`] nodes for undriven bit ranges.
 
+use sv_semantic::fx::FxSet;
 use sv_semantic::{CVal, Loc};
 
 use crate::builder::{BuildKind, NetBuilder};
@@ -96,13 +97,71 @@ impl SignalSlot {
 
 /// Resolves bit-interval drivers for every [`SignalSlot`], checking for illegal overlaps,
 /// creating [`UndrivenSlice`]s for undriven bit gaps, and binding `slot.placeholder`.
-pub(crate) fn resolve_all_signals(slots: &[SignalSlot], builder: &mut NetBuilder) {
+pub(crate) fn resolve_all_signals(slots: &[SignalSlot], builder: &mut NetBuilder, prop_values: &[Option<ValueId>]) {
+    let read = read_values(builder, prop_values);
     for slot in slots {
-        resolve_one_signal(slot, builder);
+        resolve_one_signal(slot, builder, &read);
     }
 }
 
-fn resolve_one_signal(slot: &SignalSlot, builder: &mut NetBuilder) {
+/// Every value something reads: operator operands, aliases, memory ports, register
+/// next states, resets and clocks, sampled-value inputs, checks, outputs and SVA leaves
+/// (trace bindings do not count).
+fn read_values(builder: &NetBuilder, prop_values: &[Option<ValueId>]) -> FxSet<u32> {
+    let mut r: FxSet<u32> = FxSet::default();
+    for n in &builder.nodes {
+        match &n.kind {
+            BuildKind::Alias(v) => {
+                r.insert(v.0);
+            }
+            BuildKind::Op { args, .. } => r.extend(args.iter().map(|a| a.0)),
+            BuildKind::MemRead { addr, .. } => {
+                r.insert(addr.0);
+            }
+            _ => {}
+        }
+    }
+    for s in &builder.states {
+        r.insert(s.next.0);
+        if let Some(c) = s.clock {
+            r.insert(c.signal.0);
+        }
+        if let Some(a) = s.async_reset {
+            r.extend([a.signal.0, a.value.0]);
+        }
+        if let Some(e) = s.latch_enable {
+            r.insert(e.0);
+        }
+    }
+    for m in &builder.memories {
+        for w in &m.writes {
+            r.extend([w.addr.0, w.data.0, w.enable.0]);
+            if let Some(c) = w.clock {
+                r.insert(c.signal.0);
+            }
+        }
+    }
+    for s in &builder.sampled {
+        r.insert(s.expr.0);
+        if let Some(g) = s.gate {
+            r.insert(g.0);
+        }
+        if let Some(c) = s.clock {
+            r.insert(c.signal.0);
+        }
+    }
+    for c in &builder.checks {
+        r.extend([c.enable.0, c.expr.0]);
+        if let Some(k) = c.clock {
+            r.insert(k.signal.0);
+        }
+    }
+    r.extend(builder.outputs.iter().map(|o| o.value.0));
+    r.extend(prop_values.iter().flatten().map(|v| v.0));
+    r
+}
+
+fn resolve_one_signal(slot: &SignalSlot, builder: &mut NetBuilder, read: &FxSet<u32>) {
     // Net legality: procedural blocks cannot drive a `wire` net.
     if slot.is_net {
         for d in &slot.drivers {
@@ -111,6 +170,18 @@ fn resolve_one_signal(slot: &SignalSlot, builder: &mut NetBuilder) {
                 return;
             }
         }
+    }
+
+    // A variable that only procedural blocks write and that nothing ever reads, such as a
+    // module-level `integer k` used as the loop index of several `always` blocks: which
+    // block wrote it last cannot be observed, so overlapping writes are not an error.
+    let unobserved = !read.contains(&slot.placeholder.0) && slot.drivers.iter().all(|d| d.kind.is_procedural());
+    if unobserved && slot.drivers.len() > 1 {
+        let d = &slot.drivers[0];
+        let v = builder.resize_val(d.value, d.hi - d.lo + 1, false, false, d.loc);
+        let v = builder.resize_val(v, slot.width, false, slot.signed, d.loc);
+        builder.bind_placeholder(slot.placeholder, v);
+        return;
     }
 
     // Check pairwise bit-interval overlaps (`O(k^2)` where `k` is the number of slice drivers on one signal, typically 1..8).

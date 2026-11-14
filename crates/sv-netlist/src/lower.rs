@@ -106,7 +106,7 @@ pub fn lower_design(trees: &[Tree], design: &ElaboratedDesign, config: &LowerCon
     }
 
     // Pass 5: bit-level driver interval resolution (multi-driver slice merging, overlap errors, undriven bits).
-    resolve_all_signals(&lowerer.slots, &mut lowerer.builder);
+    resolve_all_signals(&lowerer.slots, &mut lowerer.builder, &prop_expr_values);
     if !lowerer.builder.diags.is_empty() {
         return classify_diags(lowerer.builder.diags);
     }
